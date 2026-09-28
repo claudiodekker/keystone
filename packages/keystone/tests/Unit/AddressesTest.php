@@ -34,6 +34,8 @@ describe('normalize', function () {
         'domain as punycode' => ['jane@Bücher.example', 'jane@xn--bcher-kva.example'],
         'split on the last @' => ['"a@b"@example.com', '"a@b"@example.com'],
         'no @' => [' Jane ', 'jane'],
+        'domain punycode cannot encode' => ['Jane@'.str_repeat('a', 64).'.example', 'jane@'.str_repeat('a', 64).'.example'],
+        'invalid UTF-8' => ["Jane\xFF@example.com", 'jane?@example.com'],
     ]);
 });
 

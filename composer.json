@@ -5,6 +5,7 @@
     "type": "project",
     "require": {
         "php": "^8.4",
+        "ext-intl": "*",
         "illuminate/support": "^13.0"
     },
     "require-dev": {

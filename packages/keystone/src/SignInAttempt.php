@@ -6,8 +6,10 @@ use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\Proof;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
 use ClaudioDekker\Keystone\Methods\Surface;
+use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Timebox;
+use LogicException;
 use Throwable;
 
 /**
@@ -46,7 +48,12 @@ class SignInAttempt
                 return null;
             }
 
-            $this->guard->signIn($account);
+            try {
+                $this->guard->signIn($account);
+            } catch (LogicException) {
+                return null;
+            }
+
             $timebox->returnEarly();
 
             return $account;
@@ -64,7 +71,7 @@ class SignInAttempt
         $account = $this->subject($identifier);
         $credentials = new Credentials($this->guard->userModel());
 
-        $proof = $this->verify($type, $input, $account === null ? [] : $credentials->ofType($account->getKey(), $type->name()));
+        $proof = $this->verify($type, $input, fn () => $account === null ? [] : $credentials->ofType($account->getKey(), $type->name()));
 
         if ($account === null || ! $proof->proven || $proof->credentialId === null) {
             return null;
@@ -93,15 +100,15 @@ class SignInAttempt
     }
 
     /**
-     * Let the type verify the input, turning a failure of its own into a rejection.
+     * Let the type verify the input against the credentials, turning any failure into a rejection.
      *
      * @param  array<string, mixed>  $input
-     * @param  list<StoredCredential>  $credentials
+     * @param  Closure(): list<StoredCredential>  $credentials
      */
-    protected function verify(CredentialType $type, #[\SensitiveParameter] array $input, array $credentials): Proof
+    protected function verify(CredentialType $type, #[\SensitiveParameter] array $input, Closure $credentials): Proof
     {
         try {
-            return $type->verify(Surface::SIGN_IN, $input, $credentials);
+            return $type->verify(Surface::SIGN_IN, $input, $credentials());
         } catch (Throwable $e) {
             report($e);
 

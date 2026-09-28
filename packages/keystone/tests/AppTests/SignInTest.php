@@ -9,6 +9,7 @@ use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormType;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormTypeSupport;
 use ClaudioDekker\Keystone\Tests\Fixtures\RogueType;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
 
@@ -157,3 +158,41 @@ function rogueCredential($account, string $type = 'rogue'): int
 {
     return DB::table('user_credentials')->insertGetId(['user_id' => $account->getKey(), 'type' => $type]);
 }
+
+describe('failures around the proof', function () {
+    it('refuses exactly like an unknown account when a stored credential cannot be decrypted', function () {
+        Exceptions::fake();
+        $account = $this->createAccount();
+        $this->arrangeCredential($account, new FormTypeSupport, Surface::SIGN_IN);
+        DB::table('user_credentials')->update(['secret' => 'not-encrypted']);
+        $proof = (new FormTypeSupport)->validProof(Surface::SIGN_IN);
+
+        $this->assertIndistinguishable(
+            fn () => $this->post(route('login.submit', ['type' => 'form']), ['identifier' => 'jane@example.com', ...$proof]),
+            fn () => $this->post(route('login.submit', ['type' => 'form']), ['identifier' => 'nobody@example.com', ...$proof]),
+        );
+        $this->assertGuest();
+        Exceptions::assertReported(DecryptException::class);
+    });
+
+    it('refuses an account suspended while its proof was checked', function () {
+        $account = $this->createAccount();
+        $id = rogueCredential($account);
+        $this->app->make(CredentialTypes::class)->register(new RogueType(function () use ($account, $id) {
+            DB::table('users')->where('id', $account->getKey())->update(['suspended_at' => now()]);
+
+            return Proof::proven(new StoredCredential($id, null, null, null));
+        }));
+
+        $this->post(route('login.submit', ['type' => 'rogue']), ['identifier' => 'jane@example.com'])
+            ->assertSessionHasErrors(['identifier' => 'These credentials do not match our records.']);
+
+        $this->assertGuest();
+    });
+
+    it('flashes back nothing for an identifier that is not a string', function () {
+        $this->post(route('login.submit', ['type' => 'form']), ['identifier' => ['jane@example.com'], 'secret' => 'typed']);
+
+        expect(session()->getOldInput())->toBe([]);
+    });
+});

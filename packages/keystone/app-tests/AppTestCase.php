@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Sleep;
 use Illuminate\Support\ViewErrorBag;
 use Illuminate\Testing\TestResponse;
@@ -37,6 +38,7 @@ abstract class AppTestCase extends TestCase
         parent::setUp();
 
         Sleep::fake();
+        Http::preventStrayRequests();
 
         $this->withHeader('Sec-Fetch-Site', 'same-origin');
     }

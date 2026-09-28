@@ -170,9 +170,10 @@ describe('submit', function () {
         $account = $this->createAccount();
         $this->arrangeCredential($account, $this->support, Surface::SIGN_IN);
 
-        $response = $this->post(route('login.submit', ['type' => 'no-such-type']), ['identifier' => 'jane@example.com']);
-
-        $this->responses->assertSignInRefused($response);
+        $this->assertIndistinguishable(
+            fn () => signIn($this, $this->support, 'jane@example.com', $this->support->wrongProof(Surface::SIGN_IN)),
+            fn () => $this->post(route('login.submit', ['type' => 'no-such-type']), ['identifier' => 'jane@example.com']),
+        );
         $this->assertGuest();
     });
 
