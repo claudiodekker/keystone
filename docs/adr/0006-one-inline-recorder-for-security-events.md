@@ -6,7 +6,7 @@ Recording inline, rather than from listeners on Laravel's auth events, means an 
 
 ## Consequences
 
-- Outside production an app can turn recording off with `keystone.events.enabled` set to `false` (and only `false`), for local and small internal apps. Boot refuses that value in production, so no production app runs without its trail. This relaxes the spec's "no app can turn recording off" [SEC-04] at Claudio's review.
+- An app can opt out of recording entirely with `keystone.events.enabled` set to `false` (and only `false`), in any environment. Recording stays on by default; this relaxes the spec's "no app can turn recording off" [SEC-04] at Claudio's review, since an app that doesn't want an audit trail shouldn't be forced to keep one.
 
 - The log line's message is always `keystone.security_event` and every field travels in its context array, so typed input that reaches a field (a user agent) is JSON-escaped and can't forge a second line.
 - Events about nobody are log lines only. Identical ones (same type, IP address and path) are logged once per 60 seconds, counted in the default cache; while the cache fails every one is logged.

@@ -1,7 +1,6 @@
 <?php
 
 use Carbon\CarbonImmutable;
-use ClaudioDekker\Keystone\KeystoneServiceProvider;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
 use ClaudioDekker\Keystone\RequestContext;
 use ClaudioDekker\Keystone\SecurityEvent;
@@ -335,18 +334,4 @@ describe('turning recording off', function () {
         'zero' => [0],
         'a string' => ['false'],
     ]);
-
-    it('refuses to boot turned off in production', function () {
-        config(['keystone.events.enabled' => false]);
-        $this->app['env'] = 'production';
-
-        $this->app->call([$this->app->getProvider(KeystoneServiceProvider::class), 'boot']);
-    })->throws(LogicException::class, 'keystone.events.enabled can only be false outside production.');
-
-    it('boots turned off outside production', function () {
-        config(['keystone.events.enabled' => false]);
-        $this->app['env'] = 'local';
-
-        $this->app->call([$this->app->getProvider(KeystoneServiceProvider::class), 'boot']);
-    })->throwsNoExceptions();
 });

@@ -14,7 +14,7 @@ Listeners run during the request, and a refused sign-in only takes its fixed min
 
 ## Turning recording off
 
-Outside production, you can turn recording off entirely, for a local or small internal app, by setting `keystone.events.enabled` to `false`. Nothing is then logged, stored or dispatched. Only `false` turns it off: a missing or null value keeps recording. Keystone refuses to boot in the `production` environment while it is `false`, so a production app always keeps its audit trail.
+Recording is on by default. To turn it off entirely, set `keystone.events.enabled` to `false`: nothing is then logged, stored or dispatched, and your users have no audit trail of their sign-ins. Only `false` turns it off; a missing or null value keeps recording.
 
 To keep the audit trail but drop the log line, set `keystone.log_channel` to Laravel's `null` channel instead.
 

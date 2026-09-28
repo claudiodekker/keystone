@@ -53,7 +53,7 @@ class SecurityEventRecorder
         ?StoredCredential $credential = null,
         ?string $reason = null,
     ): void {
-        if (! static::enabled()) {
+        if (! $this->enabled()) {
             return;
         }
 
@@ -83,7 +83,7 @@ class SecurityEventRecorder
     /**
      * Determine if recording is on; only a literal false in keystone.events.enabled turns it off.
      */
-    public static function enabled(): bool
+    protected function enabled(): bool
     {
         return config('keystone.events.enabled') !== false;
     }
