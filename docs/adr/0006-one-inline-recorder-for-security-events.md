@@ -13,6 +13,6 @@ Recording inline, rather than from listeners on Laravel's auth events, means an 
 - IP address, location and user agent are encrypted at rest and hidden from the model's array form. The log line carries them in clear, since the log is the operator's and is the record of events about nobody.
 - A reason is a short code of `a-z`, `0-9`, `.` and `_`, at most 64 characters, prefixed by the event's credential type or by `keystone.`; anything else is stored as `<type>.invalid_reason`, so a method can't smuggle typed input through it.
 - Core's global middleware captures the request's IP address, user agent, path and a new ULID request id once per request, after the app's trusted-proxy middleware, into a scoped instance that resets between Octane requests.
-- A hard-deleted account's rows stay, belonging to nobody.
+- A hard-deleted account's rows stay with its `user_id`, so its trail still reads as one account's until retention prunes it. `user_id` has no foreign key for that reason, and apps must not reuse user ids.
 - A refused sign-in naming an account records inside the sign-in's 300 ms timing floor, and one naming nobody records nothing, so the floor hides the difference only while logging, the insert and the app's synchronous listeners finish inside it. Listeners doing slow work (mail, HTTP) should be queued; the docs say so.
 - Control characters in the user agent and credential label are replaced by spaces before they reach any field, because Laravel's default log formatter turns escaped newlines in a JSON context back into real ones.

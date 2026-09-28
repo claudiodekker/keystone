@@ -37,11 +37,11 @@ it('hides the IP address, location and user agent from serialization', function 
         ->and($serialized)->toHaveKeys(['type', 'actor', 'occurred_at']);
 });
 
-it('keeps an account\'s events when it is hard deleted, belonging to nobody', function () {
+it('keeps an account\'s events and their user id when it is hard deleted', function () {
     $user = User::factory()->create();
     storeEvent()->forceFill(['user_id' => $user->getKey()])->save();
 
     $user->forceDelete();
 
-    expect(SecurityEvent::sole()->user_id)->toBeNull();
+    expect(SecurityEvent::sole()->user_id)->toEqual($user->getKey());
 });
