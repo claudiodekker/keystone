@@ -2,6 +2,7 @@
 
 - TDD for all code (`/tdd`): red, green, refactor. No untested logic.
 - No documentation beyond `CONTEXT.md`, ADRs and `docs/agents/`. No docblocks that restate types, no README prose.
+- `.scratch/` holds research that fed past decisions. Don't read it unless a decision (spec, ticket, ADR) lacks the specifics you need.
 - Small PRs: one ticket, one tracer-bullet slice per PR.
 - Laravel, Pest and Boost MCP guidance: @docs/agents/laravel.md
 
