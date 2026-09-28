@@ -1,6 +1,9 @@
 <?php
 
-namespace ClaudioDekker\Keystone;
+namespace ClaudioDekker\Keystone\Actions;
+
+use ClaudioDekker\Keystone\Addresses;
+use ClaudioDekker\Keystone\Keystone;
 
 /**
  * @api

@@ -2,6 +2,7 @@
 
 namespace ClaudioDekker\Keystone;
 
+use ClaudioDekker\Keystone\Actions\AccountLookup;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\Proof;
 use ClaudioDekker\Keystone\Methods\StoredCredential;

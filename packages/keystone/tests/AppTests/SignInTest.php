@@ -1,6 +1,6 @@
 <?php
 
-use ClaudioDekker\Keystone\AccountLookup;
+use ClaudioDekker\Keystone\Actions\AccountLookup;
 use ClaudioDekker\Keystone\AppTests\AppTestCase;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Proof;

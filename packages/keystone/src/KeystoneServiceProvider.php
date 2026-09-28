@@ -2,6 +2,7 @@
 
 namespace ClaudioDekker\Keystone;
 
+use ClaudioDekker\Keystone\Actions\AccountLookup;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use Illuminate\Auth\AuthManager;
 use Illuminate\Auth\EloquentUserProvider;

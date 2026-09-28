@@ -2,7 +2,7 @@
 
 namespace ClaudioDekker\Keystone\Http\Controllers;
 
-use ClaudioDekker\Keystone\AccountLookup;
+use ClaudioDekker\Keystone\Actions\AccountLookup;
 use ClaudioDekker\Keystone\Http\PageValues\SignInPage;
 use ClaudioDekker\Keystone\IntendedUrl;
 use ClaudioDekker\Keystone\Keystone;
