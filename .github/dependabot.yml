@@ -10,6 +10,10 @@ updates:
       directory: /
       schedule:
           interval: weekly
+      ignore:
+          # vue-tsc can't run on TypeScript 7 yet, see #77
+          - dependency-name: typescript
+            versions: ['>=7']
 
     - package-ecosystem: github-actions
       directory: /
