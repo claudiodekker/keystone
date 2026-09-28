@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Symfony\Component\HttpKernel\Exception\UnauthorizedHttpException;
 
@@ -218,6 +219,14 @@ it('signs nobody in through the SessionGuard credential and session methods', fu
     'onceUsingId' => fn (KeystoneGuard $guard, User $user) => expect($guard->onceUsingId($user->getKey()))->toBeFalse(),
     'loginUsingId' => fn (KeystoneGuard $guard, User $user) => expect($guard->loginUsingId($user->getKey()))->toBeFalse(),
 ]);
+
+it('lets tests act as a user', function () {
+    config(['app.key' => 'base64:'.base64_encode(random_bytes(32))]);
+    Route::middleware(['web', 'auth'])->get('/me', fn () => Auth::id());
+    $user = User::factory()->create();
+
+    $this->actingAs($user)->get('/me')->assertSee((string) $user->getKey());
+});
 
 it('leaves the password alone on logoutOtherDevices', function () {
     $user = User::factory()->create(['password' => $hash = Hash::make('secret', ['rounds' => 5])]);
