@@ -33,6 +33,10 @@ class KeystoneServiceProvider extends ServiceProvider
      */
     public function boot(AuthManager $auth, Kernel $kernel): void
     {
+        if (! SecurityEventRecorder::enabled() && $this->app->environment('production')) {
+            throw new LogicException('keystone.events.enabled can only be false outside production.');
+        }
+
         $auth->extend('keystone', $this->createGuard(...));
 
         if ($kernel instanceof HttpKernel) {

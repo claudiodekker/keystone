@@ -1,6 +1,7 @@
 <?php
 
 use Carbon\CarbonImmutable;
+use ClaudioDekker\Keystone\KeystoneServiceProvider;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
 use ClaudioDekker\Keystone\RequestContext;
 use ClaudioDekker\Keystone\SecurityEvent;
@@ -308,4 +309,44 @@ describe('a failing step', function () {
         $this->assertDatabaseCount('user_security_events', 1);
         Exceptions::assertReported(fn (RuntimeException $e) => $e->getMessage() === 'Listener broke.');
     });
+});
+
+describe('turning recording off', function () {
+    it('records nothing while turned off', function () {
+        config(['keystone.events.enabled' => false]);
+        Event::fake([SecurityEventRecorded::class]);
+
+        recorder()->record(SecurityEventType::SIGNED_OUT, account: User::factory()->create());
+
+        expect(logRecords())->toHaveCount(0);
+        $this->assertDatabaseCount('user_security_events', 0);
+        Event::assertNotDispatched(SecurityEventRecorded::class);
+    });
+
+    it('keeps recording unless turned off with false', function (mixed $enabled) {
+        config(['keystone.events.enabled' => $enabled]);
+
+        recorder()->record(SecurityEventType::SIGNED_OUT, account: User::factory()->create());
+
+        $this->assertDatabaseCount('user_security_events', 1);
+    })->with([
+        'true' => [true],
+        'null' => [null],
+        'zero' => [0],
+        'a string' => ['false'],
+    ]);
+
+    it('refuses to boot turned off in production', function () {
+        config(['keystone.events.enabled' => false]);
+        $this->app['env'] = 'production';
+
+        $this->app->call([$this->app->getProvider(KeystoneServiceProvider::class), 'boot']);
+    })->throws(LogicException::class, 'keystone.events.enabled can only be false outside production.');
+
+    it('boots turned off outside production', function () {
+        config(['keystone.events.enabled' => false]);
+        $this->app['env'] = 'local';
+
+        $this->app->call([$this->app->getProvider(KeystoneServiceProvider::class), 'boot']);
+    })->throwsNoExceptions();
 });

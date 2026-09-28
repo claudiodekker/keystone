@@ -53,6 +53,10 @@ class SecurityEventRecorder
         ?StoredCredential $credential = null,
         ?string $reason = null,
     ): void {
+        if (! static::enabled()) {
+            return;
+        }
+
         try {
             $event = $this->entry(
                 type: $type,
@@ -74,6 +78,14 @@ class SecurityEventRecorder
         $this->rescue(fn () => $this->log($event));
         $this->rescue(fn () => $this->append($event, $account));
         $this->rescue(fn () => event($recorded));
+    }
+
+    /**
+     * Determine if recording is on; only a literal false in keystone.events.enabled turns it off.
+     */
+    public static function enabled(): bool
+    {
+        return config('keystone.events.enabled') !== false;
     }
 
     /**

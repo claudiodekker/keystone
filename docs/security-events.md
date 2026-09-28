@@ -1,6 +1,6 @@
 # Security events
 
-Keystone records every security-relevant event itself, inline, from the code that made it happen. Nothing in your app needs to be wired up, and nothing your app does can turn recording off.
+Keystone records every security-relevant event itself, inline, from the code that made it happen. Nothing in your app needs to be wired up, and no listener or middleware of yours can turn recording off.
 
 Each event is:
 
@@ -11,6 +11,12 @@ Each event is:
 If any of these steps throws, Keystone reports the exception to your exception handler and carries on with the others. The response never changes.
 
 Listeners run during the request, and a refused sign-in only takes its fixed minimum time while they finish inside it. Queue any listener that does slow work, such as sending mail or calling an API, so response times can't reveal which addresses have an account.
+
+## Turning recording off
+
+Outside production, you can turn recording off entirely, for a local or small internal app, by setting `keystone.events.enabled` to `false`. Nothing is then logged, stored or dispatched. Only `false` turns it off: a missing or null value keeps recording. Keystone refuses to boot in the `production` environment while it is `false`, so a production app always keeps its audit trail.
+
+To keep the audit trail but drop the log line, set `keystone.log_channel` to Laravel's `null` channel instead.
 
 ## Types
 
