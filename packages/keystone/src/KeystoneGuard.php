@@ -52,29 +52,29 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Start a signed-in session for the account, stamped with the credential epoch it was read with.
+     * Start a signed-in session for the user, stamped with the credential epoch they were read with.
      */
-    public function signIn(Model&KeystoneUser $account): void
+    public function signIn(Model&KeystoneUser $user): void
     {
-        $current = $this->retrieveAccount($account->getAuthIdentifier());
+        $account = $this->retrieveAccount($user->getAuthIdentifier());
 
-        if (is_null($current)) {
+        if (is_null($account)) {
             throw new LogicException('The account being signed in no longer exists.');
         }
 
-        if (! $this->isActive($current)) {
+        if (! $this->isActive($account)) {
             throw new LogicException('The account being signed in is disabled or suspended.');
         }
 
         $this->rotate();
 
-        $this->session->put($this->getName(), $account->getAuthIdentifier());
-        $this->session->put($this->epochKey(), $this->epochOf($account));
+        $this->session->put($this->getName(), $user->getAuthIdentifier());
+        $this->session->put($this->epochKey(), $this->epochOf($user));
         $this->session->put($this->signedInAtKey(), Date::now()->getTimestamp());
 
-        $this->fireLoginEvent($account);
+        $this->fireLoginEvent($user);
 
-        $this->setUser($account);
+        $this->setUser($user);
     }
 
     /**
