@@ -60,13 +60,6 @@ Suite setup: only when creating or explicitly asked to tune `tests/Pest.php`, ne
 - Global `beforeEach`: `Http::preventStrayRequests()`, `Sleep::fake(syncWithCarbon: true)`, `Exceptions::fake()`.
 - Fast local runs: `vendor/bin/pest --parallel --tia`. CI: `--update-shards`, commit `tests/.pest/shards.json`, `--shard=N/M` per job.
 
-## Fortify
-
-- 2FA: `TwoFactorAuthenticatable` on User, `Features::twoFactorAuthentication()`. If the columns are missing: `php artisan vendor:publish --tag=fortify-migrations`.
-- Passkeys are built in; no third-party WebAuthn package. `Features::passkeys()`, `PasskeyAuthenticatable` trait + `PasskeyUser` interface on User, frontend with `@laravel/passkeys`.
-- Passkey config lives in `config/fortify.php`: `relying_party_id`, `allowed_origins`, `user_handle_secret`, `timeout`.
-- Routes: `GET /passkeys/login/options` → `POST /passkeys/login`; `GET /passkeys/confirm/options` → `POST /passkeys/confirm`; `GET /user/passkeys/options` → `POST /user/passkeys`; `DELETE /user/passkeys/{passkey}`.
-
 ## Frontend
 
 - Tailwind: `gap-*` for spacing between siblings, not margins or `space-*`.
