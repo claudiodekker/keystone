@@ -1,6 +1,6 @@
 <?php
 
-namespace ClaudioDekker\Keystone\Tests;
+namespace ClaudioDekker\Keystone\Tests\Unit;
 
 use ClaudioDekker\Keystone\KeystoneGuard;
 use ClaudioDekker\Keystone\Tests\Fixtures\User;
