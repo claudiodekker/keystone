@@ -160,8 +160,7 @@ describe('submit', function () {
     it('requires an identifier and the type\'s input', function () {
         $response = $this->post(route('login.submit', ['type' => $this->support->type()]));
 
-        $response->assertRedirectToRoute('login')
-            ->assertSessionHasErrors(['identifier', ...array_keys($this->support->validProof(Surface::SIGN_IN))]);
+        $this->assertSignInInvalid($response, ['identifier', ...array_keys($this->support->validProof(Surface::SIGN_IN))]);
     });
 
     it('refuses a type that does not serve sign-in like a rejected proof', function () {

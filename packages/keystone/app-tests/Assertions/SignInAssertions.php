@@ -33,6 +33,17 @@ trait SignInAssertions
     }
 
     /**
+     * Assert the response refuses invalid input, with an error for each field.
+     *
+     * @param  TestResponse<Response>  $response
+     * @param  list<string>  $fields
+     */
+    public function assertSignInInvalid(TestResponse $response, array $fields): void
+    {
+        $response->assertRedirectToRoute('login')->assertSessionHasErrors($fields);
+    }
+
+    /**
      * Assert the response sends the signed-in user on to the intended URL.
      *
      * @param  TestResponse<Response>  $response
