@@ -2,7 +2,7 @@
 
 namespace ClaudioDekker\Keystone\Tests\Fixtures;
 
-class ProbeResponses
+trait ProbeAssertions
 {
     //
 }

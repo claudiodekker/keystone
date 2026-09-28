@@ -1,6 +1,6 @@
 <?php
 
-namespace ClaudioDekker\Keystone\AppTests\Responses;
+namespace ClaudioDekker\Keystone\AppTests\Assertions;
 
 use Illuminate\Testing\TestResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -8,7 +8,7 @@ use Symfony\Component\HttpFoundation\Response;
 /**
  * @api
  */
-class SignOutResponses
+trait SignOutAssertions
 {
     /**
      * Assert the response sends the signed-out user to the sign-in page.

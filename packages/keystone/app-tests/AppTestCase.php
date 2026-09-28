@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Sleep;
 use Illuminate\Support\ViewErrorBag;
 use Illuminate\Testing\TestResponse;
+use LogicException;
 use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
 
@@ -29,9 +30,9 @@ abstract class AppTestCase extends TestCase
     use LazilyRefreshDatabase;
 
     /**
-     * The namespace the app's Responses overrides live in.
+     * The namespace the app's own copies of the assertion traits live in.
      */
-    protected const string RESPONSES_NAMESPACE = 'Tests\\Keystone\\Responses\\';
+    public const string ASSERTIONS_NAMESPACE = 'Tests\\Keystone\\Assertions\\';
 
     protected function setUp(): void
     {
@@ -176,26 +177,26 @@ abstract class AppTestCase extends TestCase
     }
 
     /**
-     * Get the Responses class, or the app's override of it.
+     * Get the app's copy of the assertion trait when it has one, else Keystone's.
      *
-     * @template TResponses of object
+     * The app's copy uses Keystone's trait and redefines the assertions its responses need.
      *
-     * @param  class-string<TResponses>  $class
-     * @return TResponses
+     * @param  trait-string  $trait
+     * @return trait-string
      */
-    protected function responses(string $class): object
+    public static function assertions(string $trait): string
     {
-        $override = self::RESPONSES_NAMESPACE.class_basename($class);
+        $override = self::ASSERTIONS_NAMESPACE.class_basename($trait);
 
-        if (! class_exists($override)) {
-            return new $class;
+        if (! trait_exists($override)) {
+            return $trait;
         }
 
-        if (! is_subclass_of($override, $class)) {
-            $this->fail("{$override} must extend {$class}.");
+        if (! in_array($trait, class_uses($override), true)) {
+            throw new LogicException("{$override} must use {$trait}.");
         }
 
-        return new $override;
+        return $override;
     }
 
     /**

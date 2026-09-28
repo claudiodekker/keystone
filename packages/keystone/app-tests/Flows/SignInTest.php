@@ -1,18 +1,17 @@
 <?php
 
 use ClaudioDekker\Keystone\AppTests\AppTestCase;
-use ClaudioDekker\Keystone\AppTests\Responses\SignInResponses;
+use ClaudioDekker\Keystone\AppTests\Assertions\SignInAssertions;
 use ClaudioDekker\Keystone\AppTests\Support\CredentialTypeSupport;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\Surface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Sleep;
 
-pest()->extend(AppTestCase::class);
+pest()->extend(AppTestCase::class)->use(AppTestCase::assertions(SignInAssertions::class));
 
 beforeEach(function () {
     $this->support = $this->supportsFor(Surface::SIGN_IN)[0];
-    $this->responses = $this->responses(SignInResponses::class);
 });
 
 function signIn(AppTestCase $test, CredentialTypeSupport $support, string $identifier, array $proof)
@@ -22,7 +21,7 @@ function signIn(AppTestCase $test, CredentialTypeSupport $support, string $ident
 
 describe('show', function () {
     it('shows the sign-in page', function () {
-        $this->responses->assertSignInPage($this->get(route('login')));
+        $this->assertSignInPage($this->get(route('login')));
     });
 
     it('sends a signed-in user away without signing them out', function () {
@@ -45,7 +44,7 @@ describe('submit', function () {
 
         $response = signIn($this, $this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN));
 
-        $this->responses->assertSignedIn($response, '/');
+        $this->assertSignedIn($response, '/');
         $this->assertAuthenticatedAs($account);
         expect(session()->getId())->not->toBe($sessionId)
             ->and(Keystone::guard()->signedInAt()?->getTimestamp())->toBe(now()->getTimestamp());
@@ -78,7 +77,7 @@ describe('submit', function () {
 
         $response = signIn($this, $this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN));
 
-        $this->responses->assertSignedIn($response, $expected);
+        $this->assertSignedIn($response, $expected);
     })->with([
         'same-origin' => ['{app}/dashboard?tab=security', '/dashboard?tab=security'],
         'other origin' => ['https://evil.example/dashboard', '/'],
@@ -91,7 +90,7 @@ describe('submit', function () {
 
         $response = signIn($this, $this->support, 'jane@example.com', $this->support->rejectedProof(Surface::SIGN_IN));
 
-        $this->responses->assertSignInRefused($response);
+        $this->assertSignInRefused($response);
         $this->assertGuest();
     });
 
@@ -130,7 +129,7 @@ describe('submit', function () {
 
         $response = signIn($this, $this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN));
 
-        $this->responses->assertSignInRefused($response);
+        $this->assertSignInRefused($response);
         $this->assertGuest();
     });
 

@@ -1,6 +1,6 @@
 <?php
 
-namespace ClaudioDekker\Keystone\AppTests\Responses;
+namespace ClaudioDekker\Keystone\AppTests\Assertions;
 
 use ClaudioDekker\Keystone\Http\Controllers\SignInController;
 use Illuminate\Testing\TestResponse;
@@ -9,7 +9,7 @@ use Symfony\Component\HttpFoundation\Response;
 /**
  * @api
  */
-class SignInResponses
+trait SignInAssertions
 {
     /**
      * Assert the response is the sign-in page.

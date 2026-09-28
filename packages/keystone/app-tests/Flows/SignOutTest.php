@@ -1,10 +1,10 @@
 <?php
 
 use ClaudioDekker\Keystone\AppTests\AppTestCase;
-use ClaudioDekker\Keystone\AppTests\Responses\SignOutResponses;
+use ClaudioDekker\Keystone\AppTests\Assertions\SignOutAssertions;
 use ClaudioDekker\Keystone\Methods\Surface;
 
-pest()->extend(AppTestCase::class);
+pest()->extend(AppTestCase::class)->use(AppTestCase::assertions(SignOutAssertions::class));
 
 it('signs out, ending the session and regenerating the CSRF token', function () {
     $support = $this->supportsFor(Surface::SIGN_IN)[0];
@@ -16,7 +16,7 @@ it('signs out, ending the session and regenerating the CSRF token', function () 
 
     $response = $this->post(route('logout'));
 
-    $this->responses(SignOutResponses::class)->assertSignedOut($response);
+    $this->assertSignedOut($response);
     $this->assertGuest();
     expect(session()->getId())->not->toBe($sessionId)
         ->and(session()->token())->not->toBe($token)

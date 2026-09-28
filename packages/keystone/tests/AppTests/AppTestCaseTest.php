@@ -1,9 +1,9 @@
 <?php
 
 use ClaudioDekker\Keystone\AppTests\AppTestCase;
-use ClaudioDekker\Keystone\AppTests\Responses\SignInResponses;
-use ClaudioDekker\Keystone\Tests\Fixtures\ProbeResponses;
-use ClaudioDekker\Keystone\Tests\Fixtures\UnrelatedProbeResponses;
+use ClaudioDekker\Keystone\AppTests\Assertions\SignInAssertions;
+use ClaudioDekker\Keystone\Tests\Fixtures\ProbeAssertions;
+use ClaudioDekker\Keystone\Tests\Fixtures\UnrelatedProbeAssertions;
 use ClaudioDekker\Keystone\Tests\Fixtures\UserWithoutFactory;
 use Illuminate\Support\Facades\Route;
 use PHPUnit\Framework\AssertionFailedError;
@@ -44,20 +44,20 @@ describe('assertIndistinguishable', function () {
     })->with(['other-status', 'other-location', 'other-header', 'other-cookie', 'other-flash']);
 });
 
-describe('responses', function () {
-    it('uses the default Responses class when the app has no override', function () {
-        expect($this->responses(SignInResponses::class))->toBeInstanceOf(SignInResponses::class);
+describe('assertions', function () {
+    it('uses Keystone\'s assertion trait when the app has no copy', function () {
+        expect(AppTestCase::assertions(SignInAssertions::class))->toBe(SignInAssertions::class);
     });
 
-    it('uses the app\'s override', function () {
-        eval('namespace Tests\Keystone\Responses; class ProbeResponses extends \ClaudioDekker\Keystone\Tests\Fixtures\ProbeResponses {}');
+    it('uses the app\'s copy of the assertion trait', function () {
+        eval('namespace Tests\Keystone\Assertions; trait ProbeAssertions { use \ClaudioDekker\Keystone\Tests\Fixtures\ProbeAssertions; }');
 
-        expect($this->responses(ProbeResponses::class))->toBeInstanceOf('Tests\Keystone\Responses\ProbeResponses');
+        expect(AppTestCase::assertions(ProbeAssertions::class))->toBe('Tests\Keystone\Assertions\ProbeAssertions');
     });
 
-    it('fails when the app\'s override does not extend the default', function () {
-        eval('namespace Tests\Keystone\Responses; class UnrelatedProbeResponses {}');
+    it('refuses an app copy that does not use Keystone\'s trait', function () {
+        eval('namespace Tests\Keystone\Assertions; trait UnrelatedProbeAssertions {}');
 
-        $this->responses(UnrelatedProbeResponses::class);
-    })->throws(AssertionFailedError::class, 'Tests\Keystone\Responses\UnrelatedProbeResponses must extend '.UnrelatedProbeResponses::class);
+        AppTestCase::assertions(UnrelatedProbeAssertions::class);
+    })->throws(LogicException::class, 'Tests\Keystone\Assertions\UnrelatedProbeAssertions must use '.UnrelatedProbeAssertions::class);
 });
