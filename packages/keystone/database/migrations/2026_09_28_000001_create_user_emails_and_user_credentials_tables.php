@@ -15,8 +15,8 @@ return new class extends Migration
         Schema::create('user_emails', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
-            $this->binary($table->string('address'));
-            $this->binary($table->string('verified_address')->nullable()->unique());
+            $this->compareExactly($table->string('address'));
+            $this->compareExactly($table->string('verified_address')->nullable()->unique());
             $table->timestamp('verified_at')->nullable();
             $table->boolean('is_primary')->default(false);
             $table->timestamps();
@@ -29,7 +29,7 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
             $table->string('type', 64);
             $table->text('identifier')->nullable();
-            $this->binary($table->string('identifier_hash', 64)->nullable());
+            $this->compareExactly($table->string('identifier_hash', 64)->nullable());
             $table->string('label', 64)->nullable();
             $table->text('secret')->nullable();
             $table->timestamp('last_used_at')->nullable();
@@ -43,9 +43,9 @@ return new class extends Migration
     }
 
     /**
-     * Make the column compare byte for byte, so the database never folds case or accents.
+     * Keep the column a UTF-8 string, but compare it byte for byte, so the database never folds case or accents.
      */
-    protected function binary(ColumnDefinition $column): void
+    protected function compareExactly(ColumnDefinition $column): void
     {
         match (Schema::getConnection()->getDriverName()) {
             'mysql', 'mariadb' => $column->charset('utf8mb4')->collation('utf8mb4_bin'),
