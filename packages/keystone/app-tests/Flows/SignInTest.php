@@ -227,6 +227,7 @@ describe('security events', function () {
             'actor' => 'user',
             'flow' => 'sign-in',
             'credential_type' => $this->support->type(),
+            'credential_id' => DB::table('user_credentials')->where('user_id', $account->getKey())->value('id'),
             'reason' => null,
         ]);
     });
@@ -243,7 +244,8 @@ describe('security events', function () {
             'flow' => 'sign-in',
             'credential_type' => $this->support->type(),
         ]);
-        $this->assertDatabaseMissing('user_security_events', ['reason' => null]);
+        expect(DB::table('user_security_events')->value('reason'))->toStartWith($this->support->type().'.')
+            ->not->toBe($this->support->type().'.invalid_reason');
     });
 
     it('stores and logs nothing typed for an address no account holds', function () {

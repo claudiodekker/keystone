@@ -52,14 +52,28 @@ class SecurityEventRecorder
         ?string $credentialType = null,
         ?StoredCredential $credential = null,
         ?string $reason = null,
-    ): SecurityEvent {
-        $event = $this->entry($type, $account, $actor, $flow, $credentialType, $credential, $reason);
+    ): void {
+        try {
+            $event = $this->entry(
+                type: $type,
+                account: $account,
+                actor: $actor,
+                flow: $flow,
+                credentialType: $credentialType,
+                credential: $credential,
+                reason: $reason,
+            );
+        } catch (Throwable $e) {
+            report($e);
+
+            return;
+        }
+
+        $recorded = new SecurityEventRecorded($event);
 
         $this->rescue(fn () => $this->log($event));
         $this->rescue(fn () => $this->append($event, $account));
-        $this->rescue(fn () => event(new SecurityEventRecorded($event)));
-
-        return $event;
+        $this->rescue(fn () => event($recorded));
     }
 
     /**
@@ -75,11 +89,12 @@ class SecurityEventRecorder
         ?string $reason,
     ): SecurityEvent {
         $context = $this->context();
-        $userAgent = $context->userAgent === null ? null : Str::substr($context->userAgent, 0, self::USER_AGENT_LENGTH);
-        $label = $credential?->label === null ? null : Str::substr($credential->label, 0, self::FIELD_LENGTH);
+        $userAgent = $this->clean($context->userAgent, self::USER_AGENT_LENGTH);
+        $label = $this->clean($credential?->label, self::FIELD_LENGTH);
+        $keptReason = $this->reason($reason, $credentialType);
 
         return new SecurityEvent([
-            'occurred_at' => Date::now()->utc(),
+            'occurred_at' => Date::now(),
             'type' => $type,
             'user_id' => $account?->getKey(),
             'actor' => $actor,
@@ -87,13 +102,27 @@ class SecurityEventRecorder
             'credential_type' => $credentialType,
             'credential_id' => $credential?->id,
             'credential_label' => $label,
-            'reason' => $this->reason($reason, $credentialType),
+            'reason' => $keptReason,
             'ip_address' => $context->ipAddress,
             'location' => null,
             'user_agent' => $userAgent,
             'known_device' => null,
             'request_id' => $context->requestId,
         ]);
+    }
+
+    /**
+     * Cut a value taken from input to its length, with control characters replaced by spaces so it can't break a log line.
+     */
+    protected function clean(?string $value, int $length): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $printable = (string) preg_replace('/\p{Cc}/u', ' ', $value);
+
+        return Str::substr($printable, 0, $length);
     }
 
     /**
@@ -133,8 +162,9 @@ class SecurityEventRecorder
             return;
         }
 
-        $channel = config('keystone.log_channel');
-        $logger = Log::channel(is_string($channel) ? $channel : null);
+        $configured = config('keystone.log_channel');
+        $channel = is_string($configured) ? $configured : null;
+        $logger = Log::channel($channel);
 
         $logger->info(self::LOG_MESSAGE, $this->logContext($event));
     }
@@ -145,7 +175,8 @@ class SecurityEventRecorder
     protected function loggedRecently(SecurityEvent $event): bool
     {
         $context = $this->context();
-        $fingerprint = hash('sha256', implode('|', [$event->type->value, $context->ipAddress, $context->path]));
+        $identity = implode('|', [$event->type->value, $context->ipAddress, $context->path]);
+        $fingerprint = hash('sha256', $identity);
 
         try {
             return ! Cache::add("keystone:security-event:{$fingerprint}", true, self::ANONYMOUS_LOG_SECONDS);
@@ -159,7 +190,7 @@ class SecurityEventRecorder
     /**
      * Get the event's fields as the log line's context.
      *
-     * @return array<string, mixed>
+     * @return array{occurred_at: string, type: string, user_id: int|string|null, actor: string, flow: ?string, credential_type: ?string, credential_id: ?int, credential_label: ?string, reason: ?string, ip_address: ?string, location: ?string, user_agent: ?string, known_device: ?bool, request_id: ?string}
      */
     protected function logContext(SecurityEvent $event): array
     {
@@ -190,7 +221,9 @@ class SecurityEventRecorder
             return;
         }
 
-        $event->setConnection($account->getConnectionName());
+        $connection = $account->getConnection()->getName();
+
+        $event->setConnection($connection);
 
         $event->saveQuietly();
     }

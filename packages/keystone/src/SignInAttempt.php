@@ -55,13 +55,23 @@ class SignInAttempt
             }
 
             if (! $this->owns($account, $type, $proof)) {
-                $this->recordRejected($account, $type, $credential, $proof->reason ?? 'keystone.foreign_credential');
+                $this->recordRejected(
+                    account: $account,
+                    type: $type,
+                    credential: $credential,
+                    reason: $proof->reason ?? 'keystone.foreign_credential',
+                );
 
                 return null;
             }
 
             if ((new SignInDecision)->demand($account) !== Demand::SIGN_IN) {
-                $this->recordRejected($account, $type, $credential, 'keystone.barred');
+                $this->recordRejected(
+                    account: $account,
+                    type: $type,
+                    credential: $credential,
+                    reason: 'keystone.barred',
+                );
 
                 return null;
             }
@@ -69,7 +79,12 @@ class SignInAttempt
             try {
                 $this->guard->signIn($account);
             } catch (LogicException) {
-                $this->recordRejected($account, $type, $credential, 'keystone.barred');
+                $this->recordRejected(
+                    account: $account,
+                    type: $type,
+                    credential: $credential,
+                    reason: 'keystone.barred',
+                );
 
                 return null;
             }
@@ -133,7 +148,12 @@ class SignInAttempt
     /**
      * Record a refused sign-in for the account, naming only a credential the account owns.
      */
-    protected function recordRejected(Model&KeystoneUser $account, CredentialType $type, ?StoredCredential $credential, string $reason): void
+    protected function recordRejected(
+        Model&KeystoneUser $account,
+        CredentialType $type,
+        ?StoredCredential $credential,
+        string $reason,
+    ): void
     {
         $this->recorder->record(
             SecurityEventType::PROOF_REJECTED,

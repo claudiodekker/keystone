@@ -7,6 +7,8 @@ use Illuminate\Support\Str;
 
 /**
  * @internal
+ *
+ * @phpstan-consistent-constructor
  */
 readonly class RequestContext
 {
@@ -25,9 +27,9 @@ readonly class RequestContext
     /**
      * Capture the context of the request, giving it a new request id.
      */
-    public static function capture(Request $request): self
+    public static function capture(Request $request): static
     {
-        return new self(
+        return new static(
             ipAddress: $request->ip(),
             userAgent: $request->userAgent(),
             path: $request->path(),

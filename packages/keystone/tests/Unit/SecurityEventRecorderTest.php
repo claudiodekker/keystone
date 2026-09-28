@@ -9,6 +9,7 @@ use ClaudioDekker\Keystone\SecurityEventRecorder;
 use ClaudioDekker\Keystone\SecurityEventType;
 use ClaudioDekker\Keystone\Tests\Fixtures\User;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Exceptions;
@@ -172,7 +173,9 @@ describe('the audit trail', function () {
             date_default_timezone_set($timezone);
         }
 
-        expect(DB::table('user_security_events')->value('occurred_at'))->toBe('2026-09-28 10:00:00');
+        expect(DB::table('user_security_events')->value('occurred_at'))->toBe('2026-09-28 10:00:00')
+            ->and(loggedContext()[0]['occurred_at'])->toBe('2026-09-28T10:00:00Z')
+            ->and(SecurityEvent::sole()->occurred_at->equalTo(now()))->toBeTrue();
     });
 
     it('keeps an event about nobody out of the trail', function () {
@@ -281,6 +284,19 @@ describe('a failing step', function () {
         expect(logRecords())->toHaveCount(1);
         Event::assertDispatched(SecurityEventRecorded::class);
         Exceptions::assertReported(InvalidArgumentException::class);
+    });
+
+    it('records nothing, and throws nothing, when the entry can\'t be built', function () {
+        Event::fake([SecurityEventRecorded::class]);
+        Crypt::shouldReceive('encrypt', 'encryptString')->andThrow(new RuntimeException('Key lost.'));
+        captureContext();
+
+        recorder()->record(SecurityEventType::SIGNED_OUT, account: User::factory()->create());
+
+        expect(logRecords())->toHaveCount(0);
+        $this->assertDatabaseCount('user_security_events', 0);
+        Event::assertNotDispatched(SecurityEventRecorded::class);
+        Exceptions::assertReported(fn (RuntimeException $e) => $e->getMessage() === 'Key lost.');
     });
 
     it('still logs and stores when a listener fails', function () {

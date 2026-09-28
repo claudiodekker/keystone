@@ -32,7 +32,10 @@ abstract class SignOutController
         /** @var Model&KeystoneUser $account */
         $account = $guard->user();
 
-        (new SecurityEventRecorder)->record(SecurityEventType::SIGNED_OUT, account: $account);
+        (new SecurityEventRecorder)->record(
+            SecurityEventType::SIGNED_OUT,
+            account: $account,
+        );
 
         $guard->signOut();
 

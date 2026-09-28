@@ -10,6 +10,8 @@ Each event is:
 
 If any of these steps throws, Keystone reports the exception to your exception handler and carries on with the others. The response never changes.
 
+Listeners run during the request, and a refused sign-in only takes its fixed minimum time while they finish inside it. Queue any listener that does slow work, such as sending mail or calling an API, so response times can't reveal which addresses have an account.
+
 ## Types
 
 | Type | Recorded when |
@@ -33,7 +35,7 @@ Every event has the same fields, and never typed input, secrets, codes, tokens o
 | `flow` | where it happened, such as `sign-in` |
 | `credential_type`, `credential_id`, `credential_label` | the credential involved and its label at the time; a refusal names only a credential the account holds |
 | `reason` | a short code such as `form.mismatch` or `keystone.barred`; a reason that isn't a lowercase code of at most 64 characters prefixed by its credential type or `keystone.` is stored as `<type>.invalid_reason` |
-| `ip_address`, `user_agent` | the request's, the user agent cut to 512 characters |
+| `ip_address`, `user_agent` | the request's, the user agent cut to 512 characters with control characters replaced by spaces |
 | `location` | reserved for a later release; always null |
 | `known_device` | reserved for a later release; always null |
 | `request_id` | an id Keystone gives each request, shared by every event it records |
