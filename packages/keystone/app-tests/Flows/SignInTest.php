@@ -5,7 +5,11 @@ use ClaudioDekker\Keystone\AppTests\Assertions\SignInAssertions;
 use ClaudioDekker\Keystone\AppTests\Support\CredentialTypeSupport;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\Surface;
+use ClaudioDekker\Keystone\SecurityEventRecorded;
+use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Sleep;
 use Illuminate\Testing\TestResponse;
 
@@ -207,5 +211,76 @@ describe('submit', function () {
 
         $this->assertSignedInSentAway($response);
         expect(session()->getId())->toBe($sessionId);
+    });
+});
+
+describe('security events', function () {
+    it('records the sign-in on the account\'s trail', function () {
+        $account = $this->createAccount();
+        $this->arrangeCredential($account, $this->support, Surface::SIGN_IN);
+
+        $this->assertSignedIn(signIn($this, $this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN)), '/');
+
+        $this->assertDatabaseHas('user_security_events', [
+            'type' => 'signed_in',
+            'user_id' => $account->getKey(),
+            'actor' => 'user',
+            'flow' => 'sign-in',
+            'credential_type' => $this->support->type(),
+            'credential_id' => DB::table('user_credentials')->where('user_id', $account->getKey())->value('id'),
+            'reason' => null,
+        ]);
+    });
+
+    it('records a rejected proof on the account\'s trail', function () {
+        $account = $this->createAccount();
+        $this->arrangeCredential($account, $this->support, Surface::SIGN_IN);
+
+        $this->assertSignInRefused(signIn($this, $this->support, 'jane@example.com', $this->support->rejectedProof(Surface::SIGN_IN)));
+
+        $this->assertDatabaseHas('user_security_events', [
+            'type' => 'proof.rejected',
+            'user_id' => $account->getKey(),
+            'flow' => 'sign-in',
+            'credential_type' => $this->support->type(),
+        ]);
+        expect(DB::table('user_security_events')->value('reason'))->toStartWith($this->support->type().'.')
+            ->not->toBe($this->support->type().'.invalid_reason');
+    });
+
+    it('stores and logs nothing typed for an address no account holds', function () {
+        $logged = [];
+        Event::listen(MessageLogged::class, function (MessageLogged $message) use (&$logged) {
+            $logged[] = [$message->message, $message->context];
+        });
+
+        $this->assertSignInRefused(signIn($this, $this->support, 'typed-nobody@example.com', $this->support->rejectedProof(Surface::SIGN_IN)));
+
+        $this->assertDatabaseCount('user_security_events', 0);
+        expect(json_encode($logged))->not->toContain('typed-nobody');
+    });
+
+    it('signs in as usual when recording fails', function () {
+        Exceptions::fake();
+        Event::listen(SecurityEventRecorded::class, fn () => throw new RuntimeException('Listener broke.'));
+        $account = $this->createAccount();
+        $this->arrangeCredential($account, $this->support, Surface::SIGN_IN);
+
+        $this->assertSignedIn(signIn($this, $this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN)), '/');
+
+        $this->assertAuthenticatedAs($account);
+        Exceptions::assertReported(fn (RuntimeException $e) => $e->getMessage() === 'Listener broke.');
+    });
+
+    it('refuses as usual when recording fails', function () {
+        Exceptions::fake();
+        Event::listen(SecurityEventRecorded::class, fn () => throw new RuntimeException('Listener broke.'));
+        $account = $this->createAccount();
+        $this->arrangeCredential($account, $this->support, Surface::SIGN_IN);
+
+        $this->assertSignInRefused(signIn($this, $this->support, 'jane@example.com', $this->support->rejectedProof(Surface::SIGN_IN)));
+
+        $this->assertGuest();
+        Exceptions::assertReported(fn (RuntimeException $e) => $e->getMessage() === 'Listener broke.');
     });
 });

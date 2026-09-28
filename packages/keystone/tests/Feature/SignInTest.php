@@ -67,6 +67,12 @@ describe('proofs', function () {
         $this->post(route('login.submit', ['type' => 'rogue']), ['identifier' => 'jane@example.com']);
 
         $this->assertGuest();
+        $this->assertDatabaseHas('user_security_events', [
+            'type' => 'proof.rejected',
+            'user_id' => $jane->getKey(),
+            'credential_id' => null,
+            'reason' => 'keystone.foreign_credential',
+        ]);
     })->with([
         'another account\'s' => fn ($jane, $john) => rogueCredential($john),
         'disabled' => function ($jane) {
@@ -106,6 +112,49 @@ describe('proofs', function () {
         $this->post(route('login.submit', ['type' => 'rogue']), ['identifier' => 'nobody@example.com', 'secret' => 'typed']);
 
         expect($rogue->calls)->toBe([[Surface::SIGN_IN, ['secret' => 'typed'], []]]);
+    });
+
+    it('names the subject\'s credential a rejection points at, with its stored label', function () {
+        $account = $this->createAccount();
+        $id = DB::table('user_credentials')->insertGetId(['user_id' => $account->getKey(), 'type' => 'rogue', 'label' => 'Laptop']);
+        $this->app->make(CredentialTypes::class)->register(new RogueType(fn () => Proof::rejected('rogue.mismatch', new StoredCredential($id, null, null, 'Forged'))));
+
+        $this->post(route('login.submit', ['type' => 'rogue']), ['identifier' => 'jane@example.com']);
+
+        $this->assertDatabaseHas('user_security_events', [
+            'type' => 'proof.rejected',
+            'user_id' => $account->getKey(),
+            'credential_type' => 'rogue',
+            'credential_id' => $id,
+            'credential_label' => 'Laptop',
+            'reason' => 'rogue.mismatch',
+        ]);
+    });
+
+    it('names no credential of another account in a rejection', function () {
+        $jane = $this->createAccount();
+        $id = rogueCredential($this->createAccount('john@example.com'));
+        $this->app->make(CredentialTypes::class)->register(new RogueType(fn () => Proof::rejected('rogue.mismatch', new StoredCredential($id, null, null, null))));
+
+        $this->post(route('login.submit', ['type' => 'rogue']), ['identifier' => 'jane@example.com']);
+
+        $this->assertDatabaseHas('user_security_events', ['user_id' => $jane->getKey(), 'credential_id' => null, 'reason' => 'rogue.mismatch']);
+    });
+
+    it('records a suspended account\'s valid proof as refused', function () {
+        $account = $this->createAccount();
+        $this->arrangeCredential($account, new FormTypeSupport, Surface::SIGN_IN);
+        DB::table('users')->where('id', $account->getKey())->update(['suspended_at' => now()]);
+
+        $this->post(route('login.submit', ['type' => 'form']), ['identifier' => 'jane@example.com', ...(new FormTypeSupport)->validProof(Surface::SIGN_IN)]);
+
+        $this->assertGuest();
+        $this->assertDatabaseHas('user_security_events', [
+            'type' => 'proof.rejected',
+            'user_id' => $account->getKey(),
+            'credential_id' => DB::table('user_credentials')->value('id'),
+            'reason' => 'keystone.barred',
+        ]);
     });
 });
 
@@ -173,6 +222,7 @@ describe('failures around the proof', function () {
         );
         $this->assertGuest();
         Exceptions::assertReported(DecryptException::class);
+        $this->assertDatabaseHas('user_security_events', ['type' => 'proof.rejected', 'credential_id' => null, 'reason' => 'keystone.verify_failed']);
     });
 
     it('refuses an account suspended while its proof was checked', function () {
@@ -188,6 +238,7 @@ describe('failures around the proof', function () {
             ->assertSessionHasErrors(['identifier' => 'These credentials do not match our records.']);
 
         $this->assertGuest();
+        $this->assertDatabaseHas('user_security_events', ['type' => 'proof.rejected', 'credential_id' => $id, 'reason' => 'keystone.barred']);
     });
 
     it('flashes back nothing for an identifier that is not a string', function () {

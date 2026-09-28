@@ -1,0 +1,264 @@
+<?php
+
+namespace ClaudioDekker\Keystone;
+
+use ClaudioDekker\Keystone\Methods\StoredCredential;
+use Closure;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+use Throwable;
+
+/**
+ * @internal
+ */
+class SecurityEventRecorder
+{
+    /**
+     * The message of every security event's log line.
+     */
+    public const string LOG_MESSAGE = 'keystone.security_event';
+
+    /**
+     * How long an anonymous event is logged only once for its type, IP address and path.
+     */
+    public const int ANONYMOUS_LOG_SECONDS = 60;
+
+    /**
+     * The most characters of a user agent kept.
+     */
+    public const int USER_AGENT_LENGTH = 512;
+
+    /**
+     * The most characters of a reason or a credential label kept.
+     */
+    public const int FIELD_LENGTH = 64;
+
+    /**
+     * The characters a reason may hold.
+     */
+    protected const string REASON_PATTERN = '/^[a-z0-9._]+$/';
+
+    /**
+     * Record the event: log it, append it to the account's trail, and dispatch it, each step rescued on its own.
+     */
+    public function record(
+        SecurityEventType $type,
+        (Model&KeystoneUser)|null $account = null,
+        Actor $actor = Actor::USER,
+        ?string $flow = null,
+        ?string $credentialType = null,
+        ?StoredCredential $credential = null,
+        ?string $reason = null,
+    ): void {
+        if (! $this->enabled()) {
+            return;
+        }
+
+        try {
+            $event = $this->entry(
+                type: $type,
+                account: $account,
+                actor: $actor,
+                flow: $flow,
+                credentialType: $credentialType,
+                credential: $credential,
+                reason: $reason,
+            );
+        } catch (Throwable $e) {
+            report($e);
+
+            return;
+        }
+
+        $recorded = new SecurityEventRecorded($event);
+
+        $this->rescue(fn () => $this->log($event));
+        $this->rescue(fn () => $this->append($event, $account));
+        $this->rescue(fn () => event($recorded));
+    }
+
+    /**
+     * Determine if recording is on; only a literal false in keystone.events.enabled turns it off.
+     */
+    protected function enabled(): bool
+    {
+        return config('keystone.events.enabled') !== false;
+    }
+
+    /**
+     * Build the entry from the facts and the request's context.
+     */
+    protected function entry(
+        SecurityEventType $type,
+        (Model&KeystoneUser)|null $account,
+        Actor $actor,
+        ?string $flow,
+        ?string $credentialType,
+        ?StoredCredential $credential,
+        ?string $reason,
+    ): SecurityEvent {
+        $context = $this->context();
+        $userAgent = $this->clean($context->userAgent, self::USER_AGENT_LENGTH);
+        $label = $this->clean($credential?->label, self::FIELD_LENGTH);
+        $keptReason = $this->reason($reason, $credentialType);
+
+        return new SecurityEvent([
+            'occurred_at' => Date::now(),
+            'type' => $type,
+            'user_id' => $account?->getKey(),
+            'actor' => $actor,
+            'flow' => $flow,
+            'credential_type' => $credentialType,
+            'credential_id' => $credential?->id,
+            'credential_label' => $label,
+            'reason' => $keptReason,
+            'ip_address' => $context->ipAddress,
+            'location' => null,
+            'user_agent' => $userAgent,
+            'known_device' => null,
+            'request_id' => $context->requestId,
+        ]);
+    }
+
+    /**
+     * Cut a value taken from input to its length, with control characters replaced by spaces so it can't break a log line.
+     */
+    protected function clean(?string $value, int $length): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $printable = (string) preg_replace('/\p{Cc}/u', ' ', $value);
+
+        return Str::substr($printable, 0, $length);
+    }
+
+    /**
+     * Keep a reason that is a short code, prefixed by its credential type or by keystone when it names a type.
+     */
+    protected function reason(?string $reason, ?string $credentialType): ?string
+    {
+        if ($reason === null) {
+            return null;
+        }
+
+        $fallback = ($credentialType ?? 'keystone').'.invalid_reason';
+
+        if (Str::length($reason) > self::FIELD_LENGTH) {
+            return $fallback;
+        }
+
+        $prefixes = $credentialType === null ? [''] : ["{$credentialType}.", 'keystone.'];
+
+        foreach ($prefixes as $prefix) {
+            $code = substr($reason, strlen($prefix));
+
+            if (str_starts_with($reason, $prefix) && preg_match(self::REASON_PATTERN, $code) === 1) {
+                return $reason;
+            }
+        }
+
+        return $fallback;
+    }
+
+    /**
+     * Write the event's log line, logging an anonymous event only once per window.
+     */
+    protected function log(SecurityEvent $event): void
+    {
+        if ($event->user_id === null && $this->loggedRecently($event)) {
+            return;
+        }
+
+        $configured = config('keystone.log_channel');
+        $channel = is_string($configured) ? $configured : null;
+        $logger = Log::channel($channel);
+
+        $logger->info(self::LOG_MESSAGE, $this->logContext($event));
+    }
+
+    /**
+     * Determine if an identical anonymous event was logged inside the window, counting it when it wasn't.
+     */
+    protected function loggedRecently(SecurityEvent $event): bool
+    {
+        $context = $this->context();
+        $identity = implode('|', [$event->type->value, $context->ipAddress, $context->path]);
+        $fingerprint = hash('sha256', $identity);
+
+        try {
+            return ! Cache::add("keystone:security-event:{$fingerprint}", true, self::ANONYMOUS_LOG_SECONDS);
+        } catch (Throwable $e) {
+            report($e);
+
+            return false;
+        }
+    }
+
+    /**
+     * Get the event's fields as the log line's context.
+     *
+     * @return array{occurred_at: string, type: string, user_id: int|string|null, actor: string, flow: ?string, credential_type: ?string, credential_id: ?int, credential_label: ?string, reason: ?string, ip_address: ?string, location: ?string, user_agent: ?string, known_device: ?bool, request_id: ?string}
+     */
+    protected function logContext(SecurityEvent $event): array
+    {
+        return [
+            'occurred_at' => $event->occurred_at->toIso8601ZuluString(),
+            'type' => $event->type->value,
+            'user_id' => $event->user_id,
+            'actor' => $event->actor->value,
+            'flow' => $event->flow,
+            'credential_type' => $event->credential_type,
+            'credential_id' => $event->credential_id,
+            'credential_label' => $event->credential_label,
+            'reason' => $event->reason,
+            'ip_address' => $event->ip_address,
+            'location' => $event->location,
+            'user_agent' => $event->user_agent,
+            'known_device' => $event->known_device,
+            'request_id' => $event->request_id,
+        ];
+    }
+
+    /**
+     * Append the event to the account's trail; events about nobody are log lines only.
+     */
+    protected function append(SecurityEvent $event, (Model&KeystoneUser)|null $account): void
+    {
+        if ($account === null) {
+            return;
+        }
+
+        $connection = $account->getConnection()->getName();
+
+        $event->setConnection($connection);
+
+        $event->saveQuietly();
+    }
+
+    /**
+     * Run the step, reporting its failure instead of letting it escape.
+     *
+     * @param  Closure(): mixed  $step
+     */
+    protected function rescue(Closure $step): void
+    {
+        try {
+            $step();
+        } catch (Throwable $e) {
+            report($e);
+        }
+    }
+
+    /**
+     * Get the context the current request captured.
+     */
+    protected function context(): RequestContext
+    {
+        return app(RequestContext::class);
+    }
+}

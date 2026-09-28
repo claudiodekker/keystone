@@ -3,8 +3,12 @@
 namespace ClaudioDekker\Keystone\Http\Controllers;
 
 use ClaudioDekker\Keystone\Keystone;
+use ClaudioDekker\Keystone\KeystoneUser;
+use ClaudioDekker\Keystone\SecurityEventRecorder;
+use ClaudioDekker\Keystone\SecurityEventType;
 use ClaudioDekker\Keystone\Status;
 use Illuminate\Contracts\Support\Responsable;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -24,6 +28,14 @@ abstract class SignOutController
         if (! $guard->check()) {
             return $this->refuseGuest();
         }
+
+        /** @var Model&KeystoneUser $account */
+        $account = $guard->user();
+
+        (new SecurityEventRecorder)->record(
+            SecurityEventType::SIGNED_OUT,
+            account: $account,
+        );
 
         $guard->signOut();
 
