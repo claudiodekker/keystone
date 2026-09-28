@@ -16,11 +16,11 @@ use LogicException;
 class KeystoneGuard extends SessionGuard
 {
     /**
-     * The columns that end a session when set.
+     * The columns, besides the soft-delete column, that bar an account from signing in when set.
      *
      * @var list<string>
      */
-    protected const array ENDING_COLUMNS = ['deleted_at', 'invalidated_at', 'suspended_at'];
+    protected const array BARRING_COLUMNS = ['invalidated_at', 'suspended_at'];
 
     /**
      * Get the currently authenticated user.
@@ -61,10 +61,22 @@ class KeystoneGuard extends SessionGuard
      */
     public function signIn(KeystoneUser $user): void
     {
+        $account = $this->retrieveAccount($user->getAuthIdentifier());
+
+        if (is_null($account)) {
+            throw new LogicException('The account being signed in no longer exists.');
+        }
+
+        if (! $this->isActive($account)) {
+            throw new LogicException('The account being signed in is disabled or suspended.');
+        }
+
         $this->rotate();
 
         $this->session->put($this->getName(), $user->getAuthIdentifier());
-        $this->session->put($this->epochKey(), $this->currentEpoch($user));
+        $this->session->put($this->epochKey(), $this->epochOf($account));
+
+        $this->fireLoginEvent($user);
 
         $this->setUser($user);
     }
@@ -111,6 +123,16 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
+     * Refuse to set the user for this request; only Keystone signs anyone in.
+     *
+     * @param  mixed  $id
+     */
+    public function onceUsingId($id)
+    {
+        return false;
+    }
+
+    /**
      * Refuse to sign the user in; only Keystone signs anyone in.
      *
      * @param  mixed  $id
@@ -132,14 +154,24 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
+     * Leave the app's remember token alone; Keystone never reads or writes it.
+     */
+    protected function cycleRememberToken(Authenticatable $user)
+    {
+        //
+    }
+
+    /**
      * Read the account and its Keystone state in one query, bypassing every global scope.
      *
      * @return (Model&KeystoneUser)|null
      */
     protected function retrieveAccount(mixed $id): ?Model
     {
+        $model = $this->provider->createModel();
+
         /** @var (Model&KeystoneUser)|null */
-        return $this->provider->createModel()->newModelQuery()->whereKey($id)->first();
+        return $model->newQueryWithoutScopes()->where($model->getAuthIdentifierName(), $id)->first();
     }
 
     /**
@@ -147,27 +179,24 @@ class KeystoneGuard extends SessionGuard
      */
     protected function isLive(Model&KeystoneUser $account): bool
     {
-        foreach (self::ENDING_COLUMNS as $column) {
+        return $this->isActive($account)
+            && $this->session->get($this->epochKey()) === $this->epochOf($account);
+    }
+
+    /**
+     * Determine if the account is neither deleted, invalidated nor suspended.
+     */
+    protected function isActive(Model&KeystoneUser $account): bool
+    {
+        $columns = [...self::BARRING_COLUMNS, $account->getDeletedAtColumn()];
+
+        foreach ($columns as $column) {
             if (! is_null($account->getRawOriginal($column))) {
                 return false;
             }
         }
 
-        return $this->session->get($this->epochKey()) === $this->epochOf($account);
-    }
-
-    /**
-     * Read the account's current credential epoch from the database.
-     */
-    protected function currentEpoch(KeystoneUser $user): int
-    {
-        $account = $this->retrieveAccount($user->getAuthIdentifier());
-
-        if (is_null($account)) {
-            throw new LogicException('The account being signed in no longer exists.');
-        }
-
-        return $this->epochOf($account);
+        return true;
     }
 
     /**

@@ -17,7 +17,7 @@ class User extends Authenticatable implements KeystoneUser
 }
 ```
 
-`HasKeystone` adds soft deletes and keeps Keystone's `users` columns out of the model's array form and out of mass assignment. The model may use its own table and key name.
+`HasKeystone` adds soft deletes and keeps Keystone's `users` columns out of the model's array form and out of mass assignment. The model may use its own table and key name; Keystone's migration only changes `users`, so add its columns to your table yourself.
 
 ## The guard
 
@@ -32,6 +32,6 @@ Set your app's guard to the `keystone` driver in `config/auth.php`. Its provider
 ],
 ```
 
-Only Keystone signs anyone in. `Auth::attempt()`, `Auth::login()`, `Auth::loginUsingId()`, `Auth::logoutOtherDevices()` and the `auth.basic` middleware sign nobody in. Sessions and remember-me cookies from before Keystone end on their next request.
+Only Keystone signs anyone in. `Auth::attempt()`, `Auth::once()`, `Auth::onceUsingId()`, `Auth::login()`, `Auth::loginUsingId()`, `Auth::logoutOtherDevices()` and the `auth.basic` middleware sign nobody in. Sessions and remember-me cookies from before Keystone end on their next request.
 
-Keystone's migration adds its columns to `users` and makes `email`, `password` and `remember_token` nullable. It never reads or drops them.
+Keystone's migration adds its columns to `users` and makes `email`, `password` and `remember_token` nullable strings (255, 255 and 100 characters). It never reads or drops them.

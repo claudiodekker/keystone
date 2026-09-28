@@ -9,5 +9,10 @@ use Illuminate\Contracts\Auth\Authenticatable;
  */
 interface KeystoneUser extends Authenticatable
 {
-    //
+    /**
+     * Get the name of the "deleted at" column.
+     *
+     * @return string
+     */
+    public function getDeletedAtColumn();
 }

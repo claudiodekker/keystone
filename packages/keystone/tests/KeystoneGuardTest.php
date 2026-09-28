@@ -5,14 +5,19 @@ namespace ClaudioDekker\Keystone\Tests;
 use ClaudioDekker\Keystone\KeystoneGuard;
 use ClaudioDekker\Keystone\Tests\Fixtures\Member;
 use ClaudioDekker\Keystone\Tests\Fixtures\User;
+use ClaudioDekker\Keystone\Tests\Fixtures\UserWithArchivedAt;
+use ClaudioDekker\Keystone\Tests\Fixtures\UserWithEagerLoads;
 use ClaudioDekker\Keystone\Tests\Fixtures\UserWithoutScopes;
+use ClaudioDekker\Keystone\Tests\Fixtures\UserWithUuidIdentifier;
 use Closure;
+use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Recaller;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Auth\User as LaravelUser;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Symfony\Component\HttpKernel\Exception\UnauthorizedHttpException;
@@ -71,6 +76,61 @@ it('refuses to sign in an account that no longer exists', function () {
     Auth::guard('web')->signIn($user);
 })->throws(\LogicException::class, 'The account being signed in no longer exists.');
 
+it('refuses to sign in a disabled or suspended account', function (string $column) {
+    $user = User::factory()->create();
+    DB::table('users')->where('id', $user->getKey())->update([$column => now()]);
+
+    Auth::guard('web')->signIn($user);
+})->with(['deleted_at', 'invalidated_at', 'suspended_at'])->throws(\LogicException::class, 'The account being signed in is disabled or suspended.');
+
+it('fires the login event when signing in', function () {
+    Event::fake([Login::class]);
+    $user = User::factory()->create();
+
+    Auth::guard('web')->signIn($user);
+
+    Event::assertDispatched(Login::class, fn (Login $event) => $event->user->is($user) && ! $event->remember);
+});
+
+it('keeps the model\'s eager loads', function () {
+    config(['auth.providers.users.model' => UserWithEagerLoads::class]);
+    $user = User::factory()->create();
+    Auth::guard('web')->signIn($user);
+
+    expect(nextRequest()->user()->relationLoaded('self'))->toBeTrue();
+});
+
+it('finds the account by its auth identifier', function () {
+    Schema::table('users', fn (Blueprint $table) => $table->string('uuid')->nullable());
+    config(['auth.providers.users.model' => UserWithUuidIdentifier::class]);
+    User::factory()->create(['uuid' => 'other']);
+    $user = UserWithUuidIdentifier::query()->findOrFail(User::factory()->create(['uuid' => '1'])->getKey());
+    Auth::guard('web')->signIn($user);
+
+    expect(nextRequest()->user()?->getKey())->toBe($user->getKey());
+});
+
+it('ends the session of an account soft deleted under its own column name', function () {
+    Schema::table('users', fn (Blueprint $table) => $table->timestamp('archived_at')->nullable());
+    config(['auth.providers.users.model' => UserWithArchivedAt::class]);
+    $user = User::factory()->create();
+    Auth::guard('web')->signIn($user);
+
+    DB::table('users')->where('id', $user->getKey())->update(['archived_at' => now()]);
+
+    expect(nextRequest()->user())->toBeNull();
+});
+
+it('leaves the remember token alone when signing out', function () {
+    $user = User::factory()->create(['remember_token' => 'legacy-token']);
+    $guard = Auth::guard('web');
+    $guard->signIn($user);
+
+    $guard->logout();
+
+    expect($user->fresh()->remember_token)->toBe('legacy-token');
+});
+
 it('reads the account state in one query, ignoring the cache', function () {
     Auth::guard('web')->signIn(User::factory()->create());
     $guard = nextRequest();
@@ -97,7 +157,7 @@ it('ends a session stamped with an older credential epoch', function () {
 
 it('ends the session of a disabled or suspended account, even when the model drops its scopes', function (string $column) {
     config(['auth.providers.users.model' => UserWithoutScopes::class]);
-    $user = UserWithoutScopes::factory()->create();
+    $user = User::factory()->create();
     Auth::guard('web')->signIn($user);
     $session = app('session.store');
     $id = $session->getId();
@@ -155,10 +215,11 @@ it('signs nobody in through the SessionGuard credential and session methods', fu
     'basic' => fn (KeystoneGuard $guard) => $guard->basic(),
     'onceBasic' => fn (KeystoneGuard $guard) => $guard->onceBasic(),
     'login' => fn (KeystoneGuard $guard, User $user) => $guard->login($user, remember: true),
+    'onceUsingId' => fn (KeystoneGuard $guard, User $user) => expect($guard->onceUsingId($user->getKey()))->toBeFalse(),
     'loginUsingId' => fn (KeystoneGuard $guard, User $user) => expect($guard->loginUsingId($user->getKey()))->toBeFalse(),
 ]);
 
-it('leaves other sessions and the password alone on logoutOtherDevices', function () {
+it('leaves the password alone on logoutOtherDevices', function () {
     $user = User::factory()->create(['password' => $hash = Hash::make('secret', ['rounds' => 5])]);
     $guard = Auth::guard('web');
     $guard->signIn($user);

@@ -12,14 +12,14 @@ $columns = [
     'suspended_at',
 ];
 
-it('keeps keystone columns out of the array form', function (string $column) {
+test('keystone columns are kept out of the array form', function (string $column) {
     $user = User::factory()->create();
     $user->forceFill([$column => $column === 'credential_epoch' ? 3 : now()]);
 
     expect($user->toArray())->not->toHaveKey($column);
 })->with($columns);
 
-it('refuses to mass assign keystone columns', function (string $column) {
+test('keystone columns are not mass assignable', function (string $column) {
     $user = User::factory()->create();
 
     $user->fill([$column => 1]);
