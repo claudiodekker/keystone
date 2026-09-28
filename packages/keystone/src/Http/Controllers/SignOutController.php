@@ -4,9 +4,12 @@ namespace ClaudioDekker\Keystone\Http\Controllers;
 
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\KeystoneUser;
+use ClaudioDekker\Keystone\RateLimiter;
 use ClaudioDekker\Keystone\SecurityEventRecorder;
 use ClaudioDekker\Keystone\SecurityEventType;
 use ClaudioDekker\Keystone\Status;
+use ClaudioDekker\Keystone\StepKind;
+use ClaudioDekker\Keystone\Throttled;
 use Illuminate\Contracts\Support\Responsable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
@@ -24,6 +27,12 @@ abstract class SignOutController
     public function __invoke(Request $request): Response|Responsable
     {
         $guard = Keystone::guard();
+
+        try {
+            (new RateLimiter($request, $guard))->hitRequest(StepKind::CHANGE);
+        } catch (Throttled $throttled) {
+            return $this->refuseThrottled($request, $throttled->retryAfterSeconds);
+        }
 
         if (! $guard->check()) {
             return $this->refuseGuest();
@@ -48,6 +57,16 @@ abstract class SignOutController
      * Respond to a completed sign-out.
      */
     abstract protected function sendSignedOut(Request $request): Response|Responsable;
+
+    /**
+     * Refuse the sign-out when its rate limit is spent, saying when to try again.
+     */
+    protected function refuseThrottled(Request $request, int $retryAfterSeconds): Response
+    {
+        $message = __('keystone::messages.throttled', ['seconds' => $retryAfterSeconds]);
+
+        return response($message, Response::HTTP_TOO_MANY_REQUESTS, ['Retry-After' => $retryAfterSeconds]);
+    }
 
     /**
      * Send a guest away from a signed-in step.

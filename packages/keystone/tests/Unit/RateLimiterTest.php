@@ -1,0 +1,219 @@
+<?php
+
+use ClaudioDekker\Keystone\Flow;
+use ClaudioDekker\Keystone\Keystone;
+use ClaudioDekker\Keystone\RateLimiter;
+use ClaudioDekker\Keystone\StepKind;
+use ClaudioDekker\Keystone\Tests\Fixtures\FormType;
+use ClaudioDekker\Keystone\Tests\Fixtures\User;
+use ClaudioDekker\Keystone\Throttled;
+use Illuminate\Cache\RateLimiter as CacheRateLimiter;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Exceptions;
+
+function limiter(string $ip = '203.0.113.5'): RateLimiter
+{
+    $request = Request::create('/', server: ['REMOTE_ADDR' => $ip]);
+
+    return new RateLimiter($request, Keystone::guard());
+}
+
+function hitTimes(RateLimiter $limiter, StepKind $kind, int $times): void
+{
+    foreach (range(1, $times) as $ignored) {
+        $limiter->hitRequest($kind);
+    }
+}
+
+function failTimes(RateLimiter $limiter, int $times, string $identifier = 'nobody@example.com', ?User $account = null, string $type = 'form'): void
+{
+    foreach (range(1, $times) as $ignored) {
+        $limiter->takeFailedAttempt(Flow::SIGN_IN, new FormType($type), $account, $identifier);
+    }
+}
+
+function retryAfter(Closure $callback): ?int
+{
+    try {
+        $callback();
+    } catch (Throttled $throttled) {
+        return $throttled->retryAfterSeconds;
+    }
+
+    return null;
+}
+
+describe('request limit', function () {
+    it('allows each step kind its requests a minute, then refuses until the minute ends', function (StepKind $kind, int $allowance) {
+        $this->freezeSecond();
+        hitTimes(limiter(), $kind, $allowance);
+
+        expect(retryAfter(fn () => limiter()->hitRequest($kind)))->toBe(60);
+    })->with([
+        'view' => [StepKind::VIEW, 60],
+        'start' => [StepKind::START, 10],
+        'submit' => [StepKind::SUBMIT, 10],
+        'change' => [StepKind::CHANGE, 10],
+    ]);
+
+    it('tells how long until the spent key expires', function () {
+        $this->freezeSecond();
+        hitTimes(limiter(), StepKind::SUBMIT, 10);
+
+        $this->travel(15)->seconds();
+
+        expect(retryAfter(fn () => limiter()->hitRequest(StepKind::SUBMIT)))->toBe(45);
+    });
+
+    it('allows requests again once the minute has passed', function () {
+        $this->freezeSecond();
+        hitTimes(limiter(), StepKind::SUBMIT, 10);
+
+        $this->travel(60)->seconds();
+
+        expect(retryAfter(fn () => limiter()->hitRequest(StepKind::SUBMIT)))->toBeNull();
+    });
+
+    it('counts each step kind separately', function () {
+        hitTimes(limiter(), StepKind::SUBMIT, 10);
+
+        expect(retryAfter(fn () => limiter()->hitRequest(StepKind::CHANGE)))->toBeNull();
+    });
+
+    it('counts each address separately', function () {
+        hitTimes(limiter('203.0.113.5'), StepKind::SUBMIT, 10);
+
+        expect(retryAfter(fn () => limiter('203.0.113.6')->hitRequest(StepKind::SUBMIT)))->toBeNull()
+            ->and(retryAfter(fn () => limiter('2001:db8:0:2::1')->hitRequest(StepKind::SUBMIT)))->toBeNull();
+    });
+
+    it('shares one key between addresses of one network', function (string $spent, string $other) {
+        hitTimes(limiter($spent), StepKind::SUBMIT, 10);
+
+        expect(retryAfter(fn () => limiter($other)->hitRequest(StepKind::SUBMIT)))->toBe(60);
+    })->with([
+        'one IPv6 /64' => ['2001:db8:0:1::1', '2001:db8:0:1:ffff:ffff:ffff:ffff'],
+        'IPv4-mapped IPv6 and IPv4' => ['::ffff:203.0.113.5', '203.0.113.5'],
+        'unusable addresses' => ['', 'not-an-address'],
+    ]);
+
+    it('limits the account the session names across addresses', function () {
+        $user = User::factory()->create();
+        Keystone::guard()->setUser($user);
+        hitTimes(limiter('203.0.113.5'), StepKind::SUBMIT, 10);
+
+        expect(retryAfter(fn () => limiter('198.51.100.7')->hitRequest(StepKind::SUBMIT)))->toBe(60);
+    });
+
+    it('lets requests through while the store is down, reporting the failure', function () {
+        $this->mock(CacheRateLimiter::class)->shouldReceive('increment')->andThrow(new RuntimeException('Store down.'));
+
+        expect(retryAfter(fn () => limiter()->hitRequest(StepKind::SUBMIT)))->toBeNull();
+
+        Exceptions::assertReported(fn (RuntimeException $e) => $e->getMessage() === 'Store down.');
+    });
+});
+
+describe('failed-attempt limit', function () {
+    it('allows 20 failed attempts an hour, then refuses until the hour ends', function () {
+        $this->freezeSecond();
+        failTimes(limiter(), 20);
+
+        $this->travel(10)->minutes();
+
+        expect(retryAfter(fn () => failTimes(limiter(), 1)))->toBe(3000);
+    });
+
+    it('allows failed attempts again once the hour has passed', function () {
+        $this->freezeSecond();
+        failTimes(limiter(), 20);
+
+        $this->travel(1)->hour();
+
+        expect(retryAfter(fn () => failTimes(limiter(), 1)))->toBeNull();
+    });
+
+    it('keeps refused attempts counted', function () {
+        $taken = limiter()->takeFailedAttempt(Flow::SIGN_IN, new FormType, null, 'nobody@example.com');
+        failTimes(limiter(), 19);
+        retryAfter(fn () => failTimes(limiter(), 1));
+
+        limiter()->giveBack($taken);
+
+        expect(retryAfter(fn () => failTimes(limiter(), 1)))->toBe(3600);
+    });
+
+    it('gives back an attempt that did not count', function () {
+        failTimes(limiter(), 19);
+        $taken = limiter()->takeFailedAttempt(Flow::SIGN_IN, new FormType, null, 'nobody@example.com');
+
+        limiter()->giveBack($taken);
+
+        expect(retryAfter(fn () => failTimes(limiter(), 1)))->toBeNull()
+            ->and(retryAfter(fn () => failTimes(limiter(), 1)))->toBe(3600);
+    });
+
+    it('gives nothing back once the attempt\'s hour has ended', function () {
+        $this->freezeSecond();
+        $taken = limiter()->takeFailedAttempt(Flow::SIGN_IN, new FormType, null, 'nobody@example.com');
+        $this->travel(1)->hour();
+        failTimes(limiter(), 20);
+
+        limiter()->giveBack($taken);
+
+        expect(retryAfter(fn () => failTimes(limiter(), 1)))->toBe(3600);
+    });
+
+    it('counts from any address', function () {
+        failTimes(limiter('203.0.113.5'), 20);
+
+        expect(retryAfter(fn () => failTimes(limiter('198.51.100.7'), 1)))->toBe(3600);
+    });
+
+    it('counts each credential type separately', function () {
+        failTimes(limiter(), 20, type: 'form');
+
+        expect(retryAfter(fn () => failTimes(limiter(), 1, type: 'other-form')))->toBeNull();
+    });
+
+    it('keys a known account by its id, whatever was typed', function () {
+        $user = User::factory()->create();
+        failTimes(limiter(), 20, 'jane@example.com', $user);
+
+        expect(retryAfter(fn () => failTimes(limiter(), 1, 'Jane.Doe', $user)))->toBe(3600)
+            ->and(retryAfter(fn () => failTimes(limiter(), 1, 'jane@example.com')))->toBeNull()
+            ->and(retryAfter(fn () => failTimes(limiter(), 1, 'jane@example.com', User::factory()->create())))->toBeNull();
+    });
+
+    it('shares one key between spellings of an unmatched identifier', function (string $spent, string $other) {
+        failTimes(limiter(), 20, $spent);
+
+        expect(retryAfter(fn () => failTimes(limiter(), 1, $other)))->toBe(3600);
+    })->with([
+        'accents' => ['rené@example.com', 'rene@example.com'],
+        'case' => ['Nobody@Example.com', 'nobody@example.com'],
+    ]);
+
+    it('refuses while the store is down, reporting the failure', function () {
+        $this->mock(CacheRateLimiter::class)->shouldReceive('increment')->andThrow(new RuntimeException('Store down.'));
+
+        expect(retryAfter(fn () => failTimes(limiter(), 1)))->toBe(RateLimiter::OUTAGE_RETRY_AFTER_SECONDS);
+
+        Exceptions::assertReported(fn (RuntimeException $e) => $e->getMessage() === 'Store down.');
+    });
+});
+
+it('keeps no identifier or address in clear in the store', function () {
+    $user = User::factory()->create();
+    Keystone::guard()->setUser($user);
+    limiter('203.0.113.5')->hitRequest(StepKind::SUBMIT);
+    failTimes(limiter('203.0.113.5'), 1, 'nobody@example.com');
+    failTimes(limiter('203.0.113.5'), 1, 'jane@example.com', $user);
+
+    $stored = (fn () => $this->storage)->call(Cache::store('array')->getStore());
+
+    expect($stored)->not->toBeEmpty()
+        ->and(json_encode($stored, JSON_THROW_ON_ERROR))->not->toContain('nobody')
+        ->not->toContain('203.0.113');
+});

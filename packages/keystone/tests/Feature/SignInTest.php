@@ -12,6 +12,7 @@ use ClaudioDekker\Keystone\Tests\Fixtures\RogueType;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
+use Illuminate\Testing\TestResponse;
 
 pest()->extend(AppTestCase::class);
 
@@ -245,5 +246,61 @@ describe('failures around the proof', function () {
         $this->post(route('login.submit', ['type' => 'form']), ['identifier' => ['jane@example.com'], 'secret' => 'typed']);
 
         expect(session()->getOldInput())->toBe([]);
+    });
+});
+
+function signInFrom(AppTestCase $test, int $address, string $type, array $input = []): TestResponse
+{
+    $test->withServerVariables(['REMOTE_ADDR' => "203.0.113.{$address}"]);
+
+    return $test->post(route('login.submit', ['type' => $type]), ['identifier' => 'jane@example.com', ...$input]);
+}
+
+describe('rate limits', function () {
+    it('refuses a spent limit with 429, Retry-After and the message', function () {
+        $this->freezeSecond();
+
+        foreach (range(1, 10) as $ignored) {
+            $this->post(route('login.submit', ['type' => 'form']));
+        }
+
+        $this->post(route('login.submit', ['type' => 'form']))
+            ->assertTooManyRequests()
+            ->assertHeader('Retry-After', '60')
+            ->assertSee('Too many attempts. Please try again in 60 seconds.');
+    });
+
+    it('never lets the type verify more answers than the allowance', function () {
+        $this->createAccount();
+        $this->app->make(CredentialTypes::class)->register($rogue = new RogueType(fn () => Proof::rejected('rogue.mismatch')));
+
+        foreach (range(1, 25) as $address) {
+            signInFrom($this, $address, 'rogue');
+        }
+
+        expect($rogue->calls)->toHaveCount(20);
+    });
+
+    it('gives back the attempt when the type fails', function () {
+        $this->createAccount();
+        $this->app->make(CredentialTypes::class)->register($rogue = new RogueType(fn () => throw new RuntimeException('Broken method.')));
+
+        foreach (range(1, 21) as $address) {
+            signInFrom($this, $address, 'rogue');
+        }
+
+        expect($rogue->calls)->toHaveCount(21);
+    });
+
+    it('counts a suspended account\'s valid proofs like wrong answers', function () {
+        $account = $this->createAccount();
+        $this->arrangeCredential($account, new FormTypeSupport, Surface::SIGN_IN);
+        DB::table('users')->where('id', $account->getKey())->update(['suspended_at' => now()]);
+
+        foreach (range(1, 20) as $address) {
+            signInFrom($this, $address, 'form', (new FormTypeSupport)->validProof(Surface::SIGN_IN));
+        }
+
+        signInFrom($this, 21, 'form', (new FormTypeSupport)->validProof(Surface::SIGN_IN))->assertTooManyRequests();
     });
 });

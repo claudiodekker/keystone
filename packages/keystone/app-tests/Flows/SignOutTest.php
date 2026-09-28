@@ -32,6 +32,14 @@ it('sends a guest away', function () {
     $this->assertGuest();
 });
 
+it('throttles the eleventh sign-out in a minute', function () {
+    foreach (range(1, 10) as $ignored) {
+        $this->post(route('logout'));
+    }
+
+    $this->assertSignOutThrottled($this->post(route('logout')));
+});
+
 it('records the sign-out on the account\'s trail', function () {
     $support = $this->supportsFor(Surface::SIGN_IN)[0];
     $account = $this->createAccount();

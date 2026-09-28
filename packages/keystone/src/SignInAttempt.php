@@ -28,6 +28,7 @@ class SignInAttempt
     public function __construct(
         protected KeystoneGuard $guard,
         protected AccountLookup $lookup,
+        protected RateLimiter $limiter,
         protected Timebox $timebox = new Timebox,
         protected SecurityEventRecorder $recorder = new SecurityEventRecorder,
     ) {
@@ -39,6 +40,8 @@ class SignInAttempt
      *
      * @param  array<string, mixed>  $input
      * @return (Model&KeystoneUser)|null
+     *
+     * @throws Throttled
      */
     public function attempt(?CredentialType $type, string $identifier, #[\SensitiveParameter] array $input): ?Model
     {
@@ -47,8 +50,10 @@ class SignInAttempt
                 return null;
             }
 
+            $flow = Flow::of($this->guard, Surface::SIGN_IN);
             $account = $this->subject($identifier);
-            [$proof, $credential] = $this->prove($type, $account, $input);
+            $taken = $this->limiter->takeFailedAttempt($flow, $type, $account, $identifier);
+            [$proof, $credential] = $this->prove($type, $account, $input, $taken);
 
             if ($account === null) {
                 return null;
@@ -89,6 +94,8 @@ class SignInAttempt
                 return null;
             }
 
+            $this->limiter->giveBack($taken);
+
             $this->recorder->record(
                 SecurityEventType::SIGNED_IN,
                 account: $account,
@@ -106,13 +113,13 @@ class SignInAttempt
     /**
      * Let the type verify the input against the subject's usable credentials, turning any failure into a rejection.
      *
-     * The proof comes back with the subject's credential it names, if any.
+     * The proof comes back with the subject's credential it names, if any. A failure gives the taken attempt back.
      *
      * @param  (Model&KeystoneUser)|null  $account
      * @param  array<string, mixed>  $input
      * @return array{Proof, ?StoredCredential}
      */
-    protected function prove(CredentialType $type, ?Model $account, #[\SensitiveParameter] array $input): array
+    protected function prove(CredentialType $type, ?Model $account, #[\SensitiveParameter] array $input, TakenAttempt $taken): array
     {
         $credentials = new Credentials($this->guard->userModel());
 
@@ -121,6 +128,7 @@ class SignInAttempt
             $proof = $type->verify(Surface::SIGN_IN, $input, $usable);
         } catch (Throwable $e) {
             report($e);
+            $this->limiter->giveBack($taken);
 
             return [Proof::rejected('keystone.verify_failed'), null];
         }

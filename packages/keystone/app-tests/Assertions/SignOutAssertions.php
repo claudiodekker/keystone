@@ -29,4 +29,17 @@ trait SignOutAssertions
     {
         $response->assertRedirectToRoute('login');
     }
+
+    /**
+     * Assert the response refuses the sign-out because its rate limit is spent, saying when to try again.
+     *
+     * @param  TestResponse<Response>  $response
+     */
+    public function assertSignOutThrottled(TestResponse $response): void
+    {
+        $seconds = $response->headers->get('Retry-After');
+
+        $response->assertTooManyRequests()
+            ->assertSee(__('keystone::messages.throttled', ['seconds' => $seconds]));
+    }
 }
