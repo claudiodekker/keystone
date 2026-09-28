@@ -29,8 +29,7 @@ describe('show', function () {
         $this->arrangeCredential($account, $this->support, Surface::SIGN_IN);
         signIn($this, $this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN));
 
-        $this->get(route('login'))->assertRedirect('/');
-
+        $this->assertSignedInSentAway($this->get(route('login')));
         $this->assertAuthenticatedAs($account);
     });
 });
@@ -65,8 +64,8 @@ describe('submit', function () {
         DB::table($account->getTable())->where($account->getKeyName(), $account->getKey())->update(['credential_epoch' => 3]);
 
         signIn($this, $this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN));
+        $this->get(route('login'));
 
-        $this->get(route('login'))->assertRedirect('/');
         $this->assertAuthenticatedAs($account);
     });
 
@@ -182,8 +181,9 @@ describe('submit', function () {
         signIn($this, $this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN));
         $sessionId = session()->getId();
 
-        signIn($this, $this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN))->assertRedirect('/');
+        $response = signIn($this, $this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN));
 
+        $this->assertSignedInSentAway($response);
         expect(session()->getId())->toBe($sessionId);
     });
 });

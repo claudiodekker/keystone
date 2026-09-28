@@ -41,4 +41,14 @@ trait SignInAssertions
     {
         $response->assertRedirect($intendedUrl);
     }
+
+    /**
+     * Assert the response sends a signed-in user away from the guest-only sign-in steps.
+     *
+     * @param  TestResponse<Response>  $response
+     */
+    public function assertSignedInSentAway(TestResponse $response): void
+    {
+        $response->assertRedirect('/');
+    }
 }

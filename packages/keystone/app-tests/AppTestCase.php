@@ -34,6 +34,9 @@ abstract class AppTestCase extends TestCase
      */
     public const string ASSERTIONS_NAMESPACE = 'Tests\\Keystone\\Assertions\\';
 
+    /**
+     * Set up the test environment, relaxing the timing floor and sending a same-origin browser's headers.
+     */
     protected function setUp(): void
     {
         parent::setUp();
