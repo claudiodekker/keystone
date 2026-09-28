@@ -3,10 +3,13 @@
 namespace ClaudioDekker\Keystone;
 
 use ClaudioDekker\Keystone\Actions\AccountLookup;
+use ClaudioDekker\Keystone\Http\Middleware\CaptureRequestContext;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use Illuminate\Auth\AuthManager;
 use Illuminate\Auth\EloquentUserProvider;
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Contracts\Http\Kernel;
+use Illuminate\Foundation\Http\Kernel as HttpKernel;
 use Illuminate\Support\ServiceProvider;
 use LogicException;
 
@@ -22,14 +25,19 @@ class KeystoneServiceProvider extends ServiceProvider
     {
         $this->app->singleton(CredentialTypes::class);
         $this->app->bindIf(AccountLookup::class);
+        $this->app->scoped(RequestContext::class, fn () => new RequestContext);
     }
 
     /**
      * Bootstrap the package services.
      */
-    public function boot(AuthManager $auth): void
+    public function boot(AuthManager $auth, Kernel $kernel): void
     {
         $auth->extend('keystone', $this->createGuard(...));
+
+        if ($kernel instanceof HttpKernel) {
+            $kernel->pushMiddleware(CaptureRequestContext::class);
+        }
 
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
         $this->loadTranslationsFrom(__DIR__.'/../lang', 'keystone');

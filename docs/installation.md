@@ -36,7 +36,7 @@ Only Keystone signs anyone in. `Auth::attempt()`, `Auth::once()`, `Auth::onceUsi
 
 Keystone's migration adds its columns to `users` and makes `email`, `password` and `remember_token` nullable strings (255, 255 and 100 characters). It never reads or drops them.
 
-Keystone's migrations also create `user_emails`, which holds each account's email addresses, and `user_credentials`, which holds every credential of every method in one table with its identifier and secret encrypted.
+Keystone's migrations also create `user_emails`, which holds each account's email addresses, and `user_credentials`, which holds every credential of every method in one table with its identifier and secret encrypted. A third table, `user_security_events`, holds each account's audit trail; see [Security events](security-events.md).
 
 ## Email addresses
 

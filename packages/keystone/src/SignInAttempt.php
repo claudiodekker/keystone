@@ -7,7 +7,6 @@ use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\Proof;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
 use ClaudioDekker\Keystone\Methods\Surface;
-use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Timebox;
 use LogicException;
@@ -30,6 +29,7 @@ class SignInAttempt
         protected KeystoneGuard $guard,
         protected AccountLookup $lookup,
         protected Timebox $timebox = new Timebox,
+        protected SecurityEventRecorder $recorder = new SecurityEventRecorder,
     ) {
         //
     }
@@ -43,17 +43,44 @@ class SignInAttempt
     public function attempt(?CredentialType $type, string $identifier, #[\SensitiveParameter] array $input): ?Model
     {
         return $this->timebox->call(function (Timebox $timebox) use ($type, $identifier, $input) {
-            $account = $type === null ? null : $this->prove($type, $identifier, $input);
+            if ($type === null) {
+                return null;
+            }
 
-            if ($account === null || (new SignInDecision)->demand($account) !== Demand::SIGN_IN) {
+            $account = $this->subject($identifier);
+            [$proof, $credential] = $this->prove($type, $account, $input);
+
+            if ($account === null) {
+                return null;
+            }
+
+            if (! $this->owns($account, $type, $proof)) {
+                $this->recordRejected($account, $type, $credential, $proof->reason ?? 'keystone.foreign_credential');
+
+                return null;
+            }
+
+            if ((new SignInDecision)->demand($account) !== Demand::SIGN_IN) {
+                $this->recordRejected($account, $type, $credential, 'keystone.barred');
+
                 return null;
             }
 
             try {
                 $this->guard->signIn($account);
             } catch (LogicException) {
+                $this->recordRejected($account, $type, $credential, 'keystone.barred');
+
                 return null;
             }
+
+            $this->recorder->record(
+                SecurityEventType::SIGNED_IN,
+                account: $account,
+                flow: Surface::SIGN_IN->value,
+                credentialType: $type->name(),
+                credential: $credential,
+            );
 
             $timebox->returnEarly();
 
@@ -62,26 +89,60 @@ class SignInAttempt
     }
 
     /**
-     * Get the named account, as read before verifying, when the proof names one of its credentials.
+     * Let the type verify the input against the subject's usable credentials, turning any failure into a rejection.
      *
+     * The proof comes back with the subject's credential it names, if any.
+     *
+     * @param  (Model&KeystoneUser)|null  $account
      * @param  array<string, mixed>  $input
-     * @return (Model&KeystoneUser)|null
+     * @return array{Proof, ?StoredCredential}
      */
-    protected function prove(CredentialType $type, string $identifier, #[\SensitiveParameter] array $input): ?Model
+    protected function prove(CredentialType $type, ?Model $account, #[\SensitiveParameter] array $input): array
     {
-        $account = $this->subject($identifier);
         $credentials = new Credentials($this->guard->userModel());
 
-        $usable = fn () => $account === null ? [] : $credentials->ofType($account->getKey(), $type->name());
-        $proof = $this->verify($type, $input, $usable);
+        try {
+            $usable = $account === null ? [] : $credentials->ofType($account->getKey(), $type->name());
+            $proof = $type->verify(Surface::SIGN_IN, $input, $usable);
+        } catch (Throwable $e) {
+            report($e);
 
-        if ($account === null || ! $proof->proven || $proof->credentialId === null) {
-            return null;
+            return [Proof::rejected('keystone.verify_failed'), null];
         }
 
+        $named = array_filter($usable, fn (StoredCredential $credential) => $credential->id === $proof->credentialId);
+
+        return [$proof, array_values($named)[0] ?? null];
+    }
+
+    /**
+     * Determine if the proof is proven and names a usable credential the account owns.
+     */
+    protected function owns(Model&KeystoneUser $account, CredentialType $type, Proof $proof): bool
+    {
+        if (! $proof->proven || $proof->credentialId === null) {
+            return false;
+        }
+
+        $credentials = new Credentials($this->guard->userModel());
         $owner = $credentials->ownerOf($proof->credentialId, $type->name());
 
-        return $owner !== null && (string) $owner === (string) $account->getKey() ? $account : null;
+        return $owner !== null && (string) $owner === (string) $account->getKey();
+    }
+
+    /**
+     * Record a refused sign-in for the account, naming only a credential the account owns.
+     */
+    protected function recordRejected(Model&KeystoneUser $account, CredentialType $type, ?StoredCredential $credential, string $reason): void
+    {
+        $this->recorder->record(
+            SecurityEventType::PROOF_REJECTED,
+            account: $account,
+            flow: Surface::SIGN_IN->value,
+            credentialType: $type->name(),
+            credential: $credential,
+            reason: $reason,
+        );
     }
 
     /**
@@ -99,22 +160,5 @@ class SignInAttempt
 
         /** @var (Model&KeystoneUser)|null */
         return $this->guard->userModel()->newQueryWithoutScopes()->whereKey($id)->first();
-    }
-
-    /**
-     * Let the type verify the input against the credentials, turning any failure into a rejection.
-     *
-     * @param  array<string, mixed>  $input
-     * @param  Closure(): list<StoredCredential>  $credentials
-     */
-    protected function verify(CredentialType $type, #[\SensitiveParameter] array $input, Closure $credentials): Proof
-    {
-        try {
-            return $type->verify(Surface::SIGN_IN, $input, $credentials());
-        } catch (Throwable $e) {
-            report($e);
-
-            return Proof::rejected('keystone.verify_failed');
-        }
     }
 }
