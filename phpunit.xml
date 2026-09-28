@@ -13,9 +13,11 @@
         </testsuite>
         <testsuite name="keystone">
             <directory>packages/keystone/tests</directory>
+            <directory>packages/keystone/app-tests</directory>
         </testsuite>
         <testsuite name="keystone-password">
             <directory>packages/keystone-password/tests</directory>
+            <directory>packages/keystone-password/app-tests</directory>
         </testsuite>
         <testsuite name="keystone-inertia-vue">
             <directory>packages/keystone-inertia-vue/tests</directory>

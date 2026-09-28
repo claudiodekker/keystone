@@ -8,8 +8,6 @@ providers:
 workbench:
     start: '/'
     install: true
-    discovers:
-        web: true
     build:
         - create-sqlite-db
         - migrate-fresh

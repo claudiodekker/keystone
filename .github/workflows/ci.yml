@@ -33,14 +33,14 @@ jobs:
 
         services:
             postgres:
-                image: postgres:17
+                image: ${{ matrix.database == 'pgsql' && 'postgres:17' || '' }}
                 env:
                     POSTGRES_DB: keystone
                     POSTGRES_PASSWORD: password
                 ports: ['5432:5432']
                 options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
             mysql:
-                image: mysql:8.4
+                image: ${{ matrix.database == 'mysql' && 'mysql:8.4' || '' }}
                 env:
                     MYSQL_DATABASE: keystone
                     MYSQL_ROOT_PASSWORD: password

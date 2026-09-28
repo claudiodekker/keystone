@@ -26,7 +26,7 @@ arch('debugging functions are never left in')
     ->not->toBeUsed();
 
 arch('src never depends on tests')
-    ->expect(TEST_NAMESPACES)
+    ->expect([...TEST_NAMESPACES, 'Tests'])
     ->toOnlyBeUsedIn([...TEST_NAMESPACES, 'Tests']);
 
 arch('core never depends on a method or adapter package')

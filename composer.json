@@ -52,6 +52,7 @@
         ],
         "check": [
             "@composer validate --strict",
+            "for manifest in packages/*/composer.json; do composer validate --strict --no-check-lock \"$manifest\" || exit 1; done",
             "@php vendor/bin/pint --test",
             "@php vendor/bin/phpstan analyse --memory-limit=1G --no-progress packages/*/src",
             "@php vendor/bin/pest",

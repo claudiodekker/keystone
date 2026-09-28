@@ -15,4 +15,4 @@ pest()->extend(TestCase::class)
         Sleep::fake(syncWithCarbon: true);
         Exceptions::fake();
     })
-    ->in('../packages/*/tests');
+    ->in('../packages/*/tests', '../packages/*/app-tests');
