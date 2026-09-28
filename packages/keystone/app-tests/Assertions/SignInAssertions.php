@@ -12,13 +12,17 @@ use Symfony\Component\HttpFoundation\Response;
 trait SignInAssertions
 {
     /**
-     * Assert the response is the sign-in page.
+     * Assert the response is the sign-in page, showing the status message when one is given.
      *
      * @param  TestResponse<Response>  $response
      */
-    public function assertSignInPage(TestResponse $response): void
+    public function assertSignInPage(TestResponse $response, ?string $status = null): void
     {
         $response->assertOk();
+
+        if ($status !== null) {
+            $response->assertSee($status);
+        }
     }
 
     /**
