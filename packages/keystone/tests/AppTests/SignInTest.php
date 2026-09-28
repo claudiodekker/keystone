@@ -1,0 +1,159 @@
+<?php
+
+use ClaudioDekker\Keystone\AccountLookup;
+use ClaudioDekker\Keystone\AppTests\AppTestCase;
+use ClaudioDekker\Keystone\Methods\CredentialTypes;
+use ClaudioDekker\Keystone\Methods\Proof;
+use ClaudioDekker\Keystone\Methods\StoredCredential;
+use ClaudioDekker\Keystone\Methods\Surface;
+use ClaudioDekker\Keystone\Tests\Fixtures\FormType;
+use ClaudioDekker\Keystone\Tests\Fixtures\FormTypeSupport;
+use ClaudioDekker\Keystone\Tests\Fixtures\RogueType;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Exceptions;
+
+pest()->extend(AppTestCase::class);
+
+describe('the sign-in page', function () {
+    it('lists the types serving sign-in with their initiate shapes', function () {
+        $this->app->make(CredentialTypes::class)->register(new FormType(name: 'second-factor', surfaces: ['challenge']));
+
+        $this->get(route('login'))->assertExactJson(['types' => [['type' => 'form', 'shape' => 'form']], 'status' => null]);
+    });
+
+    it('carries the translated status after signing out', function () {
+        $account = $this->createAccount();
+        $this->arrangeCredential($account, new FormTypeSupport, Surface::SIGN_IN);
+        $this->post(route('login.submit', ['type' => 'form']), ['identifier' => 'jane@example.com', ...(new FormTypeSupport)->validProof(Surface::SIGN_IN)]);
+        $this->post(route('logout'));
+
+        $this->get(route('login'))->assertJsonPath('status', 'You have been logged out.');
+    });
+
+    it('carries the app\'s own translation of the status', function () {
+        $this->app['translator']->addLines(['messages.status.signed-out' => 'See you soon.'], 'en', 'keystone');
+        session()->flash('keystone.status', 'signed-out');
+
+        $this->get(route('login'))->assertJsonPath('status', 'See you soon.');
+    });
+
+    it('ignores an unknown status', function () {
+        session()->flash('keystone.status', 'no-such-status');
+
+        $this->get(route('login'))->assertJsonPath('status', null);
+    });
+});
+
+describe('proofs', function () {
+    it('refuses a proof when the type fails, and reports the failure', function () {
+        Exceptions::fake();
+        $this->app->make(CredentialTypes::class)->register(new RogueType(fn () => throw new RuntimeException('Broken method.')));
+        $this->createAccount();
+
+        $this->post(route('login.submit', ['type' => 'rogue']), ['identifier' => 'jane@example.com'])
+            ->assertSessionHasErrors(['identifier' => 'These credentials do not match our records.']);
+
+        $this->assertGuest();
+        Exceptions::assertReported(fn (RuntimeException $e) => $e->getMessage() === 'Broken method.');
+    });
+
+    it('refuses a proof naming a credential the subject does not hold', function (Closure $credential) {
+        $jane = $this->createAccount();
+        $john = $this->createAccount('john@example.com');
+        $id = $credential->call($this, $jane, $john);
+        $this->app->make(CredentialTypes::class)->register(new RogueType(fn () => Proof::proven(new StoredCredential($id, null, null, null))));
+
+        $this->post(route('login.submit', ['type' => 'rogue']), ['identifier' => 'jane@example.com']);
+
+        $this->assertGuest();
+    })->with([
+        'another account\'s' => fn ($jane, $john) => rogueCredential($john),
+        'disabled' => function ($jane) {
+            $id = rogueCredential($jane);
+            DB::table('user_credentials')->where('id', $id)->update(['disabled_at' => now()]);
+
+            return $id;
+        },
+        'of another type' => fn ($jane) => rogueCredential($jane, 'form'),
+        'missing' => fn () => 999,
+    ]);
+
+    it('refuses a proven proof when no account was named', function () {
+        $id = rogueCredential($this->createAccount());
+        $this->app->make(CredentialTypes::class)->register(new RogueType(fn () => Proof::proven(new StoredCredential($id, null, null, null))));
+
+        $this->post(route('login.submit', ['type' => 'rogue']), ['identifier' => 'nobody@example.com']);
+
+        $this->assertGuest();
+    });
+
+    it('gives the type only the subject\'s usable credentials of its own type, and only its own input', function () {
+        $account = $this->createAccount();
+        $this->arrangeCredential($account, new FormTypeSupport, Surface::SIGN_IN);
+        $id = rogueCredential($account);
+        rogueCredential($this->createAccount('john@example.com'));
+        $this->app->make(CredentialTypes::class)->register($rogue = new RogueType(fn () => Proof::rejected('rogue.mismatch')));
+
+        $this->post(route('login.submit', ['type' => 'rogue']), ['identifier' => 'jane@example.com', 'secret' => 'typed', 'extra' => 'ignored']);
+
+        expect($rogue->calls)->toBe([[Surface::SIGN_IN, ['secret' => 'typed'], [$id]]]);
+    });
+
+    it('lets the type do its work when no account was named', function () {
+        $this->app->make(CredentialTypes::class)->register($rogue = new RogueType(fn () => Proof::rejected('rogue.mismatch')));
+
+        $this->post(route('login.submit', ['type' => 'rogue']), ['identifier' => 'nobody@example.com', 'secret' => 'typed']);
+
+        expect($rogue->calls)->toBe([[Surface::SIGN_IN, ['secret' => 'typed'], []]]);
+    });
+});
+
+describe('account lookup', function () {
+    it('signs in the account a swapped lookup names', function () {
+        $account = $this->createAccount();
+        $this->arrangeCredential($account, new FormTypeSupport, Surface::SIGN_IN);
+        $this->app->bind(AccountLookup::class, fn () => new class($account->getKey()) extends AccountLookup
+        {
+            public function __construct(protected int $id)
+            {
+                //
+            }
+
+            public function handle(string $identifier): int|string|null
+            {
+                return $identifier === 'employee-7' ? $this->id : null;
+            }
+        });
+
+        $this->post(route('login.submit', ['type' => 'form']), ['identifier' => 'employee-7', ...(new FormTypeSupport)->validProof(Surface::SIGN_IN)]);
+
+        $this->assertAuthenticatedAs($account);
+    });
+
+    it('still refuses a disabled account a swapped lookup names', function () {
+        $account = $this->createAccount();
+        $this->arrangeCredential($account, new FormTypeSupport, Surface::SIGN_IN);
+        DB::table('users')->where('id', $account->getKey())->update(['invalidated_at' => now()]);
+        $this->app->bind(AccountLookup::class, fn () => new class($account->getKey()) extends AccountLookup
+        {
+            public function __construct(protected int $id)
+            {
+                //
+            }
+
+            public function handle(string $identifier): int|string|null
+            {
+                return $this->id;
+            }
+        });
+
+        $this->post(route('login.submit', ['type' => 'form']), ['identifier' => 'anything', ...(new FormTypeSupport)->validProof(Surface::SIGN_IN)]);
+
+        $this->assertGuest();
+    });
+});
+
+function rogueCredential($account, string $type = 'rogue'): int
+{
+    return DB::table('user_credentials')->insertGetId(['user_id' => $account->getKey(), 'type' => $type]);
+}
