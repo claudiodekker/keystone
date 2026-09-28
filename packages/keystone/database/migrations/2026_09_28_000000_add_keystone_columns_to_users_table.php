@@ -14,8 +14,6 @@ return new class extends Migration
         Schema::table('users', function (Blueprint $table) {
             $table->unsignedBigInteger('credential_epoch')->default(0);
             $table->timestamp('credential_epoch_moved_at')->nullable();
-            $table->boolean('has_second_factor')->default(false);
-            $table->boolean('has_recovery_codes')->default(false);
             $table->timestamp('invalidated_at')->nullable();
             $table->timestamp('suspended_at')->nullable();
 

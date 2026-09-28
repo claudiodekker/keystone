@@ -249,8 +249,6 @@ it('works with a user model that has its own table and key name', function () {
     Schema::create('members', function (Blueprint $table) {
         $table->id('member_id');
         $table->unsignedBigInteger('credential_epoch')->default(0);
-        $table->boolean('has_second_factor')->default(false);
-        $table->boolean('has_recovery_codes')->default(false);
         $table->timestamp('invalidated_at')->nullable();
         $table->timestamp('suspended_at')->nullable();
         $table->softDeletes();
