@@ -33,5 +33,5 @@ interface CredentialTypeSupport
      *
      * @return array<string, mixed>
      */
-    public function wrongProof(Surface $surface): array;
+    public function rejectedProof(Surface $surface): array;
 }

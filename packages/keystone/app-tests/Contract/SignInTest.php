@@ -22,24 +22,24 @@ it('signs in with a valid proof of every installed type', function () {
     });
 });
 
-it('refuses a wrong proof of every installed type', function () {
+it('refuses a rejected proof of every installed type', function () {
     $this->eachSupportFor(Surface::SIGN_IN, function (CredentialTypeSupport $support) {
         $account = $this->createAccount("{$support->type()}@example.com");
         $this->arrangeCredential($account, $support, Surface::SIGN_IN);
 
-        submitSignIn($this, $support, "{$support->type()}@example.com", $support->wrongProof(Surface::SIGN_IN));
+        submitSignIn($this, $support, "{$support->type()}@example.com", $support->rejectedProof(Surface::SIGN_IN));
 
         $this->assertGuest();
     });
 });
 
-it('refuses a proof for no account exactly like a wrong one, for every installed type', function () {
+it('refuses a proof for no account exactly like a rejected one, for every installed type', function () {
     $this->eachSupportFor(Surface::SIGN_IN, function (CredentialTypeSupport $support) {
         $account = $this->createAccount("{$support->type()}@example.com");
         $this->arrangeCredential($account, $support, Surface::SIGN_IN);
 
         $this->assertIndistinguishable(
-            fn () => submitSignIn($this, $support, "{$support->type()}@example.com", $support->wrongProof(Surface::SIGN_IN)),
+            fn () => submitSignIn($this, $support, "{$support->type()}@example.com", $support->rejectedProof(Surface::SIGN_IN)),
             fn () => submitSignIn($this, $support, 'nobody@example.com', $support->validProof(Surface::SIGN_IN)),
         );
     });

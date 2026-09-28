@@ -27,7 +27,7 @@ class FormTypeSupport implements CredentialTypeSupport
         return ['secret' => self::SECRET];
     }
 
-    public function wrongProof(Surface $surface): array
+    public function rejectedProof(Surface $surface): array
     {
         return ['secret' => 'wrong '.self::SECRET];
     }

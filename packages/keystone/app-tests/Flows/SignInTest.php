@@ -85,11 +85,11 @@ describe('submit', function () {
         'protocol-relative' => ['//evil.example/dashboard', '/'],
     ]);
 
-    it('refuses a wrong proof without signing in', function () {
+    it('refuses a rejected proof without signing in', function () {
         $account = $this->createAccount();
         $this->arrangeCredential($account, $this->support, Surface::SIGN_IN);
 
-        $response = signIn($this, $this->support, 'jane@example.com', $this->support->wrongProof(Surface::SIGN_IN));
+        $response = signIn($this, $this->support, 'jane@example.com', $this->support->rejectedProof(Surface::SIGN_IN));
 
         $this->responses->assertSignInRefused($response);
         $this->assertGuest();
@@ -113,13 +113,13 @@ describe('submit', function () {
         'address held by two accounts' => fn () => $this->holdAddress($this->userFactory()->create(), 'jane@example.com'),
     ]);
 
-    it('refuses a wrong proof exactly like an unknown account', function () {
+    it('refuses a rejected proof exactly like an unknown account', function () {
         $account = $this->createAccount();
         $this->arrangeCredential($account, $this->support, Surface::SIGN_IN);
 
         $this->assertIndistinguishable(
-            fn () => signIn($this, $this->support, 'jane@example.com', $this->support->wrongProof(Surface::SIGN_IN)),
-            fn () => signIn($this, $this->support, 'nobody@example.com', $this->support->wrongProof(Surface::SIGN_IN)),
+            fn () => signIn($this, $this->support, 'jane@example.com', $this->support->rejectedProof(Surface::SIGN_IN)),
+            fn () => signIn($this, $this->support, 'nobody@example.com', $this->support->rejectedProof(Surface::SIGN_IN)),
         );
     });
 
@@ -155,7 +155,7 @@ describe('submit', function () {
 
         expect(session()->getOldInput())->toBe(['identifier' => 'jane@example.com']);
     })->with([
-        'refused' => fn () => $this->support->wrongProof(Surface::SIGN_IN),
+        'refused' => fn () => $this->support->rejectedProof(Surface::SIGN_IN),
         'invalid' => fn () => [],
     ]);
 
@@ -166,12 +166,12 @@ describe('submit', function () {
             ->assertSessionHasErrors(['identifier', ...array_keys($this->support->validProof(Surface::SIGN_IN))]);
     });
 
-    it('refuses a type that does not serve sign-in like a wrong proof', function () {
+    it('refuses a type that does not serve sign-in like a rejected proof', function () {
         $account = $this->createAccount();
         $this->arrangeCredential($account, $this->support, Surface::SIGN_IN);
 
         $this->assertIndistinguishable(
-            fn () => signIn($this, $this->support, 'jane@example.com', $this->support->wrongProof(Surface::SIGN_IN)),
+            fn () => signIn($this, $this->support, 'jane@example.com', $this->support->rejectedProof(Surface::SIGN_IN)),
             fn () => $this->post(route('login.submit', ['type' => 'no-such-type']), ['identifier' => 'jane@example.com']),
         );
         $this->assertGuest();
