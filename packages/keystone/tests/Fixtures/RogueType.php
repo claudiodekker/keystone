@@ -42,7 +42,7 @@ class RogueType implements CredentialType
         return ['sign-in' => InitiateShape::FORM];
     }
 
-    public function isMultiFactorOnItsOwn(): bool
+    public function representsMultipleFactors(): bool
     {
         return false;
     }

@@ -20,9 +20,9 @@ interface CredentialType
     public function surfaces(): array;
 
     /**
-     * Determine if a proof of this type is multi-factor on its own.
+     * Determine if a proof of this type represents multiple factors, so it signs in without a challenge.
      */
-    public function isMultiFactorOnItsOwn(): bool;
+    public function representsMultipleFactors(): bool;
 
     /**
      * Get the validation rules for the input verify takes on the surface.

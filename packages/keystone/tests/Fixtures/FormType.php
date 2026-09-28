@@ -39,7 +39,7 @@ class FormType implements CredentialType
         return array_fill_keys($this->surfaces, InitiateShape::FORM);
     }
 
-    public function isMultiFactorOnItsOwn(): bool
+    public function representsMultipleFactors(): bool
     {
         return false;
     }
