@@ -19,4 +19,14 @@ trait SignOutAssertions
     {
         $response->assertRedirectToRoute('login');
     }
+
+    /**
+     * Assert the response sends a guest away from the signed-in-only sign-out step.
+     *
+     * @param  TestResponse<Response>  $response
+     */
+    public function assertGuestSentAway(TestResponse $response): void
+    {
+        $response->assertRedirectToRoute('login');
+    }
 }

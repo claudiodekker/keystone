@@ -24,6 +24,7 @@ it('signs out, ending the session and regenerating the CSRF token', function () 
         ->and(session('keystone.status'))->toBe('signed-out');
 });
 
-it('sends a guest to the sign-in page', function () {
-    $this->post(route('logout'))->assertRedirectToRoute('login');
+it('sends a guest away', function () {
+    $this->assertGuestSentAway($this->post(route('logout')));
+    $this->assertGuest();
 });

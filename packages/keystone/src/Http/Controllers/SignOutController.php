@@ -5,6 +5,7 @@ namespace ClaudioDekker\Keystone\Http\Controllers;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Status;
 use Illuminate\Contracts\Support\Responsable;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -21,7 +22,7 @@ abstract class SignOutController
         $guard = Keystone::guard();
 
         if (! $guard->check()) {
-            return redirect()->route('login');
+            return $this->refuseGuest();
         }
 
         $guard->signOut();
@@ -35,4 +36,12 @@ abstract class SignOutController
      * Respond to a completed sign-out.
      */
     abstract protected function sendSignedOut(Request $request): Response|Responsable;
+
+    /**
+     * Send a guest away from a signed-in step.
+     */
+    protected function refuseGuest(): RedirectResponse
+    {
+        return redirect()->route('login');
+    }
 }
