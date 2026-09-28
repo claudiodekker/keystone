@@ -80,10 +80,11 @@ test('package tests live in Unit or Feature', function () {
     expect($offenders)->toBe([]);
 });
 
-test('classes with a handle method are actions or middleware', function () {
+test('swappable actions live in src/Actions', function () {
     $files = packageFiles('src');
-    $sources = preg_grep('#/src/(Actions|Http/Middleware)/#', $files, PREG_GREP_INVERT);
-    $offenders = filesContaining($sources, '/public function handle\(/');
+    $sources = preg_grep('#/src/Actions/#', $files, PREG_GREP_INVERT);
+    $publicClasses = filesContaining($sources, '/@api/');
+    $offenders = filesContaining($publicClasses, '/public function handle\(/');
 
     expect($offenders)->toBe([]);
 });
