@@ -3,3 +3,7 @@ includes:
 
 parameters:
     level: 8
+
+    ignoreErrors:
+        - identifier: trait.unused
+          path: packages/*/src/Has*.php
