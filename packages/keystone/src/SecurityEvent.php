@@ -77,12 +77,12 @@ class SecurityEvent extends Model
     /**
      * Keep the time the event occurred in UTC, whatever the app's timezone.
      *
-     * @return Attribute<CarbonImmutable|null, DateTimeInterface>
+     * @return Attribute<CarbonImmutable, DateTimeInterface>
      */
     protected function occurredAt(): Attribute
     {
         return Attribute::make(
-            get: fn (?string $value) => $value === null ? null : CarbonImmutable::parse($value, 'UTC'),
+            get: fn (string $value) => CarbonImmutable::parse($value, 'UTC'),
             set: function (DateTimeInterface $value) {
                 $utc = CarbonImmutable::instance($value)->utc();
                 $format = $this->getDateFormat();
