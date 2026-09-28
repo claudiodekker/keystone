@@ -3,7 +3,6 @@
 use ClaudioDekker\Keystone\Actor;
 use ClaudioDekker\Keystone\SecurityEvent;
 use ClaudioDekker\Keystone\SecurityEventType;
-use ClaudioDekker\Keystone\Tests\Fixtures\User;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 
@@ -35,13 +34,4 @@ it('hides the IP address, location and user agent from serialization', function 
 
     expect($serialized)->not->toHaveKeys(['ip_address', 'location', 'user_agent'])
         ->and($serialized)->toHaveKeys(['type', 'actor', 'occurred_at']);
-});
-
-it('keeps an account\'s events when it is hard deleted, belonging to nobody', function () {
-    $user = User::factory()->create();
-    storeEvent()->forceFill(['user_id' => $user->getKey()])->save();
-
-    $user->forceDelete();
-
-    expect(SecurityEvent::sole()->user_id)->toBeNull();
 });

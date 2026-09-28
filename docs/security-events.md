@@ -45,5 +45,3 @@ Every event has the same fields, and never typed input, secrets, codes, tokens o
 ## The log line
 
 Every event logs one `info` line with the message `keystone.security_event` and every field above in its context, `ip_address` and `user_agent` included. Events about nobody are only logged, and an identical one (same type, IP address and path) is logged at most once a minute. While your cache is down, every one is logged.
-
-When an account is deleted for good, its events stay in the table with `user_id` set to null.
