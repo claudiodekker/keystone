@@ -2,7 +2,6 @@
 
 use ClaudioDekker\Keystone\Actions\AccountLookup;
 use ClaudioDekker\Keystone\AppTests\AppTestCase;
-use ClaudioDekker\Keystone\Http\PageValues\SignInPage;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Proof;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
@@ -16,18 +15,11 @@ use Illuminate\Support\Facades\Exceptions;
 
 pest()->extend(AppTestCase::class);
 
-function signInPage(AppTestCase $test): SignInPage
-{
-    $test->get(route('login'));
-
-    return app(SignInPage::class);
-}
-
 describe('the sign-in page', function () {
     it('lists the types serving sign-in with their initiate shapes', function () {
         $this->app->make(CredentialTypes::class)->register(new FormType(name: 'second-factor', surfaces: ['challenge']));
 
-        expect(signInPage($this)->types)->toBe([['type' => 'form', 'shape' => 'form']]);
+        $this->get(route('login'))->assertExactJson(['types' => [['type' => 'form', 'shape' => 'form']], 'status' => null]);
     });
 
     it('carries the translated status after signing out', function () {
@@ -36,20 +28,20 @@ describe('the sign-in page', function () {
         $this->post(route('login.submit', ['type' => 'form']), ['identifier' => 'jane@example.com', ...(new FormTypeSupport)->validProof(Surface::SIGN_IN)]);
         $this->post(route('logout'));
 
-        expect(signInPage($this)->status)->toBe('You have been logged out.');
+        $this->get(route('login'))->assertJsonPath('status', 'You have been logged out.');
     });
 
     it('carries the app\'s own translation of the status', function () {
         $this->app['translator']->addLines(['messages.status.signed-out' => 'See you soon.'], 'en', 'keystone');
         session()->flash('keystone.status', 'signed-out');
 
-        expect(signInPage($this)->status)->toBe('See you soon.');
+        $this->get(route('login'))->assertJsonPath('status', 'See you soon.');
     });
 
     it('ignores an unknown status', function () {
         session()->flash('keystone.status', 'no-such-status');
 
-        expect(signInPage($this)->status)->toBeNull();
+        $this->get(route('login'))->assertJsonPath('status', null);
     });
 });
 

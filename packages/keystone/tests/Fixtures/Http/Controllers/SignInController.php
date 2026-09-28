@@ -4,17 +4,15 @@ namespace ClaudioDekker\Keystone\Tests\Fixtures\Http\Controllers;
 
 use ClaudioDekker\Keystone\Http\Controllers\SignInController as Controller;
 use ClaudioDekker\Keystone\Http\PageValues\SignInPage;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 
 class SignInController extends Controller
 {
-    protected function sendSignInPage(Request $request, SignInPage $page): Response
+    protected function sendSignInPage(Request $request, SignInPage $page): JsonResponse
     {
-        app()->instance(SignInPage::class, $page);
-
-        return response('The sign-in page.');
+        return response()->json(['types' => $page->types, 'status' => $page->status]);
     }
 
     protected function sendSignInRefused(Request $request, string $message): RedirectResponse
