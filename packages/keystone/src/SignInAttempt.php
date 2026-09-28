@@ -153,8 +153,7 @@ class SignInAttempt
         CredentialType $type,
         ?StoredCredential $credential,
         string $reason,
-    ): void
-    {
+    ): void {
         $this->recorder->record(
             SecurityEventType::PROOF_REJECTED,
             account: $account,
