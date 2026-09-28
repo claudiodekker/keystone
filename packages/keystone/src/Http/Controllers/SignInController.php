@@ -38,13 +38,14 @@ abstract class SignInController
             return $this->refuseSignedIn();
         }
 
-        return $this->sendSignInPage($request, new SignInPage(
-            types: array_map(fn (CredentialType $type) => [
-                'type' => $type->name(),
-                'shape' => $type->surfaces()[Surface::SIGN_IN->value]->value,
-            ], $this->types()->serving(Surface::SIGN_IN)),
-            status: Status::flashed($request)?->label(),
-        ));
+        $types = array_map(fn (CredentialType $type) => [
+            'type' => $type->name(),
+            'shape' => $type->surfaces()[Surface::SIGN_IN->value]->value,
+        ], $this->types()->serving(Surface::SIGN_IN));
+
+        $page = new SignInPage(types: $types, status: Status::flashed($request)?->label());
+
+        return $this->sendSignInPage($request, $page);
     }
 
     /**
@@ -58,9 +59,11 @@ abstract class SignInController
 
         $credentialType = $this->types()->find($type, Surface::SIGN_IN);
 
+        $typeRules = $credentialType?->rules(Surface::SIGN_IN) ?? [];
+
         $validator = Validator::make($request->all(), [
             self::IDENTIFIER => ['required', 'string', 'max:255'],
-            ...$credentialType?->rules(Surface::SIGN_IN) ?? [],
+            ...$typeRules,
         ]);
 
         if ($validator->fails()) {
@@ -68,8 +71,11 @@ abstract class SignInController
         }
 
         $input = $validator->validated();
-        $account = (new SignInAttempt(Keystone::guard(), app(AccountLookup::class)))
-            ->attempt($credentialType, $input[self::IDENTIFIER], Arr::except($input, self::IDENTIFIER));
+        $identifier = $input[self::IDENTIFIER];
+        $proofInput = Arr::except($input, self::IDENTIFIER);
+
+        $attempt = new SignInAttempt(Keystone::guard(), app(AccountLookup::class));
+        $account = $attempt->attempt($credentialType, $identifier, $proofInput);
 
         if ($account === null) {
             $this->flashIdentifier($request);
@@ -77,10 +83,10 @@ abstract class SignInController
             return $this->sendSignInRefused($request, __('keystone::messages.failed'));
         }
 
-        return $this->sendSignedIn($request, IntendedUrl::sanitize(
-            $request->session()->pull('url.intended'),
-            (string) config('app.url'),
-        ));
+        $intended = $request->session()->pull('url.intended');
+        $intendedUrl = IntendedUrl::sanitize($intended, (string) config('app.url'));
+
+        return $this->sendSignedIn($request, $intendedUrl);
     }
 
     /**

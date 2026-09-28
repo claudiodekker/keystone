@@ -129,11 +129,14 @@ abstract class AppTestCase extends TestCase
      */
     protected function arrangeCredential(Model&KeystoneUser $account, CredentialTypeSupport $support, Surface $surface): void
     {
+        $type = $this->types()->find($support->type(), $surface)
+            ?? $this->fail("The [{$support->type()}] credential type doesn't serve {$surface->value}.");
         $arranged = $support->arrange($surface);
+        $credentials = new Credentials(Keystone::guard()->userModel());
 
-        (new Credentials(Keystone::guard()->userModel()))->store(
+        $credentials->store(
             $account,
-            $this->types()->find($support->type(), $surface) ?? $this->fail("The [{$support->type()}] credential type doesn't serve {$surface->value}."),
+            $type,
             identifier: $arranged['identifier'],
             secret: $arranged['secret'],
             label: $arranged['label'],

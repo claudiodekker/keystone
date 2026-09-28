@@ -29,7 +29,9 @@ class SignInDecision
      */
     public function isBarred(Model&KeystoneUser $account): bool
     {
-        foreach ([...self::BARRING_COLUMNS, $account->getDeletedAtColumn()] as $column) {
+        $columns = [...self::BARRING_COLUMNS, $account->getDeletedAtColumn()];
+
+        foreach ($columns as $column) {
             if (! is_null($account->getRawOriginal($column))) {
                 return true;
             }

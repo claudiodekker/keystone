@@ -26,7 +26,9 @@ class Addresses
      */
     public static function normalize(string $address): string
     {
-        $address = Str::lower(Normalizer::normalize(trim($address), Normalizer::FORM_C) ?: trim($address));
+        $address = trim($address);
+        $address = Normalizer::normalize($address, Normalizer::FORM_C) ?: $address;
+        $address = Str::lower($address);
 
         if (! str_contains($address, '@')) {
             return $address;
@@ -34,8 +36,9 @@ class Addresses
 
         $local = Str::beforeLast($address, '@');
         $domain = Str::afterLast($address, '@');
+        $domain = idn_to_ascii($domain, IDNA_NONTRANSITIONAL_TO_ASCII) ?: $domain;
 
-        return $local.'@'.(idn_to_ascii($domain, IDNA_NONTRANSITIONAL_TO_ASCII) ?: $domain);
+        return $local.'@'.$domain;
     }
 
     /**
@@ -45,18 +48,23 @@ class Addresses
     {
         $users = $this->users->getTable();
         $key = $this->users->getKeyName();
+        $deletedAt = $this->users->getDeletedAtColumn();
+
+        $holdsAVerifiedAddress = fn (Builder $query) => $query
+            ->from('user_emails', 'verified')
+            ->whereColumn('verified.user_id', 'user_emails.user_id')
+            ->whereNotNull('verified.verified_at');
+
+        $countsAsVerified = fn (Builder $query) => $query
+            ->whereNotNull('user_emails.verified_at')
+            ->orWhereNotExists($holdsAVerifiedAddress);
 
         $holders = $this->users->getConnection()->table('user_emails')
             ->join($users, "{$users}.{$key}", '=', 'user_emails.user_id')
             ->where('user_emails.address', static::normalize($address))
-            ->whereNull("{$users}.{$this->users->getDeletedAtColumn()}")
+            ->whereNull("{$users}.{$deletedAt}")
             ->whereNull("{$users}.invalidated_at")
-            ->where(fn (Builder $query) => $query
-                ->whereNotNull('user_emails.verified_at')
-                ->orWhereNotExists(fn (Builder $query) => $query
-                    ->from('user_emails', 'verified')
-                    ->whereColumn('verified.user_id', 'user_emails.user_id')
-                    ->whereNotNull('verified.verified_at')))
+            ->where($countsAsVerified)
             ->distinct()
             ->limit(2)
             ->pluck('user_emails.user_id');

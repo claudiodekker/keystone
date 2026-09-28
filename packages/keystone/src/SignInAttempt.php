@@ -72,7 +72,8 @@ class SignInAttempt
         $account = $this->subject($identifier);
         $credentials = new Credentials($this->guard->userModel());
 
-        $proof = $this->verify($type, $input, fn () => $account === null ? [] : $credentials->ofType($account->getKey(), $type->name()));
+        $usable = fn () => $account === null ? [] : $credentials->ofType($account->getKey(), $type->name());
+        $proof = $this->verify($type, $input, $usable);
 
         if ($account === null || ! $proof->proven || $proof->credentialId === null) {
             return null;

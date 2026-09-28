@@ -53,17 +53,19 @@ class Credentials
      */
     public function ofType(int|string $accountId, string $type): array
     {
-        return array_values($this->usable($type)
+        $rows = $this->usable($type)
             ->where('user_id', $accountId)
             ->orderBy('id')
-            ->get()
-            ->map(fn (object $row) => new StoredCredential(
-                id: $row->id,
-                identifier: $row->identifier === null ? null : Crypt::decryptString($row->identifier),
-                secret: $row->secret === null ? null : Crypt::decryptString($row->secret),
-                label: $row->label,
-            ))
-            ->all());
+            ->get();
+
+        $credentials = $rows->map(fn (object $row) => new StoredCredential(
+            id: $row->id,
+            identifier: $row->identifier === null ? null : Crypt::decryptString($row->identifier),
+            secret: $row->secret === null ? null : Crypt::decryptString($row->secret),
+            label: $row->label,
+        ));
+
+        return array_values($credentials->all());
     }
 
     /**
