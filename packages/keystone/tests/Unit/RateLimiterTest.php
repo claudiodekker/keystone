@@ -12,6 +12,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Exceptions;
 
+beforeEach(function () {
+    $this->freezeSecond();
+});
+
 function limiter(string $ip = '203.0.113.5'): RateLimiter
 {
     $request = Request::create('/', server: ['REMOTE_ADDR' => $ip]);
@@ -46,7 +50,6 @@ function retryAfter(Closure $callback): ?int
 
 describe('request limit', function () {
     it('allows each step kind its requests a minute, then refuses until the minute ends', function (StepKind $kind, int $allowance) {
-        $this->freezeSecond();
         hitTimes(limiter(), $kind, $allowance);
 
         expect(retryAfter(fn () => limiter()->hitRequest($kind)))->toBe(60);
@@ -58,7 +61,6 @@ describe('request limit', function () {
     ]);
 
     it('tells how long until the spent key expires', function () {
-        $this->freezeSecond();
         hitTimes(limiter(), StepKind::SUBMIT, 10);
 
         $this->travel(15)->seconds();
@@ -67,7 +69,6 @@ describe('request limit', function () {
     });
 
     it('allows requests again once the minute has passed', function () {
-        $this->freezeSecond();
         hitTimes(limiter(), StepKind::SUBMIT, 10);
 
         $this->travel(60)->seconds();
@@ -117,7 +118,6 @@ describe('request limit', function () {
 
 describe('failed-attempt limit', function () {
     it('allows 20 failed attempts an hour, then refuses until the hour ends', function () {
-        $this->freezeSecond();
         failTimes(limiter(), 20);
 
         $this->travel(10)->minutes();
@@ -126,7 +126,6 @@ describe('failed-attempt limit', function () {
     });
 
     it('allows failed attempts again once the hour has passed', function () {
-        $this->freezeSecond();
         failTimes(limiter(), 20);
 
         $this->travel(1)->hour();
@@ -154,8 +153,17 @@ describe('failed-attempt limit', function () {
             ->and(retryAfter(fn () => failTimes(limiter(), 1)))->toBe(3600);
     });
 
+    it('gives back an attempt later in the window it was taken in', function () {
+        failTimes(limiter(), 19);
+        $taken = limiter()->takeFailedAttempt(Flow::SIGN_IN, new FormType, null, 'nobody@example.com');
+        $this->travel(30)->minutes();
+
+        limiter()->giveBack($taken);
+
+        expect(retryAfter(fn () => failTimes(limiter(), 1)))->toBeNull();
+    });
+
     it('gives nothing back once the attempt\'s hour has ended', function () {
-        $this->freezeSecond();
         $taken = limiter()->takeFailedAttempt(Flow::SIGN_IN, new FormType, null, 'nobody@example.com');
         $this->travel(1)->hour();
         failTimes(limiter(), 20);

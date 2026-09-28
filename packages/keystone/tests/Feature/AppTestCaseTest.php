@@ -5,6 +5,8 @@ use ClaudioDekker\Keystone\AppTests\Assertions\SignInAssertions;
 use ClaudioDekker\Keystone\Tests\Fixtures\ProbeAssertions;
 use ClaudioDekker\Keystone\Tests\Fixtures\UnrelatedProbeAssertions;
 use ClaudioDekker\Keystone\Tests\Fixtures\UserWithoutFactory;
+use Illuminate\Cache\ArrayStore;
+use Illuminate\Cache\RateLimiter as CacheRateLimiter;
 use Illuminate\Support\Facades\Route;
 use PHPUnit\Framework\AssertionFailedError;
 
@@ -20,6 +22,14 @@ it('sends Sec-Fetch-Site as a same-origin browser would', function () {
     Route::get('probe', fn () => request()->header('Sec-Fetch-Site'));
 
     $this->get('probe')->assertContent('same-origin');
+});
+
+it('counts rate limits in a fresh in-memory store', function () {
+    $counter = $this->app->make(CacheRateLimiter::class);
+    $store = (fn () => $this->cache)->call($counter)->getStore();
+
+    expect($store)->toBeInstanceOf(ArrayStore::class)
+        ->and(config('cache.limiter'))->toBe('array');
 });
 
 describe('assertIndistinguishable', function () {

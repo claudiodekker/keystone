@@ -29,7 +29,7 @@ abstract class SignOutController
         $guard = Keystone::guard();
 
         try {
-            (new RateLimiter($request, $guard))->hitRequest(StepKind::CHANGE);
+            $this->limiter($request)->hitRequest(StepKind::CHANGE);
         } catch (Throttled $throttled) {
             return $this->refuseThrottled($request, $throttled->retryAfterSeconds);
         }
@@ -66,6 +66,14 @@ abstract class SignOutController
         $message = __('keystone::messages.throttled', ['seconds' => $retryAfterSeconds]);
 
         return response($message, Response::HTTP_TOO_MANY_REQUESTS, ['Retry-After' => $retryAfterSeconds]);
+    }
+
+    /**
+     * Get core's rate limiter for the request.
+     */
+    protected function limiter(Request $request): RateLimiter
+    {
+        return new RateLimiter($request, Keystone::guard());
     }
 
     /**

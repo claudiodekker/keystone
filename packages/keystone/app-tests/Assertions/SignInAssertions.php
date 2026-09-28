@@ -46,6 +46,7 @@ trait SignInAssertions
         $seconds = $response->headers->get('Retry-After');
 
         $response->assertTooManyRequests()
+            ->assertHeader('Retry-After')
             ->assertSee(__('keystone::messages.throttled', ['seconds' => $seconds]));
     }
 

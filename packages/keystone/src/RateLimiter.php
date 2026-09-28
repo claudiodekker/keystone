@@ -6,6 +6,7 @@ use ClaudioDekker\Keystone\Methods\CredentialType;
 use Illuminate\Cache\RateLimiter as CacheRateLimiter;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Normalizer;
 use Throwable;
@@ -34,6 +35,21 @@ class RateLimiter
      * How long a refusal asks the client to wait while the store is down.
      */
     public const int OUTAGE_RETRY_AFTER_SECONDS = 60;
+
+    /**
+     * How long before its window ends a failed attempt can no longer be given back.
+     */
+    public const int GIVE_BACK_MARGIN_SECONDS = 1;
+
+    /**
+     * The bytes an IPv4-mapped IPv6 address starts with.
+     */
+    public const string IPV4_MAPPED_PREFIX = "\0\0\0\0\0\0\0\0\0\0\xff\xff";
+
+    /**
+     * The bytes of an IPv6 address its /64 network keeps.
+     */
+    public const int IPV6_NETWORK_BYTES = 8;
 
     /**
      * The source part of a failed attempt from a browser that isn't a known device.
@@ -93,8 +109,9 @@ class RateLimiter
         ]);
 
         try {
-            $count = $this->store()->increment($key, self::FAILED_ATTEMPT_WINDOW_SECONDS);
-            $availableInSeconds = $this->store()->availableIn($key);
+            $count = $this->counter()->increment($key, self::FAILED_ATTEMPT_WINDOW_SECONDS);
+            $retryAfterSeconds = $this->retryAfter([$key]);
+            $windowEndsAt = $this->windowEndsAt($key);
         } catch (Throwable $e) {
             report($e);
 
@@ -102,10 +119,10 @@ class RateLimiter
         }
 
         if ($count > self::FAILED_ATTEMPT_ALLOWANCE) {
-            throw new Throttled(max(1, $availableInSeconds));
+            throw new Throttled($retryAfterSeconds);
         }
 
-        return new TakenAttempt($key, windowEndsAt: now()->getTimestamp() + $availableInSeconds);
+        return new TakenAttempt($key, $windowEndsAt);
     }
 
     /**
@@ -114,11 +131,12 @@ class RateLimiter
     public function giveBack(TakenAttempt $attempt): void
     {
         try {
-            $availableInSeconds = $this->store()->availableIn($attempt->key);
-            $windowEndsAt = now()->getTimestamp() + $availableInSeconds;
+            $windowEndsAt = $this->windowEndsAt($attempt->key);
+            $availableInSeconds = $this->counter()->availableIn($attempt->key);
 
-            if ($availableInSeconds > 0 && $windowEndsAt === $attempt->windowEndsAt) {
-                $this->store()->decrement($attempt->key, self::FAILED_ATTEMPT_WINDOW_SECONDS);
+            // Laravel's decrement starts a new window when the key expires first.
+            if ($windowEndsAt === $attempt->windowEndsAt && $availableInSeconds > self::GIVE_BACK_MARGIN_SECONDS) {
+                $this->counter()->decrement($attempt->key, self::FAILED_ATTEMPT_WINDOW_SECONDS);
             }
         } catch (Throwable $e) {
             report($e);
@@ -153,7 +171,7 @@ class RateLimiter
         $spent = [];
 
         foreach ($keys as $key) {
-            $count = $this->store()->increment($key, self::REQUEST_WINDOW_SECONDS);
+            $count = $this->counter()->increment($key, self::REQUEST_WINDOW_SECONDS);
 
             if ($count > $allowance) {
                 $spent[] = $key;
@@ -170,7 +188,7 @@ class RateLimiter
      */
     protected function retryAfter(array $spent): int
     {
-        $seconds = array_map(fn (string $key) => $this->store()->availableIn($key), $spent);
+        $seconds = array_map(fn (string $key) => $this->counter()->availableIn($key), $spent);
 
         return max(1, ...$seconds);
     }
@@ -203,12 +221,14 @@ class RateLimiter
         }
 
         $packed = (string) inet_pton($ip);
-        $mappedPrefix = str_repeat("\0", 10)."\xff\xff";
+        $prefixBytes = strlen(self::IPV4_MAPPED_PREFIX);
+        $network = substr($packed, 0, self::IPV6_NETWORK_BYTES);
+        $host = str_repeat("\0", self::IPV6_NETWORK_BYTES);
 
         $masked = match (true) {
-            strlen($packed) === 4 => $packed,
-            str_starts_with($packed, $mappedPrefix) => substr($packed, 12),
-            default => substr($packed, 0, 8).str_repeat("\0", 8),
+            ! str_contains($ip, ':') => $packed,
+            str_starts_with($packed, self::IPV4_MAPPED_PREFIX) => substr($packed, $prefixBytes),
+            default => $network.$host,
         };
 
         return (string) inet_ntop($masked);
@@ -223,12 +243,14 @@ class RateLimiter
     {
         $canonical = array_map(function (string $part) {
             $normalized = Normalizer::normalize($part, Normalizer::FORM_C);
+            $composed = $normalized === false ? $part : $normalized;
 
-            return mb_strtolower($normalized === false ? $part : $normalized);
+            return mb_strtolower($composed);
         }, $parts);
 
         $message = json_encode($canonical, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE);
-        $subkey = hash_hmac('sha256', "keystone.rate-limiter.{$purpose}", $this->appKey(), binary: true);
+        $appKey = $this->appKey();
+        $subkey = hash_hmac('sha256', "keystone.rate-limiter.{$purpose}", $appKey, binary: true);
         $digest = hash_hmac('sha256', $message, $subkey);
 
         return "keystone:{$digest}";
@@ -245,8 +267,19 @@ class RateLimiter
     /**
      * Get Laravel's rate limiter, counting in the limiter cache store.
      */
-    protected function store(): CacheRateLimiter
+    protected function counter(): CacheRateLimiter
     {
         return app(CacheRateLimiter::class);
+    }
+
+    /**
+     * Get the timestamp the window of the key's count ends at, or null when it has none.
+     */
+    protected function windowEndsAt(string $key): ?int
+    {
+        $storeName = config('cache.limiter');
+        $timer = Cache::store(is_string($storeName) ? $storeName : null)->get("{$key}:timer");
+
+        return is_numeric($timer) ? (int) $timer : null;
     }
 }

@@ -102,11 +102,10 @@ abstract class SignInController
         $identifier = $input[self::IDENTIFIER];
         $proofInput = Arr::except($input, self::IDENTIFIER);
 
-        $attempt = new SignInAttempt(
-            Keystone::guard(),
-            app(AccountLookup::class),
-            $this->limiter($request),
-        );
+        $guard = Keystone::guard();
+        $lookup = app(AccountLookup::class);
+        $limiter = $this->limiter($request);
+        $attempt = new SignInAttempt($guard, $lookup, $limiter);
         $account = $attempt->attempt($credentialType, $identifier, $proofInput);
 
         if ($account === null) {

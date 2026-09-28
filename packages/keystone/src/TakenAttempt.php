@@ -12,7 +12,7 @@ readonly class TakenAttempt
      */
     public function __construct(
         public string $key,
-        public int $windowEndsAt,
+        public ?int $windowEndsAt,
     ) {
         //
     }
