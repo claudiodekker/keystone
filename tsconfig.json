@@ -1,0 +1,19 @@
+{
+    "compilerOptions": {
+        "target": "ESNext",
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "strict": true,
+        "noEmit": true,
+        "isolatedModules": true,
+        "skipLibCheck": true,
+        "types": ["node", "vite/client"]
+    },
+    "include": [
+        "vite.config.ts",
+        "workbench/resources/js/**/*",
+        "packages/*/resources/js/**/*",
+        "packages/*/stubs/**/*.ts",
+        "packages/*/stubs/**/*.vue"
+    ]
+}

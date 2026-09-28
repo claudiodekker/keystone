@@ -1,0 +1,22 @@
+{
+    "name": "claudiodekker/keystone",
+    "description": "Security-first authentication for Laravel.",
+    "license": "MIT",
+    "require": {
+        "php": "^8.4",
+
+        "illuminate/support": "^13.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "ClaudioDekker\\Keystone\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "ClaudioDekker\\Keystone\\KeystoneServiceProvider"
+            ]
+        }
+    }
+}

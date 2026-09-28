@@ -1,7 +1,7 @@
 ### Working agreements
 
 - TDD for all code (`/tdd`): red, green, refactor. No untested logic.
-- No documentation beyond `CONTEXT.md`, ADRs and `docs/agents/`. No docblocks that restate types, no README prose.
+- No documentation beyond `CONTEXT.md`, ADRs, `docs/agents/` and the user docs in `docs/`. A PR that changes behaviour updates its user docs page. No docblocks that restate types, no README prose.
 - `.scratch/` holds research that fed past decisions. Don't read it unless a decision (spec, ticket, ADR) lacks the specifics you need.
 - Small PRs: one ticket, one tracer-bullet slice per PR.
 - Laravel, Pest and Boost MCP guidance: @docs/agents/laravel.md

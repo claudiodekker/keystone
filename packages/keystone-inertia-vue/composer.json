@@ -1,0 +1,22 @@
+{
+    "name": "claudiodekker/keystone-inertia-vue",
+    "description": "Inertia and Vue pages for Keystone.",
+    "license": "MIT",
+    "require": {
+        "php": "^8.4",
+        "claudiodekker/keystone": "self.version",
+        "illuminate/support": "^13.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "ClaudioDekker\\Keystone\\InertiaVue\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "ClaudioDekker\\Keystone\\InertiaVue\\InertiaVueServiceProvider"
+            ]
+        }
+    }
+}
