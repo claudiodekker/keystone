@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->timestamp('occurred_at');
             $table->string('type', 64);
-            $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->unsignedBigInteger('user_id')->nullable();
             $table->string('actor', 16);
             $table->string('flow', 32)->nullable();
             $table->string('credential_type', 64)->nullable();
