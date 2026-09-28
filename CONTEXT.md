@@ -63,6 +63,9 @@ _Avoid_: user id
 Creating an account. The account is real from that moment, even while it still owes an enrollment.
 _Avoid_: claimed user, signup placeholder
 
+**Proof**:
+What a credential type's verify answers: the typed input proves one stored credential, or it is rejected. It names a credential, never a user; core reads the credential's owner itself.
+
 **Recovery codes**:
 Single-use break-glass codes that stand in for a lost factor.
 _Avoid_: backup codes

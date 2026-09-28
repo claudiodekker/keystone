@@ -2,10 +2,12 @@
 
 namespace ClaudioDekker\Keystone;
 
+use Carbon\CarbonInterface;
 use Illuminate\Auth\EloquentUserProvider;
 use Illuminate\Auth\SessionGuard;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Date;
 use LogicException;
 
 /**
@@ -15,13 +17,6 @@ use LogicException;
  */
 class KeystoneGuard extends SessionGuard
 {
-    /**
-     * The columns, besides the soft-delete column, that bar an account from signing in when set.
-     *
-     * @var list<string>
-     */
-    protected const array BARRING_COLUMNS = ['invalidated_at', 'suspended_at'];
-
     /**
      * Get the currently authenticated user.
      *
@@ -57,9 +52,9 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Start a signed-in session for the user, stamped with their credential epoch.
+     * Start a signed-in session for the user, stamped with the credential epoch they were read with.
      */
-    public function signIn(KeystoneUser $user): void
+    public function signIn(Model&KeystoneUser $user): void
     {
         $account = $this->retrieveAccount($user->getAuthIdentifier());
 
@@ -74,11 +69,44 @@ class KeystoneGuard extends SessionGuard
         $this->rotate();
 
         $this->session->put($this->getName(), $user->getAuthIdentifier());
-        $this->session->put($this->epochKey(), $this->epochOf($account));
+        $this->session->put($this->epochKey(), $this->epochOf($user));
+        $this->session->put($this->signedInAtKey(), Date::now()->getTimestamp());
 
         $this->fireLoginEvent($user);
 
         $this->setUser($user);
+    }
+
+    /**
+     * End the signed-in session and regenerate its CSRF token.
+     */
+    public function signOut(): void
+    {
+        $this->logout();
+
+        $this->session->invalidate();
+        $this->session->regenerateToken();
+    }
+
+    /**
+     * Get the time the session signed in.
+     */
+    public function signedInAt(): ?CarbonInterface
+    {
+        $timestamp = $this->session->get($this->signedInAtKey());
+
+        return is_int($timestamp) ? Date::createFromTimestamp($timestamp) : null;
+    }
+
+    /**
+     * Get a new instance of the user model.
+     *
+     * @return Model&KeystoneUser
+     */
+    public function userModel(): Model
+    {
+        /** @var Model&KeystoneUser */
+        return $this->provider->createModel();
     }
 
     /**
@@ -168,7 +196,7 @@ class KeystoneGuard extends SessionGuard
      */
     protected function retrieveAccount(mixed $id): ?Model
     {
-        $model = $this->provider->createModel();
+        $model = $this->userModel();
 
         /** @var (Model&KeystoneUser)|null */
         return $model->newQueryWithoutScopes()->where($model->getAuthIdentifierName(), $id)->first();
@@ -188,15 +216,7 @@ class KeystoneGuard extends SessionGuard
      */
     protected function isActive(Model&KeystoneUser $account): bool
     {
-        $columns = [...self::BARRING_COLUMNS, $account->getDeletedAtColumn()];
-
-        foreach ($columns as $column) {
-            if (! is_null($account->getRawOriginal($column))) {
-                return false;
-            }
-        }
-
-        return true;
+        return ! (new SignInDecision)->isBarred($account);
     }
 
     /**
@@ -231,5 +251,13 @@ class KeystoneGuard extends SessionGuard
     protected function epochKey(): string
     {
         return 'keystone_epoch_'.$this->name;
+    }
+
+    /**
+     * Get the session key holding the time the session signed in.
+     */
+    protected function signedInAtKey(): string
+    {
+        return 'keystone_signed_in_at_'.$this->name;
     }
 }

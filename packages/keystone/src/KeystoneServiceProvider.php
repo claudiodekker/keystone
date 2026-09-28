@@ -2,6 +2,8 @@
 
 namespace ClaudioDekker\Keystone;
 
+use ClaudioDekker\Keystone\Actions\AccountLookup;
+use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use Illuminate\Auth\AuthManager;
 use Illuminate\Auth\EloquentUserProvider;
 use Illuminate\Contracts\Foundation\Application;
@@ -14,6 +16,15 @@ use LogicException;
 class KeystoneServiceProvider extends ServiceProvider
 {
     /**
+     * Register the package services.
+     */
+    public function register(): void
+    {
+        $this->app->singleton(CredentialTypes::class);
+        $this->app->bindIf(AccountLookup::class);
+    }
+
+    /**
      * Bootstrap the package services.
      */
     public function boot(AuthManager $auth): void
@@ -21,6 +32,7 @@ class KeystoneServiceProvider extends ServiceProvider
         $auth->extend('keystone', $this->createGuard(...));
 
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+        $this->loadTranslationsFrom(__DIR__.'/../lang', 'keystone');
     }
 
     /**

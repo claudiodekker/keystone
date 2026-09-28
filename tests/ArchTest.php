@@ -11,6 +11,7 @@ const PACKAGE_NAMESPACES = [
 ];
 
 const TEST_NAMESPACES = [
+    'ClaudioDekker\Keystone\AppTests',
     'ClaudioDekker\Keystone\Tests',
     'ClaudioDekker\Keystone\Password\Tests',
     'ClaudioDekker\Keystone\WebAuthn\Tests',

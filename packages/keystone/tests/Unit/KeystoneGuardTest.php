@@ -11,6 +11,7 @@ use ClaudioDekker\Keystone\Tests\Fixtures\UserWithoutScopes;
 use ClaudioDekker\Keystone\Tests\Fixtures\UserWithUuidIdentifier;
 use Closure;
 use Illuminate\Auth\Events\Login;
+use Illuminate\Auth\Events\Logout;
 use Illuminate\Auth\Recaller;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Auth\User as LaravelUser;
@@ -263,4 +264,45 @@ it('works with a user model that has its own table and key name', function () {
     DB::table('members')->where('member_id', $member->getKey())->increment('credential_epoch');
 
     expect(nextRequest()->user())->toBeNull();
+});
+
+it('stamps the credential epoch the account was read with, not the current one', function () {
+    $user = User::factory()->create();
+    $read = User::query()->findOrFail($user->getKey());
+
+    DB::table('users')->where('id', $user->getKey())->increment('credential_epoch');
+    Auth::guard('web')->signIn($read);
+
+    expect(nextRequest()->user())->toBeNull();
+});
+
+it('stamps the sign-in time', function () {
+    $this->freezeSecond();
+
+    Auth::guard('web')->signIn(User::factory()->create());
+
+    expect(Auth::guard('web')->signedInAt()?->getTimestamp())->toBe(now()->getTimestamp());
+});
+
+it('has no sign-in time while nobody signed in', function () {
+    expect(Auth::guard('web')->signedInAt())->toBeNull();
+});
+
+it('ends the session and regenerates the CSRF token when signing out', function () {
+    Event::fake([Logout::class]);
+    $user = User::factory()->create();
+    $guard = Auth::guard('web');
+    $guard->signIn($user);
+    $session = app('session.store');
+    $session->put('app-data', 'kept until sign-out');
+    [$id, $token] = [$session->getId(), $session->token()];
+
+    $guard->signOut();
+
+    expect($guard->user())->toBeNull()
+        ->and(nextRequest()->user())->toBeNull()
+        ->and($session->getId())->not->toBe($id)
+        ->and($session->token())->not->toBe($token)
+        ->and($session->has('app-data'))->toBeFalse();
+    Event::assertDispatched(Logout::class, fn (Logout $event) => $event->user->is($user));
 });
