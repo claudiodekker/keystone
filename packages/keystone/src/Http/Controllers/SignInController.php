@@ -43,7 +43,10 @@ abstract class SignInController
             'shape' => $type->surfaces()[Surface::SIGN_IN->value]->value,
         ], $this->types()->serving(Surface::SIGN_IN));
 
-        $page = new SignInPage(types: $types, status: Status::flashed($request)?->label());
+        $page = new SignInPage(
+            types: $types,
+            status: Status::flashed($request)?->label(),
+        );
 
         return $this->sendSignInPage($request, $page);
     }
