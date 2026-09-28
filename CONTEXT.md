@@ -14,7 +14,7 @@ A package that adds one way to prove who you are, such as password, WebAuthn, TO
 _Avoid_: plugin, driver, provider
 
 **Frontend adapter**:
-A package that gives core its pages: Inertia-Vue first, Blade second.
+A package that gives core its pages in one frontend stack.
 
 **Show step**:
 The only kind of request that renders a page. Every submission ends in a redirect to one.
@@ -24,17 +24,17 @@ The facts core hands a show step's page, named once so both frontend adapters us
 _Avoid_: page props (for the core side)
 
 **Response hook**:
-A method on a core controller that the app's published copy implements, turning one outcome into the response the user sees.
+The place on a published controller where the application turns one outcome into the response the user sees.
 _Avoid_: responder
 
 ### Extension
 
 **Swappable**:
-A class an application may replace: an Action or Operation through the container with a subclass, unless it makes a security decision; a model with any class meeting that model's contract.
+A class an application may replace with its own: any Action, Operation or model, except one that makes a security decision.
 _Avoid_: sealed (for the classes that aren't)
 
 **AppTests**:
-Core-owned tests that run inside the application and fail when its wiring or swaps break one of Keystone's guarantees. An application may skip one to accept that deviation.
+Core-owned tests that run inside the application and fail when its wiring or swaps break one of Keystone's guarantees.
 
 **Accepted deviation**:
 An AppTest the application has chosen to skip, recorded with its reason in the application's own repository.
@@ -68,13 +68,13 @@ Single-use break-glass codes that stand in for a lost factor.
 _Avoid_: backup codes
 
 **Account recovery**:
-Getting back into an account after losing a factor, by proving the inbox plus one second factor the account still holds, or the inbox alone when it holds none. Every credential except the one that proved it is replaced.
+Getting back into an account after losing a factor, by proving the inbox plus one second factor the account still holds, or the inbox alone when it holds none. Every other credential is removed, and a new first factor is enrolled unless the prover signs in on its own.
 _Avoid_: password reset, forgot password
 
 ### Security
 
 **Sudo**:
-A short, time-limited grant on a signed-in session, earned by proving again what a sign-in would demand, that allows changes affecting authentication.
+A short grant on a signed-in session, bound to its network, that allows changes affecting authentication. Every real sign-in brings it (never a remembered return or a recovery), and proving again what a sign-in would demand earns it back.
 _Avoid_: password confirmation, step-up
 
 **Remember-me cookie**:
@@ -107,7 +107,7 @@ A session that has named an account but still owes a challenge, an enrollment or
 _Avoid_: park, half-authenticated, held user
 
 **Credential epoch**:
-A per-account counter that moves whenever the account's credentials change in a way that should end its other sessions. A session or remember-me cookie from an older epoch is dead.
+A per-account counter that moves whenever the account's other sessions must end, such as on a password change, credential removal, recovery, suspension or "sign out others". A session or remember-me cookie from an older epoch is dead.
 
 **Ceremony slot**:
 A method's in-flight data for one step, such as a WebAuthn challenge or a TOTP secret being enrolled. It never outlives the state that owns it.
@@ -121,10 +121,10 @@ Core's one limiter, holding three limits. A spent limit always refuses the same 
 How many requests one IP address and session may make to a kind of step in a short window.
 
 **Failed-attempt limit**:
-How many wrong answers an account may get per credential type, in each flow, over a long window.
+How many wrong answers an account may get per credential type, in each flow, over a long window. TOTP shares one count across flows.
 
 **Delivery limit**:
-How many emails or prompts may be sent to one person per credential type, in each flow, over a window.
+How many emails may be sent to one person per credential type, in each flow, over a window.
 
 ### Email addresses
 
@@ -133,7 +133,7 @@ An email address on an account whose owner has proven control of the inbox.
 _Avoid_: confirmed email
 
 **Unverified address**:
-An email address on an account whose inbox control is not yet proven. While an account has no verified address, its unverified addresses count as verified.
+An email address on an account whose inbox control is not yet proven. While an account has no verified address, its unverified addresses count as verified, including for blocking others.
 _Avoid_: pending email
 
 **Primary address**:
@@ -141,7 +141,7 @@ The one address an account is known by and shown as.
 _Avoid_: main email, login email
 
 **Claim conflict**:
-Several accounts holding the same address that no active account has verified. Whichever verifies it first keeps it, and it is removed from the others. Only an active account's verified address blocks anyone else.
+Several accounts holding the same address that no active account has verified or counts as verified. Whichever verifies it first keeps it, and it is removed from the others.
 _Avoid_: ownership contest, takeover
 
 **Disabled account**:
@@ -149,7 +149,7 @@ A deleted or invalidated account still inside its restore window. Its addresses 
 _Avoid_: soft-deleted user
 
 **Invalidated account**:
-An account left with no address after losing a claim conflict. It can no longer be reached and is pruned.
+An account left with no address after losing a claim conflict. It can no longer be reached and is pruned after the restore window unless an operator restores it.
 _Avoid_: orphaned account, placeholder user
 
 **Suspended account**:
@@ -159,5 +159,5 @@ _Avoid_: banned user, locked account
 ### Moving to Keystone
 
 **Backfill**:
-A migration a package's installer publishes, only when the application already holds that package's kind of data, that copies it into Keystone's own tables.
+A one-time copy of an application's existing authentication data, such as Fortify's, into Keystone's own tables.
 _Avoid_: import, sync
