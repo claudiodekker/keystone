@@ -1,0 +1,70 @@
+{
+    "name": "claudiodekker/keystone-monorepo",
+    "description": "The Keystone monorepo.",
+    "license": "MIT",
+    "type": "project",
+    "require": {
+        "php": "^8.4",
+        "illuminate/support": "^13.0"
+    },
+    "require-dev": {
+        "larastan/larastan": "^3.12",
+        "laravel/pint": "^1.32",
+        "orchestra/testbench": "^11.0",
+        "pestphp/pest": "^5.2"
+    },
+    "replace": {
+        "claudiodekker/keystone": "self.version",
+        "claudiodekker/keystone-inertia-vue": "self.version",
+        "claudiodekker/keystone-password": "self.version"
+    },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "packages/*"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "ClaudioDekker\\Keystone\\": "packages/keystone/src/",
+            "ClaudioDekker\\Keystone\\InertiaVue\\": "packages/keystone-inertia-vue/src/",
+            "ClaudioDekker\\Keystone\\Password\\": "packages/keystone-password/src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "ClaudioDekker\\Keystone\\InertiaVue\\Tests\\": "packages/keystone-inertia-vue/tests/",
+            "ClaudioDekker\\Keystone\\Password\\Tests\\": "packages/keystone-password/tests/",
+            "ClaudioDekker\\Keystone\\Tests\\": "packages/keystone/tests/",
+            "Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "post-autoload-dump": [
+            "@clear",
+            "@prepare"
+        ],
+        "clear": "@php vendor/bin/testbench package:purge-skeleton --ansi",
+        "prepare": "@php vendor/bin/testbench package:discover --ansi",
+        "serve": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php vendor/bin/testbench serve --ansi"
+        ],
+        "check": [
+            "@composer validate --strict",
+            "for manifest in packages/*/composer.json; do composer validate --strict --no-check-lock \"$manifest\" || exit 1; done",
+            "@php vendor/bin/pint --test",
+            "@php vendor/bin/phpstan analyse --memory-limit=1G --no-progress packages/*/src",
+            "@php vendor/bin/pest",
+            "npm run check"
+        ]
+    },
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        },
+        "sort-packages": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

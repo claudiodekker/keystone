@@ -1,0 +1,10 @@
+/vendor/
+/node_modules/
+/workbench/public/build/
+/.scratch/
+/.claude/
+*.md
+*.php
+composer.json
+composer.lock
+package-lock.json

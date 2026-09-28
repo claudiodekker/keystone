@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         cacheDirectory=".phpunit.cache"
+         colors="true"
+         failOnRisky="true"
+         failOnWarning="true"
+>
+    <testsuites>
+        <testsuite name="Arch">
+            <directory>tests</directory>
+        </testsuite>
+        <testsuite name="keystone">
+            <directory>packages/keystone/tests</directory>
+            <directory>packages/keystone/app-tests</directory>
+        </testsuite>
+        <testsuite name="keystone-password">
+            <directory>packages/keystone-password/tests</directory>
+            <directory>packages/keystone-password/app-tests</directory>
+        </testsuite>
+        <testsuite name="keystone-inertia-vue">
+            <directory>packages/keystone-inertia-vue/tests</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>packages/keystone/src</directory>
+            <directory>packages/keystone-password/src</directory>
+            <directory>packages/keystone-inertia-vue/src</directory>
+        </include>
+    </source>
+    <php>
+        <env name="APP_ENV" value="testing"/>
+        <env name="BCRYPT_ROUNDS" value="4"/>
+        <env name="CACHE_STORE" value="array"/>
+        <env name="DB_CONNECTION" value="sqlite"/>
+        <env name="DB_DATABASE" value=":memory:"/>
+        <env name="MAIL_MAILER" value="array"/>
+        <env name="QUEUE_CONNECTION" value="sync"/>
+        <env name="SESSION_DRIVER" value="array"/>
+    </php>
+</phpunit>

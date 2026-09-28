@@ -1,0 +1,13 @@
+laravel: '@testbench'
+
+providers:
+    - ClaudioDekker\Keystone\KeystoneServiceProvider
+    - ClaudioDekker\Keystone\Password\PasswordServiceProvider
+    - ClaudioDekker\Keystone\InertiaVue\InertiaVueServiceProvider
+
+workbench:
+    start: '/'
+    install: true
+    build:
+        - create-sqlite-db
+        - migrate-fresh
