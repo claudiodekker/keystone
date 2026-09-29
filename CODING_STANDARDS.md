@@ -21,14 +21,14 @@ The class type tells you where code runs: Actions run in the request, jobs run o
 - External results come back asynchronously (webhook, polling job, status job). A request never blocks waiting for them.
 - Action names are verb then entity (`CreatePost`, `SyncTags`). CRUD uses `Create`, `Update` and `Delete`; a use case that isn't plain CRUD takes its own verb (`PublishPost`, `ArchiveTeam`).
 - Actions inject other Actions through the constructor as `protected` properties.
-- Actions take typed arguments (`Post $post, string $title, PostStatus $status`), and callers pass them as named arguments. An Action that edits several fields of a record, some of which a request may leave out, takes a shaped `$attributes` array instead (`array{title?: string, summary?: ?string}`), so a field that wasn't sent stays untouched and one sent as `null` is cleared. Create and Update Actions return the model.
+- Create and Update Actions return the model.
 - Any Action or job that writes more than one row or model wraps the writes in `DB::transaction()`. Remote API calls stay outside the transaction, and jobs dispatched inside one use `afterCommit()`.
 - Side effects that must not fail the operation, such as broadcasts and notifications, are wrapped in `rescue()`.
 - Enum-driven branching uses `match`.
 
 ## 3. HTTP layer
 
-- Validation lives in a Form Request. Callers pass an Action each validated value through a typed accessor on its key (`$request->string('title')->value()`, `->integer()`, `->enum()`), and an `$attributes` array through `safe()->only([...])`, which leaves out keys the request didn't send.
+- Validation lives in a Form Request. Actions receive validated data: `validated()`, `safe()->only([...])`, or a typed accessor (`->boolean()`, `->enum()`) on a validated key.
 - A Form Request is named after the Action it feeds, with the Action's verb (`CreatePostRequest` for `CreatePost`, `PublishPostRequest` for `PublishPost`), or after the flow it holds (`LoginRequest`). Not after the controller method (`StorePostRequest`).
 - A method on a Form Request derives something (a `period()` that turns `'7d'` into a date), or holds a whole request-bound flow like `LoginRequest::authenticate()`. It doesn't wrap a single typed accessor such as `$this->boolean('is_draft')`.
 - A Form Request keeps the stub's `rules()`, with a `//` body when it has none. A request the record's current state refuses (a post already published) fails in the Form Request's `after()`, not in a try/catch in the controller or a check in the Action. Each `after()` closure opens with `if ($validator->errors()->any()) { return; }`, so it only checks input that passed `rules()`.
@@ -71,7 +71,7 @@ The class type tells you where code runs: Actions run in the request, jobs run o
 - Arrays carry shapes (`array{host: string, port: int}`) or `list<T>`. Keep `mixed` out of APIs you own. A shape that keeps growing is a sign it should become a value object.
 - Fixed sets of values are backed enums with UPPER_CASE cases. Each enum owns its display text through a `label()` method, usually provided by a shared trait. Status, type and queue-name literals are replaced by enum cases or constants.
 - Variables and columns that carry a unit include it in the name, e.g. `$maxUploadMb`, `$sizeBytes`, `$timeoutSeconds`.
-- Calls with several parameters of the same type use named arguments. Action calls always do (§2).
+- Calls with several parameters of the same type use named arguments.
 - Each step that does real work (reads rows, plans, writes, hashes, calls another class) gets its own statement and a named variable. Don't nest it inside another call's argument, where a reader skims past it, e.g. `$post->update(['tags' => $this->names((new SyncTags(...))->plan())])`.
 - Money is a `Brick\Money\Money`, never a float or an int.
 - In apps, collections are preferred over manual loops for transformations.
