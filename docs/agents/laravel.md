@@ -10,14 +10,13 @@
 ## Guardrails
 
 - Don't delete tests or test files without approval.
-- Don't create new folders (e.g. `app/Pricing`) or add dependencies without approval.
+- Don't create new top-level folders under `app/` or a package's `src/` (e.g. `src/Pricing`) or add dependencies without approval. Area subfolders (`Controllers/Admin`, `tests/Feature/Admin`) and the framework's standard folders (`Http/Middleware`, `Models/Concerns`, `resources/js/components`) need no approval.
 - Artisan: pass `--no-interaction` to `make:*` commands. Read config with dot keys: `config:show app.name`. Tinker: `tinker --execute '...'` in single quotes.
 - After PHP edits: `vendor/bin/pint --dirty --format agent`.
 
 ## Laravel
 
 - Local scopes over global scopes. A global scope also applies to route model binding and every relation.
-- No new Action/Service/FormRequest for trivial code (e.g. a single inline validation rule).
 - Typed request accessors: `$request->integer()`, `->boolean()`, `->string()`. No `(int)` casts.
 - Build URLs with `Uri::of($base)->withQuery([...])`, not string concatenation or `http_build_query`.
 - Scheduled tasks that share constraints: `Schedule::hourly()->onOneServer()->group(fn () => ...)`. Keep `onOneServer()` whenever more than one server can run the scheduler.
@@ -28,9 +27,8 @@
 Coverage
 
 - Cover every decision: each branch, validation rule, calculation and authorization, including boundaries (e.g. 8 vs 8.25 hours).
-- Authorization: full role × ability matrix in the policy test (dataset). Each endpoint gets one HTTP test for one refused role.
+- Authorization: through HTTP, never by calling the gate or policy. Each endpoint's own tests get one role test with a shared role dataset: every role reaches it or is refused.
 - Validation: one empty-payload test for all required fields. Test rules through the endpoint, never by asserting on `rules()`.
-- If a unit test and a feature test catch the same defect, trim the feature test to one case (it proves the wiring). Never remove the last case.
 - Escaping: assert the escaped value is present and the raw value is absent. Don't assert an exact quote entity.
 - No real-browser tests (`pest-plugin-browser`, Dusk) unless the user asks.
 

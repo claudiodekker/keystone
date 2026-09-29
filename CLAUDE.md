@@ -16,6 +16,13 @@ Before opening a PR:
 
 If the diff changes after the PR is open, re-run /pr to update the description.
 
+- Answer review comments on the PR itself, in full. The thread gets at most a link.
+- Open at most two PRs ahead of review. Each stacked PR is reviewed against its own base.
+- Fix review feedback in the PR it was left on, even when later PRs extend that code.
+- With more than one PR open, give the review and merge order in the thread.
+- After a retro changes `CODING_STANDARDS.md`, re-review every open PR against it.
+- Only a PR that is green and next to merge is ready for review; keep every other PR a draft. Mark a PR draft before pushing to it, and ready again once its checks pass.
+
 ## Agent skills
 
 ### Issue tracker

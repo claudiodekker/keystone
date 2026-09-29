@@ -2,32 +2,49 @@
 
 The reviewer reads this file. Apply every rule to each changed hunk in the diff. Skip anything the repo's tooling already enforces (Pint, PHPStan/Larastan, arch tests, ESLint, type coverage).
 
-Sections 1–16 cover Laravel apps and packages in general. Where a legacy repo already has a different established convention, **follow the repo** within that area; the rule describes the intent. Section 16 applies only to packages.
+Sections 1–16 cover Laravel apps and packages in general. Where a legacy repo already has a different established convention, **follow the repo** within that area; the rule describes the intent. Section 17 applies only to packages.
 
 ## 1. Sibling changes
 
 - A fix to one member of a **sibling set** (`Create*`/`Update*`/`Delete*` actions, jobs, Form Requests, hooks or listeners of the same kind, controllers sharing a helper) must also cover the other members in the same diff. Grep for them. If a sibling is left alone, the PR description says why.
 - Changing a shared value (queue name, config key, enum case, a function's signature) updates every place it is used, not just the one in the ticket.
 
-## 2. Actions
+## 2. Actions and jobs
 
-- Business logic lives in an Action class under `app/Actions`, with one public `handle()` method. Controllers, jobs and commands call Actions.
-- Action names are verb then entity (`CreatePost`, `SyncTags`). Verbs come from a small fixed set: `Create`, `Update`, `Delete`, `Sync`, `Attach`, `Detach`, `Ensure`.
+The class type tells you where code runs: Actions run in the request, jobs run on the queue.
+
+- Controllers validate input with a Form Request, call one Action, and return. They hold no business logic.
+- Actions (`app/Actions`, or `src/Actions` in a package) are the use cases a request triggers, with one public `handle()` method. They only change state: write or update records, record activity, broadcast, dispatch jobs. No slow or failure-prone work: no provisioning, third-party writes, file processing or cleanup.
+- Jobs (`app/Jobs`) are queued, retryable work, and the job's `handle()` holds that work's logic. Don't wrap a single Action in a thin job: if the work belongs on the queue, it belongs in the job. A job may call Actions for shared state changes, not to hold its main logic.
+- Jobs are safe to retry: running `handle()` twice gives the same result.
+- Commands and tests run queued work with `Job::dispatchSync()` or by calling `handle()` directly. They don't need an Action for that.
+- An Action may make a synchronous external call only when the request can't finish without the result (an id or credential needed to create the record, or a payment outcome the user must see). Keep that call small and queue everything after it. Read-only external calls that feed a page render are allowed; cache them where possible.
+- External results come back asynchronously (webhook, polling job, status job). A request never blocks waiting for them.
+- Action names are verb then entity (`CreatePost`, `SyncTags`). CRUD uses `Create`, `Update` and `Delete`; a use case that isn't plain CRUD takes its own verb (`PublishPost`, `ArchiveTeam`).
 - Actions inject other Actions through the constructor as `protected` properties.
-- Any Action that writes more than one row or model wraps the writes in `DB::transaction()`. Remote API calls stay outside the transaction, and jobs dispatched inside one use `afterCommit()`.
+- A Create Action takes typed arguments (`string $title, PostStatus $status`), called with named arguments. An Update Action takes a shaped `$attributes` array (`array{title?: string}`), since the update is partial. Create and Update Actions return the model.
+- Any Action or job that writes more than one row or model wraps the writes in `DB::transaction()`. Remote API calls stay outside the transaction, and jobs dispatched inside one use `afterCommit()`.
 - Side effects that must not fail the operation, such as broadcasts and notifications, are wrapped in `rescue()`.
 - Enum-driven branching uses `match`.
 
 ## 3. HTTP layer
 
-- Validation lives in a Form Request. Actions receive validated data (`validated()` or `safe()->only([...])`).
+- Validation lives in a Form Request. Actions receive validated data: `validated()`, `safe()->only([...])`, or a typed accessor (`->boolean()`, `->enum()`) on a validated key.
+- A Form Request is named after the Action it feeds, with the Action's verb (`CreatePostRequest` for `CreatePost`, `PublishPostRequest` for `PublishPost`), or after the flow it holds (`LoginRequest`). Not after the controller method (`StorePostRequest`).
+- A method on a Form Request derives something (a `period()` that turns `'7d'` into a date, an `options()` that picks a subset of `validated()`), or holds a whole request-bound flow like `LoginRequest::authenticate()`. It doesn't wrap a single typed accessor such as `$this->boolean('is_draft')`.
+- A Form Request keeps the stub's `rules()`, with a `//` body when it has none. A request the record's current state refuses (a post already published) fails in the Form Request's `after()`, not in a try/catch in the controller or a check in the Action. Each `after()` closure opens with `if ($validator->errors()->any()) { return; }`, so it only checks input that passed `rules()`.
 - Every endpoint is authorized in exactly one place: a policy through route `->can()`, `$this->authorize()`, or Form Request `authorize()`. It has a test proving the denied case, and special account states (suspended, banned, read-only) are part of that authorization.
 - A controller method resolves input, calls one Action, and returns a response: `back()` for form submits, `to_route()` for named redirects. Controllers use only resource methods or `__invoke`.
+- A controller method injects its Action as `$action`: `store(CreatePostRequest $request, CreatePost $action)`.
+- A name users tell records apart by (a team's name, a project's name) is unique: a unique index plus a `unique` rule on create and update, ignoring the record itself on update.
 - **Update** requests accept partial payloads: fields use `sometimes`/`nullable`, and cross-field rules (`requiredIf`, uniqueness excluding self) only run when the related fields are present. Every update endpoint has a test that sends a minimal payload.
 - A field gated by a feature flag is gated in both places: the Form Request rule and the value the frontend submits.
 - Responses return shaped data (API Resource, `only([...])`, Data object), never a raw model or collection. Call `->values()` after filtering a collection that becomes a JSON list.
 - Controllers and props do not instantiate external API clients just to build a URL or label; derive those from the model or enum.
 - Query-string numbers (`page`, `limit`, `per_page`) are validated and clamped before use.
+- Route names say what the page is. A single page is not `*.index`; `index` is only for a list with siblings like `create` and `store`.
+- A resource's routes sit in `Route::prefix('posts')->name('posts.')->group(...)`, one verb per line. Routes on one record nest in a `Route::prefix('{post}')` group, with `/` for the record itself (`patch('/')`). A single route needs no group: `Route::get('tags/{tag}', ...)->name('tags.show')`.
+- An area's controllers, pages and tests share a subfolder: `Controllers\Admin`, `pages/Admin`, `tests/Feature/Admin`.
 
 ## 4. Queries
 
@@ -35,6 +52,7 @@ Sections 1–16 cover Laravel apps and packages in general. Where a legacy repo 
 - Queries with an explicit `select([...])` include every column the consumer reads. Adding a field means checking those selects.
 - Queries built for a user are scoped to their tenant/organization, including inside `whereHas()` and `with()` closures. `with()` constraints don't filter the parent; use `whereHas()` for that.
 - Queries in request paths are bounded by pagination, a limit or a date window.
+- A loop over rows doesn't query or write per row. Load the set once, match in memory, and write the changes in one query (`whereKey($ids)->update([...])`, `upsert()`).
 
 ## 5. Models and null-safety
 
@@ -43,6 +61,10 @@ Sections 1–16 cover Laravel apps and packages in general. Where a legacy repo 
 - Columns holding tokens, secrets or keys are listed in `$hidden` or use `encrypted` casts.
 - A new column written via `create()`/`update()` is added to `$fillable` in the same diff.
 - Every nullable value is guarded (`?->`, `?? default`, early return) before it is dereferenced or passed to a non-nullable parameter. That covers optional relations, nullable enum casts, optional payload keys and framework/event properties.
+- Behaviour that isn't the model's own concern (slugs, public ids) goes in a trait under `Models/Concerns`.
+- Local scopes read as conditions: `wherePublished()`/`whereNotPublished()`, not `published()` or `active()`.
+- A new column doesn't duplicate one the framework already keeps: no `occurred_at` next to `created_at`.
+- A state users act on (archived, complete) is a column set by an explicit step, not inferred from matching timestamps. Age-based checks such as staleness stay separate from it.
 - Code that touches a `SoftDeletes` model or its parent in a job, command, billing path or route binding makes an explicit choice: call `withTrashed()`, or null-guard the relation.
 
 ## 6. Types and values
@@ -51,6 +73,7 @@ Sections 1–16 cover Laravel apps and packages in general. Where a legacy repo 
 - Fixed sets of values are backed enums with UPPER_CASE cases. Each enum owns its display text through a `label()` method, usually provided by a shared trait. Status, type and queue-name literals are replaced by enum cases or constants.
 - Variables and columns that carry a unit include it in the name, e.g. `$maxUploadMb`, `$sizeBytes`, `$timeoutSeconds`.
 - Calls with several parameters of the same type use named arguments.
+- Each step that does real work (reads rows, plans, writes, hashes, calls another class) gets its own statement and a named variable. Don't nest it inside another call's argument, where a reader skims past it, e.g. `$post->update(['tags' => $this->names((new SyncTags(...))->plan())])`.
 - Money is a `Brick\Money\Money`, never a float or an int.
 - In apps, collections are preferred over manual loops for transformations.
 - `json_encode()` on external or user data uses `JSON_THROW_ON_ERROR`, plus `JSON_INVALID_UTF8_SUBSTITUTE` where binary data is possible.
@@ -73,8 +96,12 @@ Sections 1–16 cover Laravel apps and packages in general. Where a legacy repo 
 
 ## 8. Jobs and long-running processes
 
+- Where work runs is set in §2: the request changes state through an Action, and slow, failure-prone or external work (provisioning, third-party APIs, DNS, file processing, cleanup) runs in a job.
+- A job that must see committed data is dispatched `afterCommit()`.
 - Job settings (`$tries`, `$timeout`, `$backoff`, `$maxExceptions`) are `public`; the worker ignores protected ones.
 - Jobs that take a model set `public bool $deleteWhenMissingModels = true`, so a model deleted before the job runs drops the job instead of failing it.
+- A job takes the domain model it works on and resolves its dependencies from it (the container, or the model's own configuration), not pre-built services.
+- Queued work whose outcome users see is tracked on one record. An Action creates it as `pending` and dispatches the job with it. The job returns early if the record is already `running`, then moves it to `running`, and then to `succeeded` or `failed`. A retry runs the same record again, and `failed()` marks it failed when the queue gives up.
 - Queued jobs that call external services use a shared retry concern (escalating `backoff()` plus `retryUntil()`) rather than setting their own `$tries`/`$backoff`.
 - Delete and cleanup jobs are idempotent: a remote resource that is already gone counts as success.
 - Static properties and singletons that hold request- or job-specific data are reset between executions, because Octane and queue workers reuse the process.
@@ -97,6 +124,7 @@ Sections 1–16 cover Laravel apps and packages in general. Where a legacy repo 
 
 - Migrations are forward-only: no `down()` method.
 - Foreign keys use `->constrained()` with an explicit `cascadeOnDelete()` or `nullOnDelete()`.
+- A column that queries filter or sort on gets an index in the same migration, composite with its parent key when the query is scoped by one (`index(['team_id', 'archived_at'])`).
 - A migration that may run against a column that already exists guards with `Schema::hasColumn()`.
 - Data backfills go in chunked, idempotent Artisan commands (resumable, e.g. `--from-id`), not in migrations.
 
@@ -104,8 +132,14 @@ Sections 1–16 cover Laravel apps and packages in general. Where a legacy repo 
 
 - Every behaviour change and every bug fix ships with a test. A fix's test fails without the fix.
 - A test whose expectation flips (e.g. "cannot" becomes "can") is a behaviour change, and the PR explains it.
-- In Pest, tests use `it('does something')`, group related cases in `describe()`, and use `->with([...])` for data-driven cases. In PHPUnit repos, match the existing style.
+- A test reads as three phases, arrange, act and assert, separated by a blank line. Capture the result (`$response = $this->post(...)`) and assert on it afterwards, rather than chaining the request into its assertions.
+- Data-driven cases use `->with([...])` with named dataset keys, and the test call uses named arguments when several share a type. In PHPUnit repos, match the existing style.
+- A test checks real values in both directions (e.g. `-1250` renders as `-12,50` and parses back), not only that a round trip returns its input.
+- Tests assert user-facing text through `__('key')`, never a copy of the translated string.
+- Feature tests (`tests/Feature`) are the default: each drives one thing a user or the schedule triggers (a request, a command, a scheduled job) end to end and asserts the state it leaves. A Unit test (`tests/Unit`) covers only what a feature test can't reach (a retry, a queue failure hook, a query count, a fake's own assertions) or a very complex module, and a unit test that a feature test already covers is deleted. Both suites boot the app. A unit test file is named after the class it covers (`tests/Unit/RateLimiterTest.php`), not the mechanism it tests.
 - Tests build data with factories and `->for()`.
+- A test of an assertion helper (a fake's `assert*()`, a macro) has one failing case per condition the helper checks, as a dataset, so removing any condition fails a case. A test that would pass with the code under test removed is testing the framework.
+- A test's name says the behaviour it proves ("refuses a sign-in once the limit is spent"), not the mechanism ("fails").
 - Deterministic tests use:
     - `fake()->unique()` for unique columns
     - order-insensitive assertions for sets (`toEqualCanonicalizing()`)
@@ -123,6 +157,7 @@ Sections 1–16 cover Laravel apps and packages in general. Where a legacy repo 
 
 ## 14. Methods and classes
 
+- Before writing a helper, check whether Laravel, Eloquent or an installed package already does it (`is()`, `value()`, casts, collection methods, enum serialization). When a helper is still needed, the PR says why.
 - Guard clauses handle edge cases first and return early; the happy path comes last.
 - An orchestrating method reads as a short list of named steps. A phase that needs a comment to explain it becomes a named method.
 - Callers get named variants (`findOrFail()`, `firstOrCreate()`) instead of a `null` return they must branch on.
@@ -140,18 +175,26 @@ Sections 1–16 cover Laravel apps and packages in general. Where a legacy repo 
 - `@param`/`@return` carry the type. Add a description only for a constraint the name can't express.
 - Inline `//` comments are kept only for a vendor quirk, a gotcha or a cross-reference. A comment that restates the next line is deleted.
 - Comments describe the domain. Comments aimed at tools or reviewers ("kills the mutant", "proves the X branch", "why this ignore exists") are removed; that belongs in the commit message.
-- A magic number becomes a named constant, not a number with a comment (`private const EXCERPT_LENGTH = 160;`).
+- A magic number becomes a named constant, not a number with a comment (`protected const EXCERPT_LENGTH = 160;`). A value used once and passed straight to a framework call stays inline (`paginate(50)`).
+- An array in `app/` or `src/` with more than one element and at least one key (props, `create([...$validated, …])`) puts one element per line. A validation rule list and test datasets stay on one line.
+- A blank line separates two statements when either spans several lines.
+- A guard clause stays on one line. If it doesn't fit, shorten the message rather than wrapping it.
 - Multi-line `//` comments and config `|` header blocks use Laravel's **slope**: 3 lines, each 2–4 characters shorter than the one above. Count the text after the `// ` or `| ` prefix. Reword to fit rather than padding.
 - Every `TODO` has an owner or a linked issue.
 - Every `@phpstan-ignore` names the error identifier.
 - The diff touches only code related to the change.
 
-## 16. Packages
+## 16. Domain language and user-facing text
+
+- User-facing text is a key in a Laravel PHP lang file, grouped by a broad area (`lang/{locale}/messages.php`), in every locale. A new file for a narrow topic that won't grow is folded into a broader one.
+- A PR that adds a domain value (an enum case, a status, a mode) whose meaning isn't in `CONTEXT.md` or an ADR adds it to `CONTEXT.md`.
+
+## 17. Packages
 
 - The public surface is explicit: internal classes are marked `@internal`, supported entry points `@api`.
 - Every framework API used exists in the lowest supported version. Newer APIs are gated behind one compatibility check whose `@see` links the upstream change.
 - User-facing changes update `CHANGELOG.md`.
 
-## 17. Keystone review rules
+## 18. Keystone review rules
 
 - Don't split a call's arguments into local variables unless a variable is reused or names something the call hides. `new SignInAttempt(Keystone::guard(), app(AccountLookup::class))` reads fine inline.
