@@ -31,6 +31,6 @@ abstract class StubsTestCase extends AppTestCase
      */
     protected function defineRoutes($router): void
     {
-        $router->middleware(['web', Middleware::class])->group(self::STUBS.'/routes/auth.php');
+        $router->middleware(['web', Middleware::class])->group(self::STUBS.'/routes/keystone.php');
     }
 }
