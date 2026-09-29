@@ -10,9 +10,9 @@ pest()->extend(StubsTestCase::class)->use(SignInAssertions::class);
 
 beforeEach(function () {
     Route::middleware('web')->group(function () {
-        Route::get('sign-in-page', fn () => Inertia::render('keystone/SignIn', ['types' => [], 'status' => 'Signed out.']));
-        Route::get('other-component', fn () => Inertia::render('keystone/Other', ['types' => [], 'status' => 'Signed out.']));
-        Route::get('no-types', fn () => Inertia::render('keystone/SignIn', ['status' => 'Signed out.']));
+        Route::get('sign-in-page', fn () => Inertia::render('auth/Login', ['types' => [], 'status' => 'Signed out.']));
+        Route::get('other-component', fn () => Inertia::render('auth/Other', ['types' => [], 'status' => 'Signed out.']));
+        Route::get('no-types', fn () => Inertia::render('auth/Login', ['status' => 'Signed out.']));
     });
 });
 

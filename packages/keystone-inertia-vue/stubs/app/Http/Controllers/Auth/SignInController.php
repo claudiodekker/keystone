@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Keystone;
+namespace App\Http\Controllers\Auth;
 
 use ClaudioDekker\Keystone\Http\Controllers\SignInController as Controller;
 use ClaudioDekker\Keystone\Http\PageValues\SignInPage;
@@ -18,7 +18,7 @@ class SignInController extends Controller
     {
         Inertia::encryptHistory();
 
-        return Inertia::render('keystone/SignIn', [
+        return Inertia::render('auth/Login', [
             'types' => $page->types,
             'status' => $page->status,
         ]);

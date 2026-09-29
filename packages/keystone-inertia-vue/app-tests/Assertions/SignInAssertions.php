@@ -22,7 +22,7 @@ trait SignInAssertions
     public function assertSignInPage(TestResponse $response, ?string $status = null): void
     {
         $response->assertInertia(function (AssertableInertia $page) use ($status) {
-            $page->component('keystone/SignIn')->has('types');
+            $page->component('auth/Login')->has('types');
 
             if ($status !== null) {
                 $page->where('status', $status);

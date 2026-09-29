@@ -36,7 +36,7 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "App\\Http\\Controllers\\Keystone\\": "packages/keystone-inertia-vue/stubs/app/Http/Controllers/Keystone/",
+            "App\\Http\\Controllers\\Auth\\": "packages/keystone-inertia-vue/stubs/app/Http/Controllers/Auth/",
             "ClaudioDekker\\Keystone\\AppTests\\": "packages/keystone/app-tests/",
             "ClaudioDekker\\Keystone\\InertiaVue\\AppTests\\": "packages/keystone-inertia-vue/app-tests/",
             "ClaudioDekker\\Keystone\\InertiaVue\\Tests\\": "packages/keystone-inertia-vue/tests/",

@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
-import CredentialTypeForm from '@/components/keystone/CredentialTypeForm.vue';
-import KeystoneLayout from '@/layouts/KeystoneLayout.vue';
-import type { SignInPage } from '@/types/keystone';
+import CredentialTypeForm from '@/components/CredentialTypeForm.vue';
+import AuthLayout from '@/layouts/AuthLayout.vue';
+import type { SignInPage } from '@/types/auth';
 
-defineOptions({ layout: KeystoneLayout });
+defineOptions({ layout: AuthLayout });
 
 defineProps<SignInPage>();
 </script>

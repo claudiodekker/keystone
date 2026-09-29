@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Keystone;
+namespace App\Http\Controllers\Auth;
 
 use ClaudioDekker\Keystone\Http\Controllers\SignOutController as Controller;
 use Illuminate\Http\RedirectResponse;

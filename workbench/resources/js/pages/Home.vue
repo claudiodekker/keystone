@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import SignOutButton from '@/components/keystone/SignOutButton.vue';
+import SignOutButton from '@/components/SignOutButton.vue';
 import { login } from '@/routes';
 
 defineProps<{ signedIn: boolean }>();

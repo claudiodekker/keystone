@@ -44,13 +44,14 @@ Keystone stores and matches an address trimmed, Unicode NFC-composed, lowercased
 
 ## The Inertia-Vue adapter
 
-`claudiodekker/keystone-inertia-vue` gives Keystone its pages in Inertia and Vue, styled with Tailwind. It publishes files into your app that you then own:
+`claudiodekker/keystone-inertia-vue` gives Keystone its pages in Inertia and Vue, styled with Tailwind. It publishes files into your app that you then own. They carry no Keystone branding and sit where your own auth files would, as in Laravel's starter kits:
 
-- `app/Http/Controllers/Keystone/`: one controller per Keystone controller. Each response hook turns one outcome into a response, so change a hook to change what users see. Keystone decides the outcome before the hook runs.
-- `routes/keystone.php`: the routes, required from `routes/web.php`. Keystone relies on the route names, not the URLs, so you may change the URLs.
-- `resources/js/pages/keystone/`: one page per step. `SignIn.vue` shows the status message Keystone passes it, already translated, and a form per credential type.
-- `resources/js/components/keystone/partials/`: a component per credential type, such as `Password.vue`. Without one, a type falls back to the component for its initiate shape in `components/keystone/shapes/`.
-- `resources/js/types/keystone.ts`: the props each page receives.
+- `app/Http/Controllers/Auth/`: one controller per Keystone controller, such as `SignInController`. Each response hook turns one outcome into a response, so change a hook to change what users see. Keystone decides the outcome before the hook runs.
+- `routes/auth.php`: the routes, required from `routes/web.php`. Keystone relies on the route names, not the URLs, so you may change the URLs.
+- `resources/js/pages/auth/`: one page per step, such as `Login.vue`, which shows the status message Keystone passes it, already translated, and a form per credential type. `layouts/AuthLayout.vue` wraps them.
+- `resources/js/partials/`: a partial per credential type, such as `Password.vue`. Without one, a type falls back to the partial for its initiate shape in `partials/shapes/`.
+- `resources/js/components/`: the pieces the pages and partials share, such as `PasswordField.vue`, `CredentialTypeForm.vue` and `SignOutButton.vue`.
+- `resources/js/types/auth.ts`: the props each page receives.
 - `tests/Keystone/Assertions/`: the Inertia versions of the assertions Keystone's AppTests make about your responses. Redefine one there when you change what its hook returns.
 
 The pages build their URLs with [Wayfinder](https://github.com/laravel/wayfinder), generated when Vite builds; don't commit its output. Your app needs Inertia's middleware in the `web` group and a root view, as the Laravel Vue starter kit has.

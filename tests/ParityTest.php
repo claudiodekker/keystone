@@ -2,7 +2,7 @@
 
 use Illuminate\Support\Str;
 
-const ADAPTER_CONTROLLERS_NAMESPACE = 'App\Http\Controllers\Keystone\\';
+const ADAPTER_CONTROLLERS_NAMESPACE = 'App\Http\Controllers\Auth\\';
 
 function coreControllers(): array
 {

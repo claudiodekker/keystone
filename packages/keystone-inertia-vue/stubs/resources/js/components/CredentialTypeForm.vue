@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, type Component } from 'vue';
-import type { CredentialTypeOption } from '@/types/keystone';
+import type { CredentialTypeOption } from '@/types/auth';
 
 const props = defineProps<{ option: CredentialTypeOption }>();
 
-const partials = import.meta.glob<Component>('@/components/keystone/partials/*.vue', { eager: true, import: 'default' });
-const shapes = import.meta.glob<Component>('@/components/keystone/shapes/*.vue', { eager: true, import: 'default' });
+const partials = import.meta.glob<Component>('@/partials/*.vue', { eager: true, import: 'default' });
+const shapes = import.meta.glob<Component>('@/partials/shapes/*.vue', { eager: true, import: 'default' });
 
 const studly = (name: string): string => name.replace(/(?:^|[-_])(\w)/g, (_match, letter: string) => letter.toUpperCase());
 

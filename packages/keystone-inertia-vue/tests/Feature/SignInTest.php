@@ -12,7 +12,7 @@ it('renders the sign-in page with the page value\'s fields', function () {
     $response = $this->get(route('login'));
 
     $response->assertInertia(fn (AssertableInertia $page) => $page
-        ->component('keystone/SignIn')
+        ->component('auth/Login')
         ->where('types', [['type' => 'form', 'shape' => 'form'], ['type' => 'password', 'shape' => 'form']])
         ->where('status', null));
 });

@@ -1,7 +1,7 @@
 <?php
 
-use App\Http\Controllers\Keystone\SignInController;
-use App\Http\Controllers\Keystone\SignOutController;
+use App\Http\Controllers\Auth\SignInController;
+use App\Http\Controllers\Auth\SignOutController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('login', [SignInController::class, 'show'])->name('login');

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Form } from '@inertiajs/vue3';
 import { submit } from '@/routes/login';
-import type { CredentialTypeOption } from '@/types/keystone';
+import type { CredentialTypeOption } from '@/types/auth';
 
 defineProps<{ option: CredentialTypeOption }>();
 
