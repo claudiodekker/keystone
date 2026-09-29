@@ -99,7 +99,7 @@ jobs:
                   node-version: 22
 
             - name: Create a blank Laravel app
-              run: composer create-project laravel/laravel app --prefer-dist --no-interaction --no-progress
+              run: composer create-project "laravel/laravel:^13.0" app --prefer-dist --no-interaction --no-progress
 
             - name: Require Pest and every Keystone package from the checkout
               working-directory: app
@@ -109,7 +109,7 @@ jobs:
                   composer config minimum-stability dev
                   composer config repositories.keystone "$(jq -n --argjson versions "$versions" '{type: "path", url: "../keystone/packages/*", options: {symlink: false, versions: $versions}}')"
                   composer remove --dev phpunit/phpunit nunomaduro/collision --no-update
-                  composer require --dev pestphp/pest --no-update
+                  composer require --dev "pestphp/pest:^5.2" --no-update
                   composer require $packages --no-update
                   composer update --no-interaction --no-progress
 
