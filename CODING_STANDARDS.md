@@ -2,7 +2,7 @@
 
 The reviewer reads this file. Apply every rule to each changed hunk in the diff. Skip anything the repo's tooling already enforces (Pint, PHPStan/Larastan, arch tests, ESLint, type coverage).
 
-Sections 1–16 cover Laravel apps and packages in general. Where a legacy repo already has a different established convention, **follow the repo** within that area; the rule describes the intent. Section 17 applies only to packages.
+Sections 1–16 cover Laravel apps and packages in general. Where a legacy repo already has a different established convention, **follow the repo** within that area; the rule describes the intent. Section 17 applies only to packages, and section 18 only to this repo.
 
 ## 1. Sibling changes
 
@@ -13,25 +13,24 @@ Sections 1–16 cover Laravel apps and packages in general. Where a legacy repo 
 
 The class type tells you where code runs: Actions run in the request, jobs run on the queue.
 
-- Controllers validate input with a Form Request, call one Action, and return. They hold no business logic.
 - Actions (`app/Actions`, or `src/Actions` in a package) are the use cases a request triggers, with one public `handle()` method. They only change state: write or update records, record activity, broadcast, dispatch jobs. No slow or failure-prone work: no provisioning, third-party writes, file processing or cleanup.
-- Jobs (`app/Jobs`) are queued, retryable work, and the job's `handle()` holds that work's logic. Don't wrap a single Action in a thin job: if the work belongs on the queue, it belongs in the job. A job may call Actions for shared state changes, not to hold its main logic.
+- Jobs (`app/Jobs`, or `src/Jobs` in a package) are queued, retryable work, and the job's `handle()` holds that work's logic. Don't wrap a single Action in a thin job: if the work belongs on the queue, it belongs in the job. A job may call Actions for shared state changes, not to hold its main logic.
 - Jobs are safe to retry: running `handle()` twice gives the same result.
 - Commands and tests run queued work with `Job::dispatchSync()` or by calling `handle()` directly. They don't need an Action for that.
-- An Action may make a synchronous external call only when the request can't finish without the result (an id or credential needed to create the record, or a payment outcome the user must see). Keep that call small and queue everything after it. Read-only external calls that feed a page render are allowed; cache them where possible.
+- An Action may make a synchronous external call only when the request can't finish without the result (an id or credential needed to create the record, or a payment outcome the user must see). Keep that call small and queue everything after it. Read-only external calls that feed a page render may run in the request; cache them where possible.
 - External results come back asynchronously (webhook, polling job, status job). A request never blocks waiting for them.
 - Action names are verb then entity (`CreatePost`, `SyncTags`). CRUD uses `Create`, `Update` and `Delete`; a use case that isn't plain CRUD takes its own verb (`PublishPost`, `ArchiveTeam`).
 - Actions inject other Actions through the constructor as `protected` properties.
-- A Create Action takes typed arguments (`string $title, PostStatus $status`), called with named arguments. An Update Action takes a shaped `$attributes` array (`array{title?: string}`), since the update is partial. Create and Update Actions return the model.
+- Actions take typed arguments (`Post $post, string $title, PostStatus $status`), never an `$attributes` array, and callers pass them as named arguments. Create and Update Actions return the model.
 - Any Action or job that writes more than one row or model wraps the writes in `DB::transaction()`. Remote API calls stay outside the transaction, and jobs dispatched inside one use `afterCommit()`.
 - Side effects that must not fail the operation, such as broadcasts and notifications, are wrapped in `rescue()`.
 - Enum-driven branching uses `match`.
 
 ## 3. HTTP layer
 
-- Validation lives in a Form Request. Actions receive validated data: `validated()`, `safe()->only([...])`, or a typed accessor (`->boolean()`, `->enum()`) on a validated key.
+- Validation lives in a Form Request. Callers pass an Action each validated value through a typed accessor on its key (`$request->string('title')->value()`, `->integer()`, `->enum()`), never a `validated()` or `safe()->only([...])` array.
 - A Form Request is named after the Action it feeds, with the Action's verb (`CreatePostRequest` for `CreatePost`, `PublishPostRequest` for `PublishPost`), or after the flow it holds (`LoginRequest`). Not after the controller method (`StorePostRequest`).
-- A method on a Form Request derives something (a `period()` that turns `'7d'` into a date, an `options()` that picks a subset of `validated()`), or holds a whole request-bound flow like `LoginRequest::authenticate()`. It doesn't wrap a single typed accessor such as `$this->boolean('is_draft')`.
+- A method on a Form Request derives something (a `period()` that turns `'7d'` into a date), or holds a whole request-bound flow like `LoginRequest::authenticate()`. It doesn't wrap a single typed accessor such as `$this->boolean('is_draft')`.
 - A Form Request keeps the stub's `rules()`, with a `//` body when it has none. A request the record's current state refuses (a post already published) fails in the Form Request's `after()`, not in a try/catch in the controller or a check in the Action. Each `after()` closure opens with `if ($validator->errors()->any()) { return; }`, so it only checks input that passed `rules()`.
 - Every endpoint is authorized in exactly one place: a policy through route `->can()`, `$this->authorize()`, or Form Request `authorize()`. It has a test proving the denied case, and special account states (suspended, banned, read-only) are part of that authorization.
 - A controller method resolves input, calls one Action, and returns a response: `back()` for form submits, `to_route()` for named redirects. Controllers use only resource methods or `__invoke`.
@@ -72,7 +71,7 @@ The class type tells you where code runs: Actions run in the request, jobs run o
 - Arrays carry shapes (`array{host: string, port: int}`) or `list<T>`. Keep `mixed` out of APIs you own. A shape that keeps growing is a sign it should become a value object.
 - Fixed sets of values are backed enums with UPPER_CASE cases. Each enum owns its display text through a `label()` method, usually provided by a shared trait. Status, type and queue-name literals are replaced by enum cases or constants.
 - Variables and columns that carry a unit include it in the name, e.g. `$maxUploadMb`, `$sizeBytes`, `$timeoutSeconds`.
-- Calls with several parameters of the same type use named arguments.
+- Calls with several parameters of the same type use named arguments. Action calls always do (§2).
 - Each step that does real work (reads rows, plans, writes, hashes, calls another class) gets its own statement and a named variable. Don't nest it inside another call's argument, where a reader skims past it, e.g. `$post->update(['tags' => $this->names((new SyncTags(...))->plan())])`.
 - Money is a `Brick\Money\Money`, never a float or an int.
 - In apps, collections are preferred over manual loops for transformations.
@@ -96,8 +95,6 @@ The class type tells you where code runs: Actions run in the request, jobs run o
 
 ## 8. Jobs and long-running processes
 
-- Where work runs is set in §2: the request changes state through an Action, and slow, failure-prone or external work (provisioning, third-party APIs, DNS, file processing, cleanup) runs in a job.
-- A job that must see committed data is dispatched `afterCommit()`.
 - Job settings (`$tries`, `$timeout`, `$backoff`, `$maxExceptions`) are `public`; the worker ignores protected ones.
 - Jobs that take a model set `public bool $deleteWhenMissingModels = true`, so a model deleted before the job runs drops the job instead of failing it.
 - A job takes the domain model it works on and resolves its dependencies from it (the container, or the model's own configuration), not pre-built services.
@@ -136,10 +133,10 @@ The class type tells you where code runs: Actions run in the request, jobs run o
 - Data-driven cases use `->with([...])` with named dataset keys, and the test call uses named arguments when several share a type. In PHPUnit repos, match the existing style.
 - A test checks real values in both directions (e.g. `-1250` renders as `-12,50` and parses back), not only that a round trip returns its input.
 - Tests assert user-facing text through `__('key')`, never a copy of the translated string.
-- Feature tests (`tests/Feature`) are the default: each drives one thing a user or the schedule triggers (a request, a command, a scheduled job) end to end and asserts the state it leaves. A Unit test (`tests/Unit`) covers only what a feature test can't reach (a retry, a queue failure hook, a query count, a fake's own assertions) or a very complex module, and a unit test that a feature test already covers is deleted. Both suites boot the app. A unit test file is named after the class it covers (`tests/Unit/RateLimiterTest.php`), not the mechanism it tests.
+- Feature tests (`tests/Feature`) are the default: each drives one thing a user or the schedule triggers (a request, a command, a scheduled job) end to end and asserts the state it leaves. A Unit test (`tests/Unit`) covers only what a feature test can't reach (a retry, a queue failure hook, a query count, a fake's own assertions) or a very complex module, and a unit test that a feature test already covers is deleted. Both suites boot the app. A unit test file is named after the class it covers (`tests/Unit/SlugGeneratorTest.php`), not the mechanism it tests.
 - Tests build data with factories and `->for()`.
 - A test of an assertion helper (a fake's `assert*()`, a macro) has one failing case per condition the helper checks, as a dataset, so removing any condition fails a case. A test that would pass with the code under test removed is testing the framework.
-- A test's name says the behaviour it proves ("refuses a sign-in once the limit is spent"), not the mechanism ("fails").
+- A test's name says the behaviour it proves ("refuses to publish a post without a title"), not the mechanism ("fails").
 - Deterministic tests use:
     - `fake()->unique()` for unique columns
     - order-insensitive assertions for sets (`toEqualCanonicalizing()`)
@@ -176,7 +173,7 @@ The class type tells you where code runs: Actions run in the request, jobs run o
 - Inline `//` comments are kept only for a vendor quirk, a gotcha or a cross-reference. A comment that restates the next line is deleted.
 - Comments describe the domain. Comments aimed at tools or reviewers ("kills the mutant", "proves the X branch", "why this ignore exists") are removed; that belongs in the commit message.
 - A magic number becomes a named constant, not a number with a comment (`protected const EXCERPT_LENGTH = 160;`). A value used once and passed straight to a framework call stays inline (`paginate(50)`).
-- An array in `app/` or `src/` with more than one element and at least one key (props, `create([...$validated, …])`) puts one element per line. A validation rule list and test datasets stay on one line.
+- An array in `app/` or `src/` with more than one element and at least one key (props, `create([...])` attributes) puts one element per line. A validation rule list and test datasets stay on one line.
 - A blank line separates two statements when either spans several lines.
 - A guard clause stays on one line. If it doesn't fit, shorten the message rather than wrapping it.
 - Multi-line `//` comments and config `|` header blocks use Laravel's **slope**: 3 lines, each 2–4 characters shorter than the one above. Count the text after the `// ` or `| ` prefix. Reword to fit rather than padding.
@@ -197,4 +194,4 @@ The class type tells you where code runs: Actions run in the request, jobs run o
 
 ## 18. Keystone review rules
 
-- Don't split a call's arguments into local variables unless a variable is reused or names something the call hides. `new SignInAttempt(Keystone::guard(), app(AccountLookup::class))` reads fine inline.
+- Don't split a call's arguments into local variables unless a variable is reused or names something the call hides. `new SignInAttempt(Keystone::guard(), app(AccountLookup::class))` reads fine inline: resolving a dependency isn't a step that does real work in the §6 sense.
