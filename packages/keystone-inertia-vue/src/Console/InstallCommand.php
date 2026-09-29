@@ -168,13 +168,6 @@ class InstallCommand extends Command
             $this->line("    <testsuite name=\"Keystone\">\n".implode('', array_map(fn (string $directory) => "        <directory>{$directory}</directory>\n", $directories)).'    </testsuite>');
         }
 
-        $supports = $installer->testSupport();
-
-        if (! $installer->bindTestSupport($supports)) {
-            $this->components->warn("Bind each credential type's test support in setUp() in tests/TestCase.php:");
-            $this->line(implode("\n", array_map(fn (string $type, string $support) => "    \$this->app->bind('keystone.test-support.{$type}', \\{$support}::class);", array_keys($supports), $supports)));
-        }
-
         $installer->mapAutoloadDev($appTests);
         $this->runOrPrint($installer, ['composer dump-autoload']);
     }

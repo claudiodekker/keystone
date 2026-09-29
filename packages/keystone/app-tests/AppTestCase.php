@@ -17,6 +17,7 @@ use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Sleep;
+use Illuminate\Support\Str;
 use Illuminate\Support\ViewErrorBag;
 use Illuminate\Testing\TestResponse;
 use LogicException;
@@ -162,21 +163,33 @@ abstract class AppTestCase extends TestCase
      */
     protected function supportsFor(Surface $surface): array
     {
-        $supports = array_map(function (CredentialType $type) {
-            $key = "keystone.test-support.{$type->name()}";
-
-            if (! $this->app->bound($key)) {
-                $this->fail("No test support is registered for the [{$type->name()}] credential type under [{$key}].");
-            }
-
-            return $this->app->make($key);
-        }, $this->types()->serving($surface));
+        $supports = array_map(fn (CredentialType $type) => $this->supportFor($type), $this->types()->serving($surface));
 
         if ($supports === []) {
             $this->markTestSkipped("No installed credential type serves {$surface->value}.");
         }
 
         return $supports;
+    }
+
+    /**
+     * Get the type's test support: the one bound for it, or else the one its package's AppTests ship beside the type.
+     */
+    protected function supportFor(CredentialType $type): CredentialTypeSupport
+    {
+        $key = "keystone.test-support.{$type->name()}";
+
+        if ($this->app->bound($key)) {
+            return $this->app->make($key);
+        }
+
+        $class = Str::beforeLast($type::class, '\\').'\\AppTests\\Support\\'.class_basename($type).'Support';
+
+        if (! class_exists($class)) {
+            $this->fail("No test support found for the [{$type->name()}] credential type: add {$class} or bind one under [{$key}].");
+        }
+
+        return $this->app->make($class);
     }
 
     /**

@@ -77,33 +77,3 @@ it('keeps the folder the app already maps a namespace to', function () {
     $manifest = json_decode(file_get_contents($installer->path('composer.json')), true);
     expect($manifest['autoload-dev']['psr-4'])->toBe(['Tests\\' => 'tests/', 'Probe\\' => 'custom/', 'Other\\' => 'vendor/other/']);
 });
-
-it('binds the test support in a fresh base test case', function () {
-    $installer = installerIn(['tests/TestCase.php' => "<?php\n\nnamespace Tests;\n\nuse Illuminate\\Foundation\\Testing\\TestCase as BaseTestCase;\n\nabstract class TestCase extends BaseTestCase\n{\n    //\n}\n"]);
-
-    expect($installer->bindTestSupport(['password' => 'Vendor\\PasswordTypeSupport']))->toBeTrue()
-        ->and(file_get_contents($installer->path('tests/TestCase.php')))
-        ->toContain("abstract class TestCase extends BaseTestCase\n{\n    protected function setUp(): void\n    {\n        parent::setUp();\n        \$this->app->bind('keystone.test-support.password', \\Vendor\\PasswordTypeSupport::class);\n    }\n}\n");
-});
-
-it('adds the test support to the setUp the base test case already has, once', function () {
-    $installer = installerIn(['tests/TestCase.php' => "<?php\n\nnamespace Tests;\n\nabstract class TestCase extends BaseTestCase\n{\n    protected function setUp(): void\n    {\n        parent::setUp();\n\n        \$this->withoutVite();\n    }\n}\n"]);
-
-    $installer->bindTestSupport(['password' => 'Vendor\\PasswordTypeSupport']);
-    $installer->bindTestSupport(['password' => 'Vendor\\PasswordTypeSupport', 'totp' => 'Vendor\\TotpTypeSupport']);
-
-    expect(file_get_contents($installer->path('tests/TestCase.php')))
-        ->toContain("        parent::setUp();\n        \$this->app->bind('keystone.test-support.totp', \\Vendor\\TotpTypeSupport::class);\n        \$this->app->bind('keystone.test-support.password', \\Vendor\\PasswordTypeSupport::class);\n\n        \$this->withoutVite();\n");
-});
-
-it('leaves a base test case it can\'t match unchanged', function () {
-    $source = "<?php\n\nnamespace Tests;\n\nabstract class TestCase extends BaseTestCase {}\n";
-    $installer = installerIn(['tests/TestCase.php' => $source]);
-
-    expect($installer->bindTestSupport(['password' => 'Vendor\\PasswordTypeSupport']))->toBeFalse()
-        ->and(file_get_contents($installer->path('tests/TestCase.php')))->toBe($source);
-});
-
-it('needs no base test case when no type has test support', function () {
-    expect(installerIn([])->bindTestSupport([]))->toBeTrue();
-});

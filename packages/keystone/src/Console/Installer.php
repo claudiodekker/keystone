@@ -28,13 +28,6 @@ class Installer
     ];
 
     /**
-     * The test support of each Keystone package's credential types, keyed by type name.
-     */
-    protected const array TEST_SUPPORT = [
-        'claudiodekker/keystone-password' => ['password' => 'ClaudioDekker\\Keystone\\Password\\AppTests\\Support\\PasswordTypeSupport'],
-    ];
-
-    /**
      * Create a new installer for the app at the base path.
      */
     public function __construct(
@@ -310,56 +303,6 @@ class Installer
             array_map(fn (string $package) => self::APP_TESTS[$package], $installed),
             array_map(fn (string $package) => "vendor/{$package}/app-tests/", $installed),
         );
-    }
-
-    /**
-     * Get the test support of the installed packages' credential types, keyed by type name.
-     *
-     * @return array<string, string>
-     */
-    public function testSupport(): array
-    {
-        $installed = array_filter(array_keys(self::TEST_SUPPORT), fn (string $package) => InstalledVersions::isInstalled($package));
-
-        return array_merge(...array_map(fn (string $package) => self::TEST_SUPPORT[$package], $installed));
-    }
-
-    /**
-     * Bind each credential type's test support in the app's base test case, where Keystone's AppTests look it up.
-     *
-     * @param  array<string, string>  $supports
-     */
-    public function bindTestSupport(array $supports): bool
-    {
-        $path = $this->path('tests/TestCase.php');
-        $source = $this->files->exists($path) ? $this->files->get($path) : '';
-        $missing = array_filter($supports, fn (string $support, string $type) => ! str_contains($source, "'keystone.test-support.{$type}'"), ARRAY_FILTER_USE_BOTH);
-
-        if ($missing === []) {
-            return true;
-        }
-
-        $bindings = implode('', array_map(
-            fn (string $type, string $support) => "        \$this->app->bind('keystone.test-support.{$type}', \\{$support}::class);\n",
-            array_keys($missing),
-            $missing,
-        ));
-        $setUp = "    protected function setUp(): void\n    {\n        parent::setUp();\n";
-        $skeleton = "abstract class TestCase extends BaseTestCase\n{\n    //\n}";
-
-        $source = match (true) {
-            str_contains($source, $setUp) => str_replace($setUp, $setUp.$bindings, $source),
-            str_contains($source, $skeleton) => str_replace($skeleton, "abstract class TestCase extends BaseTestCase\n{\n{$setUp}{$bindings}    }\n}", $source),
-            default => null,
-        };
-
-        if ($source === null) {
-            return false;
-        }
-
-        $this->files->put($path, $source);
-
-        return true;
     }
 
     /**

@@ -282,25 +282,6 @@ it('leaves the npm packages the app already has as dependencies alone', function
         ->and($manifest['devDependencies'])->not->toHaveKey('vue');
 });
 
-it('binds the installed credential types\' test support in the app\'s base test case', function () {
-    $app = freshApp();
-
-    $this->artisan('keystone:install')->assertSuccessful()->run();
-
-    expect(file_get_contents("{$app}/tests/TestCase.php"))
-        ->toContain("\$this->app->bind('keystone.test-support.password', \\ClaudioDekker\\Keystone\\Password\\AppTests\\Support\\PasswordTypeSupport::class);");
-});
-
-it('prints the test support to bind when it can\'t edit tests/TestCase.php', function () {
-    $app = freshApp();
-    unlink("{$app}/tests/TestCase.php");
-
-    $this->artisan('keystone:install')
-        ->expectsOutputToContain("\$this->app->bind('keystone.test-support.password', \\ClaudioDekker\\Keystone\\Password\\AppTests\\Support\\PasswordTypeSupport::class);")
-        ->assertSuccessful()
-        ->run();
-});
-
 it('installs and builds the npm packages', function () {
     $app = freshApp();
 
