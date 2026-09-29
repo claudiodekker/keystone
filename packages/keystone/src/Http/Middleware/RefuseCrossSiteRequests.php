@@ -76,7 +76,7 @@ class RefuseCrossSiteRequests
         $expected = $request->session()->token();
         $token = $this->token($request);
 
-        return is_string($expected) && $token !== '' && hash_equals($expected, $token);
+        return $token !== '' && hash_equals($expected, $token);
     }
 
     /**
