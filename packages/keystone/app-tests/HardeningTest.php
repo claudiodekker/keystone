@@ -38,7 +38,7 @@ it('hardens every Keystone response, whatever answers the request', function (Cl
     'a cross-site refusal' => fn () => $this->withHeader('Sec-Fetch-Site', 'cross-site')->post(route('logout')),
 ]);
 
-it('refuses a cross-site sign-in, even when the app exempts it from CSRF checks', function () {
+it('refuses a cross-site sign-in', function () {
     $account = $this->createAccount();
     $this->arrangeCredential($account, $this->support, Surface::SIGN_IN);
 
@@ -47,7 +47,7 @@ it('refuses a cross-site sign-in, even when the app exempts it from CSRF checks'
     $this->assertGuest();
 });
 
-it('refuses a cross-site sign-out, even when the app exempts it from CSRF checks', function () {
+it('refuses a cross-site sign-out', function () {
     $account = $this->signInAccount($this->support);
 
     $this->withHeader('Sec-Fetch-Site', 'cross-site')->post(route('logout'));

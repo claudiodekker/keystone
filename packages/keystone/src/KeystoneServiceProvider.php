@@ -14,6 +14,7 @@ use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Foundation\Http\Kernel as HttpKernel;
 use Illuminate\Foundation\Http\Middleware\TrimStrings;
+use Illuminate\Routing\Router;
 use Illuminate\Support\ServiceProvider;
 use LogicException;
 
@@ -40,7 +41,7 @@ class KeystoneServiceProvider extends ServiceProvider
     /**
      * Bootstrap the package services.
      */
-    public function boot(AuthManager $auth, Kernel $kernel): void
+    public function boot(AuthManager $auth, Kernel $kernel, Router $router): void
     {
         $auth->extend('keystone', $this->createGuard(...));
 
@@ -50,8 +51,9 @@ class KeystoneServiceProvider extends ServiceProvider
             $kernel->pushMiddleware(CaptureRequestContext::class);
             $kernel->prependMiddleware(ClearSiteDataOnSessionEnd::class);
             $kernel->prependMiddleware(AddHardeningHeaders::class);
-            $kernel->appendMiddlewareToGroup('web', RefuseCrossSiteRequests::class);
         }
+
+        $router->pushMiddlewareToGroup('web', RefuseCrossSiteRequests::class);
 
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
         $this->loadTranslationsFrom(__DIR__.'/../lang', 'keystone');

@@ -108,7 +108,7 @@ describe('assertions', function () {
 });
 
 describe('assertHardeningFloor', function () {
-    function routeProbe(Closure $weaken): void
+    function routeHardeningProbe(Closure $weaken): void
     {
         Route::get('probe', function () use ($weaken) {
             $response = response('')->withHeaders([
@@ -123,13 +123,13 @@ describe('assertHardeningFloor', function () {
     }
 
     it('passes a response carrying the floor', function () {
-        routeProbe(fn () => null);
+        routeHardeningProbe(fn () => null);
 
         $this->assertHardeningFloor($this->get('probe'));
     });
 
     it('fails a response missing any part of the floor', function (Closure $weaken) {
-        routeProbe($weaken);
+        routeHardeningProbe($weaken);
         $response = $this->get('probe');
 
         expect(fn () => $this->assertHardeningFloor($response))->toThrow(AssertionFailedError::class);

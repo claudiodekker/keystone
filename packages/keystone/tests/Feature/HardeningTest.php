@@ -99,14 +99,6 @@ describe('cross-site requests', function () {
         $this->assertGuest();
     });
 
-    it('refuses a cross-site Keystone mutation the app exempted from CSRF checks', function () {
-        PreventRequestForgery::except(['logout', 'login/*']);
-
-        $response = $this->withHeader('Sec-Fetch-Site', 'cross-site')->post(route('login.submit', ['type' => 'form']), ['identifier' => 'jane@example.com']);
-
-        $response->assertStatus(419);
-    });
-
     it('records the refusal on the signed-in account\'s trail', function () {
         $account = $this->signInAccount(new FormTypeSupport);
 

@@ -12,5 +12,7 @@ The app owns its copies of Keystone's controllers and its route file, and may su
 - A route counts as Keystone's by its controller class alone. A closure route or an app controller that doesn't extend core's gets none of this, which is what lets the app's own pages keep their own caching and framing.
 - Overriding `callAction()` itself, or removing the middleware from the kernel, still drops the floor. That is deliberate misuse rather than a customisation, and the AppTests catch it: every Keystone response they see must carry the floor.
 - Laravel's own CSRF check still runs first for routes it covers, so a cross-site request it refuses is not recorded. Only the requests Laravel lets through reach core's check.
+- The middleware classes are `@internal` but, being middleware, are built by the container. Binding a replacement for one is unsupported in the same way as overriding `callAction()`.
+- The cross-site middleware is pushed onto the router's `web` group rather than through the HTTP kernel, because the kernel's group methods copy every kernel group back onto the router and would drop middleware other packages added there.
 - Laravel skips its CSRF check under unit tests; core's never does, which is why the AppTest base sends `Sec-Fetch-Site: same-origin`.
 - The per-request state checks (a signed-in user on a guest step, a guest on a signed-in step) stay inline in each action, so they run with or without the route's `guest` or `auth` middleware.
