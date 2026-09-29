@@ -9,9 +9,11 @@ use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormType;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormTypeSupport;
 use ClaudioDekker\Keystone\Tests\Fixtures\RogueType;
+use Illuminate\Auth\Events\Login;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Testing\TestResponse;
 
@@ -64,7 +66,7 @@ describe('proofs', function () {
         $jane = $this->createAccount();
         $john = $this->createAccount('john@example.com');
         $id = $credential->call($this, $jane, $john);
-        $this->app->make(CredentialTypes::class)->register(new RogueType(fn () => Proof::proven(new StoredCredential($id, null, null, null))));
+        $this->app->make(CredentialTypes::class)->register(new RogueType(fn () => Proof::proven(new StoredCredential($id, identifier: null, secret: null, label: null))));
 
         $this->post(route('login.submit', ['type' => 'rogue']), ['identifier' => 'jane@example.com']);
 
@@ -89,7 +91,7 @@ describe('proofs', function () {
 
     it('refuses a proven proof when no account was named', function () {
         $id = rogueCredential($this->createAccount());
-        $this->app->make(CredentialTypes::class)->register(new RogueType(fn () => Proof::proven(new StoredCredential($id, null, null, null))));
+        $this->app->make(CredentialTypes::class)->register(new RogueType(fn () => Proof::proven(new StoredCredential($id, identifier: null, secret: null, label: null))));
 
         $this->post(route('login.submit', ['type' => 'rogue']), ['identifier' => 'nobody@example.com']);
 
@@ -119,7 +121,7 @@ describe('proofs', function () {
     it('names the subject\'s credential a rejection points at, with its stored label', function () {
         $account = $this->createAccount();
         $id = DB::table('user_credentials')->insertGetId(['user_id' => $account->getKey(), 'type' => 'rogue', 'label' => 'Laptop']);
-        $this->app->make(CredentialTypes::class)->register(new RogueType(fn () => Proof::rejected('rogue.mismatch', new StoredCredential($id, null, null, 'Forged'))));
+        $this->app->make(CredentialTypes::class)->register(new RogueType(fn () => Proof::rejected('rogue.mismatch', new StoredCredential($id, identifier: null, secret: null, label: 'Forged'))));
 
         $this->post(route('login.submit', ['type' => 'rogue']), ['identifier' => 'jane@example.com']);
 
@@ -136,7 +138,7 @@ describe('proofs', function () {
     it('names no credential of another account in a rejection', function () {
         $jane = $this->createAccount();
         $id = rogueCredential($this->createAccount('john@example.com'));
-        $this->app->make(CredentialTypes::class)->register(new RogueType(fn () => Proof::rejected('rogue.mismatch', new StoredCredential($id, null, null, null))));
+        $this->app->make(CredentialTypes::class)->register(new RogueType(fn () => Proof::rejected('rogue.mismatch', new StoredCredential($id, identifier: null, secret: null, label: null))));
 
         $this->post(route('login.submit', ['type' => 'rogue']), ['identifier' => 'jane@example.com']);
 
@@ -164,7 +166,7 @@ describe('updated secrets', function () {
     it('stores the updated secret a proven proof carries, without moving the epoch', function () {
         $account = $this->createAccount();
         $id = rogueCredential($account);
-        $this->app->make(CredentialTypes::class)->register(new RogueType(fn () => Proof::proven(new StoredCredential($id, null, null, null), updatedSecret: fn () => 'rehashed')));
+        $this->app->make(CredentialTypes::class)->register(new RogueType(fn () => Proof::proven(new StoredCredential($id, identifier: null, secret: null, label: null), updatedSecret: fn () => 'rehashed')));
 
         $this->post(route('login.submit', ['type' => 'rogue']), ['identifier' => 'jane@example.com']);
 
@@ -173,26 +175,28 @@ describe('updated secrets', function () {
             ->and(DB::table('users')->where('id', $account->getKey())->value('credential_epoch'))->toEqual(0);
     });
 
-    it('keeps a secret that changed after the type verified it', function () {
+    it('stores no updated secret once the credential changed after the type verified it', function (array $change) {
         $account = $this->createAccount();
         $id = DB::table('user_credentials')->insertGetId(['user_id' => $account->getKey(), 'type' => 'rogue', 'secret' => Crypt::encryptString('verified')]);
-        $this->app->make(CredentialTypes::class)->register(new RogueType(function () use ($id) {
-            DB::table('user_credentials')->where('id', $id)->update(['secret' => Crypt::encryptString('changed')]);
-
-            return Proof::proven(new StoredCredential($id, null, 'verified', null), updatedSecret: fn () => 'rehashed');
-        }));
+        $this->app->make(CredentialTypes::class)->register(new RogueType(fn () => Proof::proven(new StoredCredential($id, identifier: null, secret: 'verified', label: null), updatedSecret: fn () => 'rehashed')));
+        Event::listen(Login::class, fn () => DB::table('user_credentials')->where('id', $id)->update($change));
 
         $this->post(route('login.submit', ['type' => 'rogue']), ['identifier' => 'jane@example.com']);
 
-        expect(Crypt::decryptString(DB::table('user_credentials')->where('id', $id)->value('secret')))->toBe('changed');
-    });
+        $this->assertAuthenticatedAs($account);
+        expect(Crypt::decryptString(DB::table('user_credentials')->where('id', $id)->value('secret')))->not->toBe('rehashed');
+    })->with([
+        'its secret' => fn () => ['secret' => Crypt::encryptString('changed')],
+        'its type' => fn () => ['type' => 'other'],
+        'disabled' => fn () => ['disabled_at' => now()],
+    ]);
 
     it('makes and stores no updated secret when the account is refused', function () {
         $account = $this->createAccount();
         $id = DB::table('user_credentials')->insertGetId(['user_id' => $account->getKey(), 'type' => 'rogue', 'secret' => Crypt::encryptString('verified')]);
         DB::table('users')->where('id', $account->getKey())->update(['suspended_at' => now()]);
         $made = false;
-        $this->app->make(CredentialTypes::class)->register(new RogueType(fn () => Proof::proven(new StoredCredential($id, null, 'verified', null), updatedSecret: function () use (&$made) {
+        $this->app->make(CredentialTypes::class)->register(new RogueType(fn () => Proof::proven(new StoredCredential($id, identifier: null, secret: 'verified', label: null), updatedSecret: function () use (&$made) {
             $made = true;
 
             return 'rehashed';
@@ -212,7 +216,7 @@ describe('updated secrets', function () {
         $this->app->make(CredentialTypes::class)->register(new RogueType(function () use ($id) {
             DB::table('user_credentials')->where('id', $id)->update(['secret' => 'not-encrypted']);
 
-            return Proof::proven(new StoredCredential($id, null, null, null), updatedSecret: fn () => 'rehashed');
+            return Proof::proven(new StoredCredential($id, identifier: null, secret: null, label: null), updatedSecret: fn () => 'rehashed');
         }));
 
         $this->post(route('login.submit', ['type' => 'rogue']), ['identifier' => 'jane@example.com']);
@@ -225,7 +229,7 @@ describe('updated secrets', function () {
         Exceptions::fake();
         $account = $this->createAccount();
         $id = rogueCredential($account);
-        $this->app->make(CredentialTypes::class)->register(new RogueType(fn () => Proof::proven(new StoredCredential($id, null, null, null), updatedSecret: fn () => throw new RuntimeException('Cannot hash.'))));
+        $this->app->make(CredentialTypes::class)->register(new RogueType(fn () => Proof::proven(new StoredCredential($id, identifier: null, secret: null, label: null), updatedSecret: fn () => throw new RuntimeException('Cannot hash.'))));
 
         $this->post(route('login.submit', ['type' => 'rogue']), ['identifier' => 'jane@example.com']);
 
@@ -307,7 +311,7 @@ describe('failures around the proof', function () {
         $this->app->make(CredentialTypes::class)->register(new RogueType(function () use ($account, $id) {
             DB::table('users')->where('id', $account->getKey())->update(['suspended_at' => now()]);
 
-            return Proof::proven(new StoredCredential($id, null, null, null));
+            return Proof::proven(new StoredCredential($id, identifier: null, secret: null, label: null));
         }));
 
         $this->post(route('login.submit', ['type' => 'rogue']), ['identifier' => 'jane@example.com'])

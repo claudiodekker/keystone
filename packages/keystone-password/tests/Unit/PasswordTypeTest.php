@@ -1,11 +1,8 @@
 <?php
 
-use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\InitiateShape;
-use ClaudioDekker\Keystone\Methods\Proof;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
 use ClaudioDekker\Keystone\Methods\Surface;
-use ClaudioDekker\Keystone\Password\PasswordServiceProvider;
 use ClaudioDekker\Keystone\Password\PasswordType;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
@@ -14,7 +11,7 @@ use Mockery\MockInterface;
 
 function passwordCredential(string $secret, int $id = 1): StoredCredential
 {
-    return new StoredCredential($id, null, $secret, null);
+    return new StoredCredential($id, identifier: null, secret: $secret, label: null);
 }
 
 function spyOnHash(): MockInterface
@@ -30,37 +27,24 @@ function passwordRulesPass(Surface $surface, mixed $password): bool
     return Validator::make(['password' => $password], (new PasswordType)->rules($surface))->passes();
 }
 
-describe('registration', function () {
-    test('the type serves sign-in, registration and enrollment with a form, and is not multi-factor on its own', function () {
-        $type = new PasswordType;
+test('the type serves sign-in, registration and enrollment with a form, and is not multi-factor on its own', function () {
+    $type = new PasswordType;
 
-        expect($type->name())->toBe('password')
-            ->and($type->surfaces())->toBe([
-                'sign-in' => InitiateShape::FORM,
-                'registration' => InitiateShape::FORM,
-                'enrollment' => InitiateShape::FORM,
-            ])
-            ->and($type->representsMultipleFactors())->toBeFalse();
-    });
-
-    it('is registered for sign-in', function () {
-        expect(app(CredentialTypes::class)->find('password', Surface::SIGN_IN))->toBeInstanceOf(PasswordType::class);
-    });
-
-    it('keeps a type the app bound in its place', function () {
-        $custom = new class extends PasswordType {};
-        $this->app->instance(PasswordType::class, $custom);
-
-        (new PasswordServiceProvider($this->app))->register();
-
-        expect($this->app->make(PasswordType::class))->toBe($custom);
-    });
+    expect($type->name())->toBe('password')
+        ->and($type->surfaces())->toBe([
+            'sign-in' => InitiateShape::FORM,
+            'registration' => InitiateShape::FORM,
+            'enrollment' => InitiateShape::FORM,
+        ])
+        ->and($type->representsMultipleFactors())->toBeFalse();
 });
 
-describe('rules', function () {
+describe('new password rules', function () {
     it('requires a string password', function (Surface $surface, mixed $password, bool $passes) {
-        expect(passwordRulesPass($surface, $password))->toBe($passes);
-    })->with([Surface::SIGN_IN, Surface::REGISTRATION, Surface::ENROLLMENT])->with([
+        $passed = passwordRulesPass($surface, $password);
+
+        expect($passed)->toBe($passes);
+    })->with([Surface::REGISTRATION, Surface::ENROLLMENT])->with([
         'missing' => [null, false],
         'empty' => ['', false],
         'an array' => [['secret'], false],
@@ -70,7 +54,9 @@ describe('rules', function () {
     it('caps a new password at 72 bytes under bcrypt', function (Surface $surface, string $password, bool $passes) {
         config(['hashing.driver' => 'bcrypt']);
 
-        expect(passwordRulesPass($surface, $password))->toBe($passes);
+        $passed = passwordRulesPass($surface, $password);
+
+        expect($passed)->toBe($passes);
     })->with([Surface::REGISTRATION, Surface::ENROLLMENT])->with([
         '72 bytes' => [str_repeat('a', 72), true],
         '73 bytes' => [str_repeat('a', 73), false],
@@ -81,7 +67,9 @@ describe('rules', function () {
     it('caps a new password at the app\'s bcrypt limit when it is lower', function (Surface $surface, string $password, bool $passes) {
         config(['hashing.driver' => 'bcrypt', 'hashing.bcrypt.limit' => 64]);
 
-        expect(passwordRulesPass($surface, $password))->toBe($passes);
+        $passed = passwordRulesPass($surface, $password);
+
+        expect($passed)->toBe($passes);
     })->with([Surface::REGISTRATION, Surface::ENROLLMENT])->with([
         '64 bytes' => [str_repeat('a', 64), true],
         '65 bytes' => [str_repeat('a', 65), false],
@@ -90,111 +78,16 @@ describe('rules', function () {
     it('caps a new password at 1024 characters under argon', function (Surface $surface, string $driver, string $password, bool $passes) {
         config(['hashing.driver' => $driver]);
 
-        expect(passwordRulesPass($surface, $password))->toBe($passes);
+        $passed = passwordRulesPass($surface, $password);
+
+        expect($passed)->toBe($passes);
     })->with([Surface::REGISTRATION, Surface::ENROLLMENT])->with(['argon', 'argon2id'])->with([
         '1024 two-byte characters' => [str_repeat('é', 1024), true],
         '1025 characters' => [str_repeat('a', 1025), false],
     ]);
-
-    it('takes a long password at sign-in, so an imported hash of one still verifies', function () {
-        config(['hashing.driver' => 'bcrypt']);
-
-        expect(passwordRulesPass(Surface::SIGN_IN, str_repeat('a', 100)))->toBeTrue();
-    });
 });
 
 describe('verify', function () {
-    it('proves the password credential the typed password matches', function () {
-        $credential = passwordCredential(Hash::make('correct horse'));
-
-        expect((new PasswordType)->verify(Surface::SIGN_IN, ['password' => 'correct horse'], [$credential]))
-            ->toEqual(Proof::proven($credential));
-    });
-
-    it('rejects a wrong password, naming the credential it was checked against', function () {
-        $credential = passwordCredential(Hash::make('correct horse'));
-
-        expect((new PasswordType)->verify(Surface::SIGN_IN, ['password' => 'wrong horse'], [$credential]))
-            ->toEqual(Proof::rejected('password.mismatch', $credential));
-    });
-
-    it('verifies a hash with its own driver and rehashes it to the app\'s', function (string $from, string $to, string $algorithm) {
-        config(['hashing.driver' => $from]);
-        $credential = passwordCredential(Hash::make('correct horse'));
-        config(['hashing.driver' => $to]);
-        app('hash')->forgetDrivers();
-
-        $proof = (new PasswordType)->verify(Surface::SIGN_IN, ['password' => 'correct horse'], [$credential]);
-
-        expect($proof->proven)->toBeTrue()
-            ->and(password_get_info(($proof->updatedSecret)())['algoName'])->toBe($algorithm)
-            ->and(Hash::check('correct horse', ($proof->updatedSecret)()))->toBeTrue();
-    })->with([
-        'bcrypt to argon2id' => ['bcrypt', 'argon2id', 'argon2id'],
-        'argon2i to argon2id' => ['argon', 'argon2id', 'argon2id'],
-        'argon2id to bcrypt' => ['argon2id', 'bcrypt', 'bcrypt'],
-    ]);
-
-    it('verifies with the algorithm check on', function () {
-        config(['hashing.driver' => 'argon2id', 'hashing.bcrypt.verify' => true, 'hashing.argon.verify' => true]);
-        app('hash')->forgetDrivers();
-        $credential = passwordCredential(password_hash('correct horse', PASSWORD_BCRYPT));
-
-        $proof = (new PasswordType)->verify(Surface::SIGN_IN, ['password' => 'correct horse'], [$credential]);
-
-        expect($proof->proven)->toBeTrue();
-    });
-
-    it('rehashes a hash whose cost is out of date', function () {
-        $credential = passwordCredential(password_hash('correct horse', PASSWORD_BCRYPT, ['cost' => 5]));
-        config(['hashing.driver' => 'bcrypt', 'hashing.bcrypt.rounds' => 4]);
-
-        $proof = (new PasswordType)->verify(Surface::SIGN_IN, ['password' => 'correct horse'], [$credential]);
-
-        expect(password_get_info(($proof->updatedSecret)())['options'])->toBe(['cost' => 4]);
-    });
-
-    it('keeps the hash as it is when the app turned rehashing on sign-in off', function () {
-        $credential = passwordCredential(password_hash('correct horse', PASSWORD_BCRYPT, ['cost' => 5]));
-        config(['hashing.driver' => 'bcrypt', 'hashing.bcrypt.rounds' => 4, 'hashing.rehash_on_login' => false]);
-
-        expect((new PasswordType)->verify(Surface::SIGN_IN, ['password' => 'correct horse'], [$credential])->updatedSecret)->toBeNull();
-    });
-
-    it('makes the new hash only when core asks for it', function () {
-        $credential = passwordCredential(password_hash('correct horse', PASSWORD_BCRYPT, ['cost' => 5]));
-        $hash = spyOnHash();
-        $hash->shouldReceive('make')->never();
-
-        (new PasswordType)->verify(Surface::SIGN_IN, ['password' => 'correct horse'], [$credential]);
-    });
-
-    it('keeps a current hash as it is', function () {
-        $credential = passwordCredential(Hash::make('correct horse'));
-
-        expect((new PasswordType)->verify(Surface::SIGN_IN, ['password' => 'correct horse'], [$credential])->updatedSecret)->toBeNull();
-    });
-
-    it('verifies an imported bcrypt hash of a password longer than 72 bytes against its first 72', function () {
-        config(['hashing.driver' => 'bcrypt']);
-        $long = str_repeat('a', 72);
-        $credential = passwordCredential(password_hash($long.'-imported', PASSWORD_BCRYPT, ['cost' => 4]));
-
-        expect((new PasswordType)->verify(Surface::SIGN_IN, ['password' => $long.'-typed'], [$credential])->proven)->toBeTrue();
-    });
-
-    it('rejects a hash of an unknown format', function () {
-        $credential = passwordCredential('not a hash');
-
-        expect((new PasswordType)->verify(Surface::SIGN_IN, ['password' => 'not a hash'], [$credential]))
-            ->toEqual(Proof::rejected('password.mismatch', $credential));
-    });
-
-    it('rejects when the subject holds no password', function () {
-        expect((new PasswordType)->verify(Surface::SIGN_IN, ['password' => 'correct horse'], []))
-            ->toEqual(Proof::rejected('password.mismatch'));
-    });
-
     it('checks a password against the dummy hash when the subject holds none, as it would a real one', function (array $credentials) {
         $hash = spyOnHash();
         $hash->shouldReceive('check')->once()->passthru();
@@ -214,6 +107,14 @@ describe('verify', function () {
         $type->verify(Surface::SIGN_IN, ['password' => 'two'], []);
         config(['hashing.bcrypt.rounds' => 5]);
         $type->verify(Surface::SIGN_IN, ['password' => 'three'], []);
+    });
+
+    it('makes the new hash only when core asks for it', function () {
+        $credential = passwordCredential(password_hash('correct horse', PASSWORD_BCRYPT, ['cost' => 5]));
+        $hash = spyOnHash();
+        $hash->shouldReceive('make')->never();
+
+        (new PasswordType)->verify(Surface::SIGN_IN, ['password' => 'correct horse'], [$credential]);
     });
 
     it('refuses to verify on a surface it has no flow for yet', function (Surface $surface) {

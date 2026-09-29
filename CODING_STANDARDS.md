@@ -155,3 +155,8 @@ Sections 1–16 cover Laravel apps and packages in general. Where a legacy repo 
 ## 17. Keystone review rules
 
 - Don't split a call's arguments into local variables unless a variable is reused or names something the call hides. `new SignInAttempt(Keystone::guard(), app(AccountLookup::class))` reads fine inline.
+- A class that makes a security decision (a credential type, a sign-in decision) isn't Swappable: register a plain instance and never bind it in the container, so an app can't put its own in its place.
+- Slow work, such as making a hash, gets its own statement. Don't hide it inside another call's argument.
+- In a test, keep the act apart from the assert: the call under test never sits inside `expect()`.
+- Test what a request can show through the request (sign-in, validation, stored rows). Unit tests cover only what a request can't show, such as timing work or a surface with no endpoint yet; when a unit and a feature test catch the same defect, drop the unit case.
+- Name a test file after the class it covers (`KeystoneServiceProviderTest`), not after one behaviour.

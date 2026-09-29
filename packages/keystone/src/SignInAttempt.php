@@ -163,7 +163,11 @@ class SignInAttempt
             return;
         }
 
-        rescue(fn () => (new Credentials($this->guard->userModel()))->replaceSecret($credential, $type->name(), ($proof->updatedSecret)()));
+        rescue(function () use ($type, $proof, $credential) {
+            $secret = value($proof->updatedSecret);
+
+            (new Credentials($this->guard->userModel()))->replaceSecret($credential, type: $type->name(), secret: $secret);
+        });
     }
 
     /**
