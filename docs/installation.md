@@ -15,10 +15,10 @@ The installer refuses while `laravel/fortify` is installed, since both would han
 - copies the adapter's files into your app (see [The Inertia-Vue adapter](#the-inertia-vue-adapter)), with a partial for each credential type you installed. It skips and lists every file your app already has; `--force` overwrites them. Run it again after installing another method to add that method's partial.
 - requires `routes/keystone.php` from `routes/web.php`, makes your user model a Keystone user and sets the `web` guard's driver to `keystone`, as described below.
 - sets `SESSION_COOKIE=__Host-<app name>-session`, `SESSION_SECURE_COOKIE=true`, `SESSION_DOMAIN=null` and `SESSION_PATH=/` in `.env` and `.env.example`. The `__Host-` prefix keeps the session cookie to your own host, and browsers only accept it over HTTPS, so serve your app over HTTPS locally too (for example `herd secure`); `localhost` is the one exception.
-- adds the `Keystone` testsuite to `phpunit.xml` and maps the AppTests' namespaces in your `autoload-dev`, so `php artisan test` proves your copies keep Keystone's guarantees.
+- adds the `Keystone` testsuite to `phpunit.xml`, maps the AppTests' namespaces in your `autoload-dev` and binds each installed method's test support in `setUp()` of `tests/TestCase.php`, so `php artisan test` proves your copies keep Keystone's guarantees.
 - adds the npm packages the pages need, keeping the versions you already pinned, then runs `npm install && npm run build`. A package your app already depends on keeps its version.
 
-When it can't make an edit, such as a `phpunit.xml` without a `<testsuites>` element, it prints what to add yourself. It leaves `app.cipher` alone. Keystone's migrations run from the package, so there is nothing to publish.
+When it can't make an edit, such as a `phpunit.xml` without a `<testsuites>` element or a `tests/TestCase.php` it doesn't recognise, it prints what to add yourself. It leaves `app.cipher` alone. Keystone's migrations run from the package, so there is nothing to publish.
 
 ## The user model
 
