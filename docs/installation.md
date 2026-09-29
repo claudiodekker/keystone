@@ -3,10 +3,12 @@
 Keystone isn't released yet. Once it is, you install it with a frontend adapter and its installer:
 
 ```shell
-composer require claudiodekker/keystone claudiodekker/keystone-password claudiodekker/keystone-inertia-vue
+composer require claudiodekker/keystone claudiodekker/keystone-inertia-vue
 php artisan keystone:install
 php artisan migrate
 ```
+
+Each sign-in method is its own package, and none is required. To offer passwords, also require `claudiodekker/keystone-password` (see [Passwords](password.md)), before or after running the installer.
 
 The installer refuses while `laravel/fortify` is installed, since both would handle authentication, and without Pest, which Keystone's AppTests run on. Otherwise it:
 
@@ -66,7 +68,7 @@ Keystone stores and matches an address trimmed, Unicode NFC-composed, lowercased
 - `routes/keystone.php`: the routes, grouped under `/auth` and required from `routes/web.php`. Keystone relies on the route names, not the URLs, so you may change the URLs.
 - `resources/js/pages/`: one page per step, in the folder of the feature it belongs to, as your own pages would be: signing in is `auth/Login.vue`, and pages for managing email addresses will go in `emails/`. `auth/Login.vue` shows the status message Keystone passes it, already translated, and a form per credential type. `layouts/AuthLayout.vue` wraps them.
 - `resources/js/partials/`: a partial per credential type, such as `Password.vue`. Without one, a type falls back to the partial for its initiate shape in `partials/shapes/`.
-- `resources/js/components/`: the pieces the pages and partials share, such as `PasswordField.vue`, `CredentialTypeForm.vue` and `SignOutButton.vue`.
+- `resources/js/components/`: the pieces the pages and partials share, such as `CredentialTypeForm.vue` and `SignOutButton.vue`. A component only one type's partial uses, such as `PasswordField.vue`, arrives with that partial.
 - `resources/js/types/auth.ts`: the props each page receives.
 - `tests/Keystone/Assertions/`: the Inertia versions of the assertions Keystone's AppTests make about your responses. Redefine one there when you change what its hook returns.
 

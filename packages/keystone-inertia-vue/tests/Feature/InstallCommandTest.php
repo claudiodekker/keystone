@@ -1,6 +1,7 @@
 <?php
 
 use ClaudioDekker\Keystone\InertiaVue\Tests\StubsTestCase;
+use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Process\PendingProcess;
 use Illuminate\Support\Facades\Process;
@@ -83,7 +84,19 @@ it('copies the partials of installed credential types only', function () {
     }
 
     expect("{$app}/resources/js/partials/Password.vue")->toBeFile()
+        ->and("{$app}/resources/js/components/PasswordField.vue")->toBeFile()
         ->and("{$app}/resources/js/partials/NotInstalled.vue")->not->toBeFile();
+});
+
+it('installs without keystone-password, leaving out its partial and field', function () {
+    $app = freshApp();
+    app()->instance(CredentialTypes::class, new CredentialTypes);
+
+    $this->artisan('keystone:install')->assertSuccessful()->run();
+
+    expect("{$app}/resources/js/pages/auth/Login.vue")->toBeFile()
+        ->and("{$app}/resources/js/partials/Password.vue")->not->toBeFile()
+        ->and("{$app}/resources/js/components/PasswordField.vue")->not->toBeFile();
 });
 
 it('never copies the Wayfinder output generated at build', function () {

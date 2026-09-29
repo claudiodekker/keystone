@@ -35,6 +35,13 @@ class InstallCommand extends Command
     protected const string PARTIALS = 'resources/js/partials/';
 
     /**
+     * The components only one credential type's partial uses, copied only with that partial.
+     */
+    protected const array PARTIAL_COMPONENTS = [
+        'resources/js/components/PasswordField.vue' => self::PARTIALS.'Password.vue',
+    ];
+
+    /**
      * The npm packages the pages need, with the versions they're added at when the app has none.
      */
     protected const array NPM_PACKAGES = [
@@ -89,6 +96,7 @@ class InstallCommand extends Command
         $copies = $installer->copyStubs(dirname(__DIR__, 2).'/stubs', (bool) $this->option('force'), fn (string $path) => match (true) {
             in_array($path, self::BOOTSTRAP, true) => $bare,
             dirname($path).'/' === self::PARTIALS => in_array($path, $partials, true),
+            isset(self::PARTIAL_COMPONENTS[$path]) => in_array(self::PARTIAL_COMPONENTS[$path], $partials, true),
             default => true,
         });
 
