@@ -3,9 +3,12 @@
 use ClaudioDekker\Keystone\AppTests\AppTestCase;
 use ClaudioDekker\Keystone\AppTests\Assertions\SignInAssertions;
 use ClaudioDekker\Keystone\AppTests\Support\CredentialTypeSupport;
+use ClaudioDekker\Keystone\Methods\CredentialTypes;
+use ClaudioDekker\Keystone\Methods\Proof;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Tests\Fixtures\LayeredProbeAssertions;
 use ClaudioDekker\Keystone\Tests\Fixtures\ProbeAssertions;
+use ClaudioDekker\Keystone\Tests\Fixtures\RogueType;
 use ClaudioDekker\Keystone\Tests\Fixtures\UnrelatedProbeAssertions;
 use ClaudioDekker\Keystone\Tests\Fixtures\UserWithoutFactory;
 use Illuminate\Cache\ArrayStore;
@@ -48,6 +51,12 @@ it('runs each type\'s scenario in a fresh session, signed out', function () {
 
     expect($seen)->toBe([false, false]);
 });
+
+it('fails clearly when a type has no test support', function () {
+    $this->app->make(CredentialTypes::class)->register(new RogueType(fn () => Proof::rejected('rogue.mismatch')));
+
+    $this->supportsFor(Surface::SIGN_IN);
+})->throws(AssertionFailedError::class, 'No test support for the [rogue] credential type: add ClaudioDekker\\Keystone\\Tests\\Fixtures\\AppTests\\Support\\RogueTypeSupport, or bind one under [keystone.test-support.rogue].');
 
 describe('assertIndistinguishable', function () {
     beforeEach(function () {
