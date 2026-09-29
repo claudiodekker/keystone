@@ -164,7 +164,7 @@ describe('updated secrets', function () {
     it('stores the updated secret a proven proof carries, without moving the epoch', function () {
         $account = $this->createAccount();
         $id = rogueCredential($account);
-        $this->app->make(CredentialTypes::class)->register(new RogueType(fn () => Proof::proven(new StoredCredential($id, null, null, null), updatedSecret: 'rehashed')));
+        $this->app->make(CredentialTypes::class)->register(new RogueType(fn () => Proof::proven(new StoredCredential($id, null, null, null), updatedSecret: fn () => 'rehashed')));
 
         $this->post(route('login.submit', ['type' => 'rogue']), ['identifier' => 'jane@example.com']);
 
@@ -179,7 +179,7 @@ describe('updated secrets', function () {
         $this->app->make(CredentialTypes::class)->register(new RogueType(function () use ($id) {
             DB::table('user_credentials')->where('id', $id)->update(['secret' => Crypt::encryptString('changed')]);
 
-            return Proof::proven(new StoredCredential($id, null, 'verified', null), updatedSecret: 'rehashed');
+            return Proof::proven(new StoredCredential($id, null, 'verified', null), updatedSecret: fn () => 'rehashed');
         }));
 
         $this->post(route('login.submit', ['type' => 'rogue']), ['identifier' => 'jane@example.com']);
@@ -187,16 +187,22 @@ describe('updated secrets', function () {
         expect(Crypt::decryptString(DB::table('user_credentials')->where('id', $id)->value('secret')))->toBe('changed');
     });
 
-    it('stores no updated secret when the account is refused', function () {
+    it('makes and stores no updated secret when the account is refused', function () {
         $account = $this->createAccount();
         $id = DB::table('user_credentials')->insertGetId(['user_id' => $account->getKey(), 'type' => 'rogue', 'secret' => Crypt::encryptString('verified')]);
         DB::table('users')->where('id', $account->getKey())->update(['suspended_at' => now()]);
-        $this->app->make(CredentialTypes::class)->register(new RogueType(fn () => Proof::proven(new StoredCredential($id, null, 'verified', null), updatedSecret: 'rehashed')));
+        $made = false;
+        $this->app->make(CredentialTypes::class)->register(new RogueType(fn () => Proof::proven(new StoredCredential($id, null, 'verified', null), updatedSecret: function () use (&$made) {
+            $made = true;
+
+            return 'rehashed';
+        })));
 
         $this->post(route('login.submit', ['type' => 'rogue']), ['identifier' => 'jane@example.com']);
 
         $this->assertGuest();
-        expect(Crypt::decryptString(DB::table('user_credentials')->where('id', $id)->value('secret')))->toBe('verified');
+        expect($made)->toBeFalse()
+            ->and(Crypt::decryptString(DB::table('user_credentials')->where('id', $id)->value('secret')))->toBe('verified');
     });
 
     it('signs in and reports the failure when the updated secret cannot be stored', function () {
@@ -206,13 +212,25 @@ describe('updated secrets', function () {
         $this->app->make(CredentialTypes::class)->register(new RogueType(function () use ($id) {
             DB::table('user_credentials')->where('id', $id)->update(['secret' => 'not-encrypted']);
 
-            return Proof::proven(new StoredCredential($id, null, null, null), updatedSecret: 'rehashed');
+            return Proof::proven(new StoredCredential($id, null, null, null), updatedSecret: fn () => 'rehashed');
         }));
 
         $this->post(route('login.submit', ['type' => 'rogue']), ['identifier' => 'jane@example.com']);
 
         $this->assertAuthenticatedAs($account);
         Exceptions::assertReported(DecryptException::class);
+    });
+
+    it('signs in and reports the failure when the updated secret cannot be made', function () {
+        Exceptions::fake();
+        $account = $this->createAccount();
+        $id = rogueCredential($account);
+        $this->app->make(CredentialTypes::class)->register(new RogueType(fn () => Proof::proven(new StoredCredential($id, null, null, null), updatedSecret: fn () => throw new RuntimeException('Cannot hash.'))));
+
+        $this->post(route('login.submit', ['type' => 'rogue']), ['identifier' => 'jane@example.com']);
+
+        $this->assertAuthenticatedAs($account);
+        Exceptions::assertReported(fn (RuntimeException $e) => $e->getMessage() === 'Cannot hash.');
     });
 });
 

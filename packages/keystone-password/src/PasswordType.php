@@ -83,7 +83,7 @@ class PasswordType implements CredentialType
         }
 
         if ($credentials === []) {
-            Hash::check($password, $this->dummyHash());
+            $this->checkDummy($password);
         }
 
         return Proof::rejected('password.mismatch', $credentials[0] ?? null);
@@ -98,24 +98,24 @@ class PasswordType implements CredentialType
             return 'max:'.self::MAX_CHARACTERS;
         }
 
-        return function (string $attribute, mixed $value, Closure $fail) {
-            if (is_string($value) && strlen($value) > self::BCRYPT_MAX_BYTES) {
-                $fail('validation.max.string')->translate(['max' => self::BCRYPT_MAX_BYTES]);
+        $maxBytes = min(self::BCRYPT_MAX_BYTES, config('hashing.bcrypt.limit') ?? self::BCRYPT_MAX_BYTES);
+
+        return function (string $attribute, mixed $value, Closure $fail) use ($maxBytes) {
+            if (is_string($value) && strlen($value) > $maxBytes) {
+                $fail('validation.max.string')->translate(['max' => $maxBytes]);
             }
         };
     }
 
     /**
      * Check the password against the hash with the driver of the hash's own algorithm.
-     *
-     * A hash of no known algorithm is checked against the dummy hash instead, so it takes as long as a real one.
      */
     protected function check(#[\SensitiveParameter] string $password, string $hash): bool
     {
         $driver = self::DRIVERS[password_get_info($hash)['algoName']] ?? null;
 
         if ($driver === null) {
-            Hash::check($password, $this->dummyHash());
+            $this->checkDummy($password);
 
             return false;
         }
@@ -124,11 +124,25 @@ class PasswordType implements CredentialType
     }
 
     /**
-     * Hash the password again with the app's driver and cost when the hash no longer matches them.
+     * Check the password against the dummy hash, taking as long as a real check.
      */
-    protected function rehash(#[\SensitiveParameter] string $password, string $hash): ?string
+    protected function checkDummy(#[\SensitiveParameter] string $password): void
     {
-        return Hash::needsRehash($hash) ? Hash::make($password) : null;
+        Hash::check($password, $this->dummyHash());
+    }
+
+    /**
+     * Get what makes a new hash with the app's driver and cost, when the hash no longer matches them.
+     *
+     * @return (Closure(): string)|null
+     */
+    protected function rehash(#[\SensitiveParameter] string $password, string $hash): ?Closure
+    {
+        if (! config('hashing.rehash_on_login') || ! Hash::needsRehash($hash)) {
+            return null;
+        }
+
+        return fn () => Hash::make($password);
     }
 
     /**

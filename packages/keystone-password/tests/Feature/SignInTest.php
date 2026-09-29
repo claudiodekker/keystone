@@ -1,13 +1,15 @@
 <?php
 
 use ClaudioDekker\Keystone\AppTests\AppTestCase;
+use ClaudioDekker\Keystone\KeystoneUser;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 pest()->extend(AppTestCase::class);
 
-function storePassword($account, string $hash): int
+function storePassword(Model&KeystoneUser $account, string $hash): int
 {
     return DB::table('user_credentials')->insertGetId([
         'user_id' => $account->getKey(),

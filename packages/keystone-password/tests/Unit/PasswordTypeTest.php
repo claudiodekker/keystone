@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Mockery\MockInterface;
 
-function password(string $secret, int $id = 1): StoredCredential
+function passwordCredential(string $secret, int $id = 1): StoredCredential
 {
     return new StoredCredential($id, null, $secret, null);
 }
@@ -78,6 +78,15 @@ describe('rules', function () {
         '37 two-byte characters' => [str_repeat('é', 37), false],
     ]);
 
+    it('caps a new password at the app\'s bcrypt limit when it is lower', function (Surface $surface, string $password, bool $passes) {
+        config(['hashing.driver' => 'bcrypt', 'hashing.bcrypt.limit' => 64]);
+
+        expect(passwordRulesPass($surface, $password))->toBe($passes);
+    })->with([Surface::REGISTRATION, Surface::ENROLLMENT])->with([
+        '64 bytes' => [str_repeat('a', 64), true],
+        '65 bytes' => [str_repeat('a', 65), false],
+    ]);
+
     it('caps a new password at 1024 characters under argon', function (Surface $surface, string $driver, string $password, bool $passes) {
         config(['hashing.driver' => $driver]);
 
@@ -96,14 +105,14 @@ describe('rules', function () {
 
 describe('verify', function () {
     it('proves the password credential the typed password matches', function () {
-        $credential = password(Hash::make('correct horse'));
+        $credential = passwordCredential(Hash::make('correct horse'));
 
         expect((new PasswordType)->verify(Surface::SIGN_IN, ['password' => 'correct horse'], [$credential]))
             ->toEqual(Proof::proven($credential));
     });
 
     it('rejects a wrong password, naming the credential it was checked against', function () {
-        $credential = password(Hash::make('correct horse'));
+        $credential = passwordCredential(Hash::make('correct horse'));
 
         expect((new PasswordType)->verify(Surface::SIGN_IN, ['password' => 'wrong horse'], [$credential]))
             ->toEqual(Proof::rejected('password.mismatch', $credential));
@@ -111,15 +120,15 @@ describe('verify', function () {
 
     it('verifies a hash with its own driver and rehashes it to the app\'s', function (string $from, string $to, string $algorithm) {
         config(['hashing.driver' => $from]);
-        $credential = password(Hash::make('correct horse'));
+        $credential = passwordCredential(Hash::make('correct horse'));
         config(['hashing.driver' => $to]);
         app('hash')->forgetDrivers();
 
         $proof = (new PasswordType)->verify(Surface::SIGN_IN, ['password' => 'correct horse'], [$credential]);
 
         expect($proof->proven)->toBeTrue()
-            ->and(password_get_info((string) $proof->updatedSecret)['algoName'])->toBe($algorithm)
-            ->and(Hash::check('correct horse', (string) $proof->updatedSecret))->toBeTrue();
+            ->and(password_get_info(($proof->updatedSecret)())['algoName'])->toBe($algorithm)
+            ->and(Hash::check('correct horse', ($proof->updatedSecret)()))->toBeTrue();
     })->with([
         'bcrypt to argon2id' => ['bcrypt', 'argon2id', 'argon2id'],
         'argon2i to argon2id' => ['argon', 'argon2id', 'argon2id'],
@@ -129,7 +138,7 @@ describe('verify', function () {
     it('verifies with the algorithm check on', function () {
         config(['hashing.driver' => 'argon2id', 'hashing.bcrypt.verify' => true, 'hashing.argon.verify' => true]);
         app('hash')->forgetDrivers();
-        $credential = password(password_hash('correct horse', PASSWORD_BCRYPT));
+        $credential = passwordCredential(password_hash('correct horse', PASSWORD_BCRYPT));
 
         $proof = (new PasswordType)->verify(Surface::SIGN_IN, ['password' => 'correct horse'], [$credential]);
 
@@ -137,16 +146,31 @@ describe('verify', function () {
     });
 
     it('rehashes a hash whose cost is out of date', function () {
-        $credential = password(password_hash('correct horse', PASSWORD_BCRYPT, ['cost' => 5]));
+        $credential = passwordCredential(password_hash('correct horse', PASSWORD_BCRYPT, ['cost' => 5]));
         config(['hashing.driver' => 'bcrypt', 'hashing.bcrypt.rounds' => 4]);
 
         $proof = (new PasswordType)->verify(Surface::SIGN_IN, ['password' => 'correct horse'], [$credential]);
 
-        expect(password_get_info((string) $proof->updatedSecret)['options'])->toBe(['cost' => 4]);
+        expect(password_get_info(($proof->updatedSecret)())['options'])->toBe(['cost' => 4]);
+    });
+
+    it('keeps the hash as it is when the app turned rehashing on sign-in off', function () {
+        $credential = passwordCredential(password_hash('correct horse', PASSWORD_BCRYPT, ['cost' => 5]));
+        config(['hashing.driver' => 'bcrypt', 'hashing.bcrypt.rounds' => 4, 'hashing.rehash_on_login' => false]);
+
+        expect((new PasswordType)->verify(Surface::SIGN_IN, ['password' => 'correct horse'], [$credential])->updatedSecret)->toBeNull();
+    });
+
+    it('makes the new hash only when core asks for it', function () {
+        $credential = passwordCredential(password_hash('correct horse', PASSWORD_BCRYPT, ['cost' => 5]));
+        $hash = spyOnHash();
+        $hash->shouldReceive('make')->never();
+
+        (new PasswordType)->verify(Surface::SIGN_IN, ['password' => 'correct horse'], [$credential]);
     });
 
     it('keeps a current hash as it is', function () {
-        $credential = password(Hash::make('correct horse'));
+        $credential = passwordCredential(Hash::make('correct horse'));
 
         expect((new PasswordType)->verify(Surface::SIGN_IN, ['password' => 'correct horse'], [$credential])->updatedSecret)->toBeNull();
     });
@@ -154,13 +178,13 @@ describe('verify', function () {
     it('verifies an imported bcrypt hash of a password longer than 72 bytes against its first 72', function () {
         config(['hashing.driver' => 'bcrypt']);
         $long = str_repeat('a', 72);
-        $credential = password(password_hash($long.'-imported', PASSWORD_BCRYPT, ['cost' => 4]));
+        $credential = passwordCredential(password_hash($long.'-imported', PASSWORD_BCRYPT, ['cost' => 4]));
 
         expect((new PasswordType)->verify(Surface::SIGN_IN, ['password' => $long.'-typed'], [$credential])->proven)->toBeTrue();
     });
 
     it('rejects a hash of an unknown format', function () {
-        $credential = password('not a hash');
+        $credential = passwordCredential('not a hash');
 
         expect((new PasswordType)->verify(Surface::SIGN_IN, ['password' => 'not a hash'], [$credential]))
             ->toEqual(Proof::rejected('password.mismatch', $credential));
@@ -178,7 +202,7 @@ describe('verify', function () {
         (new PasswordType)->verify(Surface::SIGN_IN, ['password' => 'correct horse'], $credentials);
     })->with([
         'no password' => [[]],
-        'an unknown format' => [[password('not a hash')]],
+        'an unknown format' => [[passwordCredential('not a hash')]],
     ]);
 
     it('makes the dummy hash with the app\'s driver and cost once, until the hashing config changes', function () {

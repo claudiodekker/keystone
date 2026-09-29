@@ -155,7 +155,7 @@ class SignInAttempt
     }
 
     /**
-     * Store the secret the proof updated in place of the one the type verified, reporting a failure without refusing.
+     * Make and store the secret the proof updated in place of the one the type verified, reporting a failure without refusing.
      */
     protected function storeUpdatedSecret(CredentialType $type, Proof $proof, ?StoredCredential $credential): void
     {
@@ -163,9 +163,7 @@ class SignInAttempt
             return;
         }
 
-        $credentials = new Credentials($this->guard->userModel());
-
-        rescue(fn () => $credentials->replaceSecret($credential, $type->name(), $proof->updatedSecret));
+        rescue(fn () => (new Credentials($this->guard->userModel()))->replaceSecret($credential, $type->name(), ($proof->updatedSecret)()));
     }
 
     /**

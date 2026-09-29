@@ -22,7 +22,7 @@ class KeystoneServiceProvider extends ServiceProvider
     /**
      * The password fields a proof or a new password arrives in, which are never trimmed.
      */
-    public const array PASSWORD_FIELDS = ['password', 'current_password', 'password_confirmation'];
+    protected const array PASSWORD_FIELDS = ['password', 'current_password', 'password_confirmation'];
 
     /**
      * Register the package services.
