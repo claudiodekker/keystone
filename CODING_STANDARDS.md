@@ -183,7 +183,7 @@ The class type tells you where code runs: Actions run in the request, jobs run o
 
 ## 16. Domain language and user-facing text
 
-- User-facing text is a key in a Laravel PHP lang file, grouped by a broad area (`lang/{locale}/messages.php`), in every locale. A new file for a narrow topic that won't grow is folded into a broader one.
+- User-facing text is a key in a Laravel PHP lang file, grouped by a broad area (`lang/{locale}/messages.php`), in every locale. A package reads its keys through its namespace (`__('package::messages.failed')`). A new file for a narrow topic that won't grow is folded into a broader one.
 - A PR that adds a domain value (an enum case, a status, a mode) whose meaning isn't in `CONTEXT.md` or an ADR adds it to `CONTEXT.md`.
 
 ## 17. Packages
