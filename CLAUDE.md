@@ -1,6 +1,6 @@
 ### Working agreements
 
-- TDD for all code (`/tdd`): red, green, refactor. No untested logic.
+- TDD for all code (`/mattpocock-skills:tdd`): red, green, refactor. No untested logic.
 - No documentation beyond `CONTEXT.md`, ADRs, `docs/agents/` and the user docs in `docs/`. A PR that changes behaviour updates its user docs page. No docblocks that restate types, no README prose.
 - `.scratch/` holds research that fed past decisions. Don't read it unless a decision (spec, ticket, ADR) lacks the specifics you need.
 - Small PRs: one ticket, one tracer-bullet slice per PR.
@@ -10,11 +10,11 @@
 
 Before opening a PR:
 
-1. Run /code-review in a subagent against the merge-base. Commit its fixes; only surface questions it can't resolve.
+1. Run /mattpocock-skills:code-review in a subagent against the merge-base. Commit its fixes; only surface questions it can't resolve.
 2. Re-run checks until green.
-3. Use /pr to write the description from the final diff, then open the PR.
+3. Use /mattpocock-skills:pr to write the description from the final diff, then open the PR.
 
-If the diff changes after the PR is open, re-run /pr to update the description.
+If the diff changes after the PR is open, re-run /mattpocock-skills:pr to update the description.
 
 - Answer review comments on the PR itself, in full. The thread gets at most a link.
 - Open at most two PRs ahead of review. Each stacked PR is reviewed against its own base.
