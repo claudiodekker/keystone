@@ -37,6 +37,20 @@ trait SignInAssertions
     }
 
     /**
+     * Assert the response refuses a sign-in step because a rate limit is spent, saying when to try again.
+     *
+     * @param  TestResponse<Response>  $response
+     */
+    public function assertSignInThrottled(TestResponse $response): void
+    {
+        $seconds = $response->headers->get('Retry-After');
+
+        $response->assertTooManyRequests()
+            ->assertHeader('Retry-After')
+            ->assertSee(__('keystone::messages.throttled', ['seconds' => $seconds]));
+    }
+
+    /**
      * Assert the response refuses invalid input, with an error for each field.
      *
      * @param  TestResponse<Response>  $response

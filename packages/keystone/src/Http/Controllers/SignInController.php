@@ -9,8 +9,11 @@ use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
+use ClaudioDekker\Keystone\RateLimiter;
 use ClaudioDekker\Keystone\SignInAttempt;
 use ClaudioDekker\Keystone\Status;
+use ClaudioDekker\Keystone\StepKind;
+use ClaudioDekker\Keystone\Throttled;
 use Illuminate\Contracts\Support\Responsable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -34,6 +37,12 @@ abstract class SignInController
      */
     public function show(Request $request): Response|Responsable
     {
+        try {
+            $this->limiter($request)->hitRequest(StepKind::VIEW);
+        } catch (Throttled $throttled) {
+            return $this->refuseThrottled($request, $throttled->retryAfterSeconds);
+        }
+
         if (Keystone::guard()->check()) {
             return $this->refuseSignedIn();
         }
@@ -56,6 +65,22 @@ abstract class SignInController
      */
     public function store(Request $request, string $type): Response|Responsable
     {
+        try {
+            return $this->signIn($request, $type);
+        } catch (Throttled $throttled) {
+            return $this->refuseThrottled($request, $throttled->retryAfterSeconds);
+        }
+    }
+
+    /**
+     * Run the sign-in behind its rate limits.
+     *
+     * @throws Throttled
+     */
+    protected function signIn(Request $request, string $type): Response|Responsable
+    {
+        $this->limiter($request)->hitRequest(StepKind::SUBMIT);
+
         if (Keystone::guard()->check()) {
             return $this->refuseSignedIn();
         }
@@ -77,7 +102,7 @@ abstract class SignInController
         $identifier = $input[self::IDENTIFIER];
         $proofInput = Arr::except($input, self::IDENTIFIER);
 
-        $attempt = new SignInAttempt(Keystone::guard(), app(AccountLookup::class));
+        $attempt = new SignInAttempt(Keystone::guard(), app(AccountLookup::class), $this->limiter($request));
         $account = $attempt->attempt($credentialType, $identifier, $proofInput);
 
         if ($account === null) {
@@ -116,6 +141,16 @@ abstract class SignInController
     }
 
     /**
+     * Refuse a step whose rate limit is spent, saying when to try again.
+     */
+    protected function refuseThrottled(Request $request, int $retryAfterSeconds): Response
+    {
+        $message = __('keystone::messages.throttled', ['seconds' => $retryAfterSeconds]);
+
+        return response($message, Response::HTTP_TOO_MANY_REQUESTS, ['Retry-After' => $retryAfterSeconds]);
+    }
+
+    /**
      * Send invalid input back to the sign-in page, flashing only the identifier.
      */
     protected function refuseInvalid(Request $request, MessageBag $errors): RedirectResponse
@@ -133,6 +168,14 @@ abstract class SignInController
         $identifier = $request->input(self::IDENTIFIER);
 
         $request->session()->flashInput(is_string($identifier) ? [self::IDENTIFIER => $identifier] : []);
+    }
+
+    /**
+     * Get core's rate limiter for the request.
+     */
+    protected function limiter(Request $request): RateLimiter
+    {
+        return new RateLimiter($request, Keystone::guard());
     }
 
     /**

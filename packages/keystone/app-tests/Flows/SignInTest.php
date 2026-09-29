@@ -26,6 +26,13 @@ function refused(AppTestCase $test, TestResponse $response): TestResponse
     return $response;
 }
 
+function throttled(AppTestCase $test, TestResponse $response): TestResponse
+{
+    $test->assertSignInThrottled($response);
+
+    return $response;
+}
+
 function signIn(AppTestCase $test, CredentialTypeSupport $support, string $identifier, array $proof)
 {
     return $test->post(route('login.submit', ['type' => $support->type()]), ['identifier' => $identifier, ...$proof]);
@@ -211,6 +218,69 @@ describe('submit', function () {
 
         $this->assertSignedInSentAway($response);
         expect(session()->getId())->toBe($sessionId);
+    });
+});
+
+describe('rate limits', function () {
+    it('throttles the eleventh submission in a minute before validating it', function () {
+        foreach (range(1, 10) as $ignored) {
+            $this->post(route('login.submit', ['type' => $this->support->type()]));
+        }
+
+        $this->assertSignInThrottled($this->post(route('login.submit', ['type' => $this->support->type()])));
+    });
+
+    it('throttles a type that does not exist', function () {
+        foreach (range(1, 10) as $ignored) {
+            $this->post(route('login.submit', ['type' => 'no-such-type']), ['identifier' => 'jane@example.com']);
+        }
+
+        $this->assertSignInThrottled($this->post(route('login.submit', ['type' => 'no-such-type']), ['identifier' => 'jane@example.com']));
+    });
+
+    it('throttles the sixty-first view of the sign-in page in a minute', function () {
+        foreach (range(1, 60) as $ignored) {
+            $this->get(route('login'));
+        }
+
+        $this->assertSignInThrottled($this->get(route('login')));
+    });
+
+    it('throttles an account after 20 wrong answers in an hour from any address, exactly like an unknown one', function () {
+        $this->freezeSecond();
+        $account = $this->createAccount();
+        $this->arrangeCredential($account, $this->support, Surface::SIGN_IN);
+
+        foreach (range(1, 20) as $i) {
+            $this->withServerVariables(['REMOTE_ADDR' => "203.0.113.{$i}"]);
+            refused($this, signIn($this, $this->support, 'jane@example.com', $this->support->rejectedProof(Surface::SIGN_IN)));
+            refused($this, signIn($this, $this->support, 'nobody@example.com', $this->support->rejectedProof(Surface::SIGN_IN)));
+        }
+
+        $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.1']);
+        $this->assertIndistinguishable(
+            fn () => throttled($this, signIn($this, $this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN))),
+            fn () => throttled($this, signIn($this, $this->support, 'nobody@example.com', $this->support->validProof(Surface::SIGN_IN))),
+        );
+        $this->assertGuest();
+    });
+
+    it('neither counts a successful sign-in nor resets earlier failures', function () {
+        $account = $this->createAccount();
+        $this->arrangeCredential($account, $this->support, Surface::SIGN_IN);
+
+        foreach (range(1, 19) as $i) {
+            $this->withServerVariables(['REMOTE_ADDR' => "203.0.113.{$i}"]);
+            refused($this, signIn($this, $this->support, 'jane@example.com', $this->support->rejectedProof(Surface::SIGN_IN)));
+        }
+
+        $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.1']);
+        $this->assertSignedIn(signIn($this, $this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN)), '/');
+        $this->post(route('logout'));
+        refused($this, signIn($this, $this->support, 'jane@example.com', $this->support->rejectedProof(Surface::SIGN_IN)));
+
+        $this->assertSignInThrottled(signIn($this, $this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN)));
+        $this->assertGuest();
     });
 });
 

@@ -1,0 +1,16 @@
+# One rate limiter with hashed keys
+
+Core has one rate limiter, which its controllers and the sign-in attempt call directly; methods and the app never see a key, a count or an allowance. It holds a request limit per step kind, counted per IP address and, separately, per signed-in account, and a failed-attempt limit per account, credential type and flow. The request limit is taken first on every endpoint, before validation. A failed attempt is taken with one atomic increment before the method verifies anything and refused when it goes over the allowance, so parallel wrong answers never get more verify calls than the allowance. It is given back only when the attempt signs in or the method throws, and only inside the window it was taken in, told apart by the window's stored end rather than by clock arithmetic. Nothing ever resets a count; counts only expire.
+
+Keys are built in one place as an HMAC-SHA256 of their canonical parts under a per-purpose subkey of the app key, so the store never holds an identifier or an address in clear. Counting before the proof, rather than after a failure as Fortify does, closes the race where many parallel guesses all pass the check before any of them is counted, and never resetting on success means an attacker who also knows a password can't use it to refill the budget for guessing a second factor.
+
+## Consequences
+
+- The limiter counts in Laravel's rate-limiter cache store (`cache.limiter`, else the default store). When that store fails, the failed-attempt limit refuses every attempt and the request limit lets requests through, reporting the failure either way.
+- A request without a usable IP address shares one key with every other such request, so a broken proxy setup throttles everyone together rather than no one.
+- A proof accepted for an account that can't sign in (suspended, disabled) stays counted like a wrong answer, so the limit can't reveal that a password was right.
+- An identifier that names no account keys its bucket as lowercase plus `Str::transliterate`, as Fortify does, so `rené` and `rene` share one; a made-up address locks exactly like a real one.
+- The flow is derived from the session's phase and the surface, never passed by a caller. Only the sign-in flow exists so far; deriving any other throws until its ticket builds it.
+- Every refusal is `throttled`: 429, `Retry-After` in seconds until the spent key expires, and one message, the same for real and made-up accounts. The controllers render it through a protected `refuseThrottled()` an adapter may override; it is not a response hook, like the other guard refusals.
+- Keystone's AppTests count limits in a fresh in-memory store, so a test app whose limiter store is Redis or a file doesn't carry counts from one test to the next.
+- The first refused attempt of each key's window records `limit.tripped`, about the named or signed-in account when there is one, with a reason naming the limit. The increment's own count tells which attempt is first, so parallel refusals record it once. Alerting on it is left to security alerts. The same trip also dispatches Laravel's `Lockout` event, at Claudio's review, so Fortify-era listeners keep working; it's the one Laravel auth event core fires, and a failing listener is reported without changing the refusal.

@@ -10,6 +10,7 @@ use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
 use Closure;
+use Illuminate\Cache\RateLimiter as CacheRateLimiter;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
@@ -43,8 +44,19 @@ abstract class AppTestCase extends TestCase
 
         Sleep::fake();
         Http::preventStrayRequests();
+        $this->countLimitsInMemory();
 
         $this->withHeader('Sec-Fetch-Site', 'same-origin');
+    }
+
+    /**
+     * Count rate limits in a fresh in-memory store, so no count outlives the test.
+     */
+    protected function countLimitsInMemory(): void
+    {
+        config(['cache.limiter' => 'array']);
+
+        $this->app->forgetInstance(CacheRateLimiter::class);
     }
 
     /**

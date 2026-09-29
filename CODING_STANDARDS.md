@@ -151,3 +151,7 @@ Sections 1–16 cover Laravel apps and packages in general. Where a legacy repo 
 - The public surface is explicit: internal classes are marked `@internal`, supported entry points `@api`.
 - Every framework API used exists in the lowest supported version. Newer APIs are gated behind one compatibility check whose `@see` links the upstream change.
 - User-facing changes update `CHANGELOG.md`.
+
+## 17. Keystone review rules
+
+- Don't split a call's arguments into local variables unless a variable is reused or names something the call hides. `new SignInAttempt(Keystone::guard(), app(AccountLookup::class))` reads fine inline.
