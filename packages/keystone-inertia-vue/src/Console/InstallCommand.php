@@ -93,7 +93,7 @@ class InstallCommand extends Command
         });
 
         $this->reportCopies($copies);
-        $this->configure($installer, $bare);
+        $this->wireIntoApp($installer, $bare);
         $this->installNpmPackages($installer);
 
         return self::SUCCESS;
@@ -120,7 +120,7 @@ class InstallCommand extends Command
     /**
      * Wire the copied files, the user model, the guard, the session cookie and the AppTests into the app.
      */
-    protected function configure(Installer $installer, bool $bare): void
+    protected function wireIntoApp(Installer $installer, bool $bare): void
     {
         $installer->requireRouteFile('keystone.php');
 
