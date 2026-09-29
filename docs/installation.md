@@ -41,3 +41,18 @@ Keystone's migrations also create `user_emails`, which holds each account's emai
 ## Email addresses
 
 Keystone stores and matches an address trimmed, Unicode NFC-composed, lowercased as a whole and with its domain in punycode, so `José@Bücher.example` and `josé@xn--bcher-kva.example` are one address, while `rené@` and `rene@` stay two. An address signs in only when exactly one active account holds it verified, or holds it unverified while it has no verified address. Any other address is treated as unknown, with the same refusal as a wrong password.
+
+## The Inertia-Vue adapter
+
+`claudiodekker/keystone-inertia-vue` gives Keystone its pages in Inertia and Vue, styled with Tailwind. It publishes files into your app that you then own:
+
+- `app/Http/Controllers/Keystone/`: one controller per Keystone controller. Each response hook turns one outcome into a response, so change a hook to change what users see. Keystone decides the outcome before the hook runs.
+- `routes/keystone.php`: the routes, required from `routes/web.php`. Keystone relies on the route names, not the URLs, so you may change the URLs.
+- `resources/js/pages/keystone/`: one page per step. `SignIn.vue` shows the status message Keystone passes it, already translated, and a form per credential type.
+- `resources/js/components/keystone/partials/`: a component per credential type, such as `Password.vue`. Without one, a type falls back to the component for its initiate shape in `components/keystone/shapes/`.
+- `resources/js/types/keystone.ts`: the props each page receives.
+- `tests/Keystone/Assertions/`: the Inertia versions of the assertions Keystone's AppTests make about your responses. Redefine one there when you change what its hook returns.
+
+The pages build their URLs with [Wayfinder](https://github.com/laravel/wayfinder), generated when Vite builds; don't commit its output. Your app needs Inertia's middleware in the `web` group and a root view, as the Laravel Vue starter kit has.
+
+Keystone's pages are kept encrypted in the browser's history, and signing out clears it, so Back after signing out shows none of them.

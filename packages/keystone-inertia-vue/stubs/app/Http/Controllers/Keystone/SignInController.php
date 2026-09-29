@@ -1,0 +1,42 @@
+<?php
+
+namespace App\Http\Controllers\Keystone;
+
+use ClaudioDekker\Keystone\Http\Controllers\SignInController as Controller;
+use ClaudioDekker\Keystone\Http\PageValues\SignInPage;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Inertia\Response;
+
+class SignInController extends Controller
+{
+    /**
+     * Respond with the sign-in page, kept encrypted in the browser's history.
+     */
+    protected function sendSignInPage(Request $request, SignInPage $page): Response
+    {
+        Inertia::encryptHistory();
+
+        return Inertia::render('keystone/SignIn', [
+            'types' => $page->types,
+            'status' => $page->status,
+        ]);
+    }
+
+    /**
+     * Respond to a refused sign-in, with the message for the identifier field.
+     */
+    protected function sendSignInRefused(Request $request, string $message): RedirectResponse
+    {
+        return to_route('login')->withErrors([self::IDENTIFIER => $message]);
+    }
+
+    /**
+     * Respond to a completed sign-in, sending the user on to the intended URL.
+     */
+    protected function sendSignedIn(Request $request, string $intendedUrl): RedirectResponse
+    {
+        return redirect($intendedUrl);
+    }
+}

@@ -5,7 +5,9 @@
     "require": {
         "php": "^8.4",
         "claudiodekker/keystone": "self.version",
-        "illuminate/support": "^13.0"
+        "illuminate/support": "^13.0",
+        "inertiajs/inertia-laravel": "^3.0",
+        "laravel/wayfinder": "^0.1.14"
     },
     "autoload": {
         "psr-4": {

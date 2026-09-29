@@ -4,6 +4,7 @@ use ClaudioDekker\Keystone\AppTests\AppTestCase;
 use ClaudioDekker\Keystone\AppTests\Assertions\SignInAssertions;
 use ClaudioDekker\Keystone\AppTests\Support\CredentialTypeSupport;
 use ClaudioDekker\Keystone\Methods\Surface;
+use ClaudioDekker\Keystone\Tests\Fixtures\LayeredProbeAssertions;
 use ClaudioDekker\Keystone\Tests\Fixtures\ProbeAssertions;
 use ClaudioDekker\Keystone\Tests\Fixtures\UnrelatedProbeAssertions;
 use ClaudioDekker\Keystone\Tests\Fixtures\UserWithoutFactory;
@@ -79,6 +80,13 @@ describe('assertions', function () {
         eval('namespace Tests\Keystone\Assertions; trait ProbeAssertions { use \ClaudioDekker\Keystone\Tests\Fixtures\ProbeAssertions; }');
 
         expect(AppTestCase::assertions(ProbeAssertions::class))->toBe('Tests\Keystone\Assertions\ProbeAssertions');
+    });
+
+    it('uses the app\'s copy that reaches Keystone\'s trait through its adapter\'s', function () {
+        eval('namespace ClaudioDekker\Keystone\Tests\Fixtures; trait AdapterProbeAssertions { use LayeredProbeAssertions; }');
+        eval('namespace Tests\Keystone\Assertions; trait LayeredProbeAssertions { use \ClaudioDekker\Keystone\Tests\Fixtures\AdapterProbeAssertions; }');
+
+        expect(AppTestCase::assertions(LayeredProbeAssertions::class))->toBe('Tests\Keystone\Assertions\LayeredProbeAssertions');
     });
 
     it('refuses an app copy that does not use Keystone\'s trait', function () {
