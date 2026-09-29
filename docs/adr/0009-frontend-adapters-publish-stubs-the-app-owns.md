@@ -9,6 +9,7 @@ Owning the files, rather than configuring a package's views, lets an application
 - Inertia-Vue renders a show step as the page component `keystone/<Page>`, with the page value's fields as its props. Every other outcome redirects, as in core's own fixtures.
 - Inertia-Vue encrypts the browser's history on every Keystone show step and clears it when Keystone ends the session, so Back after signing out shows no Keystone page value.
 - A page renders one component per credential type: the partial named after the type (`Password.vue` for `password`) when the application has one, else the component for the type's initiate shape. The adapter ships a partial for every first-party type and a component for each shape a built flow uses; the form shape is the first.
+- The stubs' own labels ("Sign in", "Password") are plain English in the markup, as in Laravel's starter kits: the application owns and translates them. Everything core says, such as a status or a refusal, arrives already translated from `keystone::`.
 - Page-value TypeScript types are written by hand in the stubs, and `vue-tsc` checks the pages against them.
 - The stubs use stable Wayfinder for URLs. It is generated at build, never committed; in this repository it is generated into the stubs folder, which ignores it.
 - The adapter's AppTest assertions (`ClaudioDekker\Keystone\InertiaVue\AppTests\Assertions`) override core's where Inertia responses differ, and the stub copy the application owns uses them, so an application's copy may reach core's trait through the adapter's.

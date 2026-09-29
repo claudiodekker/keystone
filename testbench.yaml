@@ -8,6 +8,9 @@ providers:
     - ClaudioDekker\Keystone\InertiaVue\InertiaVueServiceProvider
     - Workbench\App\Providers\WorkbenchServiceProvider
 
+env:
+    - SESSION_DRIVER=file
+
 workbench:
     start: '/'
     install: true

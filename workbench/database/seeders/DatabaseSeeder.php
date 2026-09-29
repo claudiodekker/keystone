@@ -8,6 +8,7 @@ use ClaudioDekker\Keystone\Methods\Surface;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use LogicException;
 use Workbench\App\Models\User;
 
 class DatabaseSeeder extends Seeder
@@ -30,7 +31,7 @@ class DatabaseSeeder extends Seeder
 
         (new Credentials($account))->store(
             $account,
-            $types->find('password', Surface::SIGN_IN),
+            $types->find('password', Surface::SIGN_IN) ?? throw new LogicException('The workbench needs keystone-password.'),
             identifier: null,
             secret: Hash::make('password'),
         );

@@ -8,7 +8,9 @@ function coreControllers(): array
 {
     $files = glob(dirname(__DIR__).'/packages/keystone/src/Http/Controllers/*Controller.php');
 
-    return array_map(fn (string $file) => 'ClaudioDekker\Keystone\Http\Controllers\\'.basename($file, '.php'), $files);
+    $names = array_map(fn (string $file) => basename($file, '.php'), $files);
+
+    return array_combine($names, array_map(fn (string $name) => 'ClaudioDekker\Keystone\Http\Controllers\\'.$name, $names));
 }
 
 function responseHooks(string $controller): array

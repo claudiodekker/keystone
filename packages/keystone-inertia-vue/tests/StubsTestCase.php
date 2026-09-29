@@ -20,8 +20,6 @@ abstract class StubsTestCase extends AppTestCase
     {
         parent::setUp();
 
-        $this->withoutVite();
-
         config(['inertia.pages.paths' => [self::STUBS.'/resources/js/pages']]);
         $this->app['view']->addLocation(__DIR__.'/Fixtures/views');
     }
