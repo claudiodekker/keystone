@@ -13,6 +13,8 @@ The request limit is checked before anything else, so even invalid input or an u
 
 A successful sign-in doesn't count, but nothing ever resets a count: counts only expire at the end of their window.
 
+The first refusal in each window records a `limit.tripped` [security event](security-events.md), about the account when one is named, so you can react to lockouts by listening for `SecurityEventRecorded`.
+
 ## The store
 
 Counts live in Laravel's rate-limiter cache store: the store named by `cache.limiter`, else your default cache store. It must increment atomically and must not evict entries early, so use `redis`, `database` or `memcached` in production. Keys are hashed with your app key, and no email address, username or IP address is stored in clear.

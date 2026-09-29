@@ -67,6 +67,7 @@ class RateLimiter
     public function __construct(
         protected Request $request,
         protected KeystoneGuard $guard,
+        protected SecurityEventRecorder $recorder = new SecurityEventRecorder,
     ) {
         //
     }
@@ -81,7 +82,8 @@ class RateLimiter
         $keys = $this->requestKeys($kind);
 
         try {
-            $spent = $this->spentKeys($keys, $kind->allowance());
+            $counts = $this->countHits($keys);
+            $spent = array_keys(array_filter($counts, fn (int $count) => $count > $kind->allowance()));
             $retryAfterSeconds = $this->retryAfter($spent);
         } catch (Throwable $e) {
             report($e);
@@ -89,9 +91,15 @@ class RateLimiter
             return;
         }
 
-        if ($spent !== []) {
-            throw new Throttled($retryAfterSeconds);
+        if ($spent === []) {
+            return;
         }
+
+        if (in_array($kind->allowance() + 1, $counts, true)) {
+            $this->recordRequestTrip();
+        }
+
+        throw new Throttled($retryAfterSeconds);
     }
 
     /**
@@ -116,6 +124,16 @@ class RateLimiter
             report($e);
 
             throw new Throttled(self::OUTAGE_RETRY_AFTER_SECONDS);
+        }
+
+        if ($count === self::FAILED_ATTEMPT_ALLOWANCE + 1) {
+            $this->recorder->record(
+                SecurityEventType::LIMIT_TRIPPED,
+                account: $account,
+                flow: $flow->value,
+                credentialType: $type->name(),
+                reason: 'keystone.failed_attempt_limit',
+            );
         }
 
         if ($count > self::FAILED_ATTEMPT_ALLOWANCE) {
@@ -161,24 +179,35 @@ class RateLimiter
     }
 
     /**
-     * Count one hit on each key, returning the keys that went over the allowance.
+     * Count one hit on each key, returning each key's count.
      *
      * @param  list<string>  $keys
-     * @return list<string>
+     * @return array<string, int>
      */
-    protected function spentKeys(array $keys, int $allowance): array
+    protected function countHits(array $keys): array
     {
-        $spent = [];
+        $counts = [];
 
         foreach ($keys as $key) {
-            $count = $this->counter()->increment($key, self::REQUEST_WINDOW_SECONDS);
-
-            if ($count > $allowance) {
-                $spent[] = $key;
-            }
+            $counts[$key] = $this->counter()->increment($key, self::REQUEST_WINDOW_SECONDS);
         }
 
-        return $spent;
+        return $counts;
+    }
+
+    /**
+     * Record that a request limit refused its first request in the window, about the signed-in account if any.
+     */
+    protected function recordRequestTrip(): void
+    {
+        /** @var (Model&KeystoneUser)|null $account */
+        $account = $this->guard->user();
+
+        $this->recorder->record(
+            SecurityEventType::LIMIT_TRIPPED,
+            account: $account,
+            reason: 'keystone.request_limit',
+        );
     }
 
     /**

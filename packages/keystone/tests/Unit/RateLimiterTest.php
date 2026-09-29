@@ -3,6 +3,7 @@
 use ClaudioDekker\Keystone\Flow;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\RateLimiter;
+use ClaudioDekker\Keystone\SecurityEventRecorded;
 use ClaudioDekker\Keystone\StepKind;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormType;
 use ClaudioDekker\Keystone\Tests\Fixtures\User;
@@ -10,6 +11,7 @@ use ClaudioDekker\Keystone\Throttled;
 use Illuminate\Cache\RateLimiter as CacheRateLimiter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Exceptions;
 
 beforeEach(function () {
@@ -224,4 +226,71 @@ it('keeps no identifier or address in clear in the store', function () {
     expect($stored)->not->toBeEmpty()
         ->and(json_encode($stored, JSON_THROW_ON_ERROR))->not->toContain('nobody')
         ->not->toContain('203.0.113');
+});
+
+describe('limit.tripped', function () {
+    it('records the first refused request in a window, about the signed-in account', function () {
+        $user = User::factory()->create();
+        Keystone::guard()->setUser($user);
+        hitTimes(limiter('203.0.113.5'), StepKind::SUBMIT, 10);
+
+        retryAfter(fn () => limiter('198.51.100.7')->hitRequest(StepKind::SUBMIT));
+        retryAfter(fn () => limiter('198.51.100.7')->hitRequest(StepKind::SUBMIT));
+
+        $this->assertDatabaseCount('user_security_events', 1);
+        $this->assertDatabaseHas('user_security_events', [
+            'type' => 'limit.tripped',
+            'user_id' => $user->getKey(),
+            'flow' => null,
+            'reason' => 'keystone.request_limit',
+        ]);
+    });
+
+    it('records a guest\'s request-limit trip about nobody', function () {
+        Event::fake([SecurityEventRecorded::class]);
+        hitTimes(limiter(), StepKind::SUBMIT, 10);
+
+        retryAfter(fn () => limiter()->hitRequest(StepKind::SUBMIT));
+        retryAfter(fn () => limiter()->hitRequest(StepKind::SUBMIT));
+
+        Event::assertDispatchedTimes(SecurityEventRecorded::class, 1);
+        $this->assertDatabaseCount('user_security_events', 0);
+    });
+
+    it('records the first refused failed attempt in a window, about the account', function () {
+        $user = User::factory()->create();
+        failTimes(limiter(), 20, 'jane@example.com', $user);
+
+        retryAfter(fn () => failTimes(limiter(), 1, 'jane@example.com', $user));
+        retryAfter(fn () => failTimes(limiter(), 1, 'jane@example.com', $user));
+
+        $this->assertDatabaseCount('user_security_events', 1);
+        $this->assertDatabaseHas('user_security_events', [
+            'type' => 'limit.tripped',
+            'user_id' => $user->getKey(),
+            'flow' => 'sign-in',
+            'credential_type' => 'form',
+            'reason' => 'keystone.failed_attempt_limit',
+        ]);
+    });
+
+    it('records a trip for an unmatched identifier about nobody', function () {
+        Event::fake([SecurityEventRecorded::class]);
+        failTimes(limiter(), 20);
+
+        retryAfter(fn () => failTimes(limiter(), 1));
+        retryAfter(fn () => failTimes(limiter(), 1));
+
+        Event::assertDispatchedTimes(SecurityEventRecorded::class, 1);
+        $this->assertDatabaseCount('user_security_events', 0);
+    });
+
+    it('records nothing while the store is down', function () {
+        Event::fake([SecurityEventRecorded::class]);
+        $this->mock(CacheRateLimiter::class)->shouldReceive('increment')->andThrow(new RuntimeException('Store down.'));
+
+        retryAfter(fn () => failTimes(limiter(), 1));
+
+        Event::assertNotDispatched(SecurityEventRecorded::class);
+    });
 });
