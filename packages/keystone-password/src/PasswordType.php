@@ -61,13 +61,13 @@ class PasswordType implements CredentialType
     }
 
     /**
-     * Get the rules for the typed password, capping a new one at what the hashing driver takes.
+     * Get the rules for the typed password, asking a new one to be confirmed and capping it at what the hashing driver takes.
      */
     public function rules(Surface $surface): array
     {
         return match ($surface) {
             Surface::SIGN_IN => [self::FIELD => ['required', 'string']],
-            default => [self::FIELD => ['required', 'string', $this->lengthCap()]],
+            default => [self::FIELD => ['required', 'string', 'confirmed', $this->lengthCap()]],
         };
     }
 

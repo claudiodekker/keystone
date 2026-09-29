@@ -10,6 +10,10 @@ A stored bcrypt, argon2i or argon2id hash is checked with its own algorithm, wha
 
 An imported hash is the plain string `Hash` writes (`$2y$…`, `$argon2i$…` or `$argon2id$…`), as Fortify stores it in `users.password`.
 
+## New passwords
+
+At registration and enrollment a new password must be typed twice, in `password` and `password_confirmation`.
+
 ## Length
 
 Under bcrypt a new password may be at most 72 bytes (or your lower `hashing.bcrypt.limit`), because bcrypt ignores everything after that; non-ASCII characters take more than one byte each. Under argon2i or argon2id the limit is 1024 characters. See [ADR 0008](adr/0008-passwords-hash-with-the-apps-hasher-and-bcrypt-keeps-its-72-byte-cap.md) for why, and for how hashes imported from longer passwords behave.

@@ -22,9 +22,11 @@ function spyOnHash(): MockInterface
     return $hash;
 }
 
-function passwordRulesPass(Surface $surface, mixed $password): bool
+function passwordRulesPass(Surface $surface, mixed $password, mixed $confirmation = null): bool
 {
-    return Validator::make(['password' => $password], (new PasswordType)->rules($surface))->passes();
+    $input = ['password' => $password, 'password_confirmation' => func_num_args() > 2 ? $confirmation : $password];
+
+    return Validator::make($input, (new PasswordType)->rules($surface))->passes();
 }
 
 test('the type serves sign-in, registration and enrollment with a form, and is not multi-factor on its own', function () {
@@ -49,6 +51,16 @@ describe('new password rules', function () {
         'empty' => ['', false],
         'an array' => [['secret'], false],
         'a string' => ['secret', true],
+    ]);
+
+    it('requires a new password to be confirmed', function (Surface $surface, mixed $confirmation, bool $passes) {
+        $passed = passwordRulesPass($surface, 'correct horse', $confirmation);
+
+        expect($passed)->toBe($passes);
+    })->with([Surface::REGISTRATION, Surface::ENROLLMENT])->with([
+        'missing' => [null, false],
+        'different' => ['correct horse ', false],
+        'the same' => ['correct horse', true],
     ]);
 
     it('caps a new password at 72 bytes under bcrypt', function (Surface $surface, string $password, bool $passes) {
