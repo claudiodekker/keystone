@@ -33,19 +33,16 @@ class PasswordType implements CredentialType
     public const int MAX_CHARACTERS = 1024;
 
     /**
-     * The hashing driver that verifies each algorithm a stored hash may use.
+     * Get the type's name.
      */
-    protected const array DRIVERS = [
-        'bcrypt' => 'bcrypt',
-        'argon2i' => 'argon',
-        'argon2id' => 'argon2id',
-    ];
-
     public function name(): string
     {
         return 'password';
     }
 
+    /**
+     * Get the form each surface the type serves shows.
+     */
     public function surfaces(): array
     {
         return [
@@ -55,11 +52,17 @@ class PasswordType implements CredentialType
         ];
     }
 
+    /**
+     * Determine if a password proof counts as multiple factors, which it never does.
+     */
     public function representsMultipleFactors(): bool
     {
         return false;
     }
 
+    /**
+     * Get the rules for the typed password, capping a new one at what the hashing driver takes.
+     */
     public function rules(Surface $surface): array
     {
         return match ($surface) {
@@ -68,6 +71,9 @@ class PasswordType implements CredentialType
         };
     }
 
+    /**
+     * Check the typed password against the subject's password, or against the dummy hash when there is none.
+     */
     public function verify(Surface $surface, array $input, array $credentials): Proof
     {
         if ($surface !== Surface::SIGN_IN) {
@@ -112,15 +118,15 @@ class PasswordType implements CredentialType
      */
     protected function check(#[\SensitiveParameter] string $password, string $hash): bool
     {
-        $driver = self::DRIVERS[password_get_info($hash)['algoName']] ?? null;
+        $algorithm = HashAlgorithm::of($hash);
 
-        if ($driver === null) {
+        if ($algorithm === null) {
             $this->checkDummy($password);
 
             return false;
         }
 
-        return Hash::driver($driver)->check($password, $hash);
+        return Hash::driver($algorithm->driver())->check($password, $hash);
     }
 
     /**
