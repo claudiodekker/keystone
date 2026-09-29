@@ -36,6 +36,7 @@
         "psr-4": {
             "ClaudioDekker\\Keystone\\AppTests\\": "packages/keystone/app-tests/",
             "ClaudioDekker\\Keystone\\InertiaVue\\Tests\\": "packages/keystone-inertia-vue/tests/",
+            "ClaudioDekker\\Keystone\\Password\\AppTests\\": "packages/keystone-password/app-tests/",
             "ClaudioDekker\\Keystone\\Password\\Tests\\": "packages/keystone-password/tests/",
             "ClaudioDekker\\Keystone\\Tests\\": "packages/keystone/tests/",
             "Tests\\": "tests/"

@@ -94,6 +94,7 @@ class SignInAttempt
                 return null;
             }
 
+            $this->storeUpdatedSecret($type, $proof, $credential);
             $this->limiter->giveBack($taken);
 
             $this->recorder->record(
@@ -151,6 +152,20 @@ class SignInAttempt
         $owner = $credentials->ownerOf($proof->credentialId, $type->name());
 
         return $owner !== null && (string) $owner === (string) $account->getKey();
+    }
+
+    /**
+     * Store the secret the proof updated in place of the one the type verified, reporting a failure without refusing.
+     */
+    protected function storeUpdatedSecret(CredentialType $type, Proof $proof, ?StoredCredential $credential): void
+    {
+        if ($proof->updatedSecret === null || $credential === null) {
+            return;
+        }
+
+        $credentials = new Credentials($this->guard->userModel());
+
+        rescue(fn () => $credentials->replaceSecret($credential, $type->name(), $proof->updatedSecret));
     }
 
     /**

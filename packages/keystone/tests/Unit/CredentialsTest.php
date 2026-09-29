@@ -72,3 +72,29 @@ it('finds no owner for a credential of another type, a disabled one or a missing
         ->and(credentials()->ownerOf($disabled, 'form'))->toBeNull()
         ->and(credentials()->ownerOf($id + 100, 'form'))->toBeNull();
 });
+
+it('replaces the secret of a usable credential that still holds the verified one', function () {
+    $credentials = credentials();
+    $id = $credentials->store(User::factory()->create(), new FormType, identifier: null, secret: 'old-hash');
+
+    $replaced = $credentials->replaceSecret(new StoredCredential($id, null, 'old-hash', null), 'form', 'new-hash');
+
+    expect($replaced)->toBeTrue()
+        ->and(Crypt::decryptString(DB::table('user_credentials')->value('secret')))->toBe('new-hash');
+});
+
+it('keeps the secret of a credential whose secret changed, of another type or disabled', function (Closure $arrange, string $type) {
+    $credentials = credentials();
+    $id = $credentials->store(User::factory()->create(), new FormType, identifier: null, secret: 'old-hash');
+    $arrange($id);
+    $stored = DB::table('user_credentials')->value('secret');
+
+    $replaced = $credentials->replaceSecret(new StoredCredential($id, null, 'old-hash', null), $type, 'new-hash');
+
+    expect($replaced)->toBeFalse()
+        ->and(DB::table('user_credentials')->value('secret'))->toBe($stored);
+})->with([
+    'changed' => [fn (int $id) => DB::table('user_credentials')->where('id', $id)->update(['secret' => Crypt::encryptString('changed')]), 'form'],
+    'another type' => [fn () => null, 'other'],
+    'disabled' => [fn (int $id) => DB::table('user_credentials')->where('id', $id)->update(['disabled_at' => now()]), 'form'],
+]);

@@ -10,6 +10,7 @@ use Illuminate\Auth\EloquentUserProvider;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Foundation\Http\Kernel as HttpKernel;
+use Illuminate\Foundation\Http\Middleware\TrimStrings;
 use Illuminate\Support\ServiceProvider;
 use LogicException;
 
@@ -18,6 +19,11 @@ use LogicException;
  */
 class KeystoneServiceProvider extends ServiceProvider
 {
+    /**
+     * The password fields a proof or a new password arrives in, which are never trimmed.
+     */
+    public const array PASSWORD_FIELDS = ['password', 'current_password', 'password_confirmation'];
+
     /**
      * Register the package services.
      */
@@ -34,6 +40,8 @@ class KeystoneServiceProvider extends ServiceProvider
     public function boot(AuthManager $auth, Kernel $kernel): void
     {
         $auth->extend('keystone', $this->createGuard(...));
+
+        TrimStrings::except(self::PASSWORD_FIELDS);
 
         if ($kernel instanceof HttpKernel) {
             $kernel->pushMiddleware(CaptureRequestContext::class);

@@ -10,6 +10,7 @@ use ClaudioDekker\Keystone\Tests\Fixtures\FormType;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormTypeSupport;
 use ClaudioDekker\Keystone\Tests\Fixtures\RogueType;
 use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Testing\TestResponse;
@@ -20,7 +21,7 @@ describe('the sign-in page', function () {
     it('lists the types serving sign-in with their initiate shapes', function () {
         $this->app->make(CredentialTypes::class)->register(new FormType(name: 'second-factor', surfaces: ['challenge']));
 
-        $this->get(route('login'))->assertExactJson(['types' => [['type' => 'form', 'shape' => 'form']], 'status' => null]);
+        $this->get(route('login'))->assertExactJson(['types' => [['type' => 'form', 'shape' => 'form'], ['type' => 'password', 'shape' => 'form']], 'status' => null]);
     });
 
     it('carries the translated status after signing out', function () {
@@ -156,6 +157,62 @@ describe('proofs', function () {
             'credential_id' => DB::table('user_credentials')->value('id'),
             'reason' => 'keystone.barred',
         ]);
+    });
+});
+
+describe('updated secrets', function () {
+    it('stores the updated secret a proven proof carries, without moving the epoch', function () {
+        $account = $this->createAccount();
+        $id = rogueCredential($account);
+        $this->app->make(CredentialTypes::class)->register(new RogueType(fn () => Proof::proven(new StoredCredential($id, null, null, null), updatedSecret: 'rehashed')));
+
+        $this->post(route('login.submit', ['type' => 'rogue']), ['identifier' => 'jane@example.com']);
+
+        $this->assertAuthenticatedAs($account);
+        expect(Crypt::decryptString(DB::table('user_credentials')->where('id', $id)->value('secret')))->toBe('rehashed')
+            ->and(DB::table('users')->where('id', $account->getKey())->value('credential_epoch'))->toEqual(0);
+    });
+
+    it('keeps a secret that changed after the type verified it', function () {
+        $account = $this->createAccount();
+        $id = DB::table('user_credentials')->insertGetId(['user_id' => $account->getKey(), 'type' => 'rogue', 'secret' => Crypt::encryptString('verified')]);
+        $this->app->make(CredentialTypes::class)->register(new RogueType(function () use ($id) {
+            DB::table('user_credentials')->where('id', $id)->update(['secret' => Crypt::encryptString('changed')]);
+
+            return Proof::proven(new StoredCredential($id, null, 'verified', null), updatedSecret: 'rehashed');
+        }));
+
+        $this->post(route('login.submit', ['type' => 'rogue']), ['identifier' => 'jane@example.com']);
+
+        expect(Crypt::decryptString(DB::table('user_credentials')->where('id', $id)->value('secret')))->toBe('changed');
+    });
+
+    it('stores no updated secret when the account is refused', function () {
+        $account = $this->createAccount();
+        $id = DB::table('user_credentials')->insertGetId(['user_id' => $account->getKey(), 'type' => 'rogue', 'secret' => Crypt::encryptString('verified')]);
+        DB::table('users')->where('id', $account->getKey())->update(['suspended_at' => now()]);
+        $this->app->make(CredentialTypes::class)->register(new RogueType(fn () => Proof::proven(new StoredCredential($id, null, 'verified', null), updatedSecret: 'rehashed')));
+
+        $this->post(route('login.submit', ['type' => 'rogue']), ['identifier' => 'jane@example.com']);
+
+        $this->assertGuest();
+        expect(Crypt::decryptString(DB::table('user_credentials')->where('id', $id)->value('secret')))->toBe('verified');
+    });
+
+    it('signs in and reports the failure when the updated secret cannot be stored', function () {
+        Exceptions::fake();
+        $account = $this->createAccount();
+        $id = rogueCredential($account);
+        $this->app->make(CredentialTypes::class)->register(new RogueType(function () use ($id) {
+            DB::table('user_credentials')->where('id', $id)->update(['secret' => 'not-encrypted']);
+
+            return Proof::proven(new StoredCredential($id, null, null, null), updatedSecret: 'rehashed');
+        }));
+
+        $this->post(route('login.submit', ['type' => 'rogue']), ['identifier' => 'jane@example.com']);
+
+        $this->assertAuthenticatedAs($account);
+        Exceptions::assertReported(DecryptException::class);
     });
 });
 

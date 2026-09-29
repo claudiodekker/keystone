@@ -187,7 +187,7 @@ abstract class AppTestCase extends TestCase
     protected function eachSupportFor(Surface $surface, Closure $scenario): void
     {
         foreach ($this->supportsFor($surface) as $support) {
-            $this->flushSession();
+            $this->app['session.store']->invalidate();
             Auth::forgetGuards();
 
             $scenario($support);

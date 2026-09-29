@@ -69,6 +69,26 @@ class Credentials
     }
 
     /**
+     * Replace the secret of the usable credential of the type, only while it still holds the secret that was verified.
+     */
+    public function replaceSecret(StoredCredential $credential, string $type, #[\SensitiveParameter] string $secret): bool
+    {
+        return $this->users->getConnection()->transaction(function () use ($credential, $type, $secret) {
+            $row = $this->usable($type)->where('id', $credential->id)->lockForUpdate()->first(['secret']);
+            $held = $row?->secret === null ? null : Crypt::decryptString($row->secret);
+
+            if ($row === null || $held !== $credential->secret) {
+                return false;
+            }
+
+            return $this->query()->where('id', $credential->id)->update([
+                'secret' => Crypt::encryptString($secret),
+                'updated_at' => now(),
+            ]) === 1;
+        });
+    }
+
+    /**
      * Get the id of the account owning the usable credential of the type.
      */
     public function ownerOf(int $credentialId, string $type): int|string|null
