@@ -195,3 +195,4 @@ The class type tells you where code runs: Actions run in the request, jobs run o
 ## 18. Keystone review rules
 
 - Don't split a call's arguments into local variables unless a variable is reused or names something the call hides. `new SignInAttempt(Keystone::guard(), app(AccountLookup::class))` reads fine inline: resolving a dependency isn't a step that does real work in the §6 sense.
+- A class that makes a security decision (a credential type, a sign-in decision) isn't Swappable: register a plain instance and never bind it in the container, so an app can't put its own in its place.

@@ -52,7 +52,7 @@ it('lists the account\'s usable credentials of a type, decrypted', function () {
     DB::table('user_credentials')->where('id', $disabled)->update(['disabled_at' => now()]);
 
     expect($credentials->ofType($jane->getKey(), 'form'))
-        ->toEqual([new StoredCredential($id, 'jane-form', 'jane-secret', 'Mine')]);
+        ->toEqual([new StoredCredential($id, identifier: 'jane-form', secret: 'jane-secret', label: 'Mine')]);
 });
 
 it('finds the owner of a usable credential of a type', function () {

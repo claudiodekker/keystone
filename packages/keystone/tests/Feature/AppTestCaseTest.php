@@ -2,6 +2,8 @@
 
 use ClaudioDekker\Keystone\AppTests\AppTestCase;
 use ClaudioDekker\Keystone\AppTests\Assertions\SignInAssertions;
+use ClaudioDekker\Keystone\AppTests\Support\CredentialTypeSupport;
+use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Tests\Fixtures\ProbeAssertions;
 use ClaudioDekker\Keystone\Tests\Fixtures\UnrelatedProbeAssertions;
 use ClaudioDekker\Keystone\Tests\Fixtures\UserWithoutFactory;
@@ -30,6 +32,20 @@ it('counts rate limits in a fresh in-memory store', function () {
 
     expect($store)->toBeInstanceOf(ArrayStore::class)
         ->and(config('cache.limiter'))->toBe('array');
+});
+
+it('runs each type\'s scenario in a fresh session, signed out', function () {
+    $seen = [];
+
+    $this->eachSupportFor(Surface::SIGN_IN, function (CredentialTypeSupport $support) use (&$seen) {
+        $account = $this->createAccount("{$support->type()}@example.com");
+        $this->arrangeCredential($account, $support, Surface::SIGN_IN);
+        $seen[] = $this->get(route('login'))->isRedirect();
+
+        $this->post(route('login.submit', ['type' => $support->type()]), ['identifier' => "{$support->type()}@example.com", ...$support->validProof(Surface::SIGN_IN)]);
+    });
+
+    expect($seen)->toBe([false, false]);
 });
 
 describe('assertIndistinguishable', function () {
