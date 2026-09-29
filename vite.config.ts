@@ -9,11 +9,12 @@ const stubs = 'packages/keystone-inertia-vue/stubs/resources/js';
 
 export default defineConfig({
     plugins: [
-        laravel({
-            input: ['workbench/resources/css/app.css', 'workbench/resources/js/app.ts'],
-            publicDirectory: 'workbench/public',
-            hotFile: 'vendor/orchestra/testbench-core/laravel/public/hot',
-        }),
+        !process.env.VITEST &&
+            laravel({
+                input: ['workbench/resources/css/app.css', 'workbench/resources/js/app.ts'],
+                publicDirectory: 'workbench/public',
+                hotFile: 'vendor/orchestra/testbench-core/laravel/public/hot',
+            }),
         tailwindcss(),
         vue(),
         !process.env.VITEST &&
