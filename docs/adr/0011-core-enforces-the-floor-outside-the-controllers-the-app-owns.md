@@ -1,0 +1,16 @@
+# Core enforces the floor outside the controllers the app owns
+
+The app owns its copies of Keystone's controllers and its route file, and may subclass or override anything in them, since nothing in Keystone is `final`. So nothing security-bearing may depend on a controller method running as written. Core puts the hardening floor, the cross-site check and the request limit where an override of a controller action can't reach them, and re-checks each state precondition inline so a route without its middleware still fails closed.
+
+- **Hardening headers** come from a global middleware core prepends to the HTTP kernel, so it wraps every other layer. On the way out it asks the matched route whether its controller is one of Keystone's (a subclass of core's `Controller`) and, if so, sets the floor's headers over whatever the app, a middleware short-circuit, a throttle refusal or a rendered exception left there. The floor wins every conflict. The Content-Security-Policy merges by directive instead: the app's directives stay, `object-src`, `base-uri` and `frame-ancestors` are replaced with `'none'` in each policy the response carries, and core never writes `script-src`, which only the app can know.
+- **Cross-site mutations** are refused by a middleware core appends to the `web` group, after the session starts. A Keystone mutation passes only with `Sec-Fetch-Site: same-origin`, the session's CSRF token (in `_token`, `X-CSRF-TOKEN` or the encrypted `X-XSRF-TOKEN`), or an `Origin` equal to the request's own. It reads no `except` list, so an app exempting Keystone's routes from Laravel's CSRF check still gets this one. A refusal records `request.rejected` and throws Laravel's `TokenMismatchException`, so it renders as the app's usual 419.
+- **The request limit** is taken in the base controller's `callAction()`, which Laravel calls around every controller action. An app that replaces `show()` or `store()` outright is still throttled, and a `Throttled` thrown anywhere inside the action becomes the controller's `refuseThrottled()` response.
+- **Clear-Site-Data** comes from a second global middleware. The guard marks the request whenever it ends a session (sign-out, an epoch mismatch, an account that is gone or barred), and the middleware adds `Clear-Site-Data: "cache", "storage"` to whatever response that request produces, Keystone's or the app's.
+
+## Consequences
+
+- A route counts as Keystone's by its controller class alone. A closure route or an app controller that doesn't extend core's gets none of this, which is what lets the app's own pages keep their own caching and framing.
+- Overriding `callAction()` itself, or removing the middleware from the kernel, still drops the floor. That is deliberate misuse rather than a customisation, and the AppTests catch it: every Keystone response they see must carry the floor.
+- Laravel's own CSRF check still runs first for routes it covers, so a cross-site request it refuses is not recorded. Only the requests Laravel lets through reach core's check.
+- Laravel skips its CSRF check under unit tests; core's never does, which is why the AppTest base sends `Sec-Fetch-Site: same-origin`.
+- The per-request state checks (a signed-in user on a guest step, a guest on a signed-in step) stay inline in each action, so they run with or without the route's `guest` or `auth` middleware.

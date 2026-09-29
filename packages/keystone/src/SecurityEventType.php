@@ -11,4 +11,5 @@ enum SecurityEventType: string
     case PROOF_REJECTED = 'proof.rejected';
     case SIGNED_OUT = 'signed_out';
     case LIMIT_TRIPPED = 'limit.tripped';
+    case REQUEST_REJECTED = 'request.rejected';
 }

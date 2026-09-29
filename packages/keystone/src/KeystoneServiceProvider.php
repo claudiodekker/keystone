@@ -3,7 +3,10 @@
 namespace ClaudioDekker\Keystone;
 
 use ClaudioDekker\Keystone\Actions\AccountLookup;
+use ClaudioDekker\Keystone\Http\Middleware\AddHardeningHeaders;
 use ClaudioDekker\Keystone\Http\Middleware\CaptureRequestContext;
+use ClaudioDekker\Keystone\Http\Middleware\ClearSiteDataOnSessionEnd;
+use ClaudioDekker\Keystone\Http\Middleware\RefuseCrossSiteRequests;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use Illuminate\Auth\AuthManager;
 use Illuminate\Auth\EloquentUserProvider;
@@ -45,6 +48,9 @@ class KeystoneServiceProvider extends ServiceProvider
 
         if ($kernel instanceof HttpKernel) {
             $kernel->pushMiddleware(CaptureRequestContext::class);
+            $kernel->prependMiddleware(ClearSiteDataOnSessionEnd::class);
+            $kernel->prependMiddleware(AddHardeningHeaders::class);
+            $kernel->appendMiddlewareToGroup('web', RefuseCrossSiteRequests::class);
         }
 
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');

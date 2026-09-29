@@ -9,11 +9,9 @@ use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
-use ClaudioDekker\Keystone\RateLimiter;
 use ClaudioDekker\Keystone\SignInAttempt;
 use ClaudioDekker\Keystone\Status;
 use ClaudioDekker\Keystone\StepKind;
-use ClaudioDekker\Keystone\Throttled;
 use Illuminate\Contracts\Support\Responsable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -25,7 +23,7 @@ use Symfony\Component\HttpFoundation\Response;
 /**
  * @api
  */
-abstract class SignInController
+abstract class SignInController extends Controller
 {
     /**
      * The input field that names the account; the only field ever flashed back.
@@ -37,12 +35,6 @@ abstract class SignInController
      */
     public function show(Request $request): Response|Responsable
     {
-        try {
-            $this->limiter($request)->hitRequest(StepKind::VIEW);
-        } catch (Throttled $throttled) {
-            return $this->refuseThrottled($request, $throttled->retryAfterSeconds);
-        }
-
         if (Keystone::guard()->check()) {
             return $this->refuseSignedIn();
         }
@@ -65,22 +57,6 @@ abstract class SignInController
      */
     public function store(Request $request, string $type): Response|Responsable
     {
-        try {
-            return $this->signIn($request, $type);
-        } catch (Throttled $throttled) {
-            return $this->refuseThrottled($request, $throttled->retryAfterSeconds);
-        }
-    }
-
-    /**
-     * Run the sign-in behind its rate limits.
-     *
-     * @throws Throttled
-     */
-    protected function signIn(Request $request, string $type): Response|Responsable
-    {
-        $this->limiter($request)->hitRequest(StepKind::SUBMIT);
-
         if (Keystone::guard()->check()) {
             return $this->refuseSignedIn();
         }
@@ -141,16 +117,6 @@ abstract class SignInController
     }
 
     /**
-     * Refuse a step whose rate limit is spent, saying when to try again.
-     */
-    protected function refuseThrottled(Request $request, int $retryAfterSeconds): Response
-    {
-        $message = __('keystone::messages.throttled', ['seconds' => $retryAfterSeconds]);
-
-        return response($message, Response::HTTP_TOO_MANY_REQUESTS, ['Retry-After' => $retryAfterSeconds]);
-    }
-
-    /**
      * Send invalid input back to the sign-in page, flashing only the identifier.
      */
     protected function refuseInvalid(Request $request, MessageBag $errors): RedirectResponse
@@ -171,11 +137,11 @@ abstract class SignInController
     }
 
     /**
-     * Get core's rate limiter for the request.
+     * Get the kind of step the action is, which picks its request limit.
      */
-    protected function limiter(Request $request): RateLimiter
+    protected function stepKind(string $method): StepKind
     {
-        return new RateLimiter($request, Keystone::guard());
+        return $method === 'show' ? StepKind::VIEW : StepKind::SUBMIT;
     }
 
     /**

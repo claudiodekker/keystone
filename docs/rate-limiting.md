@@ -9,7 +9,7 @@ Keystone rate limits its own endpoints. Nothing in your routes, middleware or co
 | Request limit | IP address, and separately the signed-in account, per kind of step | 60 page views, 10 submissions or sign-outs a minute |
 | Failed-attempt limit | account and credential type in each flow, from any IP address | 20 wrong answers an hour |
 
-The request limit is checked before anything else, so even invalid input or an unknown credential type is throttled. A wrong answer counts against the account the typed identifier names; an identifier that names no account gets a bucket of its own, so a made-up address locks exactly like a real one.
+The request limit is checked before anything else, so even invalid input or an unknown credential type is throttled. It is taken before your controller's action runs, so it still applies when you replace an action such as `show()` or `store()` in your published controller. A wrong answer counts against the account the typed identifier names; an identifier that names no account gets a bucket of its own, so a made-up address locks exactly like a real one.
 
 A successful sign-in doesn't count, but nothing ever resets a count: counts only expire at the end of their window.
 
