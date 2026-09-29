@@ -103,7 +103,7 @@ class Installer
         $kept = array_filter($paths, fn (string $path) => ! Str::startsWith($path, self::GENERATED));
         sort($kept);
 
-        return array_values($kept);
+        return $kept;
     }
 
     /**
