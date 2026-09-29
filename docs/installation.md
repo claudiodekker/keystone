@@ -48,7 +48,7 @@ Keystone stores and matches an address trimmed, Unicode NFC-composed, lowercased
 
 - `app/Http/Controllers/Auth/`: one controller per Keystone controller, such as `SignInController`. Each response hook turns one outcome into a response, so change a hook to change what users see. Keystone decides the outcome before the hook runs.
 - `routes/auth.php`: the routes, required from `routes/web.php`. Keystone relies on the route names, not the URLs, so you may change the URLs.
-- `resources/js/pages/auth/`: one page per step, such as `Login.vue`, which shows the status message Keystone passes it, already translated, and a form per credential type. `layouts/AuthLayout.vue` wraps them.
+- `resources/js/pages/`: one page per step, in the folder of the feature it belongs to, as your own pages would be: signing in is `auth/Login.vue`, and pages for managing email addresses will go in `emails/`. `auth/Login.vue` shows the status message Keystone passes it, already translated, and a form per credential type. `layouts/AuthLayout.vue` wraps them.
 - `resources/js/partials/`: a partial per credential type, such as `Password.vue`. Without one, a type falls back to the partial for its initiate shape in `partials/shapes/`.
 - `resources/js/components/`: the pieces the pages and partials share, such as `PasswordField.vue`, `CredentialTypeForm.vue` and `SignOutButton.vue`.
 - `resources/js/types/auth.ts`: the props each page receives.

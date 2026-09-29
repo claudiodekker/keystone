@@ -6,8 +6,8 @@ Owning the files, rather than configuring a package's views, lets an application
 
 ## Consequences
 
-- The stubs install as the application's own auth files, unbranded and where a starter kit would put them: controllers in `app/Http/Controllers/Auth/`, routes in `routes/auth.php`, pages in `pages/auth/` (`auth/Login`), partials in `partials/` and shared components in `components/`. Only the AppTest assertion overrides stay under `tests/Keystone/`, since they exist for Keystone's AppTests.
-- Inertia-Vue renders a show step as a page component under `auth/`, with the page value's fields as its props. Every other outcome redirects, as in core's own fixtures.
+- The stubs install as the application's own auth files, unbranded and where a starter kit would put them: controllers in `app/Http/Controllers/Auth/`, routes in `routes/auth.php`, pages in the folder of the feature they belong to (`pages/auth/Login.vue` for signing in, `pages/emails/` for managing email addresses), partials in `partials/` and shared components in `components/`. Only the AppTest assertion overrides stay under `tests/Keystone/`, since they exist for Keystone's AppTests.
+- Inertia-Vue renders a show step as the page component at that path (`auth/Login`), with the page value's fields as its props. Every other outcome redirects, as in core's own fixtures.
 - Inertia-Vue encrypts the browser's history on every Keystone show step and clears it when Keystone ends the session, so Back after signing out shows no Keystone page value.
 - A page renders one component per credential type: the partial named after the type (`partials/Password.vue` for `password`) when the application has one, else the partial for the type's initiate shape in `partials/shapes/`. The adapter ships a partial for every first-party type and one for each shape a built flow uses; the form shape is the first.
 - The stubs' own labels ("Sign in", "Password") are plain English in the markup, as in Laravel's starter kits: the application owns and translates them. Everything core says, such as a status or a refusal, arrives already translated from `keystone::`.
