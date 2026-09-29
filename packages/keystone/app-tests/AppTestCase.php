@@ -197,7 +197,7 @@ abstract class AppTestCase extends TestCase
     /**
      * Get the app's copy of the assertion trait when it has one, else Keystone's.
      *
-     * The app's copy uses Keystone's trait and redefines the assertions its responses need.
+     * The app's copy uses Keystone's trait, directly or through its frontend adapter's, and redefines the assertions its responses need.
      *
      * @param  trait-string  $trait
      * @return trait-string
@@ -210,7 +210,7 @@ abstract class AppTestCase extends TestCase
             return $trait;
         }
 
-        if (! in_array($trait, class_uses($override), true)) {
+        if (! in_array($trait, trait_uses_recursive($override), true)) {
             throw new LogicException("{$override} must use {$trait}.");
         }
 

@@ -7,11 +7,15 @@
         "noEmit": true,
         "isolatedModules": true,
         "skipLibCheck": true,
-        "types": ["node", "vite/client"]
+        "types": ["node", "vite/client"],
+        "paths": {
+            "@/*": ["./packages/keystone-inertia-vue/stubs/resources/js/*"]
+        }
     },
     "include": [
         "vite.config.ts",
         "workbench/resources/js/**/*",
+        "workbench/resources/js/**/*.vue",
         "packages/*/resources/js/**/*",
         "packages/*/stubs/**/*.ts",
         "packages/*/stubs/**/*.vue"

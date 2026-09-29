@@ -27,6 +27,13 @@ _Avoid_: page props (for the core side)
 The place on a published controller where the application turns one outcome into the response the user sees.
 _Avoid_: responder
 
+**Initiate shape**:
+How a credential type starts on a surface: a form, a client ceremony, a redirect or an emailed delivery. A page renders one component per shape.
+
+**Partial**:
+The application's own component for one credential type, which a page renders in place of the component for that type's initiate shape.
+_Avoid_: method view
+
 ### Extension
 
 **Swappable**:

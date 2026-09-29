@@ -19,6 +19,7 @@ const TEST_NAMESPACES = [
     'ClaudioDekker\Keystone\Totp\Tests',
     'ClaudioDekker\Keystone\MagicLink\Tests',
     'ClaudioDekker\Keystone\OAuth\Tests',
+    'ClaudioDekker\Keystone\InertiaVue\AppTests',
     'ClaudioDekker\Keystone\InertiaVue\Tests',
     'ClaudioDekker\Keystone\Blade\Tests',
 ];

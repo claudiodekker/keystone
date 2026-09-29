@@ -6,7 +6,9 @@
     "require": {
         "php": "^8.4",
         "ext-intl": "*",
-        "illuminate/support": "^13.0"
+        "illuminate/support": "^13.0",
+        "inertiajs/inertia-laravel": "^3.0",
+        "laravel/wayfinder": "^0.1.14"
     },
     "require-dev": {
         "larastan/larastan": "^3.12",
@@ -34,12 +36,16 @@
     },
     "autoload-dev": {
         "psr-4": {
+            "App\\Http\\Controllers\\Auth\\": "packages/keystone-inertia-vue/stubs/app/Http/Controllers/Auth/",
             "ClaudioDekker\\Keystone\\AppTests\\": "packages/keystone/app-tests/",
+            "ClaudioDekker\\Keystone\\InertiaVue\\AppTests\\": "packages/keystone-inertia-vue/app-tests/",
             "ClaudioDekker\\Keystone\\InertiaVue\\Tests\\": "packages/keystone-inertia-vue/tests/",
             "ClaudioDekker\\Keystone\\Password\\AppTests\\": "packages/keystone-password/app-tests/",
             "ClaudioDekker\\Keystone\\Password\\Tests\\": "packages/keystone-password/tests/",
             "ClaudioDekker\\Keystone\\Tests\\": "packages/keystone/tests/",
-            "Tests\\": "tests/"
+            "Tests\\": "tests/",
+            "Workbench\\App\\": "workbench/app/",
+            "Workbench\\Database\\Seeders\\": "workbench/database/seeders/"
         }
     },
     "scripts": {

@@ -1,9 +1,15 @@
 laravel: '@testbench'
 
 providers:
+    - Inertia\ServiceProvider
+    - Laravel\Wayfinder\WayfinderServiceProvider
     - ClaudioDekker\Keystone\KeystoneServiceProvider
     - ClaudioDekker\Keystone\Password\PasswordServiceProvider
     - ClaudioDekker\Keystone\InertiaVue\InertiaVueServiceProvider
+    - Workbench\App\Providers\WorkbenchServiceProvider
+
+env:
+    - SESSION_DRIVER=file
 
 workbench:
     start: '/'
@@ -11,3 +17,8 @@ workbench:
     build:
         - create-sqlite-db
         - migrate-fresh
+        - db-seed:
+              --class: Workbench\Database\Seeders\DatabaseSeeder
+    sync:
+        - from: workbench/public/build
+          to: public/build
