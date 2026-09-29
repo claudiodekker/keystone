@@ -3,6 +3,7 @@
 namespace ClaudioDekker\Keystone;
 
 use ClaudioDekker\Keystone\Methods\CredentialType;
+use Illuminate\Auth\Events\Lockout;
 use Illuminate\Cache\RateLimiter as CacheRateLimiter;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -134,6 +135,8 @@ class RateLimiter
                 credentialType: $type->name(),
                 reason: 'keystone.failed_attempt_limit',
             );
+
+            $this->dispatchLockout();
         }
 
         if ($count > self::FAILED_ATTEMPT_ALLOWANCE) {
@@ -208,6 +211,16 @@ class RateLimiter
             account: $account,
             reason: 'keystone.request_limit',
         );
+
+        $this->dispatchLockout();
+    }
+
+    /**
+     * Dispatch Laravel's Lockout event, as Fortify does, reporting a failing listener rather than changing the refusal.
+     */
+    protected function dispatchLockout(): void
+    {
+        rescue(fn () => event(new Lockout($this->request)));
     }
 
     /**

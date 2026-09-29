@@ -8,6 +8,7 @@ use ClaudioDekker\Keystone\StepKind;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormType;
 use ClaudioDekker\Keystone\Tests\Fixtures\User;
 use ClaudioDekker\Keystone\Throttled;
+use Illuminate\Auth\Events\Lockout;
 use Illuminate\Cache\RateLimiter as CacheRateLimiter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -285,12 +286,37 @@ describe('limit.tripped', function () {
         $this->assertDatabaseCount('user_security_events', 0);
     });
 
+    it('dispatches Laravel\'s Lockout event with each trip', function () {
+        Event::fake([Lockout::class]);
+        $user = User::factory()->create();
+        hitTimes(limiter(), StepKind::SUBMIT, 10);
+        failTimes(limiter(), 20, 'jane@example.com', $user);
+
+        retryAfter(fn () => limiter()->hitRequest(StepKind::SUBMIT));
+        retryAfter(fn () => limiter()->hitRequest(StepKind::SUBMIT));
+        retryAfter(fn () => failTimes(limiter(), 1, 'jane@example.com', $user));
+        retryAfter(fn () => failTimes(limiter(), 1, 'jane@example.com', $user));
+
+        Event::assertDispatchedTimes(Lockout::class, 2);
+        Event::assertDispatched(Lockout::class, fn (Lockout $event) => $event->request->ip() === '203.0.113.5');
+    });
+
+    it('still refuses when a Lockout listener fails, reporting the failure', function () {
+        Event::listen(Lockout::class, fn () => throw new RuntimeException('Listener broke.'));
+        failTimes(limiter(), 20);
+
+        expect(retryAfter(fn () => failTimes(limiter(), 1)))->toBe(3600);
+
+        Exceptions::assertReported(fn (RuntimeException $e) => $e->getMessage() === 'Listener broke.');
+    });
+
     it('records nothing while the store is down', function () {
-        Event::fake([SecurityEventRecorded::class]);
+        Event::fake([SecurityEventRecorded::class, Lockout::class]);
         $this->mock(CacheRateLimiter::class)->shouldReceive('increment')->andThrow(new RuntimeException('Store down.'));
 
         retryAfter(fn () => failTimes(limiter(), 1));
 
         Event::assertNotDispatched(SecurityEventRecorded::class);
+        Event::assertNotDispatched(Lockout::class);
     });
 });
