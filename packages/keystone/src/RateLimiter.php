@@ -144,7 +144,7 @@ class RateLimiter
     }
 
     /**
-     * Get the request limit's keys: the address's, and the account's the session names.
+     * Get the request limit's keys: the address's, and the signed-in account's.
      *
      * @return non-empty-list<string>
      */
@@ -221,14 +221,11 @@ class RateLimiter
         }
 
         $packed = (string) inet_pton($ip);
-        $prefixBytes = strlen(self::IPV4_MAPPED_PREFIX);
-        $network = substr($packed, 0, self::IPV6_NETWORK_BYTES);
-        $host = str_repeat("\0", self::IPV6_NETWORK_BYTES);
 
         $masked = match (true) {
             ! str_contains($ip, ':') => $packed,
-            str_starts_with($packed, self::IPV4_MAPPED_PREFIX) => substr($packed, $prefixBytes),
-            default => $network.$host,
+            str_starts_with($packed, self::IPV4_MAPPED_PREFIX) => substr($packed, strlen(self::IPV4_MAPPED_PREFIX)),
+            default => substr($packed, 0, self::IPV6_NETWORK_BYTES).str_repeat("\0", self::IPV6_NETWORK_BYTES),
         };
 
         return (string) inet_ntop($masked);
@@ -243,14 +240,12 @@ class RateLimiter
     {
         $canonical = array_map(function (string $part) {
             $normalized = Normalizer::normalize($part, Normalizer::FORM_C);
-            $composed = $normalized === false ? $part : $normalized;
 
-            return mb_strtolower($composed);
+            return mb_strtolower($normalized === false ? $part : $normalized);
         }, $parts);
 
         $message = json_encode($canonical, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE);
-        $appKey = $this->appKey();
-        $subkey = hash_hmac('sha256', "keystone.rate-limiter.{$purpose}", $appKey, binary: true);
+        $subkey = hash_hmac('sha256', "keystone.rate-limiter.{$purpose}", $this->appKey(), binary: true);
         $digest = hash_hmac('sha256', $message, $subkey);
 
         return "keystone:{$digest}";
