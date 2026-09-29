@@ -3,6 +3,7 @@
 namespace ClaudioDekker\Keystone\InertiaVue\Tests;
 
 use ClaudioDekker\Keystone\AppTests\AppTestCase;
+use Illuminate\Routing\RouteCollection;
 use Illuminate\Routing\Router;
 use Inertia\Middleware;
 
@@ -25,12 +26,13 @@ abstract class StubsTestCase extends AppTestCase
     }
 
     /**
-     * Define the stub route file's routes in the web group, as the app's routes/web.php requires it.
+     * Define the stub route file's routes in the web group, as the app's routes/web.php requires it, in place of core's fixture routes.
      *
      * @param  Router  $router
      */
     protected function defineRoutes($router): void
     {
+        $router->setRoutes(new RouteCollection);
         $router->middleware(['web', Middleware::class])->group(self::STUBS.'/routes/keystone.php');
     }
 }
