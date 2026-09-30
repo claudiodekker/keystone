@@ -71,4 +71,22 @@ class Addresses
 
         return $holders->count() === 1 ? $holders->first() : null;
     }
+
+    /**
+     * Get the addresses the account's alerts go to: every verified one, or the unverified ones when none is verified.
+     *
+     * @return list<string>
+     */
+    public function recipientsOf(Model&KeystoneUser $account): array
+    {
+        $addresses = $this->users->getConnection()->table('user_emails')
+            ->where('user_id', $account->getKey())
+            ->orderBy('id');
+
+        $verified = (clone $addresses)->whereNotNull('verified_at')->pluck('address');
+        $recipients = $verified->isEmpty() ? $addresses->pluck('address') : $verified;
+
+        /** @var list<string> */
+        return $recipients->all();
+    }
 }

@@ -94,6 +94,26 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
+     * Keep the session signed in across a move of its account's credential epoch, on a new session id, when it was live on the epoch that moved.
+     */
+    public function carryOver(Model&KeystoneUser $account, int $movedFrom): void
+    {
+        $signedInAs = $this->session->get($this->getName());
+
+        if (is_null($signedInAs) || (string) $signedInAs !== (string) $account->getAuthIdentifier()) {
+            return;
+        }
+
+        if ($this->session->get($this->epochKey()) !== $movedFrom) {
+            return;
+        }
+
+        $this->rotate();
+
+        $this->session->put($this->epochKey(), $this->epochOf($account));
+    }
+
+    /**
      * End the signed-in session and regenerate its CSRF token.
      */
     public function signOut(): void

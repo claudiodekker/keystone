@@ -94,7 +94,7 @@ class SignInAttempt
                 return null;
             }
 
-            $this->storeUpdatedSecret($type, $proof, $credential);
+            $this->storeUpdatedSecret($account, $type, $proof, $credential);
             $this->limiter->giveBack($taken);
 
             $this->recorder->record(
@@ -157,16 +157,16 @@ class SignInAttempt
     /**
      * Make and store the secret the proof updated in place of the one the type verified, reporting a failure without refusing.
      */
-    protected function storeUpdatedSecret(CredentialType $type, Proof $proof, ?StoredCredential $credential): void
+    protected function storeUpdatedSecret(Model&KeystoneUser $account, CredentialType $type, Proof $proof, ?StoredCredential $credential): void
     {
         if ($proof->updatedSecret === null || $credential === null) {
             return;
         }
 
-        rescue(function () use ($type, $proof, $credential) {
+        rescue(function () use ($account, $type, $proof, $credential) {
             $secret = value($proof->updatedSecret);
 
-            (new Credentials($this->guard->userModel()))->replaceSecret($credential, type: $type->name(), secret: $secret);
+            (new AccountChanges($this->guard))->change($account, fn (AccountChange $change) => $change->rehash($credential, type: $type->name(), secret: $secret));
         });
     }
 
