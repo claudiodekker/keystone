@@ -17,13 +17,15 @@ Your `config/keystone.php` is merged over Keystone's, key by key. A setting that
 | `rate_limits.requests_per_minute.view` | `60` | Faster scripted probing of Keystone's pages per IP address and account. |
 | `rate_limits.requests_per_minute.start` / `.submit` / `.change` | `10` each | Faster scripted submissions per IP address and account. |
 | `rate_limits.failed_attempts_per_hour` | `20` | More online guesses at each account's credentials. See [Rate limiting](rate-limiting.md). |
-| `events.enabled` | `true` | `false` records nothing: no log line, no audit trail, no `SecurityEventRecorded`. See [Security events](security-events.md). |
+| `events.enabled` | `true` | `false` records nothing: no log line, no audit trail, no alert, no `SecurityEventRecorded`. See [Security events](security-events.md). |
 | `log_channel` | `null`: your default channel | Nothing. |
+| `notifications.<type>` | `SecurityAlert` for each type that alerts | `null` silences that type's alert, so its owner never hears of it. See [Security alerts](security-alerts.md#changing-or-silencing-an-alert). |
+| `ip_location.allow_plaintext_driver` | `false` | Your users' IP addresses cross the network in plain text to a location API. See [IP location](security-alerts.md#ip-location). |
 | `hardening.frame_ancestors` | `[]`: no page may frame Keystone's | Each listed source can overlay Keystone's pages and hide what users click. See [Hardening](hardening.md#framing). |
 | `trusted_origins` | `[]`: only your app's own origin | Any page on a listed origin can submit to Keystone as your users. See [Hardening](hardening.md#cross-site-requests). |
 | `clear_site_data` | `['cache', 'storage']` | Whatever you leave out survives sign-out on a shared computer. See [Hardening](hardening.md#clearing-site-data). |
 
-Every limit is a whole number of at least 1. No setting takes a `0` or `null` that turns a control off without saying so; the one `null` that turns a control off is `session.absolute_lifetime_seconds`'s.
+Every limit is a whole number of at least 1. No setting takes a `0` or `null` that turns a control off without saying so; the `null`s that turn a control off are `session.absolute_lifetime_seconds`'s and each alert slot's, which silences only its own type.
 
 ## Methods
 
@@ -81,6 +83,7 @@ In every environment, it refuses:
 - a `methods` entry that isn't a type name or a type name mapped to a list of surfaces, a type listed twice, a type no installed package registers, or a surface the type doesn't serve;
 - two installed packages registering credential types with one name, or a type named `recovery-code`, which Keystone keeps for recovery codes;
 - a `log_channel` that isn't one of your `logging.channels`;
+- a `notifications` slot for a type that isn't a security event, or holding anything but `null` or a notification class;
 - a user model on another database connection than your default one, which Keystone's tables are migrated on.
 
 In production it also refuses what's fine on a laptop but unsafe on a server:

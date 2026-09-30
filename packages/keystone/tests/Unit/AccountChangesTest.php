@@ -5,6 +5,7 @@ use ClaudioDekker\Keystone\AccountChanges;
 use ClaudioDekker\Keystone\Actor;
 use ClaudioDekker\Keystone\KeystoneGuard;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
+use ClaudioDekker\Keystone\Notifications\SecurityAlert;
 use ClaudioDekker\Keystone\SecurityEvent;
 use ClaudioDekker\Keystone\SecurityEventRecorded;
 use ClaudioDekker\Keystone\SecurityEventType;
@@ -15,6 +16,7 @@ use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 use Monolog\Handler\TestHandler;
 
 function guard(): KeystoneGuard
@@ -142,6 +144,31 @@ it('records the change\'s events once it commits', function () {
         ->and($event->user_id)->toEqual($user->getKey())
         ->and($event->actor)->toBe(Actor::OPERATOR)
         ->and($event->operator)->toBe('jane');
+});
+
+it('alerts the recipients read before the change applies', function () {
+    Notification::fake();
+    $user = User::factory()->create();
+    holdAddresses($user, ['jane@example.com' => true]);
+
+    changes()->change($user, function (AccountChange $change) {
+        DB::table('user_emails')->delete();
+
+        $change->record(SecurityEventType::SESSIONS_TERMINATED, actor: Actor::OPERATOR);
+    });
+
+    Notification::assertSentOnDemand(SecurityAlert::class, fn (SecurityAlert $alert, array $channels, object $notifiable) => $notifiable->routes['mail'] === 'jane@example.com');
+});
+
+it('records the event without alerting when the change suppresses the alert', function () {
+    Notification::fake();
+    $user = User::factory()->create();
+    holdAddresses($user, ['jane@example.com' => true]);
+
+    changes()->change($user, fn (AccountChange $change) => $change->record(SecurityEventType::SESSIONS_TERMINATED, actor: Actor::OPERATOR, alert: false));
+
+    Notification::assertNothingSent();
+    $this->assertDatabaseCount('user_security_events', 1);
 });
 
 it('rolls back and records nothing when the change fails', function () {

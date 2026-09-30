@@ -31,19 +31,20 @@ class EndSessions implements ShouldQueue
     public function __construct(
         public Model&KeystoneUser $account,
         public ?string $operator = null,
+        public bool $alert = true,
     ) {
         //
     }
 
     /**
-     * End every session of the account, recording that an operator did.
+     * End every session of the account, recording that an operator did and alerting its owner unless the operator suppressed it.
      */
     public function handle(): void
     {
         (new AccountChanges(Keystone::guard()))->change($this->account, function (AccountChange $change) {
             $change->endSessions();
 
-            $change->record(SecurityEventType::SESSIONS_TERMINATED, actor: Actor::OPERATOR, operator: $this->operator);
+            $change->record(SecurityEventType::SESSIONS_TERMINATED, actor: Actor::OPERATOR, operator: $this->operator, alert: $this->alert);
         });
     }
 }

@@ -90,3 +90,12 @@ test('swappable actions live in src/Actions, and jobs in src/Jobs', function () 
 
     expect($offenders)->toBe([]);
 });
+
+test('every Keystone mail and notification is encrypted on the queue', function () {
+    $files = packageFiles('src');
+    $messages = filesContaining($files, '/\bextends (Notification|Mailable)\b/');
+    $offenders = array_values(array_diff($messages, filesContaining($messages, '/\bimplements\b[^{]*\bShouldBeEncrypted\b/')));
+
+    expect($messages)->not->toBe([])
+        ->and($offenders)->toBe([]);
+});

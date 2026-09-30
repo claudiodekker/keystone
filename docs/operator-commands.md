@@ -20,7 +20,13 @@ In production `--all` asks before it runs; pass `--force` to skip the question i
 
 Either way the sessions end on their next request, on every session driver: Keystone moves a counter on the account that every session is stamped with, rather than deleting session rows.
 
-Each run records a `sessions.terminated` [security event](security-events.md) with actor `operator` and the `--operator` you give, cut to 64 characters. With one account the event goes on that account's audit trail. With `--all` it is logged once, about nobody, with reason `keystone.every_account`, rather than added to every account's trail.
+Each run records a `sessions.terminated` [security event](security-events.md) with actor `operator` and the `--operator` you give, cut to 64 characters. With one account the event goes on that account's audit trail and [alerts its owner](security-alerts.md). With `--all` it is logged once, about nobody, with reason `keystone.every_account`, rather than added to every account's trail, and alerts nobody.
+
+To end one account's sessions without alerting its owner, for example because you are on the phone with them, pass `--no-alert`. The event is still recorded:
+
+```shell
+php artisan keystone:end-sessions 42 --operator="jane@ops" --no-alert
+```
 
 ### From an admin panel
 
@@ -31,6 +37,8 @@ use ClaudioDekker\Keystone\Jobs\EndEverySession;
 use ClaudioDekker\Keystone\Jobs\EndSessions;
 
 EndSessions::dispatch($user, operator: $request->user()->email);
+
+EndSessions::dispatch($user, operator: $request->user()->email, alert: false);
 
 EndEverySession::dispatch(operator: $request->user()->email);
 ```

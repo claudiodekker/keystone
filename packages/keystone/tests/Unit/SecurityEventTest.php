@@ -1,5 +1,6 @@
 <?php
 
+use Carbon\CarbonImmutable;
 use ClaudioDekker\Keystone\Actor;
 use ClaudioDekker\Keystone\SecurityEvent;
 use ClaudioDekker\Keystone\SecurityEventType;
@@ -44,4 +45,13 @@ it('keeps an account\'s events and their user id when it is hard deleted', funct
     $user->forceDelete();
 
     expect(SecurityEvent::sole()->user_id)->toEqual($user->getKey());
+});
+
+it('gives an unsaved event\'s time as an immutable UTC time', function () {
+    $this->travelTo(CarbonImmutable::parse('2026-09-30 14:05:00', 'Europe/Amsterdam'));
+
+    $event = new SecurityEvent(['occurred_at' => now()]);
+
+    expect($event->occurred_at)->toBeInstanceOf(CarbonImmutable::class)
+        ->and($event->occurred_at->toIso8601ZuluString())->toBe('2026-09-30T12:05:00Z');
 });

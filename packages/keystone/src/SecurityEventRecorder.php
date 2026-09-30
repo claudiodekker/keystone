@@ -5,6 +5,8 @@ namespace ClaudioDekker\Keystone;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Notifications\AnonymousNotifiable;
+use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Log;
@@ -42,7 +44,9 @@ class SecurityEventRecorder
     protected const string REASON_PATTERN = '/^[a-z0-9._]+$/';
 
     /**
-     * Record the event: log it, append it to the account's trail, and dispatch it, each step rescued on its own.
+     * Record the event: log it, append it to the account's trail, alert its owner and dispatch it, each step rescued on its own.
+     *
+     * @param  list<string>|null  $recipients  the addresses read before the change that caused the event; read now when null
      */
     public function record(
         SecurityEventType $type,
@@ -53,6 +57,8 @@ class SecurityEventRecorder
         ?StoredCredential $credential = null,
         ?string $reason = null,
         ?string $operator = null,
+        ?array $recipients = null,
+        bool $alert = true,
     ): void {
         if (! $this->enabled()) {
             return;
@@ -79,6 +85,7 @@ class SecurityEventRecorder
 
         $this->rescue(fn () => $this->log($event));
         $this->rescue(fn () => $this->append($event, $account));
+        $this->rescue(fn () => $this->alert($event, $account, $recipients, $alert));
         $this->rescue(fn () => event($recorded));
     }
 
@@ -244,6 +251,40 @@ class SecurityEventRecorder
         $event->setConnection($connection);
 
         $event->saveQuietly();
+    }
+
+    /**
+     * Queue the type's alert to each of the account's recipients, one mail each, unless suppressed or its slot is null.
+     *
+     * @param  list<string>|null  $recipients
+     */
+    protected function alert(SecurityEvent $event, (Model&KeystoneUser)|null $account, ?array $recipients, bool $alert): void
+    {
+        $slot = $this->slot($event->type);
+
+        if (! $alert || $account === null || $slot === null) {
+            return;
+        }
+
+        $recipients ??= (new Addresses($account))->recipientsOf($account);
+        $notification = app()->makeWith($slot, ['event' => $event]);
+
+        foreach ($recipients as $address) {
+            $this->rescue(fn () => (new AnonymousNotifiable)->route('mail', $address)->notify($notification));
+        }
+    }
+
+    /**
+     * Get the notification class the type's slot names, or null when the type is silenced.
+     *
+     * @return class-string<Notification>|null
+     */
+    protected function slot(SecurityEventType $type): ?string
+    {
+        $slots = config('keystone.notifications');
+        $slot = is_array($slots) ? ($slots[$type->value] ?? null) : null;
+
+        return is_string($slot) && is_a($slot, Notification::class, true) ? $slot : null;
     }
 
     /**

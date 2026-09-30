@@ -1,0 +1,91 @@
+<?php
+
+use ClaudioDekker\Keystone\AppTests\AppTestCase;
+use ClaudioDekker\Keystone\Jobs\EndSessions;
+use ClaudioDekker\Keystone\Notifications\SecurityAlert;
+use ClaudioDekker\Keystone\SecurityEventType;
+use ClaudioDekker\Keystone\Tests\Fixtures\FormTypeSupport;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Route;
+
+pest()->extend(AppTestCase::class);
+
+const FIREFOX = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:130.0) Gecko/20100101 Firefox/130.0';
+
+function alertedTo(): array
+{
+    $addresses = [];
+
+    Notification::assertSentOnDemand(SecurityAlert::class, function (SecurityAlert $alert, array $channels, object $notifiable) use (&$addresses) {
+        $addresses[] = $notifiable->routes['mail'];
+
+        return $alert->type === SecurityEventType::SESSIONS_TERMINATED;
+    });
+
+    return $addresses;
+}
+
+describe('ending an account\'s sessions', function () {
+    it('alerts the owner at every verified address', function () {
+        Notification::fake();
+        $account = $this->createAccount();
+        $this->holdAddress($account, 'work@example.com');
+        $this->holdAddress($account, 'old@example.com', verified: false);
+
+        $this->artisan('keystone:end-sessions', ['user' => (string) $account->getKey()])->assertSuccessful();
+
+        expect(alertedTo())->toBe(['jane@example.com', 'work@example.com']);
+    });
+
+    it('records the event without alerting when the operator suppresses the alert', function () {
+        Notification::fake();
+        $account = $this->createAccount();
+
+        $this->artisan('keystone:end-sessions', ['user' => (string) $account->getKey(), '--no-alert' => true])->assertSuccessful();
+
+        Notification::assertNothingSent();
+        $this->assertDatabaseCount('user_security_events', 1);
+    });
+
+    it('lets the job suppress the alert too', function () {
+        Notification::fake();
+        $account = $this->createAccount();
+
+        EndSessions::dispatchSync($account, operator: 'jane@ops', alert: false);
+
+        Notification::assertNothingSent();
+        $this->assertDatabaseCount('user_security_events', 1);
+    });
+
+    it('alerts nobody when every account\'s sessions end', function () {
+        Notification::fake();
+        $this->createAccount();
+
+        $this->artisan('keystone:end-sessions', ['--all' => true])->assertSuccessful();
+
+        Notification::assertNothingSent();
+    });
+});
+
+describe('the queued alert', function () {
+    beforeEach(function () {
+        config(['queue.default' => 'database', 'queue.failed.database' => config('database.default')]);
+        Route::middleware(['web', 'auth'])->post('admin/end-my-sessions', fn () => EndSessions::dispatchSync(auth()->user(), 'jane@ops'));
+    });
+
+    it('holds no IP address or user agent in clear on the queue, or once it failed', function () {
+        Mail::extend('broken', fn () => throw new RuntimeException('Mailer down.'));
+        config(['mail.mailers.broken' => ['transport' => 'broken'], 'mail.default' => 'broken']);
+        $this->signInAccount(new FormTypeSupport);
+
+        $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.7'])->withHeader('User-Agent', FIREFOX)->post('admin/end-my-sessions');
+        $queued = DB::table('jobs')->pluck('payload')->implode("\n");
+        $this->artisan('queue:work', ['--once' => true, '--tries' => 1, '--stop-when-empty' => true])->run();
+        $failed = DB::table('failed_jobs')->pluck('payload')->implode("\n");
+
+        expect($queued)->toContain('SecurityAlert')->not->toContain('203.0.113.7', 'Firefox', 'Windows', 'jane@example.com')
+            ->and($failed)->toContain('SecurityAlert')->not->toContain('203.0.113.7', 'Firefox', 'Windows', 'jane@example.com');
+    });
+});

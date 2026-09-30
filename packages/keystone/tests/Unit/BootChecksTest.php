@@ -4,6 +4,7 @@ use ClaudioDekker\Keystone\BootChecks;
 use ClaudioDekker\Keystone\KeystoneServiceProvider;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Misconfigured;
+use ClaudioDekker\Keystone\Tests\Fixtures\FlakyAlert;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormType;
 use ClaudioDekker\Keystone\Tests\Fixtures\UserOnOtherConnection;
 
@@ -113,6 +114,50 @@ describe('the log channel', function () {
 
         expect($failures)->toBe([]);
     });
+});
+
+describe('the alert slots', function () {
+    it('refuses slots that aren\'t a map of types', function (mixed $slots) {
+        config(['keystone.notifications' => $slots]);
+
+        $failures = bootFailures();
+
+        expect($failures)->toBe(['keystone.notifications must map types of security event to a notification class or null.']);
+    })->with(['null' => [null], 'a list' => [[FlakyAlert::class]], 'a string' => [FlakyAlert::class]]);
+
+    it('refuses a slot for a type that isn\'t a security event', function () {
+        config(['keystone.notifications.password_changed' => null]);
+
+        $failures = bootFailures();
+
+        expect($failures)->toBe(['keystone.notifications.password_changed isn\'t a type of security event.']);
+    });
+
+    it('refuses a slot that isn\'t null or a notification class', function (mixed $slot) {
+        config(['keystone.notifications' => ['sessions.terminated' => $slot]]);
+
+        $failures = bootFailures();
+
+        expect($failures)->toBe(['keystone.notifications.sessions.terminated must be null or the class name of a notification.']);
+    })->with(['a missing class' => ['App\\Notifications\\Missing'], 'a class that isn\'t a notification' => [stdClass::class], 'false' => [false]]);
+
+    it('accepts silencing a type, or naming the app\'s own notification for it', function (?string $slot) {
+        config(['keystone.notifications' => ['sessions.terminated' => $slot, 'signed_out' => FlakyAlert::class]]);
+
+        $failures = bootFailures();
+
+        expect($failures)->toBe([]);
+    })->with(['silenced' => [null], 'the app\'s own' => [FlakyAlert::class]]);
+});
+
+describe('the IP-location port', function () {
+    it('refuses a plaintext switch that isn\'t true or false', function (mixed $value) {
+        config(['keystone.ip_location.allow_plaintext_driver' => $value]);
+
+        $failures = bootFailures();
+
+        expect($failures)->toBe(['keystone.ip_location.allow_plaintext_driver must be true or false.']);
+    })->with(['null' => [null], 'a string' => ['true']]);
 });
 
 describe('the absolute session lifetime', function () {
