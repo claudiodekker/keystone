@@ -57,7 +57,7 @@ it('refuses a cross-site sign-out', function () {
 });
 
 it('clears the site data the app chose on sign-out', function () {
-    $types = (array) config('keystone.clear_site_data', ['cache', 'storage']);
+    $types = (array) config('keystone.clear_site_data');
     $expected = $types === [] ? null : implode(', ', array_map(fn (string $type) => "\"{$type}\"", $types));
     $this->signInAccount($this->support);
 

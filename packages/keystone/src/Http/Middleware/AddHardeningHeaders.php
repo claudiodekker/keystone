@@ -37,7 +37,7 @@ class AddHardeningHeaders
     /**
      * What a configured frame ancestor must look like: one CSP source, with nothing that could end the directive.
      */
-    protected const string FRAME_ANCESTOR_PATTERN = '/^[^\s;,]+$/';
+    public const string FRAME_ANCESTOR_PATTERN = '/^[^\s;,]+$/';
 
     /**
      * Attach the hardening floor to a Keystone response, whatever answered the request.
@@ -81,7 +81,7 @@ class AddHardeningHeaders
      */
     protected function frameAncestors(): array
     {
-        $sources = config('keystone.hardening.frame_ancestors', []);
+        $sources = config('keystone.hardening.frame_ancestors');
 
         if (! is_array($sources) || ! array_is_list($sources)) {
             return [];

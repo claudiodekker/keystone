@@ -2,8 +2,6 @@
 
 namespace ClaudioDekker\Keystone\Methods;
 
-use LogicException;
-
 /**
  * @internal
  */
@@ -22,17 +20,44 @@ class CredentialTypes
     protected array $types = [];
 
     /**
-     * Register a credential type.
+     * The names more than one type was registered under.
+     *
+     * @var list<string>
+     */
+    protected array $clashes = [];
+
+    /**
+     * Register a credential type, keeping the first type registered under a name and noting the clash for boot to refuse.
      */
     public function register(CredentialType $type): void
     {
         $name = $type->name();
 
         if ($name === self::RECOVERY_CODE || isset($this->types[$name])) {
-            throw new LogicException("The credential type name [{$name}] is already taken.");
+            $this->clashes[] = $name;
+
+            return;
         }
 
         $this->types[$name] = $type;
+    }
+
+    /**
+     * Get the registered type with the name, whatever keystone.methods lists.
+     */
+    public function registered(string $name): ?CredentialType
+    {
+        return $this->types[$name] ?? null;
+    }
+
+    /**
+     * Get the names more than one type was registered under.
+     *
+     * @return list<string>
+     */
+    public function clashes(): array
+    {
+        return $this->clashes;
     }
 
     /**
@@ -56,10 +81,34 @@ class CredentialTypes
     }
 
     /**
-     * Determine if the type serves the surface.
+     * Determine if the type serves the surface and keystone.methods allows it there.
      */
     protected function serves(CredentialType $type, Surface $surface): bool
     {
-        return isset($type->surfaces()[$surface->value]);
+        return isset($type->surfaces()[$surface->value]) && $this->allows($type->name(), $surface);
+    }
+
+    /**
+     * Determine if keystone.methods allows the type on the surface: null allows every type, a bare entry every surface.
+     */
+    protected function allows(string $name, Surface $surface): bool
+    {
+        $methods = config('keystone.methods');
+
+        if (! is_array($methods)) {
+            return true;
+        }
+
+        foreach ($methods as $key => $entry) {
+            if ($key === $name) {
+                return is_array($entry) && in_array($surface->value, $entry, true);
+            }
+
+            if (is_int($key) && $entry === $name) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

@@ -20,7 +20,7 @@ class ClearSiteDataOnSessionEnd
     /**
      * The kinds of site data keystone.clear_site_data may name.
      */
-    protected const array TYPES = ['cache', 'cookies', 'storage', 'executionContexts'];
+    public const array TYPES = ['cache', 'cookies', 'storage', 'executionContexts'];
 
     /**
      * Tell the browser to clear the site's data when Keystone ended the session during the request.
@@ -49,7 +49,7 @@ class ClearSiteDataOnSessionEnd
      */
     protected function types(): array
     {
-        $types = config('keystone.clear_site_data', self::DEFAULT_TYPES);
+        $types = config('keystone.clear_site_data');
 
         if (! is_array($types) || ! array_is_list($types)) {
             return self::DEFAULT_TYPES;

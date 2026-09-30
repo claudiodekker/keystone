@@ -38,7 +38,7 @@ By default no page, not even one of your own, can show Keystone's pages in a fra
 
 Keystone then sends `frame-ancestors 'self' https://partner.example` and no `X-Frame-Options`. `'self'` is enough for a sign-in modal that frames your own login page. Letting another site frame the sign-in page lets it overlay and hide what the user clicks, so list only sites you trust. A frame from another site also gets no session: Keystone's cookies are `SameSite=Lax`, so sign-in inside a cross-site frame won't work anyway.
 
-A value that isn't a list of single sources, such as one holding `;`, `,` or a space, is ignored, and no page may frame Keystone's.
+A value that isn't a list of single sources, such as one holding `;`, `,` or a space, stops your app from booting (see [Configuration](configuration.md#boot-checks)).
 
 ## Cross-site requests
 
@@ -54,7 +54,7 @@ To accept Keystone mutations from another of your origins, such as a sign-in for
 'trusted_origins' => ['https://www.example.com'],
 ```
 
-An origin is a scheme, host and port, and must match exactly: `https://www.example.com` doesn't trust `http://www.example.com`, `https://www.example.com:8443` or any subdomain. List only origins you control, since any page served from one can submit to Keystone as your users.
+An origin is an `http` or `https` scheme, a host and an optional port, with no path; anything else stops your app from booting. It must match exactly: `https://www.example.com` doesn't trust `http://www.example.com`, `https://www.example.com:8443` or any subdomain. List only origins you control, since any page served from one can submit to Keystone as your users.
 
 This check runs even when you list a Keystone route in your CSRF exceptions (`$middleware->preventRequestForgery(except: [...])`). A refused request gets Laravel's usual `419 Page Expired` response and records a `request.rejected` [security event](security-events.md), on the signed-in account's audit trail when there is one.
 
@@ -68,4 +68,4 @@ Clearing storage also drops what your app keeps there on purpose, such as prefer
 'clear_site_data' => ['cache'],
 ```
 
-A list naming anything else is ignored, and Keystone clears the default `cache` and `storage`.
+A list naming anything else stops your app from booting.

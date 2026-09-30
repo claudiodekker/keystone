@@ -263,7 +263,7 @@ abstract class AppTestCase extends TestCase
     {
         $headers = $response->headers;
         $cacheControl = array_map($headers->getCacheControlDirective(...), ['no-store', 'max-age', 'must-revalidate']);
-        $frameAncestors = (array) config('keystone.hardening.frame_ancestors', []);
+        $frameAncestors = (array) config('keystone.hardening.frame_ancestors');
         $expectedHeaders = [...self::HARDENING_HEADERS, 'X-Frame-Options' => $frameAncestors === [] ? 'DENY' : null];
         $expectedDirectives = [
             'object-src' => "'none'",

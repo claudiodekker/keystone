@@ -22,9 +22,14 @@ it('lists the types serving a surface', function () {
     expect($types->serving(Surface::SIGN_IN))->toBe([$form, $both]);
 });
 
-it('refuses a second type with a taken name', function (string $name) {
+it('keeps the first type registered under a taken name, noting each clash', function () {
     $types = new CredentialTypes;
-    $types->register(new FormType);
+    $types->register($form = new FormType);
 
-    $types->register(new FormType(name: $name));
-})->with(['form', 'recovery-code'])->throws(LogicException::class, 'is already taken');
+    $types->register(new FormType(surfaces: ['challenge']));
+    $types->register(new FormType(name: 'recovery-code'));
+
+    expect($types->clashes())->toBe(['form', 'recovery-code'])
+        ->and($types->registered('form'))->toBe($form)
+        ->and($types->registered('recovery-code'))->toBeNull();
+});

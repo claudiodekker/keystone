@@ -349,6 +349,29 @@ describe('rate limits', function () {
             ->assertSee('Too many attempts. Please try again in 60 seconds.');
     });
 
+    it('takes the request limit from keystone.rate_limits', function () {
+        $this->freezeSecond();
+        config(['keystone.rate_limits.requests_per_minute.submit' => 2]);
+        $this->post(route('login.submit', ['type' => 'form']));
+        $this->post(route('login.submit', ['type' => 'form']));
+
+        $response = $this->post(route('login.submit', ['type' => 'form']));
+
+        $response->assertTooManyRequests();
+    });
+
+    it('takes the failed-attempt allowance from keystone.rate_limits', function () {
+        $this->createAccount();
+        $this->app->make(CredentialTypes::class)->register($rogue = new RogueType(fn () => Proof::rejected('rogue.mismatch')));
+        config(['keystone.rate_limits.failed_attempts_per_hour' => 3]);
+
+        foreach (range(1, 5) as $address) {
+            signInFrom($this, $address, 'rogue');
+        }
+
+        expect($rogue->calls)->toHaveCount(3);
+    });
+
     it('never lets the type verify more answers than the allowance', function () {
         $this->createAccount();
         $this->app->make(CredentialTypes::class)->register($rogue = new RogueType(fn () => Proof::rejected('rogue.mismatch')));
@@ -381,5 +404,30 @@ describe('rate limits', function () {
         }
 
         signInFrom($this, 21, 'form', (new FormTypeSupport)->validProof(Surface::SIGN_IN))->assertTooManyRequests();
+    });
+});
+
+describe('the methods allow-list', function () {
+    it('lists only the types keystone.methods allows on sign-in', function (array $methods) {
+        $this->app->make(CredentialTypes::class)->register(new FormType(name: 'both', surfaces: ['sign-in', 'challenge']));
+        config(['keystone.methods' => $methods]);
+
+        $response = $this->get(route('login'));
+
+        $response->assertExactJson(['types' => [['type' => 'password', 'shape' => 'form']], 'status' => null]);
+    })->with([
+        'a bare entry' => [['password', 'both' => ['challenge']]],
+        'a narrowed entry' => [['password' => ['sign-in'], 'both' => ['challenge']]],
+    ]);
+
+    it('refuses a valid proof of a type keystone.methods leaves off sign-in', function () {
+        $account = $this->createAccount();
+        $this->arrangeCredential($account, new FormTypeSupport, Surface::SIGN_IN);
+        config(['keystone.methods' => ['password']]);
+
+        $response = $this->post(route('login.submit', ['type' => 'form']), ['identifier' => 'jane@example.com', ...(new FormTypeSupport)->validProof(Surface::SIGN_IN)]);
+
+        $response->assertSessionHasErrors(['identifier' => __('keystone::messages.failed')]);
+        $this->assertGuest();
     });
 });
