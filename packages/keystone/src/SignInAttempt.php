@@ -3,7 +3,6 @@
 namespace ClaudioDekker\Keystone;
 
 use ClaudioDekker\Keystone\Actions\AccountLookup;
-use ClaudioDekker\Keystone\Actions\RehashCredential;
 use ClaudioDekker\Keystone\Exceptions\Throttled;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\Proof;
@@ -33,7 +32,6 @@ class SignInAttempt
         protected RateLimiter $limiter,
         protected Timebox $timebox = new Timebox,
         protected SecurityEventRecorder $recorder = new SecurityEventRecorder,
-        protected RehashCredential $rehash = new RehashCredential,
     ) {
         //
     }
@@ -169,7 +167,7 @@ class SignInAttempt
         rescue(function () use ($account, $type, $proof, $credential) {
             $secret = value($proof->updatedSecret);
 
-            $this->rehash->handle($account, $credential, type: $type->name(), secret: $secret);
+            (new AccountChanges($this->guard))->change($account, fn (AccountChange $change) => $change->rehash($credential, type: $type->name(), secret: $secret));
         });
     }
 

@@ -2,8 +2,8 @@
 
 namespace ClaudioDekker\Keystone\Console;
 
-use ClaudioDekker\Keystone\Actions\SuspendAccount;
 use ClaudioDekker\Keystone\Exceptions\AlreadySuspended;
+use ClaudioDekker\Keystone\Jobs\SuspendAccount;
 use Illuminate\Console\Command;
 use Symfony\Component\Console\Attribute\AsCommand;
 
@@ -34,7 +34,7 @@ class SuspendCommand extends Command
     /**
      * Suspend the account, refusing one that already is.
      */
-    public function handle(SuspendAccount $suspend): int
+    public function handle(): int
     {
         $id = $this->argument('user');
         $account = $this->findAccountOrReport($id);
@@ -44,7 +44,7 @@ class SuspendCommand extends Command
         }
 
         try {
-            $suspend->handle($account, $this->operator());
+            SuspendAccount::dispatchSync($account, $this->operator());
         } catch (AlreadySuspended) {
             $this->components->error("Account [{$id}] is already suspended.");
 

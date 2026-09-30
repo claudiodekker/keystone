@@ -45,7 +45,7 @@ Every event has the same fields, and never typed input, secrets, codes, tokens o
 | `type` | one of the types above |
 | `user_id` | the account, or null |
 | `actor` | `user`, `operator` or `system` |
-| `operator` | who acted, as the operator command or Action named them, cut to 64 characters with control characters replaced by spaces; null otherwise |
+| `operator` | who acted, as the operator command or job named them, cut to 64 characters with control characters replaced by spaces; null otherwise |
 | `flow` | where it happened, such as `sign-in` |
 | `credential_type`, `credential_id`, `credential_label` | the credential involved and its label at the time; a refusal names only a credential the account holds |
 | `reason` | a short code such as `form.mismatch` or `keystone.barred`; a reason that isn't a lowercase code of at most 64 characters prefixed by its credential type or `keystone.` is stored as `<type>.invalid_reason` |
