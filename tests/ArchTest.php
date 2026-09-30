@@ -82,9 +82,9 @@ test('package tests live in Unit or Feature', function () {
     expect($offenders)->toBe([]);
 });
 
-test('swappable actions live in src/Actions', function () {
+test('swappable actions live in src/Actions, and jobs in src/Jobs', function () {
     $files = packageFiles('src');
-    $sources = preg_grep('#/src/Actions/#', $files, PREG_GREP_INVERT);
+    $sources = preg_grep('#/src/(Actions|Jobs)/#', $files, PREG_GREP_INVERT);
     $publicClasses = filesContaining($sources, '/@api/');
     $offenders = filesContaining($publicClasses, '/public function handle\(/');
 

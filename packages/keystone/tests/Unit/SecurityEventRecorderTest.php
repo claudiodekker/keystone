@@ -1,6 +1,7 @@
 <?php
 
 use Carbon\CarbonImmutable;
+use ClaudioDekker\Keystone\Actor;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
 use ClaudioDekker\Keystone\RequestContext;
 use ClaudioDekker\Keystone\SecurityEvent;
@@ -66,6 +67,7 @@ describe('the log line', function () {
                 'type' => 'proof.rejected',
                 'user_id' => $user->getKey(),
                 'actor' => 'user',
+                'operator' => null,
                 'flow' => 'sign-in',
                 'credential_type' => 'form',
                 'credential_id' => 7,
@@ -101,7 +103,7 @@ describe('the log line', function () {
         expect(loggedContext()[0])->toMatchArray(['ip_address' => null, 'user_agent' => null, 'request_id' => null]);
     });
 
-    it('truncates the user agent and the credential label', function () {
+    it('truncates the user agent, the credential label and the operator', function () {
         captureContext(userAgent: str_repeat('a', 600));
 
         recorder()->record(
@@ -109,9 +111,19 @@ describe('the log line', function () {
             account: User::factory()->create(),
             credentialType: 'form',
             credential: new StoredCredential(7, null, null, str_repeat('b', 70)),
+            operator: str_repeat('c', 70),
         );
 
-        expect(loggedContext()[0])->toMatchArray(['user_agent' => str_repeat('a', 512), 'credential_label' => str_repeat('b', 64)]);
+        expect(loggedContext()[0])->toMatchArray(['user_agent' => str_repeat('a', 512), 'credential_label' => str_repeat('b', 64), 'operator' => str_repeat('c', 64)]);
+    });
+
+    it('names the operator who acted, with control characters replaced by spaces', function () {
+        $user = User::factory()->create();
+
+        recorder()->record(SecurityEventType::SESSIONS_TERMINATED, account: $user, actor: Actor::OPERATOR, operator: "jane\nops");
+
+        expect(loggedContext()[0])->toMatchArray(['actor' => 'operator', 'operator' => 'jane ops'])
+            ->and(SecurityEvent::query()->sole()->operator)->toBe('jane ops');
     });
 
     it('keeps only short reason codes owned by the event\'s credential type', function (?string $type, string $reason, string $kept) {

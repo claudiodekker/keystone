@@ -2,6 +2,8 @@
 
 namespace ClaudioDekker\Keystone\Tests\Unit;
 
+use ClaudioDekker\Keystone\AccountChange;
+use ClaudioDekker\Keystone\AccountChanges;
 use ClaudioDekker\Keystone\KeystoneGuard;
 use ClaudioDekker\Keystone\Tests\Fixtures\User;
 use Closure;
@@ -82,4 +84,31 @@ it('ends the account\'s other sessions when its epoch moves', function (string $
     expect(visit($driver, $laptop, fn (KeystoneGuard $guard) => $guard->user()))->toBeNull()
         ->and(visit($driver, $phone, fn (KeystoneGuard $guard) => $guard->user()))->toBeNull()
         ->and(visit($driver, $replayed, fn (KeystoneGuard $guard) => $guard->user()))->toBeNull();
+})->with(['file', 'redis', 'cookie']);
+
+it('ends every other session of the account when a change ends them, keeping the mover\'s', function (string $driver) {
+    $user = User::factory()->create();
+    $laptop = [];
+    $phone = [];
+    visit($driver, $laptop, fn (KeystoneGuard $guard) => $guard->signIn($user));
+    visit($driver, $phone, fn (KeystoneGuard $guard) => $guard->signIn($user));
+
+    visit($driver, $laptop, fn (KeystoneGuard $guard) => (new AccountChanges($guard))->change($user, fn (AccountChange $change) => $change->endSessions()));
+
+    expect(visit($driver, $laptop, fn (KeystoneGuard $guard) => $guard->user()))->not->toBeNull()
+        ->and(visit($driver, $phone, fn (KeystoneGuard $guard) => $guard->user()))->toBeNull();
+})->with(['file', 'redis', 'cookie']);
+
+it('ends every account\'s sessions', function (string $driver) {
+    $jane = User::factory()->create();
+    $john = User::factory()->create();
+    $laptop = [];
+    $phone = [];
+    visit($driver, $laptop, fn (KeystoneGuard $guard) => $guard->signIn($jane));
+    visit($driver, $phone, fn (KeystoneGuard $guard) => $guard->signIn($john));
+
+    (new AccountChanges(Auth::guard('web')))->endEverySession();
+
+    expect(visit($driver, $laptop, fn (KeystoneGuard $guard) => $guard->user()))->toBeNull()
+        ->and(visit($driver, $phone, fn (KeystoneGuard $guard) => $guard->user()))->toBeNull();
 })->with(['file', 'redis', 'cookie']);

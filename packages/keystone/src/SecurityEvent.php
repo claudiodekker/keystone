@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property SecurityEventType $type
  * @property int|string|null $user_id
  * @property Actor $actor
+ * @property string|null $operator
  * @property string|null $flow
  * @property string|null $credential_type
  * @property int|null $credential_id

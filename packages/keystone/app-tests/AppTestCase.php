@@ -2,8 +2,9 @@
 
 namespace ClaudioDekker\Keystone\AppTests;
 
+use ClaudioDekker\Keystone\AccountChange;
+use ClaudioDekker\Keystone\AccountChanges;
 use ClaudioDekker\Keystone\AppTests\Support\CredentialTypeSupport;
-use ClaudioDekker\Keystone\Credentials;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\KeystoneUser;
 use ClaudioDekker\Keystone\Methods\CredentialType;
@@ -156,15 +157,13 @@ abstract class AppTestCase extends TestCase
         $type = $this->types()->find($support->type(), $surface)
             ?? $this->fail("The [{$support->type()}] credential type doesn't serve {$surface->value}.");
         $arranged = $support->arrange($surface);
-        $credentials = new Credentials(Keystone::guard()->userModel());
 
-        $credentials->store(
-            $account,
+        (new AccountChanges(Keystone::guard()))->change($account, fn (AccountChange $change) => $change->addCredential(
             $type,
             identifier: $arranged['identifier'],
             secret: $arranged['secret'],
             label: $arranged['label'],
-        );
+        ));
     }
 
     /**

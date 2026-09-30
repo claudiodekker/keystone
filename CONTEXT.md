@@ -125,6 +125,9 @@ _Avoid_: park, half-authenticated, held user
 **Credential epoch**:
 A per-account counter that moves whenever the account's other sessions must end, such as on a password change, credential removal, recovery, suspension or "sign out others". A session or remember-me cookie from an older epoch is dead.
 
+**Account change**:
+One locked write to an account's credentials, addresses or credential epoch. It moves the epoch whenever it removes, replaces or ends something, and records its events only once it commits.
+
 **Ceremony slot**:
 A method's in-flight data for one step, such as a WebAuthn challenge or a TOTP secret being enrolled. It never outlives the state that owns it.
 

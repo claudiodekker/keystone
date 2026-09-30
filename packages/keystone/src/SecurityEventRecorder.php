@@ -32,7 +32,7 @@ class SecurityEventRecorder
     public const int USER_AGENT_LENGTH = 512;
 
     /**
-     * The most characters of a reason or a credential label kept.
+     * The most characters of a reason, a credential label or an operator kept.
      */
     public const int FIELD_LENGTH = 64;
 
@@ -52,6 +52,7 @@ class SecurityEventRecorder
         ?string $credentialType = null,
         ?StoredCredential $credential = null,
         ?string $reason = null,
+        ?string $operator = null,
     ): void {
         if (! $this->enabled()) {
             return;
@@ -66,6 +67,7 @@ class SecurityEventRecorder
                 credentialType: $credentialType,
                 credential: $credential,
                 reason: $reason,
+                operator: $operator,
             );
         } catch (Throwable $e) {
             report($e);
@@ -99,17 +101,20 @@ class SecurityEventRecorder
         ?string $credentialType,
         ?StoredCredential $credential,
         ?string $reason,
+        ?string $operator,
     ): SecurityEvent {
         $context = $this->context();
         $userAgent = $this->clean($context->userAgent, self::USER_AGENT_LENGTH);
         $label = $this->clean($credential?->label, self::FIELD_LENGTH);
         $keptReason = $this->reason($reason, $credentialType);
+        $keptOperator = $this->clean($operator, self::FIELD_LENGTH);
 
         return new SecurityEvent([
             'occurred_at' => Date::now(),
             'type' => $type,
             'user_id' => $account?->getKey(),
             'actor' => $actor,
+            'operator' => $keptOperator,
             'flow' => $flow,
             'credential_type' => $credentialType,
             'credential_id' => $credential?->id,
@@ -202,7 +207,7 @@ class SecurityEventRecorder
     /**
      * Get the event's fields as the log line's context.
      *
-     * @return array{occurred_at: string, type: string, user_id: int|string|null, actor: string, flow: ?string, credential_type: ?string, credential_id: ?int, credential_label: ?string, reason: ?string, ip_address: ?string, location: ?string, user_agent: ?string, known_device: ?bool, request_id: ?string}
+     * @return array{occurred_at: string, type: string, user_id: int|string|null, actor: string, operator: ?string, flow: ?string, credential_type: ?string, credential_id: ?int, credential_label: ?string, reason: ?string, ip_address: ?string, location: ?string, user_agent: ?string, known_device: ?bool, request_id: ?string}
      */
     protected function logContext(SecurityEvent $event): array
     {
@@ -211,6 +216,7 @@ class SecurityEventRecorder
             'type' => $event->type->value,
             'user_id' => $event->user_id,
             'actor' => $event->actor->value,
+            'operator' => $event->operator,
             'flow' => $event->flow,
             'credential_type' => $event->credential_type,
             'credential_id' => $event->credential_id,

@@ -361,6 +361,7 @@ describe('the absolute lifetime', function () {
     });
 
     it('ends a session whose sign-in time is missing or in the future', function (mixed $signedInAt) {
+        $this->freezeSecond();
         $user = User::factory()->create();
         Auth::guard('web')->signIn($user);
         app('session.store')->put('keystone_signed_in_at_web', $signedInAt instanceof Closure ? $signedInAt() : $signedInAt);
