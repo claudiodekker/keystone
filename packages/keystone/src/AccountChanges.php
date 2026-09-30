@@ -89,7 +89,10 @@ class AccountChanges
             'credential_epoch_moved_at' => $account->fromDateTime(Date::now()),
         ];
 
-        $account->newQueryWithoutScopes()->toBase()->where($account->getKeyName(), $account->getKey())->update($moved);
+        $account->newQueryWithoutScopes()
+            ->toBase()
+            ->where($account->getKeyName(), $account->getKey())
+            ->update($moved);
 
         $account->setRawAttributes([...$account->getAttributes(), ...$moved], sync: true);
 

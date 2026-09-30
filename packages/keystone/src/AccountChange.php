@@ -142,7 +142,10 @@ class AccountChange
      */
     protected function stampSuspended(?string $suspendedAt): void
     {
-        $this->account->newQueryWithoutScopes()->toBase()->where($this->account->getKeyName(), $this->account->getKey())->update(['suspended_at' => $suspendedAt]);
+        $this->account->newQueryWithoutScopes()
+            ->toBase()
+            ->where($this->account->getKeyName(), $this->account->getKey())
+            ->update(['suspended_at' => $suspendedAt]);
 
         $this->account->setRawAttributes([
             ...$this->account->getAttributes(),
