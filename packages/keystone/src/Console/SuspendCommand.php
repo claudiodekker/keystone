@@ -2,7 +2,7 @@
 
 namespace ClaudioDekker\Keystone\Console;
 
-use ClaudioDekker\Keystone\AlreadySuspended;
+use ClaudioDekker\Keystone\Exceptions\AlreadySuspended;
 use ClaudioDekker\Keystone\Jobs\SuspendAccount;
 use Illuminate\Console\Command;
 use Symfony\Component\Console\Attribute\AsCommand;

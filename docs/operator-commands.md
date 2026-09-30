@@ -78,4 +78,4 @@ SuspendAccount::dispatch($user, operator: $request->user()->email);
 UnsuspendAccount::dispatch($user, operator: $request->user()->email);
 ```
 
-The jobs refuse an account already in the state they would put it in: `SuspendAccount` throws `ClaudioDekker\Keystone\AlreadySuspended`, and `UnsuspendAccount` throws `ClaudioDekker\Keystone\NotSuspended`. Queued, that fails the job; dispatched with `dispatchSync()`, the exception reaches your code.
+The jobs refuse an account already in the state they would put it in: `SuspendAccount` throws `ClaudioDekker\Keystone\Exceptions\AlreadySuspended`, and `UnsuspendAccount` throws `ClaudioDekker\Keystone\Exceptions\NotSuspended`. Queued, that fails the job; dispatched with `dispatchSync()`, the exception reaches your code.

@@ -2,6 +2,7 @@
 
 namespace ClaudioDekker\Keystone;
 
+use ClaudioDekker\Keystone\Exceptions\Throttled;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Cache\RateLimiter as CacheRateLimiter;

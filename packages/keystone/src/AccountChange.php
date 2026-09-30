@@ -2,6 +2,8 @@
 
 namespace ClaudioDekker\Keystone;
 
+use ClaudioDekker\Keystone\Exceptions\AlreadySuspended;
+use ClaudioDekker\Keystone\Exceptions\NotSuspended;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
 use Closure;

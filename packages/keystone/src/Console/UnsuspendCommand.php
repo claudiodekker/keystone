@@ -2,8 +2,8 @@
 
 namespace ClaudioDekker\Keystone\Console;
 
+use ClaudioDekker\Keystone\Exceptions\NotSuspended;
 use ClaudioDekker\Keystone\Jobs\UnsuspendAccount;
-use ClaudioDekker\Keystone\NotSuspended;
 use Illuminate\Console\Command;
 use Symfony\Component\Console\Attribute\AsCommand;
 

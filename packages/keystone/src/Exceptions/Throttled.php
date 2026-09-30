@@ -1,6 +1,6 @@
 <?php
 
-namespace ClaudioDekker\Keystone;
+namespace ClaudioDekker\Keystone\Exceptions;
 
 use Illuminate\Contracts\Support\Responsable;
 use RuntimeException;

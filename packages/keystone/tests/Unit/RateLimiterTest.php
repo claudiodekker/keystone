@@ -1,5 +1,6 @@
 <?php
 
+use ClaudioDekker\Keystone\Exceptions\Throttled;
 use ClaudioDekker\Keystone\Flow;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\RateLimiter;
@@ -7,7 +8,6 @@ use ClaudioDekker\Keystone\SecurityEventRecorded;
 use ClaudioDekker\Keystone\StepKind;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormType;
 use ClaudioDekker\Keystone\Tests\Fixtures\User;
-use ClaudioDekker\Keystone\Throttled;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Cache\RateLimiter as CacheRateLimiter;
 use Illuminate\Http\Request;

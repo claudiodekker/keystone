@@ -1,12 +1,12 @@
 <?php
 
 use ClaudioDekker\Keystone\Actor;
-use ClaudioDekker\Keystone\AlreadySuspended;
 use ClaudioDekker\Keystone\AppTests\AppTestCase;
+use ClaudioDekker\Keystone\Exceptions\AlreadySuspended;
+use ClaudioDekker\Keystone\Exceptions\NotSuspended;
 use ClaudioDekker\Keystone\Jobs\SuspendAccount;
 use ClaudioDekker\Keystone\Jobs\UnsuspendAccount;
 use ClaudioDekker\Keystone\Methods\Surface;
-use ClaudioDekker\Keystone\NotSuspended;
 use ClaudioDekker\Keystone\SecurityEvent;
 use ClaudioDekker\Keystone\SecurityEventType;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormTypeSupport;

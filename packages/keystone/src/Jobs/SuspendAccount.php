@@ -5,7 +5,7 @@ namespace ClaudioDekker\Keystone\Jobs;
 use ClaudioDekker\Keystone\AccountChange;
 use ClaudioDekker\Keystone\AccountChanges;
 use ClaudioDekker\Keystone\Actor;
-use ClaudioDekker\Keystone\AlreadySuspended;
+use ClaudioDekker\Keystone\Exceptions\AlreadySuspended;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\KeystoneUser;
 use ClaudioDekker\Keystone\SecurityEventType;
