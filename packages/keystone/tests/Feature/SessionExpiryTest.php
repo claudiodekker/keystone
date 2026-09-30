@@ -1,8 +1,13 @@
 <?php
 
+use ClaudioDekker\Keystone\Actions\RespondToExpiredSession;
 use ClaudioDekker\Keystone\AppTests\AppTestCase;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormTypeSupport;
+use Illuminate\Auth\AuthenticationException;
+use Illuminate\Auth\Middleware\Authenticate;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Symfony\Component\HttpFoundation\Response;
 
 pest()->extend(AppTestCase::class);
 
@@ -10,6 +15,10 @@ beforeEach(function () {
     config(['keystone.session.absolute_lifetime_seconds' => 3600]);
     Route::middleware(['web', 'auth'])->get('dashboard', fn () => 'The dashboard.');
     Route::middleware('web')->get('welcome', fn () => auth()->check() ? 'Welcome back.' : 'Welcome, guest.');
+});
+
+afterEach(function () {
+    Closure::bind(fn () => Authenticate::$redirectToCallback = null, null, Authenticate::class)();
 });
 
 it('sends an expired browser to sign in, clearing the site\'s data', function () {
@@ -70,4 +79,40 @@ it('lets a page open to guests answer an expired browser as a guest', function (
     $response = $this->get('welcome');
 
     $response->assertSee('Welcome, guest.')->assertHeader('Clear-Site-Data', '"cache", "storage"');
+});
+
+it('sends the app\'s own response to an expired session', function () {
+    $this->app->bind(RespondToExpiredSession::class, fn () => new class extends RespondToExpiredSession
+    {
+        public function handle(Request $request, AuthenticationException $e): Response
+        {
+            return response()->json(['expired' => true, 'sign_in' => route('login')], 401);
+        }
+    });
+    $this->freezeSecond();
+    $this->signInAccount(new FormTypeSupport);
+    $this->travel(3600)->seconds();
+
+    $response = $this->get('dashboard');
+
+    $response->assertUnauthorized()
+        ->assertExactJson(['expired' => true, 'sign_in' => route('login')])
+        ->assertHeader('Clear-Site-Data', '"cache", "storage"');
+});
+
+it('sends an expired browser where the app sends guests', function () {
+    Authenticate::redirectUsing(fn () => '/welcome');
+    $this->freezeSecond();
+    $this->signInAccount(new FormTypeSupport);
+    $this->travel(3600)->seconds();
+
+    $response = $this->get('dashboard');
+
+    $response->assertRedirect('/welcome');
+});
+
+it('keeps the app\'s redirect for guests', function () {
+    $response = $this->get('dashboard');
+
+    $response->assertRedirectToRoute('login');
 });

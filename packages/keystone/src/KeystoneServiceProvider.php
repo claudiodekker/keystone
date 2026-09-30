@@ -3,6 +3,7 @@
 namespace ClaudioDekker\Keystone;
 
 use ClaudioDekker\Keystone\Actions\AccountLookup;
+use ClaudioDekker\Keystone\Actions\RespondToExpiredSession;
 use ClaudioDekker\Keystone\Http\Middleware\AddHardeningHeaders;
 use ClaudioDekker\Keystone\Http\Middleware\CaptureRequestContext;
 use ClaudioDekker\Keystone\Http\Middleware\ClearSiteDataOnSessionEnd;
@@ -18,11 +19,11 @@ use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Foundation\Exceptions\Handler;
 use Illuminate\Foundation\Http\Kernel as HttpKernel;
 use Illuminate\Foundation\Http\Middleware\TrimStrings;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Router;
 use Illuminate\Support\ServiceProvider;
 use LogicException;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * @api
@@ -43,6 +44,7 @@ class KeystoneServiceProvider extends ServiceProvider
 
         $this->app->singleton(CredentialTypes::class);
         $this->app->bindIf(AccountLookup::class);
+        $this->app->bindIf(RespondToExpiredSession::class);
         $this->app->scoped(RequestContext::class, fn () => new RequestContext);
     }
 
@@ -122,18 +124,15 @@ class KeystoneServiceProvider extends ServiceProvider
     }
 
     /**
-     * Tell a JSON client that its session expired, leaving every other unauthenticated request to the app's handler.
+     * Respond to a request whose session expired, leaving every other unauthenticated request to the app's handler.
      */
-    protected function renderExpiredSession(AuthenticationException $e, Request $request): ?JsonResponse
+    protected function renderExpiredSession(AuthenticationException $e, Request $request): ?Response
     {
-        if (! $request->attributes->getBoolean(KeystoneGuard::EXPIRED_SESSION) || ! $request->expectsJson()) {
+        if (! $request->attributes->getBoolean(KeystoneGuard::EXPIRED_SESSION)) {
             return null;
         }
 
-        return new JsonResponse([
-            'message' => Status::SESSION_EXPIRED->label(),
-            'reason' => 'expired',
-        ], 401);
+        return $this->app->make(RespondToExpiredSession::class)->handle($request, $e);
     }
 
     /**

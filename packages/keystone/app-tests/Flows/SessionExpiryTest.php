@@ -1,11 +1,12 @@
 <?php
 
 use ClaudioDekker\Keystone\AppTests\AppTestCase;
+use ClaudioDekker\Keystone\AppTests\Assertions\SessionExpiryAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\SignInAssertions;
 use ClaudioDekker\Keystone\Methods\Surface;
 use Illuminate\Support\Facades\Route;
 
-pest()->extend(AppTestCase::class)->use(AppTestCase::assertions(SignInAssertions::class));
+pest()->extend(AppTestCase::class)->use(AppTestCase::assertions(SignInAssertions::class), AppTestCase::assertions(SessionExpiryAssertions::class));
 
 beforeEach(function () {
     $this->lifetime = config('keystone.session.absolute_lifetime_seconds');
@@ -36,6 +37,7 @@ it('ends a session once its absolute lifetime has passed, however active it was'
 
     $response = $this->get('keystone-app-tests/signed-in-only');
 
+    $this->assertExpiredSessionRefused($response);
     $this->assertGuest();
     $this->assertDatabaseHas('user_security_events', ['type' => 'session.ended', 'user_id' => $account->getKey(), 'reason' => 'expired']);
     $types = (array) config('keystone.clear_site_data');

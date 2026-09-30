@@ -45,12 +45,31 @@ A session ends in two ways, whichever comes first:
 - **Idle:** Laravel's own `session.lifetime` (in minutes) ends a session nobody used for that long. Every request starts the count again.
 - **Absolute:** `session.absolute_lifetime_seconds` ends a signed-in session that long after the sign-in, however busy it was. Nothing extends it. A session whose sign-in time is missing or in the future counts as expired.
 
-Keystone checks the absolute lifetime whenever something asks who is signed in, so it needs no middleware of yours. When a session has expired, Keystone ends it, records `session.ended` with the reason `expired`, and sends `Clear-Site-Data`. Your `auth` middleware then sees a guest:
+Keystone checks the absolute lifetime whenever something asks who is signed in, so it needs no middleware of yours. When a session has expired, Keystone ends it, records `session.ended` with the reason `expired`, and sends `Clear-Site-Data`. When your `auth` middleware then refuses the request:
 
-- a browser is redirected to sign in, where the sign-in page's `status` reads "Your session has expired. Please sign in again.";
+- a browser is redirected to sign in, or wherever your `redirectGuestsTo` sends guests, and the sign-in page's `status` reads "Your session has expired. Please sign in again.";
 - a request expecting JSON gets a `401` with `{"message": "Your session has expired. Please sign in again.", "reason": "expired"}`.
 
 The message is `keystone::messages.status.session-expired`, so you can translate it in `lang/vendor/keystone`.
+
+To answer an expired session your own way, bind your own `ClaudioDekker\Keystone\Actions\RespondToExpiredSession` in a service provider and override its `handle()`:
+
+```php
+use ClaudioDekker\Keystone\Actions\RespondToExpiredSession;
+use Illuminate\Auth\AuthenticationException;
+use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
+
+$this->app->bind(RespondToExpiredSession::class, fn () => new class extends RespondToExpiredSession
+{
+    public function handle(Request $request, AuthenticationException $e): Response
+    {
+        return response()->json(['reason' => 'expired', 'sign_in' => route('login')], 401);
+    }
+});
+```
+
+The session has already ended by then, whatever you respond. If you change the response, redefine `assertExpiredSessionRefused()` in your `Tests\Keystone\Assertions\SessionExpiryAssertions` trait so Keystone's AppTests check your response instead.
 
 ## Boot checks
 
