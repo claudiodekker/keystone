@@ -3,6 +3,7 @@
 namespace ClaudioDekker\Keystone\Notifications;
 
 use Carbon\CarbonImmutable;
+use ClaudioDekker\Keystone\IpLocation;
 use ClaudioDekker\Keystone\SecurityEvent;
 use ClaudioDekker\Keystone\SecurityEventType;
 use ClaudioDekker\Keystone\SessionInfo;
@@ -11,6 +12,7 @@ use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Throwable;
 
 /**
  * @api
@@ -40,19 +42,14 @@ class SecurityAlert extends Notification implements ShouldBeEncrypted, ShouldQue
     public ?string $ipAddress;
 
     /**
-     * Where the IP address is.
-     */
-    public ?string $location;
-
-    /**
      * The label of the device that caused the event, never its raw user agent.
      */
     public ?string $device;
 
     /**
-     * The credential involved, by its label at the time or else its type.
+     * The type of the credential involved; never its label, which its owner typed.
      */
-    public ?string $credential;
+    public ?string $credentialType;
 
     /**
      * Create a new notification instance.
@@ -62,9 +59,8 @@ class SecurityAlert extends Notification implements ShouldBeEncrypted, ShouldQue
         $this->type = $event->type;
         $this->occurredAt = $event->occurred_at;
         $this->ipAddress = $event->ip_address;
-        $this->location = $event->location;
         $this->device = $this->describe($event->user_agent);
-        $this->credential = $event->credential_label ?? $event->credential_type;
+        $this->credentialType = $event->credential_type;
     }
 
     /**
@@ -91,10 +87,28 @@ class SecurityAlert extends Notification implements ShouldBeEncrypted, ShouldQue
                 'what' => "keystone::alerts.{$this->type->value}",
                 'occurredAt' => $this->occurredAt->utc()->format(self::TIME_FORMAT),
                 'ipAddress' => $this->ipAddress ?? __('keystone::alerts.unknown'),
-                'location' => $this->location,
+                'location' => $this->locate(),
                 'device' => $this->device ?? __('keystone::alerts.unknown_device'),
-                'credential' => $this->credential,
+                'credential' => $this->credentialType,
             ]);
+    }
+
+    /**
+     * Name where the IP address is through the IP-location port, on the worker, so no request waits on the lookup.
+     */
+    protected function locate(): ?string
+    {
+        if ($this->ipAddress === null) {
+            return null;
+        }
+
+        try {
+            return app(IpLocation::class)->locate($this->ipAddress);
+        } catch (Throwable $e) {
+            report($e);
+
+            return null;
+        }
     }
 
     /**

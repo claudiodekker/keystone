@@ -85,7 +85,7 @@ class SecurityEventRecorder
 
         $this->rescue(fn () => $this->log($event));
         $this->rescue(fn () => $this->append($event, $account));
-        $this->rescue(fn () => $alert ? $this->alert($event, $account, $recipients) : null);
+        $this->rescue(fn () => $this->alert($event, $account, $recipients, $alert));
         $this->rescue(fn () => event($recorded));
     }
 
@@ -128,29 +128,11 @@ class SecurityEventRecorder
             'credential_label' => $label,
             'reason' => $keptReason,
             'ip_address' => $context->ipAddress,
-            'location' => $this->locate($context->ipAddress),
+            'location' => null,
             'user_agent' => $userAgent,
             'known_device' => null,
             'request_id' => $context->requestId,
         ]);
-    }
-
-    /**
-     * Name where the IP address is through the IP-location port, or null when that isn't known.
-     */
-    protected function locate(?string $ipAddress): ?string
-    {
-        if ($ipAddress === null) {
-            return null;
-        }
-
-        try {
-            return app(IpLocation::class)->locate($ipAddress);
-        } catch (Throwable $e) {
-            report($e);
-
-            return null;
-        }
     }
 
     /**
@@ -272,15 +254,15 @@ class SecurityEventRecorder
     }
 
     /**
-     * Queue the type's alert to each of the account's recipients, one mail each, unless its slot is null.
+     * Queue the type's alert to each of the account's recipients, one mail each, unless suppressed or its slot is null.
      *
      * @param  list<string>|null  $recipients
      */
-    protected function alert(SecurityEvent $event, (Model&KeystoneUser)|null $account, ?array $recipients): void
+    protected function alert(SecurityEvent $event, (Model&KeystoneUser)|null $account, ?array $recipients, bool $alert): void
     {
         $slot = $this->slot($event->type);
 
-        if ($account === null || $slot === null) {
+        if (! $alert || $account === null || $slot === null) {
             return;
         }
 

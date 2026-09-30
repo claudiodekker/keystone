@@ -25,10 +25,10 @@ The default alert is one notification class, `ClaudioDekker\Keystone\Notificatio
 - when, in UTC;
 - the IP address of the request that caused it, and where that address is when the [IP-location port](#ip-location) knows;
 - the device, as the platform and browser the [session-info port](#session-info) parses from the user agent, or "Unknown device". The raw user agent never appears in a mail;
-- the credential involved, when there is one;
+- the type of the credential involved, when there is one, such as `passkey`. Never its label: its owner typed that, and a mail client could turn a label that looks like a web address into a link;
 - "If this wasn't you, sign in and review your security settings."
 
-Every value is escaped, the mail isn't Markdown, and it carries no links, so a crafted user agent or credential label can't add one.
+Every value is escaped, the mail isn't Markdown, and it carries no links, so a crafted user agent can't add one.
 
 To change the wording, override the keys under `keystone::alerts` in `lang/vendor/keystone/{locale}/alerts.php`. To change anything else, name your own notification (below).
 
@@ -45,6 +45,7 @@ To change the wording, override the keys under `keystone::alerts` in `lang/vendo
 Keystone builds your notification through the container, passing the event as `$event`, and sends it on demand to each recipient's address:
 
 ```php
+use Carbon\CarbonImmutable;
 use ClaudioDekker\Keystone\SecurityEvent;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -55,13 +56,21 @@ class SessionsEnded extends Notification implements ShouldBeEncrypted, ShouldQue
 {
     use Queueable;
 
-    public function __construct(public SecurityEvent $event) {}
+    public CarbonImmutable $occurredAt;
+
+    public ?string $ipAddress;
+
+    public function __construct(SecurityEvent $event)
+    {
+        $this->occurredAt = $event->occurred_at;
+        $this->ipAddress = $event->ip_address;
+    }
 
     // via() and toMail() as usual
 }
 ```
 
-The event may not be stored, if writing the audit trail failed, so copy what you need from it rather than relying on it being reloaded on the queue. Implement `ShouldQueue` so the mail doesn't slow the request down, and `ShouldBeEncrypted` so the IP address and user agent it carries aren't readable in your `jobs` and `failed_jobs` tables.
+Copy what you need from the event in the constructor rather than keeping the event itself: it isn't stored when writing the audit trail failed, and a queued notification reloads a model it keeps from the database. Implement `ShouldQueue` so the mail doesn't slow the request down, and `ShouldBeEncrypted` so the IP address it carries isn't readable in your `jobs` and `failed_jobs` tables.
 
 Set a slot to `null` to silence that type. There is no switch that silences every type at once, and any other value, or a slot for a type that doesn't exist, stops your app from booting.
 
@@ -71,20 +80,22 @@ Two ports tell Keystone more about a request than its raw IP address and user ag
 
 ### IP location
 
-`ClaudioDekker\Keystone\IpLocation::locate(string $ipAddress): ?string` names where an IP address is. Keystone looks it up when it records an event, keeps it in the event's encrypted `location` field and shows it in alerts.
+`ClaudioDekker\Keystone\IpLocation::locate(string $ipAddress): ?string` names where an IP address is. The default alert looks it up on your queue worker when it builds the mail, so no request waits on it and a slow lookup can't tell anyone whether an account exists.
 
 Without anything installed, the port knows nothing. With [`stevebauman/location`](https://github.com/stevebauman/location) installed, Keystone uses its configured driver and fallbacks and names the city and country. It skips every driver that would send your users' IP addresses over plain `http`, such as that package's default `IpApi`, and tries the next; set `keystone.ip_location.allow_plaintext_driver` to `true` to use them anyway.
 
-The lookup runs during the request that records the event, including a refused sign-in, so prefer a local database (MaxMind) or a header your proxy sets (Cloudflare) over a remote API.
-
 ### Session info
 
-`ClaudioDekker\Keystone\SessionInfo::describe(string $userAgent): ?Device` names the platform and browser of a user agent. Without anything installed, the port knows nothing and alerts say "Unknown device". With [`matomo/device-detector`](https://github.com/matomo-org/device-detector) installed, Keystone uses it.
+`ClaudioDekker\Keystone\SessionInfo::describe(string $userAgent): ?Device` names the platform and browser of a user agent. Without anything installed, the port knows nothing and alerts say "Unknown device". With [`matomo/device-detector`](https://github.com/matomo-org/device-detector) installed, Keystone uses it. The alert parses the user agent when it is created, so the queue carries the device's label rather than the user agent.
 
-Bind your own in a service provider:
+### Binding your own
+
+Bind either port in a service provider:
 
 ```php
 use ClaudioDekker\Keystone\IpLocation;
+use ClaudioDekker\Keystone\SessionInfo;
 
 $this->app->bind(IpLocation::class, MyIpLocation::class);
+$this->app->bind(SessionInfo::class, MySessionInfo::class);
 ```

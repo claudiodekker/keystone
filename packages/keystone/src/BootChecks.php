@@ -64,6 +64,7 @@ class BootChecks
             ...$this->sessionFailures(),
             ...$this->eventFailures(),
             ...$this->alertFailures(),
+            ...$this->ipLocationFailures(),
             ...$this->hardeningFailures(),
             ...$this->methodFailures(),
             ...$this->connectionFailures(),
@@ -152,19 +153,17 @@ class BootChecks
     }
 
     /**
-     * Check that each alert slot names a type of security event and holds null or a notification class, and the plaintext switch.
+     * Check that each alert slot names a type of security event and holds null or a notification class.
      *
      * @return list<string>
      */
     protected function alertFailures(): array
     {
         $slots = config('keystone.notifications');
-        $failures = is_bool(config('keystone.ip_location.allow_plaintext_driver'))
-            ? []
-            : ['keystone.ip_location.allow_plaintext_driver must be true or false.'];
+        $failures = [];
 
         if (! $this->isMap($slots)) {
-            return ['keystone.notifications must map types of security event to a notification class or null.', ...$failures];
+            return ['keystone.notifications must map types of security event to a notification class or null.'];
         }
 
         foreach ($slots as $type => $slot) {
@@ -176,6 +175,20 @@ class BootChecks
         }
 
         return $failures;
+    }
+
+    /**
+     * Check the switch that lets the IP-location port use a plaintext driver.
+     *
+     * @return list<string>
+     */
+    protected function ipLocationFailures(): array
+    {
+        if (is_bool(config('keystone.ip_location.allow_plaintext_driver'))) {
+            return [];
+        }
+
+        return ['keystone.ip_location.allow_plaintext_driver must be true or false.'];
     }
 
     /**

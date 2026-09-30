@@ -2,7 +2,6 @@
 
 use Carbon\CarbonImmutable;
 use ClaudioDekker\Keystone\Actor;
-use ClaudioDekker\Keystone\IpLocation;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
 use ClaudioDekker\Keystone\Notifications\SecurityAlert;
 use ClaudioDekker\Keystone\RequestContext;
@@ -77,19 +76,6 @@ function alertedAddresses(): array
     });
 
     return $addresses;
-}
-
-function locatingAs(?string $location): void
-{
-    app()->instance(IpLocation::class, new class($location) implements IpLocation
-    {
-        public function __construct(public ?string $location) {}
-
-        public function locate(string $ipAddress): ?string
-        {
-            return $this->location;
-        }
-    });
 }
 
 describe('the log line', function () {
@@ -297,37 +283,6 @@ describe('anonymous events', function () {
         recorder()->record(SecurityEventType::PROOF_REJECTED, account: $user);
 
         expect(logRecords())->toHaveCount(2);
-    });
-});
-
-describe('the location', function () {
-    it('holds where the IP address is, as the IP-location port names it', function () {
-        captureContext();
-        locatingAs('Amsterdam, Netherlands');
-        $user = User::factory()->create();
-
-        recorder()->record(SecurityEventType::SIGNED_IN, account: $user);
-
-        expect(loggedContext()[0]['location'])->toBe('Amsterdam, Netherlands')
-            ->and(SecurityEvent::sole()->location)->toBe('Amsterdam, Netherlands');
-    });
-
-    it('isn\'t looked up without an IP address', function () {
-        app()->instance(IpLocation::class, Mockery::mock(IpLocation::class)->shouldNotReceive('locate')->getMock());
-
-        recorder()->record(SecurityEventType::SIGNED_OUT, account: User::factory()->create());
-
-        expect(loggedContext()[0]['location'])->toBeNull();
-    });
-
-    it('is null, and the event still recorded, when the port throws', function () {
-        captureContext();
-        app()->instance(IpLocation::class, Mockery::mock(IpLocation::class)->shouldReceive('locate')->andThrow(new RuntimeException('Lookup failed.'))->getMock());
-
-        recorder()->record(SecurityEventType::SIGNED_OUT, account: User::factory()->create());
-
-        expect(SecurityEvent::sole()->location)->toBeNull();
-        Exceptions::assertReported(fn (RuntimeException $e) => $e->getMessage() === 'Lookup failed.');
     });
 });
 
