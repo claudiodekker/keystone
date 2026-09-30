@@ -19,7 +19,7 @@ The first refusal in each window records a `limit.tripped` [security event](secu
 
 ## The store
 
-Counts live in Laravel's rate-limiter cache store: the store named by `cache.limiter`, else your default cache store. It must increment atomically and must not evict entries early, so use `redis`, `database` or `memcached` in production. In production, Keystone refuses to boot when that store uses the `file`, `array` or `null` driver. Keys are hashed with your app key, and no email address, username or IP address is stored in clear.
+Counts live in Laravel's rate-limiter cache store: the store named by `cache.limiter`, else your default cache store. It must increment atomically and must not evict entries early, so use `redis`, `database` or `memcached` in production. In production, Keystone refuses to boot when that store uses the `file`, `storage`, `array`, `null` or `session` driver. Keys are hashed with your app key, and no email address, username or IP address is stored in clear.
 
 If the store fails, Keystone reports the exception and refuses every sign-in attempt until it is back. Page views and other requests go through.
 

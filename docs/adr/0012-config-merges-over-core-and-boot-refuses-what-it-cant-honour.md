@@ -9,7 +9,7 @@ Keystone v3's config failed open: a `null` silently muted alerts, a `0` disabled
 
 ## Consequences
 
-- The checks run inside every request and console command, console included, so a build that boots the app with `APP_ENV=production` needs production settings. The cost is a few array reads per boot.
+- The checks run inside every request and console command, so a build that boots the app with `APP_ENV=production` needs production settings. The commands that clear or rebuild a cached config skip them, so a refused cached config can always be cleared. The cost is a few array reads per boot.
 - A credential type registered under a taken name no longer throws at registration: the registry keeps the first and boot reports the clash with every other failure.
 - Keystone's tables are migrated on the default connection, so boot refuses a user model on another connection. Swappable models (#68) extend the check to every model Keystone reads.
 - The hardening middleware still falls back to the strict default for a value that isn't well formed, which only a runtime `config()` call can now produce.

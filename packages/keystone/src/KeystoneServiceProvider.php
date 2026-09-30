@@ -77,7 +77,7 @@ class KeystoneServiceProvider extends ServiceProvider
 
         $config = $this->app->make('config');
 
-        $config->set($key, $this->mergeOver(require $path, $config->get($key, [])));
+        $config->set($key, $this->mergeOver(defaults: require $path, values: $config->get($key, [])));
     }
 
     /**

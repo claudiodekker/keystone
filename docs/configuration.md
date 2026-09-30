@@ -45,7 +45,7 @@ In every environment, it refuses:
 
 - a setting above of the wrong type, or a limit below 1;
 - a `methods` entry that isn't a type name or a type name mapped to a list of surfaces, a type listed twice, a type no installed package registers, or a surface the type doesn't serve;
-- two installed packages registering credential types with one name;
+- two installed packages registering credential types with one name, or a type named `recovery-code`, which Keystone keeps for recovery codes;
 - a `log_channel` that isn't one of your `logging.channels`;
 - a user model on another database connection than your default one, which Keystone's tables are migrated on.
 
@@ -59,10 +59,10 @@ In production it also refuses what's fine on a laptop but unsafe on a server:
 | `session.same_site` | anything but `lax` or `strict` |
 | `session.cookie` | a name without the `__Host-` prefix, or `__Secure-` when `session.domain` is set |
 | `session.path` | anything but `/` |
-| `cache.default` | a store using the `array` or `null` driver, which forget their entries |
-| `cache.limiter` (else `cache.default`) | a store using the `file`, `array` or `null` driver, which can't count atomically |
+| `cache.default` | a store using the `array`, `null` or `session` driver, which forget their entries |
+| `cache.limiter` (else `cache.default`) | a store using the `file`, `storage`, `array`, `null` or `session` driver, which can't count atomically |
 | `app.url` | anything but `https://` |
 | `mail.default` | a mailer using the `log` or `array` transport |
 | `queue.default` | a connection using the `null` driver |
 
-The installer sets the session cookie up this way. Because the checks run on every boot, a build step such as `composer install` that boots your app with `APP_ENV=production` needs the production settings too.
+The installer sets the session cookie up this way. Because the checks run on every boot, a build step that boots your app with `APP_ENV=production` needs the production settings too. The commands that clear or rebuild a cached config (`config:clear`, `config:cache`, `optimize:clear` and `package:discover`) skip the checks, so you can always recover from a cached config Keystone refuses.

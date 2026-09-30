@@ -205,13 +205,22 @@ describe('the methods allow-list', function () {
         'an unknown surface' => [['form' => ['sudo']], 'keystone.methods lists [form] on [sudo], which it doesn\'t serve.'],
     ]);
 
-    it('refuses two credential types with one name', function (string $name) {
-        app(CredentialTypes::class)->register(new FormType(name: $name));
+    it('refuses two credential types with one name, however often it is taken', function () {
+        app(CredentialTypes::class)->register(new FormType);
+        app(CredentialTypes::class)->register(new FormType);
 
         $failures = bootFailures();
 
-        expect($failures)->toBe(["More than one credential type is named [{$name}]."]);
-    })->with(['a registered type\'s name' => ['form'], 'core\'s reserved name' => ['recovery-code']]);
+        expect($failures)->toBe(['More than one credential type is named [form].']);
+    });
+
+    it('refuses a credential type under core\'s reserved name', function () {
+        app(CredentialTypes::class)->register(new FormType(name: 'recovery-code'));
+
+        $failures = bootFailures();
+
+        expect($failures)->toBe(['The credential type name [recovery-code] is reserved for Keystone\'s recovery codes.']);
+    });
 });
 
 it('refuses a user model on another connection than the one Keystone\'s tables are migrated on', function () {
@@ -263,10 +272,13 @@ describe('in production', function () {
         'a secure-prefixed cookie without a domain' => [['session.cookie' => '__Secure-example-session'], 'session.cookie must start with __Host- in production.'],
         'a host-prefixed cookie with a domain' => [['session.domain' => '.example.com'], 'session.cookie must start with __Secure- when session.domain is set.'],
         'a session cookie on a subpath' => [['session.path' => '/app'], 'session.path must be / in production.'],
-        'an array cache' => [['cache.default' => 'array', 'cache.limiter' => 'database'], 'cache.default must use a store that keeps its entries, not array or null.'],
-        'a null cache' => [['cache.stores.none' => ['driver' => 'null'], 'cache.default' => 'none', 'cache.limiter' => 'database'], 'cache.default must use a store that keeps its entries, not array or null.'],
-        'a file limiter store' => [['cache.limiter' => 'file'], 'cache.limiter must use a store that increments atomically, not file, array or null.'],
-        'a file default store for the limiter' => [['cache.default' => 'file'], 'cache.limiter must use a store that increments atomically, not file, array or null.'],
+        'an array cache' => [['cache.default' => 'array', 'cache.limiter' => 'database'], 'cache.default must use a store that keeps its entries, not array, null or session.'],
+        'a null cache' => [['cache.stores.none' => ['driver' => 'null'], 'cache.default' => 'none', 'cache.limiter' => 'database'], 'cache.default must use a store that keeps its entries, not array, null or session.'],
+        'a file limiter store' => [['cache.limiter' => 'file'], 'cache.limiter must use a store that increments atomically, not file, storage, array, null or session.'],
+        'a session cache' => [['cache.default' => 'session', 'cache.limiter' => 'database'], 'cache.default must use a store that keeps its entries, not array, null or session.'],
+        'a session limiter store' => [['cache.limiter' => 'session'], 'cache.limiter must use a store that increments atomically, not file, storage, array, null or session.'],
+        'a storage limiter store' => [['cache.stores.disk' => ['driver' => 'storage'], 'cache.limiter' => 'disk'], 'cache.limiter must use a store that increments atomically, not file, storage, array, null or session.'],
+        'a file default store for the limiter' => [['cache.default' => 'file'], 'cache.limiter must use a store that increments atomically, not file, storage, array, null or session.'],
         'an http app url' => [['app.url' => 'http://example.com'], 'app.url must use https in production.'],
         'a logging mailer' => [['mail.default' => 'log'], 'mail.default must deliver mail in production, not log or array.'],
         'an array mailer' => [['mail.default' => 'array'], 'mail.default must deliver mail in production, not log or array.'],
@@ -281,6 +293,17 @@ describe('in production', function () {
         expect($failures)->toBe([]);
     });
 });
+
+it('skips the checks for the commands that clear or rebuild a cached config', function (string $command) {
+    config(['keystone.events.enabled' => null]);
+    $argv = $_SERVER['argv'];
+    $_SERVER['argv'] = ['artisan', $command];
+
+    $failures = bootFailures();
+
+    $_SERVER['argv'] = $argv;
+    expect($failures)->toBe([]);
+})->with(['config:clear', 'config:cache', 'optimize:clear', 'package:discover']);
 
 it('leaves production\'s checks to production', function () {
     config(['app.url' => 'http://localhost', 'auth.guards.web.driver' => 'session', 'keystone.methods' => [], 'mail.default' => 'log']);

@@ -57,7 +57,7 @@ class CredentialTypes
      */
     public function clashes(): array
     {
-        return $this->clashes;
+        return array_values(array_unique($this->clashes));
     }
 
     /**

@@ -16,12 +16,17 @@ class BootChecks
     /**
      * The cache drivers that don't keep their entries across requests.
      */
-    protected const array FORGETFUL_CACHE_DRIVERS = ['array', 'null'];
+    protected const array FORGETFUL_CACHE_DRIVERS = ['array', 'null', 'session'];
 
     /**
      * The cache drivers that don't increment atomically, so the rate limiter can't count on them.
      */
-    protected const array NON_ATOMIC_CACHE_DRIVERS = ['file', 'array', 'null'];
+    protected const array NON_ATOMIC_CACHE_DRIVERS = ['file', 'storage', 'array', 'null', 'session'];
+
+    /**
+     * The commands that clear or rebuild a cached config, which must run even while it is misconfigured.
+     */
+    protected const array CONFIG_COMMANDS = ['config:clear', 'config:cache', 'optimize:clear', 'package:discover'];
 
     /**
      * The mail transports that never deliver.
@@ -49,6 +54,10 @@ class BootChecks
      */
     public function check(): void
     {
+        if (app()->runningConsoleCommand(self::CONFIG_COMMANDS)) {
+            return;
+        }
+
         $failures = [
             ...$this->rateLimitFailures(),
             ...$this->eventFailures(),
@@ -194,7 +203,9 @@ class BootChecks
      */
     protected function methodFailures(): array
     {
-        $clashes = array_map(fn (string $name) => "More than one credential type is named [{$name}].", $this->types->clashes());
+        $clashes = array_map(fn (string $name) => $name === CredentialTypes::RECOVERY_CODE
+            ? "The credential type name [{$name}] is reserved for Keystone's recovery codes."
+            : "More than one credential type is named [{$name}].", $this->types->clashes());
         $methods = config('keystone.methods');
 
         if ($methods === null) {
@@ -374,11 +385,11 @@ class BootChecks
         $limiter = config('cache.limiter') ?? $default;
 
         if (in_array(config("cache.stores.{$default}.driver"), self::FORGETFUL_CACHE_DRIVERS, true)) {
-            $failures[] = 'cache.default must use a store that keeps its entries, not array or null.';
+            $failures[] = 'cache.default must use a store that keeps its entries, not array, null or session.';
         }
 
         if (in_array(config("cache.stores.{$limiter}.driver"), self::NON_ATOMIC_CACHE_DRIVERS, true)) {
-            $failures[] = 'cache.limiter must use a store that increments atomically, not file, array or null.';
+            $failures[] = 'cache.limiter must use a store that increments atomically, not file, storage, array, null or session.';
         }
 
         return $failures;
