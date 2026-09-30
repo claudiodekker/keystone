@@ -4,7 +4,6 @@ namespace ClaudioDekker\Keystone\Actions;
 
 use ClaudioDekker\Keystone\Actions\Concerns\ChangesAccounts;
 use ClaudioDekker\Keystone\Credentials;
-use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\KeystoneUser;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use Illuminate\Database\Eloquent\Model;
@@ -26,12 +25,10 @@ class AddCredential
         #[\SensitiveParameter] ?string $secret,
         ?string $label = null,
     ): int {
-        return $this->changeAccount($account, fn (Model&KeystoneUser $account) => (new Credentials(Keystone::guard()->userModel()))->store(
-            $account,
-            $type,
-            identifier: $identifier,
-            secret: $secret,
-            label: $label,
-        ));
+        return $this->changeAccount($account, function (Model&KeystoneUser $account) use ($type, $identifier, $secret, $label) {
+            $credentials = new Credentials($account);
+
+            return $credentials->store($account, $type, identifier: $identifier, secret: $secret, label: $label);
+        });
     }
 }

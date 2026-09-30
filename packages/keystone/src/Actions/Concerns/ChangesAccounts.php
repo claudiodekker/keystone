@@ -46,12 +46,13 @@ trait ChangesAccounts
      */
     protected function changeAccount(Model&KeystoneUser $account, Closure $write): mixed
     {
-        $guard = Keystone::guard();
-        $connection = $guard->userModel()->getConnection();
+        $connection = $account->getConnection();
 
-        [$locked, $result] = $connection->transaction(function () use ($guard, $account, $write) {
+        [$locked, $result] = $connection->transaction(function () use ($account, $write) {
             $locked = $this->lockAccount($account);
-            $this->recipients = (new Addresses($guard->userModel()))->recipientsOf($locked);
+            $addresses = new Addresses($locked);
+
+            $this->recipients = $addresses->recipientsOf($locked);
             $this->movedFrom = null;
             $this->pendingEvents = [];
 
@@ -61,9 +62,9 @@ trait ChangesAccounts
         $movedFrom = $this->movedFrom;
         $events = $this->pendingEvents;
 
-        $connection->afterCommit(function () use ($guard, $locked, $movedFrom, $events) {
+        $connection->afterCommit(function () use ($locked, $movedFrom, $events) {
             if ($movedFrom !== null) {
-                $guard->carryOver($locked, movedFrom: $movedFrom);
+                Keystone::guard()->carryOver($locked, movedFrom: $movedFrom);
             }
 
             $recorder = new SecurityEventRecorder;
@@ -105,14 +106,9 @@ trait ChangesAccounts
     ): void {
         $recipients = $this->recipients;
 
-        $this->pendingEvents[] = fn (SecurityEventRecorder $recorder) => $recorder->record(
-            $type,
-            account: $account,
-            actor: $actor,
-            operator: $operator,
-            recipients: $recipients,
-            alert: $alert,
-        );
+        $this->pendingEvents[] = function (SecurityEventRecorder $recorder) use ($type, $account, $actor, $operator, $recipients, $alert) {
+            $recorder->record($type, account: $account, actor: $actor, operator: $operator, recipients: $recipients, alert: $alert);
+        };
     }
 
     /**
@@ -138,6 +134,6 @@ trait ChangesAccounts
     protected function lockAccount(Model&KeystoneUser $account): Model
     {
         /** @var Model&KeystoneUser */
-        return Keystone::guard()->userModel()->newQueryWithoutScopes()->whereKey($account->getKey())->lockForUpdate()->firstOrFail();
+        return $account->newQueryWithoutScopes()->whereKey($account->getKey())->lockForUpdate()->firstOrFail();
     }
 }

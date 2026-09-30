@@ -23,11 +23,10 @@ class EndEverySession
 
         $users->newQueryWithoutScopes()->toBase()->increment('credential_epoch', extra: ['credential_epoch_moved_at' => $movedAt]);
 
-        $users->getConnection()->afterCommit(fn () => (new SecurityEventRecorder)->record(
-            SecurityEventType::SESSIONS_TERMINATED,
-            actor: Actor::OPERATOR,
-            reason: 'keystone.every_account',
-            operator: $operator,
-        ));
+        $users->getConnection()->afterCommit(function () use ($operator) {
+            $recorder = new SecurityEventRecorder;
+
+            $recorder->record(SecurityEventType::SESSIONS_TERMINATED, actor: Actor::OPERATOR, reason: 'keystone.every_account', operator: $operator);
+        });
     }
 }
