@@ -61,7 +61,6 @@ class ClearSiteDataOnSessionEnd
             }
         }
 
-        /** @var list<string> $types */
         return $types;
     }
 }

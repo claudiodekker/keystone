@@ -93,7 +93,6 @@ class AddHardeningHeaders
             }
         }
 
-        /** @var list<string> $sources */
         return $sources;
     }
 
