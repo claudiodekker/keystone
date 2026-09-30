@@ -306,3 +306,94 @@ it('ends the session and regenerates the CSRF token when signing out', function 
         ->and($session->has('app-data'))->toBeFalse();
     Event::assertDispatched(Logout::class, fn (Logout $event) => $event->user->is($user));
 });
+
+describe('the absolute lifetime', function () {
+    beforeEach(function () {
+        config(['keystone.session.absolute_lifetime_seconds' => 3600]);
+    });
+
+    it('keeps a session until its lifetime from the sign-in has passed', function () {
+        $this->freezeSecond();
+        $user = User::factory()->create();
+        Auth::guard('web')->signIn($user);
+
+        $this->travel(3599)->seconds();
+
+        expect(nextRequest()->user()?->getKey())->toBe($user->getKey());
+    });
+
+    it('ends a session once its lifetime from the sign-in has passed, however active it was', function () {
+        $this->freezeSecond();
+        Auth::guard('web')->signIn(User::factory()->create());
+        $this->travel(3599)->seconds();
+        nextRequest()->user();
+
+        $this->travel(1)->seconds();
+
+        expect(nextRequest()->user())->toBeNull();
+    });
+
+    it('ends an expired session, clearing the site\'s data and flashing why', function () {
+        $this->freezeSecond();
+        Auth::guard('web')->signIn(User::factory()->create());
+        $session = app('session.store');
+        $id = $session->getId();
+
+        $this->travel(3600)->seconds();
+
+        expect(nextRequest()->user())->toBeNull()
+            ->and($session->getId())->not->toBe($id)
+            ->and($session->all())->not->toHaveKey(Auth::guard('web')->getName())
+            ->and($session->get('keystone.status'))->toBe('session-expired')
+            ->and(request()->attributes->get(KeystoneGuard::ENDED_SESSION))->toBeTrue()
+            ->and(request()->attributes->get(KeystoneGuard::EXPIRED_SESSION))->toBeTrue();
+    });
+
+    it('records the expiry on the account\'s trail', function () {
+        $this->freezeSecond();
+        $user = User::factory()->create();
+        Auth::guard('web')->signIn($user);
+
+        $this->travel(3600)->seconds();
+        nextRequest()->user();
+
+        $this->assertDatabaseHas('user_security_events', ['type' => 'session.ended', 'user_id' => $user->getKey(), 'reason' => 'expired']);
+    });
+
+    it('ends a session whose sign-in time is missing or in the future', function (mixed $signedInAt) {
+        $user = User::factory()->create();
+        Auth::guard('web')->signIn($user);
+        app('session.store')->put('keystone_signed_in_at_web', $signedInAt instanceof Closure ? $signedInAt() : $signedInAt);
+
+        expect(nextRequest()->user())->toBeNull();
+        $this->assertDatabaseHas('user_security_events', ['type' => 'session.ended', 'user_id' => $user->getKey(), 'reason' => 'expired']);
+    })->with([
+        'missing' => [null],
+        'not a timestamp' => ['yesterday'],
+        'a second ahead' => [fn () => now()->addSecond()->getTimestamp()],
+    ]);
+
+    it('never ends a session by its age when the lifetime is off', function () {
+        config(['keystone.session.absolute_lifetime_seconds' => null]);
+        $user = User::factory()->create();
+        Auth::guard('web')->signIn($user);
+        app('session.store')->forget('keystone_signed_in_at_web');
+
+        $this->travel(10)->years();
+
+        expect(nextRequest()->user()?->getKey())->toBe($user->getKey());
+    });
+
+    it('ends a session on an older epoch without calling it expired', function () {
+        $this->freezeSecond();
+        $user = User::factory()->create();
+        Auth::guard('web')->signIn($user);
+        DB::table('users')->where('id', $user->getKey())->increment('credential_epoch');
+
+        $this->travel(3600)->seconds();
+
+        expect(nextRequest()->user())->toBeNull()
+            ->and(app('session.store')->has('keystone.status'))->toBeFalse();
+        $this->assertDatabaseMissing('user_security_events', ['type' => 'session.ended']);
+    });
+});

@@ -17,6 +17,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Session Lifetime
+    |--------------------------------------------------------------------------
+    |
+    | How long a session may stay signed in, counted from the sign-in and
+    | never extended by activity. Laravel's session.lifetime still ends
+    | idle sessions sooner. A null lets a busy session live forever.
+    |
+    */
+
+    'session' => [
+        'absolute_lifetime_seconds' => 43200,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Rate Limits
     |--------------------------------------------------------------------------
     |

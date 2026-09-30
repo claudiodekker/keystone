@@ -23,6 +23,11 @@ class KeystoneGuard extends SessionGuard
     public const string ENDED_SESSION = 'keystone.ended_session';
 
     /**
+     * The request attribute set when Keystone ended the session during the request because it outlived its absolute lifetime.
+     */
+    public const string EXPIRED_SESSION = 'keystone.expired_session';
+
+    /**
      * Get the currently authenticated user.
      *
      * @return Authenticatable|null
@@ -47,6 +52,12 @@ class KeystoneGuard extends SessionGuard
 
         if (is_null($user) || ! $this->isLive($user)) {
             $this->endSession();
+
+            return null;
+        }
+
+        if ($this->hasExpired()) {
+            $this->expire($user);
 
             return null;
         }
@@ -232,6 +243,44 @@ class KeystoneGuard extends SessionGuard
     protected function epochOf(Model&KeystoneUser $account): int
     {
         return (int) $account->getRawOriginal('credential_epoch');
+    }
+
+    /**
+     * Determine if the session outlived its absolute lifetime, or has no believable sign-in time to count it from.
+     */
+    protected function hasExpired(): bool
+    {
+        if (config('keystone.session.absolute_lifetime_seconds') === null) {
+            return false;
+        }
+
+        $signedInAt = $this->signedInAt();
+
+        if (is_null($signedInAt) || $signedInAt->isFuture()) {
+            return true;
+        }
+
+        $lifetimeSeconds = config()->integer('keystone.session.absolute_lifetime_seconds');
+
+        return $signedInAt->addSeconds($lifetimeSeconds)->lessThanOrEqualTo(Date::now());
+    }
+
+    /**
+     * End the session because it outlived its absolute lifetime, recording why and telling the user.
+     */
+    protected function expire(Model&KeystoneUser $account): void
+    {
+        (new SecurityEventRecorder)->record(
+            SecurityEventType::SESSION_ENDED,
+            account: $account,
+            reason: 'expired',
+        );
+
+        $this->endSession();
+
+        $this->session->flash(Status::SESSION_KEY, Status::SESSION_EXPIRED->value);
+
+        $this->getRequest()->attributes->set(self::EXPIRED_SESSION, true);
     }
 
     /**

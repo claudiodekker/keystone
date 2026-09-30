@@ -3,21 +3,27 @@
 namespace ClaudioDekker\Keystone;
 
 use ClaudioDekker\Keystone\Actions\AccountLookup;
+use ClaudioDekker\Keystone\Actions\RespondToExpiredSession;
 use ClaudioDekker\Keystone\Http\Middleware\AddHardeningHeaders;
 use ClaudioDekker\Keystone\Http\Middleware\CaptureRequestContext;
 use ClaudioDekker\Keystone\Http\Middleware\ClearSiteDataOnSessionEnd;
 use ClaudioDekker\Keystone\Http\Middleware\RefuseCrossSiteRequests;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Auth\AuthManager;
 use Illuminate\Auth\EloquentUserProvider;
+use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Foundation\CachesConfiguration;
 use Illuminate\Contracts\Http\Kernel;
+use Illuminate\Foundation\Exceptions\Handler;
 use Illuminate\Foundation\Http\Kernel as HttpKernel;
 use Illuminate\Foundation\Http\Middleware\TrimStrings;
+use Illuminate\Http\Request;
 use Illuminate\Routing\Router;
 use Illuminate\Support\ServiceProvider;
 use LogicException;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * @api
@@ -38,6 +44,7 @@ class KeystoneServiceProvider extends ServiceProvider
 
         $this->app->singleton(CredentialTypes::class);
         $this->app->bindIf(AccountLookup::class);
+        $this->app->bindIf(RespondToExpiredSession::class);
         $this->app->scoped(RequestContext::class, fn () => new RequestContext);
     }
 
@@ -57,6 +64,12 @@ class KeystoneServiceProvider extends ServiceProvider
         }
 
         $router->pushMiddlewareToGroup('web', RefuseCrossSiteRequests::class);
+
+        $this->callAfterResolving(ExceptionHandler::class, function (ExceptionHandler $handler) {
+            if ($handler instanceof Handler) {
+                $handler->renderable($this->renderExpiredSession(...));
+            }
+        });
 
         $this->app->booted(fn (Application $app) => (new BootChecks($app->make(CredentialTypes::class)))->check());
 
@@ -108,6 +121,18 @@ class KeystoneServiceProvider extends ServiceProvider
     protected function isMap(mixed $value): bool
     {
         return is_array($value) && $value !== [] && ! array_is_list($value);
+    }
+
+    /**
+     * Respond to a request whose session expired, leaving every other unauthenticated request to the app's handler.
+     */
+    protected function renderExpiredSession(AuthenticationException $e, Request $request): ?Response
+    {
+        if (! $request->attributes->getBoolean(KeystoneGuard::EXPIRED_SESSION)) {
+            return null;
+        }
+
+        return $this->app->make(RespondToExpiredSession::class)->handle($request, $e);
     }
 
     /**

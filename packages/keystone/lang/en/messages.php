@@ -7,5 +7,6 @@ return [
 
     'status' => [
         'signed-out' => 'You have been logged out.',
+        'session-expired' => 'Your session has expired. Please sign in again.',
     ],
 ];
