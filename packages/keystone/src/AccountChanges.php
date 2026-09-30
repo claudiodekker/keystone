@@ -74,7 +74,7 @@ class AccountChanges
     protected function lock(Model&KeystoneUser $account): Model
     {
         /** @var Model&KeystoneUser */
-        return $account->newQueryWithoutScopes()->whereKey($account->getKey())->lockForUpdate()->firstOrFail();
+        return $this->guard->userModel()->newQueryWithoutScopes()->whereKey($account->getKey())->lockForUpdate()->firstOrFail();
     }
 
     /**

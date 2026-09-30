@@ -133,7 +133,7 @@ it('records the change\'s events once it commits', function () {
     changes()->change($user, function (AccountChange $change) {
         $change->record(SecurityEventType::SESSIONS_TERMINATED, actor: Actor::OPERATOR, operator: 'jane');
 
-        expect(SecurityEvent::query()->count())->toBe(0);
+        $this->assertDatabaseCount('user_security_events', 0);
     });
 
     $event = SecurityEvent::query()->sole();
