@@ -17,6 +17,7 @@ return new class extends Migration
             $table->string('type', 64);
             $table->unsignedBigInteger('user_id')->nullable();
             $table->string('actor', 16);
+            $table->string('operator', 64)->nullable();
             $table->string('flow', 32)->nullable();
             $table->string('credential_type', 64)->nullable();
             $table->unsignedBigInteger('credential_id')->nullable();
