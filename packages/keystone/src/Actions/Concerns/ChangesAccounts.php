@@ -49,16 +49,17 @@ trait ChangesAccounts
         $guard = Keystone::guard();
         $connection = $guard->userModel()->getConnection();
 
-        [$locked, $result, $movedFrom, $events] = $connection->transaction(function () use ($guard, $account, $write) {
+        [$locked, $result] = $connection->transaction(function () use ($guard, $account, $write) {
             $locked = $this->lockAccount($account);
             $this->recipients = (new Addresses($guard->userModel()))->recipientsOf($locked);
             $this->movedFrom = null;
             $this->pendingEvents = [];
 
-            $result = $write($locked);
-
-            return [$locked, $result, $this->movedFrom, $this->pendingEvents];
+            return [$locked, $write($locked)];
         });
+
+        $movedFrom = $this->movedFrom;
+        $events = $this->pendingEvents;
 
         $connection->afterCommit(function () use ($guard, $locked, $movedFrom, $events) {
             if ($movedFrom !== null) {
