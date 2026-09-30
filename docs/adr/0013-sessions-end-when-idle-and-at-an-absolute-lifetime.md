@@ -13,3 +13,5 @@ ASVS 7.1.1 asks for both an inactivity timeout and an absolute maximum session l
 - Expiry is checked when something asks for the user, not on every request. A page that never asks who is signed in keeps an expired session until one that does, the same way the epoch check works.
 - A remembered return (remember-me) will restore a fresh session with its own absolute lifetime, and no expiry notice, when its cookie is still valid; expiry never kills the remember-me token.
 - The HTML redirect is Laravel's own unauthenticated redirect, so the app's `redirectGuestsTo` still decides where it goes and the intended URL is kept.
+- There is no tolerance for clock skew: a server whose clock runs behind the one that signed the session in ends it at once. Servers behind one load balancer need synchronised clocks.
+- The JSON 401 is added through Laravel's exception handler, so an app whose handler doesn't extend `Illuminate\Foundation\Exceptions\Handler` gets its own unauthenticated response instead.

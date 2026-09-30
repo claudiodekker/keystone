@@ -312,16 +312,21 @@ describe('the absolute lifetime', function () {
         config(['keystone.session.absolute_lifetime_seconds' => 3600]);
     });
 
-    it('keeps a session until its lifetime from the sign-in has passed, however active it was', function () {
+    it('keeps a session until its lifetime from the sign-in has passed', function () {
         $this->freezeSecond();
         $user = User::factory()->create();
         Auth::guard('web')->signIn($user);
 
         $this->travel(3599)->seconds();
-        $guard = nextRequest();
-        $guard->user();
 
-        expect($guard->user()?->getKey())->toBe($user->getKey());
+        expect(nextRequest()->user()?->getKey())->toBe($user->getKey());
+    });
+
+    it('ends a session once its lifetime from the sign-in has passed, however active it was', function () {
+        $this->freezeSecond();
+        Auth::guard('web')->signIn(User::factory()->create());
+        $this->travel(3599)->seconds();
+        nextRequest()->user();
 
         $this->travel(1)->seconds();
 

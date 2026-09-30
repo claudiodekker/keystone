@@ -260,9 +260,9 @@ class KeystoneGuard extends SessionGuard
             return true;
         }
 
-        $lifetime = config()->integer('keystone.session.absolute_lifetime_seconds');
+        $lifetimeSeconds = config()->integer('keystone.session.absolute_lifetime_seconds');
 
-        return $signedInAt->addSeconds($lifetime)->lessThanOrEqualTo(Date::now());
+        return $signedInAt->addSeconds($lifetimeSeconds)->lessThanOrEqualTo(Date::now());
     }
 
     /**

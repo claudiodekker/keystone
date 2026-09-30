@@ -22,7 +22,7 @@ return [
     |
     | How long a session may stay signed in, counted from the sign-in and
     | never extended by activity. Laravel's session.lifetime still ends
-    | idle sessions sooner. A null lets an active session live forever.
+    | idle sessions sooner. A null lets a busy session live forever.
     |
     */
 

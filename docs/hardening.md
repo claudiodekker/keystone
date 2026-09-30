@@ -60,7 +60,7 @@ This check runs even when you list a Keystone route in your CSRF exceptions (`$m
 
 ## Clearing site data
 
-When Keystone ends a session, because the user signed out, its other sessions were ended (for example by a password change), or the account was deleted, suspended or invalidated, the response to that request carries `Clear-Site-Data: "cache", "storage"`. The browser then drops what it cached and stored for your site, so nothing from the ended session is left behind on a shared computer. This applies to whichever response that request gets, including one from your own routes.
+When Keystone ends a session, because the user signed out, its other sessions were ended (for example by a password change), the session outlived its [absolute lifetime](configuration.md#session-lifetime), or the account was deleted, suspended or invalidated, the response to that request carries `Clear-Site-Data: "cache", "storage"`. The browser then drops what it cached and stored for your site, so nothing from the ended session is left behind on a shared computer. This applies to whichever response that request gets, including one from your own routes.
 
 Clearing storage also drops what your app keeps there on purpose, such as preferences in `localStorage` or a service worker's offline cache. Choose the kinds of data to clear in `keystone.clear_site_data`, from `cache`, `cookies`, `storage` and `executionContexts`, or turn it off with an empty list:
 
