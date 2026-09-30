@@ -225,10 +225,11 @@ describe('the methods allow-list', function () {
 
 it('refuses a user model on another connection than the one Keystone\'s tables are migrated on', function () {
     config(['auth.providers.users.model' => UserOnOtherConnection::class]);
+    $default = config('database.default');
 
     $failures = bootFailures();
 
-    expect($failures)->toBe(['The user model\'s connection [other] isn\'t the default connection [testing] Keystone\'s tables are migrated on.']);
+    expect($failures)->toBe(["The user model's connection [other] isn't the default connection [{$default}] Keystone's tables are migrated on."]);
 });
 
 describe('in production', function () {
