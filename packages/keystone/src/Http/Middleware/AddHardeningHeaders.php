@@ -37,7 +37,7 @@ class AddHardeningHeaders
     /**
      * What a configured frame ancestor must look like: one CSP source, with nothing that could end the directive.
      */
-    public const string FRAME_ANCESTOR_PATTERN = '/^[^\s;,]+$/';
+    protected const string FRAME_ANCESTOR_PATTERN = '/^[^\s;,]+$/';
 
     /**
      * Attach the hardening floor to a Keystone response, whatever answered the request.
@@ -88,12 +88,20 @@ class AddHardeningHeaders
         }
 
         foreach ($sources as $source) {
-            if (! is_string($source) || preg_match(self::FRAME_ANCESTOR_PATTERN, $source) !== 1) {
+            if (! is_string($source) || ! static::isFrameAncestor($source)) {
                 return [];
             }
         }
 
         return $sources;
+    }
+
+    /**
+     * Determine if the value is a single CSP source a frame-ancestors directive can list.
+     */
+    public static function isFrameAncestor(string $source): bool
+    {
+        return preg_match(self::FRAME_ANCESTOR_PATTERN, $source) === 1;
     }
 
     /**

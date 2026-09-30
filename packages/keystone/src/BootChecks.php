@@ -141,7 +141,7 @@ class BootChecks
     {
         $failures = [];
 
-        if (! $this->isListOf(config('keystone.hardening.frame_ancestors'), fn (string $source) => preg_match(AddHardeningHeaders::FRAME_ANCESTOR_PATTERN, $source) === 1)) {
+        if (! $this->isListOf(config('keystone.hardening.frame_ancestors'), AddHardeningHeaders::isFrameAncestor(...))) {
             $failures[] = 'keystone.hardening.frame_ancestors must be a list of CSP sources.';
         }
 
@@ -149,7 +149,7 @@ class BootChecks
             $failures[] = 'keystone.trusted_origins must be a list of origins, such as https://example.com.';
         }
 
-        if (! $this->isListOf(config('keystone.clear_site_data'), fn (string $type) => in_array($type, ClearSiteDataOnSessionEnd::TYPES, true))) {
+        if (! $this->isListOf(config('keystone.clear_site_data'), ClearSiteDataOnSessionEnd::isClearable(...))) {
             $failures[] = 'keystone.clear_site_data must be a list drawn from cache, cookies, storage and executionContexts.';
         }
 
