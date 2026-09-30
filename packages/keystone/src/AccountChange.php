@@ -2,10 +2,13 @@
 
 namespace ClaudioDekker\Keystone;
 
+use ClaudioDekker\Keystone\Exceptions\AlreadySuspended;
+use ClaudioDekker\Keystone\Exceptions\NotSuspended;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Date;
 
 /**
  * @internal
@@ -69,6 +72,36 @@ class AccountChange
     public function endSessions(): void
     {
         $this->movesEpoch = true;
+    }
+
+    /**
+     * Bar the account from signing in and end its sessions.
+     *
+     * @throws AlreadySuspended
+     */
+    public function suspend(): void
+    {
+        if (! is_null($this->account->getRawOriginal('suspended_at'))) {
+            throw new AlreadySuspended;
+        }
+
+        $this->account->forceFill(['suspended_at' => Date::now()])->saveQuietly();
+
+        $this->endSessions();
+    }
+
+    /**
+     * Lift the account's suspension.
+     *
+     * @throws NotSuspended
+     */
+    public function unsuspend(): void
+    {
+        if (is_null($this->account->getRawOriginal('suspended_at'))) {
+            throw new NotSuspended;
+        }
+
+        $this->account->forceFill(['suspended_at' => null])->saveQuietly();
     }
 
     /**

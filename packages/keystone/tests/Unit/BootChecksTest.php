@@ -1,9 +1,9 @@
 <?php
 
 use ClaudioDekker\Keystone\BootChecks;
+use ClaudioDekker\Keystone\Exceptions\Misconfigured;
 use ClaudioDekker\Keystone\KeystoneServiceProvider;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
-use ClaudioDekker\Keystone\Misconfigured;
 use ClaudioDekker\Keystone\Tests\Fixtures\FlakyAlert;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormType;
 use ClaudioDekker\Keystone\Tests\Fixtures\UserOnOtherConnection;

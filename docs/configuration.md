@@ -75,7 +75,7 @@ The session has already ended by then, whatever you respond. If you change the r
 
 ## Boot checks
 
-Keystone checks its configuration every time your app boots, console commands included, and refuses to boot with one `ClaudioDekker\Keystone\Misconfigured` exception that lists every problem it found. Its `failures` property holds the same list.
+Keystone checks its configuration every time your app boots, console commands included, and refuses to boot with one `ClaudioDekker\Keystone\Exceptions\Misconfigured` exception that lists every problem it found. Its `failures` property holds the same list.
 
 In every environment, it refuses:
 

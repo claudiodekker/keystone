@@ -83,6 +83,8 @@ return [
 
     'notifications' => [
         'sessions.terminated' => SecurityAlert::class,
+        'account.suspended' => SecurityAlert::class,
+        'account.unsuspended' => SecurityAlert::class,
     ],
 
     /*

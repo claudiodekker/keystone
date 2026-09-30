@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Run the command up to five times, waiting longer after each failure, so a
+# registry outage (Packagist answering 502) doesn't fail the job outright.
+
+attempts=5
+
+for attempt in $(seq 1 "$attempts"); do
+    "$@" && exit 0
+
+    if [ "$attempt" -lt "$attempts" ]; then
+        echo "Attempt $attempt of $attempts failed, retrying in $((attempt * 30))s." >&2
+        sleep $((attempt * 30))
+    fi
+done
+
+exit 1

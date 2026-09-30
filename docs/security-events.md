@@ -28,6 +28,8 @@ To keep the audit trail but drop the log line, set `keystone.log_channel` to Lar
 | `signed_out` | the user signs out |
 | `session.ended` | Keystone ended a session; the reason says why (`expired` once the [absolute lifetime](configuration.md#session-lifetime) passed) |
 | `sessions.terminated` | an operator ended every session of the account, or of every account with reason `keystone.every_account` (see [Operator commands](operator-commands.md#ending-sessions)); alerts the account's owner |
+| `account.suspended` | an operator suspended the account (see [Operator commands](operator-commands.md#suspending-accounts)); alerts the account's owner |
+| `account.unsuspended` | an operator lifted the account's suspension; alerts the account's owner |
 | `limit.tripped` | a rate limit refuses its first attempt in a window; the reason names the limit (`keystone.request_limit` or `keystone.failed_attempt_limit`) |
 | `request.rejected` | a request to change something on a Keystone route is refused as cross-site; the reason is `keystone.cross_site` (see [Hardening](hardening.md)) |
 

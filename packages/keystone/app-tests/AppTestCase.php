@@ -158,12 +158,11 @@ abstract class AppTestCase extends TestCase
             ?? $this->fail("The [{$support->type()}] credential type doesn't serve {$surface->value}.");
         $arranged = $support->arrange($surface);
 
-        (new AccountChanges(Keystone::guard()))->change($account, fn (AccountChange $change) => $change->addCredential(
-            $type,
-            identifier: $arranged['identifier'],
-            secret: $arranged['secret'],
-            label: $arranged['label'],
-        ));
+        $changes = new AccountChanges(Keystone::guard());
+
+        $changes->change($account, function (AccountChange $change) use ($type, $arranged) {
+            return $change->addCredential($type, identifier: $arranged['identifier'], secret: $arranged['secret'], label: $arranged['label']);
+        });
     }
 
     /**

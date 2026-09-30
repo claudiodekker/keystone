@@ -66,14 +66,18 @@ test('the alert is a queued mail, encrypted on the queue', function () {
         ->and($alert->via(new AnonymousNotifiable))->toBe(['mail']);
 });
 
-it('is worded by its type\'s translation keys', function () {
+it('is worded by its type\'s translation keys', function (SecurityEventType $type) {
     $notifiable = (new AnonymousNotifiable)->route('mail', 'jane@example.com');
 
-    $mail = (new SecurityAlert(alertEvent()))->toMail($notifiable);
+    $mail = (new SecurityAlert(alertEvent(['type' => $type])))->toMail($notifiable);
 
-    expect($mail->subject)->toBe(__('keystone::alerts.types.sessions.terminated.subject'))
-        ->and(renderedAlert(alertEvent()))->toContain(e(__('keystone::alerts.types.sessions.terminated.what')), e(__('keystone::alerts.review')));
-});
+    expect($mail->subject)->toBe(__("keystone::alerts.types.{$type->value}.subject"))
+        ->and(renderedAlert(alertEvent(['type' => $type])))->toContain(e(__("keystone::alerts.types.{$type->value}.what")), e(__('keystone::alerts.review')));
+})->with([
+    'sessions terminated' => [SecurityEventType::SESSIONS_TERMINATED],
+    'account suspended' => [SecurityEventType::ACCOUNT_SUSPENDED],
+    'account unsuspended' => [SecurityEventType::ACCOUNT_UNSUSPENDED],
+]);
 
 it('says when, in UTC, from which IP address and where', function () {
     $this->travelTo(CarbonImmutable::parse('2026-09-30 14:05:00', 'Europe/Amsterdam'));

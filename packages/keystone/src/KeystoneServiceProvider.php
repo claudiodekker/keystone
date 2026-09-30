@@ -5,6 +5,8 @@ namespace ClaudioDekker\Keystone;
 use ClaudioDekker\Keystone\Actions\AccountLookup;
 use ClaudioDekker\Keystone\Actions\RespondToExpiredSession;
 use ClaudioDekker\Keystone\Console\EndSessionsCommand;
+use ClaudioDekker\Keystone\Console\SuspendCommand;
+use ClaudioDekker\Keystone\Console\UnsuspendCommand;
 use ClaudioDekker\Keystone\Http\Middleware\AddHardeningHeaders;
 use ClaudioDekker\Keystone\Http\Middleware\CaptureRequestContext;
 use ClaudioDekker\Keystone\Http\Middleware\ClearSiteDataOnSessionEnd;
@@ -79,7 +81,11 @@ class KeystoneServiceProvider extends ServiceProvider
         $this->app->booted(fn (Application $app) => (new BootChecks($app->make(CredentialTypes::class)))->check());
 
         if ($this->app->runningInConsole()) {
-            $this->commands([EndSessionsCommand::class]);
+            $this->commands([
+                EndSessionsCommand::class,
+                SuspendCommand::class,
+                UnsuspendCommand::class,
+            ]);
         }
 
         $this->publishes([__DIR__.'/../config/keystone.php' => config_path('keystone.php')], 'keystone-config');

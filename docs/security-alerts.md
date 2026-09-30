@@ -9,6 +9,8 @@ Alerts are queued. Run a queue worker, or they are never sent: `queue.default` s
 | Type | Alerted when |
 |---|---|
 | `sessions.terminated` | an operator ended every session of the account, unless they passed `--no-alert` (see [Operator commands](operator-commands.md#ending-sessions)); ending every account's sessions with `--all` alerts nobody |
+| `account.suspended` | an operator suspended the account (see [Operator commands](operator-commands.md#suspending-accounts)) |
+| `account.unsuspended` | an operator lifted the account's suspension |
 
 Later releases add alerts to more types.
 
