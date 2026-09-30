@@ -2,6 +2,7 @@
 
 namespace ClaudioDekker\Keystone\Console;
 
+use ClaudioDekker\Keystone\AlreadySuspended;
 use ClaudioDekker\Keystone\Jobs\SuspendAccount;
 use Illuminate\Console\Command;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -31,7 +32,7 @@ class SuspendCommand extends Command
     protected $description = 'Bar an account from signing in and end its sessions, keeping its addresses';
 
     /**
-     * Suspend the account, unless it is already suspended.
+     * Suspend the account, refusing one that already is.
      */
     public function handle(): int
     {
@@ -42,9 +43,15 @@ class SuspendCommand extends Command
             return self::FAILURE;
         }
 
-        $changed = (new SuspendAccount($account, $this->operator()))->handle();
+        try {
+            SuspendAccount::dispatchSync($account, $this->operator());
+        } catch (AlreadySuspended) {
+            $this->components->error("Account [{$id}] is already suspended.");
 
-        $this->components->info($changed ? "Suspended account [{$id}]." : "Account [{$id}] is already suspended.");
+            return self::FAILURE;
+        }
+
+        $this->components->info("Suspended account [{$id}].");
 
         return self::SUCCESS;
     }

@@ -5,6 +5,7 @@ namespace ClaudioDekker\Keystone\Jobs;
 use ClaudioDekker\Keystone\AccountChange;
 use ClaudioDekker\Keystone\AccountChanges;
 use ClaudioDekker\Keystone\Actor;
+use ClaudioDekker\Keystone\AlreadySuspended;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\KeystoneUser;
 use ClaudioDekker\Keystone\SecurityEventType;
@@ -36,18 +37,16 @@ class SuspendAccount implements ShouldQueue
     }
 
     /**
-     * Suspend the account, recording that an operator did and alerting its owner; false when it already was.
+     * Suspend the account, recording that an operator did and alerting its owner.
+     *
+     * @throws AlreadySuspended
      */
-    public function handle(): bool
+    public function handle(): void
     {
-        return (new AccountChanges(Keystone::guard()))->change($this->account, function (AccountChange $change) {
-            if (! $change->suspend()) {
-                return false;
-            }
+        (new AccountChanges(Keystone::guard()))->change($this->account, function (AccountChange $change) {
+            $change->suspend();
 
             $change->record(SecurityEventType::ACCOUNT_SUSPENDED, actor: Actor::OPERATOR, operator: $this->operator);
-
-            return true;
         });
     }
 }

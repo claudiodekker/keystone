@@ -73,33 +73,33 @@ class AccountChange
     }
 
     /**
-     * Bar the account from signing in and end its sessions, unless it is already suspended.
+     * Bar the account from signing in and end its sessions.
+     *
+     * @throws AlreadySuspended
      */
-    public function suspend(): bool
+    public function suspend(): void
     {
         if (! is_null($this->account->getRawOriginal('suspended_at'))) {
-            return false;
+            throw new AlreadySuspended;
         }
 
         $this->stampSuspended($this->account->fromDateTime(Date::now()));
 
         $this->endSessions();
-
-        return true;
     }
 
     /**
-     * Lift the account's suspension, unless it isn't suspended.
+     * Lift the account's suspension.
+     *
+     * @throws NotSuspended
      */
-    public function unsuspend(): bool
+    public function unsuspend(): void
     {
         if (is_null($this->account->getRawOriginal('suspended_at'))) {
-            return false;
+            throw new NotSuspended;
         }
 
         $this->stampSuspended(null);
-
-        return true;
     }
 
     /**

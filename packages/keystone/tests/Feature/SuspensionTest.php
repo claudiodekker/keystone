@@ -1,10 +1,12 @@
 <?php
 
 use ClaudioDekker\Keystone\Actor;
+use ClaudioDekker\Keystone\AlreadySuspended;
 use ClaudioDekker\Keystone\AppTests\AppTestCase;
 use ClaudioDekker\Keystone\Jobs\SuspendAccount;
 use ClaudioDekker\Keystone\Jobs\UnsuspendAccount;
 use ClaudioDekker\Keystone\Methods\Surface;
+use ClaudioDekker\Keystone\NotSuspended;
 use ClaudioDekker\Keystone\SecurityEvent;
 use ClaudioDekker\Keystone\SecurityEventType;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormTypeSupport;
@@ -76,13 +78,13 @@ describe('keystone:suspend', function () {
         ]);
     });
 
-    it('leaves an account that is already suspended as it is', function () {
+    it('refuses an account that is already suspended, and leaves it as it is', function () {
         $account = $this->createAccount();
         DB::table('users')->update(['suspended_at' => '2026-09-01 12:00:00']);
 
         $this->artisan('keystone:suspend', ['user' => (string) $account->getKey()])
             ->expectsOutputToContain("Account [{$account->getKey()}] is already suspended.")
-            ->assertSuccessful();
+            ->assertFailed();
 
         $this->assertDatabaseCount('user_security_events', 0);
         expect(DB::table('users')->first(['credential_epoch', 'suspended_at']))->toEqual((object) ['credential_epoch' => 0, 'suspended_at' => '2026-09-01 12:00:00']);
@@ -127,12 +129,12 @@ describe('keystone:unsuspend', function () {
         ]);
     });
 
-    it('leaves an account that isn\'t suspended as it is', function () {
+    it('refuses an account that isn\'t suspended', function () {
         $account = $this->createAccount();
 
         $this->artisan('keystone:unsuspend', ['user' => (string) $account->getKey()])
             ->expectsOutputToContain("Account [{$account->getKey()}] isn't suspended.")
-            ->assertSuccessful();
+            ->assertFailed();
 
         $this->assertDatabaseCount('user_security_events', 0);
     });
@@ -147,25 +149,16 @@ describe('keystone:unsuspend', function () {
 });
 
 describe('the suspension jobs', function () {
-    it('records a suspension once, however often the job runs', function () {
+    it('refuses to suspend an account that already is', function () {
         $account = $this->createAccount();
-
-        SuspendAccount::dispatchSync($account, operator: 'jane@ops');
         SuspendAccount::dispatchSync($account, operator: 'jane@ops');
 
-        $this->assertDatabaseCount('user_security_events', 1);
-        $this->assertDatabaseHas('user_security_events', ['type' => SecurityEventType::ACCOUNT_SUSPENDED->value]);
-        expect(DB::table('users')->value('credential_epoch'))->toEqual(1);
-    });
+        SuspendAccount::dispatchSync($account, operator: 'jane@ops');
+    })->throws(AlreadySuspended::class);
 
-    it('records an unsuspension once, however often the job runs', function () {
+    it('refuses to unsuspend an account that isn\'t suspended', function () {
         $account = $this->createAccount();
-        DB::table('users')->update(['suspended_at' => now()]);
 
         UnsuspendAccount::dispatchSync($account, operator: 'jane@ops');
-        UnsuspendAccount::dispatchSync($account, operator: 'jane@ops');
-
-        $this->assertDatabaseCount('user_security_events', 1);
-        $this->assertDatabaseHas('user_security_events', ['type' => SecurityEventType::ACCOUNT_UNSUSPENDED->value]);
-    });
+    })->throws(NotSuspended::class);
 });

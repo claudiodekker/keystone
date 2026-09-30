@@ -7,6 +7,7 @@ use ClaudioDekker\Keystone\AccountChanges;
 use ClaudioDekker\Keystone\Actor;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\KeystoneUser;
+use ClaudioDekker\Keystone\NotSuspended;
 use ClaudioDekker\Keystone\SecurityEventType;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Model;
@@ -36,18 +37,16 @@ class UnsuspendAccount implements ShouldQueue
     }
 
     /**
-     * Unsuspend the account, recording that an operator did and alerting its owner; false when it wasn't suspended.
+     * Unsuspend the account, recording that an operator did and alerting its owner.
+     *
+     * @throws NotSuspended
      */
-    public function handle(): bool
+    public function handle(): void
     {
-        return (new AccountChanges(Keystone::guard()))->change($this->account, function (AccountChange $change) {
-            if (! $change->unsuspend()) {
-                return false;
-            }
+        (new AccountChanges(Keystone::guard()))->change($this->account, function (AccountChange $change) {
+            $change->unsuspend();
 
             $change->record(SecurityEventType::ACCOUNT_UNSUSPENDED, actor: Actor::OPERATOR, operator: $this->operator);
-
-            return true;
         });
     }
 }

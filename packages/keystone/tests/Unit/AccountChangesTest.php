@@ -54,9 +54,10 @@ function storeCredential(User $user, string $secret = 'old-hash'): StoredCredent
     return new StoredCredential($id, identifier: null, secret: $secret, label: null);
 }
 
-test('the credential epoch moves only for a change that removes, replaces or ends something', function (Closure $apply, bool $moves) {
+test('the credential epoch moves only for a change that removes, replaces or ends something', function (Closure $apply, bool $moves, ?string $suspendedAt = null) {
     $this->freezeSecond();
     $user = User::factory()->create();
+    DB::table('users')->where('id', $user->getKey())->update(['suspended_at' => $suspendedAt]);
     $credential = storeCredential($user);
 
     changes()->change($user, fn (AccountChange $change) => $apply($change, $credential));
@@ -71,7 +72,7 @@ test('the credential epoch moves only for a change that removes, replaces or end
     'a rehash' => [fn (AccountChange $change, StoredCredential $credential) => $change->rehash($credential, type: 'form', secret: 'new-hash'), false],
     'ending sessions' => [fn (AccountChange $change) => $change->endSessions(), true],
     'suspending' => [fn (AccountChange $change) => $change->suspend(), true],
-    'unsuspending' => [fn (AccountChange $change) => $change->unsuspend(), false],
+    'unsuspending' => [fn (AccountChange $change) => $change->unsuspend(), false, '2026-09-01 12:00:00'],
 ]);
 
 it('moves the epoch once however many times the change ends sessions', function () {

@@ -63,7 +63,7 @@ php artisan keystone:unsuspend 42 --operator="jane@ops"
 
 Unsuspending doesn't bring back the sessions that suspending ended.
 
-Each command records `account.suspended` or `account.unsuspended` [security events](security-events.md) with actor `operator` and the `--operator` you give, and [alerts the owner](security-alerts.md). Suspending an account that is already suspended, or unsuspending one that isn't, changes nothing and records nothing.
+Each command records `account.suspended` or `account.unsuspended` [security events](security-events.md) with actor `operator` and the `--operator` you give, and [alerts the owner](security-alerts.md). Suspending an account that is already suspended, or unsuspending one that isn't, is refused: the command fails and nothing is recorded.
 
 ### From an admin panel
 
@@ -77,3 +77,5 @@ SuspendAccount::dispatch($user, operator: $request->user()->email);
 
 UnsuspendAccount::dispatch($user, operator: $request->user()->email);
 ```
+
+The jobs refuse an account already in the state they would put it in: `SuspendAccount` throws `ClaudioDekker\Keystone\AlreadySuspended`, and `UnsuspendAccount` throws `ClaudioDekker\Keystone\NotSuspended`. Queued, that fails the job; dispatched with `dispatchSync()`, the exception reaches your code.

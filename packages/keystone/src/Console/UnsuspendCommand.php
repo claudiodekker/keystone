@@ -3,6 +3,7 @@
 namespace ClaudioDekker\Keystone\Console;
 
 use ClaudioDekker\Keystone\Jobs\UnsuspendAccount;
+use ClaudioDekker\Keystone\NotSuspended;
 use Illuminate\Console\Command;
 use Symfony\Component\Console\Attribute\AsCommand;
 
@@ -31,7 +32,7 @@ class UnsuspendCommand extends Command
     protected $description = 'Let a suspended account sign in again';
 
     /**
-     * Unsuspend the account, unless it isn't suspended.
+     * Unsuspend the account, refusing one that isn't suspended.
      */
     public function handle(): int
     {
@@ -42,9 +43,15 @@ class UnsuspendCommand extends Command
             return self::FAILURE;
         }
 
-        $changed = (new UnsuspendAccount($account, $this->operator()))->handle();
+        try {
+            UnsuspendAccount::dispatchSync($account, $this->operator());
+        } catch (NotSuspended) {
+            $this->components->error("Account [{$id}] isn't suspended.");
 
-        $this->components->info($changed ? "Unsuspended account [{$id}]." : "Account [{$id}] isn't suspended.");
+            return self::FAILURE;
+        }
+
+        $this->components->info("Unsuspended account [{$id}].");
 
         return self::SUCCESS;
     }
