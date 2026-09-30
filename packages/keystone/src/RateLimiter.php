@@ -124,17 +124,26 @@ class RateLimiter
         $limits = $this->failedAttemptLimits($flow, $type, $this->subject($account, $identifier));
 
         try {
-            $counts = array_map(fn (array $limit) => $this->counter()->increment($limit['key'], $limit['window_seconds']), $limits);
+            $counts = [];
+            $incremented = [];
+
+            // The ceiling counts only attempts the hourly limit let through, so a spent hour can't burn the day's allowance.
+            foreach ($limits as $index => $limit) {
+                $hourSpent = $index > 0 && $counts[0] > $limits[0]['allowance'];
+                $counts[$index] = $hourSpent ? (int) $this->counter()->attempts($limit['key']) : $this->counter()->increment($limit['key'], $limit['window_seconds']);
+                $incremented[$index] = ! $hourSpent;
+            }
+
             $spent = array_filter($limits, fn (array $limit, int $index) => $counts[$index] > $limit['allowance'], ARRAY_FILTER_USE_BOTH);
             $retryAfterSeconds = $this->retryAfter(array_column($spent, 'key'));
-            $taken = array_map(fn (array $limit) => new TakenCount($limit['key'], $limit['window_seconds'], $this->windowEndsAt($limit['key'])), $limits);
+            $taken = array_map(fn (array $limit) => new TakenCount($limit['key'], windowSeconds: $limit['window_seconds'], windowEndsAt: $this->windowEndsAt($limit['key'])), $limits);
         } catch (Throwable $e) {
             report($e);
 
             throw new Throttled(self::OUTAGE_RETRY_AFTER_SECONDS);
         }
 
-        $tripped = array_filter($limits, fn (array $limit, int $index) => $counts[$index] === $limit['allowance'] + 1, ARRAY_FILTER_USE_BOTH);
+        $tripped = array_filter($limits, fn (array $limit, int $index) => $incremented[$index] && $counts[$index] === $limit['allowance'] + 1, ARRAY_FILTER_USE_BOTH);
 
         if ($tripped !== []) {
             $this->recorder->record(

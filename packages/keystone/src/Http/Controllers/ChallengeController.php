@@ -146,7 +146,7 @@ abstract class ChallengeController extends Controller
         $decision = new SignInDecision;
         $offer = $decision->challengeOffer($pending->account, $pending->firstFactor);
 
-        if ($offer === [] && ! $decision->holdsSecondFactor($pending->account)) {
+        if ($offer === [] && ! $decision->holdsSecondFactor($pending->account, $pending->firstFactor)) {
             Keystone::guard()->forgetPending();
 
             return $this->refuseWithoutChallenge();

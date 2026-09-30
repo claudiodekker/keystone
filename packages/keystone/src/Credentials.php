@@ -81,12 +81,13 @@ class Credentials
     }
 
     /**
-     * Determine if the account holds a usable credential stamped as serving the challenge when it was stored, whatever keystone.methods lists now.
+     * Determine if the account holds a usable credential of another type than the first factor's, stamped as serving the challenge when it was stored, whatever keystone.methods lists now.
      */
-    public function holdsSecondFactor(int|string $accountId): bool
+    public function holdsSecondFactor(int|string $accountId, string $firstFactor): bool
     {
         return $this->query()
             ->where('user_id', $accountId)
+            ->where('type', '!=', $firstFactor)
             ->where('served_challenge', true)
             ->whereNull('disabled_at')
             ->exists();

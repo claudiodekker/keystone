@@ -85,7 +85,7 @@ it('lists the types the account holds a usable credential of, once each', functi
     expect($credentials->typesOf($jane->getKey()))->toBe(['form']);
 });
 
-it('tells whether the account holds a usable credential stamped as serving the challenge', function () {
+it('tells whether the account holds a usable credential of another type than the first factor\'s, stamped as serving the challenge', function () {
     [$held, $firstFactorOnly, $disabled, $other] = User::factory()->count(4)->create();
     $credentials = credentials();
     $credentials->store($held, new FormType(name: 'unlisted', surfaces: ['challenge']), identifier: null, secret: 'secret');
@@ -94,7 +94,8 @@ it('tells whether the account holds a usable credential stamped as serving the c
     DB::table('user_credentials')->where('id', $id)->update(['disabled_at' => now()]);
     $credentials->store($other, new FormType(surfaces: ['challenge']), identifier: null, secret: 'secret');
 
-    expect($credentials->holdsSecondFactor($held->getKey()))->toBeTrue()
-        ->and($credentials->holdsSecondFactor($firstFactorOnly->getKey()))->toBeFalse()
-        ->and($credentials->holdsSecondFactor($disabled->getKey()))->toBeFalse();
+    expect($credentials->holdsSecondFactor($held->getKey(), 'form'))->toBeTrue()
+        ->and($credentials->holdsSecondFactor($held->getKey(), 'unlisted'))->toBeFalse()
+        ->and($credentials->holdsSecondFactor($firstFactorOnly->getKey(), 'other'))->toBeFalse()
+        ->and($credentials->holdsSecondFactor($disabled->getKey(), 'other'))->toBeFalse();
 });

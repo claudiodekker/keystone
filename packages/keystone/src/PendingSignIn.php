@@ -28,12 +28,4 @@ readonly class PendingSignIn
     ) {
         //
     }
-
-    /**
-     * Get the time the pending sign-in ends.
-     */
-    public function endsAt(): CarbonImmutable
-    {
-        return $this->heldAt->addSeconds(self::LIFETIME_SECONDS);
-    }
 }

@@ -12,7 +12,7 @@ Keystone rate limits its own endpoints. Nothing in your routes, middleware or co
 
 Change the allowances in `keystone.rate_limits` (see [Configuration](configuration.md)). Each must be a whole number of at least 1: no value turns a limit off.
 
-A six-digit code is easy enough to guess that wrong [TOTP](totp.md) codes share one count across every flow behind a first factor, so moving between the challenge and other flows gets an attacker no fresh guesses. The hourly allowance is `failed_attempts_per_hour`; the 100-a-day ceiling is fixed. Wrong answers at the challenge never touch the first factor's count, and cancelling a challenge resets nothing.
+A six-digit code is easy enough to guess that wrong [TOTP](totp.md) codes share one count across every flow behind a first factor, so moving between the challenge and other flows gets an attacker no fresh guesses. The hourly allowance is `failed_attempts_per_hour`; the 100-a-day ceiling is fixed, and counts only the wrong codes the hourly limit let through, so hammering a spent hour can't lock the account out for the day. Wrong answers at the challenge never touch the first factor's count, and cancelling a challenge resets nothing.
 
 The request limit is checked before anything else, so even invalid input or an unknown credential type is throttled. It is taken before your controller's action runs, so it still applies when you replace an action such as `show()` or `store()` in your published controller. A wrong answer counts against the account the typed identifier names; an identifier that names no account gets a bucket of its own, so a made-up address locks exactly like a real one.
 

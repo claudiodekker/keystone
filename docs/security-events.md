@@ -25,7 +25,7 @@ To keep the audit trail but drop the log line, set `keystone.log_channel` to Lar
 |---|---|
 | `signed_in` | a session signs in |
 | `sign_in.held` | a first factor is proven for an account that owes the [second-factor challenge](challenge.md); the reason is `keystone.challenge`, and the credential is the first factor |
-| `sign_in.voided` | a held sign-in is dropped because its account was suspended or deleted, or its sessions were ended, before the challenge was answered |
+| `sign_in.voided` | a pending sign-in is dropped because its account was suspended or soft-deleted, or its sessions were ended, before the challenge was answered |
 | `proof.rejected` | a sign-in naming an account, or an answer to its challenge, is refused: a rejected proof, a proof naming a credential the account doesn't hold, an answer of the first factor's type (`keystone.first_factor`), or an account that is suspended |
 | `signed_out` | the user signs out |
 | `session.ended` | Keystone ended a session; the reason says why (`expired` once the [absolute lifetime](configuration.md#session-lifetime) passed) |

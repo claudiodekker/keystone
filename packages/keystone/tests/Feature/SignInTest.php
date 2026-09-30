@@ -191,6 +191,33 @@ describe('updated secrets', function () {
         'disabled' => fn () => ['disabled_at' => now()],
     ]);
 
+    it('stores the secret an advanced proof moves its credential on to', function () {
+        $account = $this->createAccount();
+        $id = DB::table('user_credentials')->insertGetId(['user_id' => $account->getKey(), 'type' => 'rogue', 'secret' => Crypt::encryptString('step-1')]);
+        $this->app->make(CredentialTypes::class)->register(new RogueType(fn () => Proof::advanced(new StoredCredential($id, identifier: null, secret: 'step-1', label: null), 'step-2')));
+
+        $this->post(route('login.submit', ['type' => 'rogue']), ['identifier' => 'jane@example.com']);
+
+        $this->assertAuthenticatedAs($account);
+        expect(Crypt::decryptString(DB::table('user_credentials')->where('id', $id)->value('secret')))->toBe('step-2');
+    });
+
+    it('refuses an advanced proof once another proof moved its credential on first', function () {
+        $account = $this->createAccount();
+        $id = DB::table('user_credentials')->insertGetId(['user_id' => $account->getKey(), 'type' => 'rogue', 'secret' => Crypt::encryptString('step-1')]);
+        $this->app->make(CredentialTypes::class)->register(new RogueType(function () use ($id) {
+            DB::table('user_credentials')->where('id', $id)->update(['secret' => Crypt::encryptString('step-2')]);
+
+            return Proof::advanced(new StoredCredential($id, identifier: null, secret: 'step-1', label: null), 'step-2');
+        }));
+
+        $response = $this->post(route('login.submit', ['type' => 'rogue']), ['identifier' => 'jane@example.com']);
+
+        $response->assertSessionHasErrors('identifier');
+        $this->assertGuest();
+        $this->assertDatabaseHas('user_security_events', ['type' => 'proof.rejected', 'credential_id' => $id, 'reason' => 'keystone.superseded']);
+    });
+
     it('makes and stores no updated secret when the account is refused', function () {
         $account = $this->createAccount();
         $id = DB::table('user_credentials')->insertGetId(['user_id' => $account->getKey(), 'type' => 'rogue', 'secret' => Crypt::encryptString('verified')]);

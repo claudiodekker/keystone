@@ -253,6 +253,31 @@ describe('failed-attempt limit', function () {
         expect(retryAfter(fn () => failSharedTimes(limiter(), 1)))->toBeNull();
     });
 
+    it('leaves the day\'s ceiling alone while the hour is spent', function () {
+        failSharedTimes(limiter(), 20);
+        foreach (range(1, 100) as $ignored) {
+            retryAfter(fn () => failSharedTimes(limiter(), 1));
+        }
+
+        $this->travel(1)->hour();
+
+        expect(retryAfter(fn () => failSharedTimes(limiter(), 1)))->toBeNull();
+    });
+
+    it('records each trip once, however often the spent hour refuses after the ceiling is spent', function () {
+        Event::fake([SecurityEventRecorded::class]);
+        foreach (range(1, 5) as $ignored) {
+            failSharedTimes(limiter(), 20);
+            $this->travel(1)->hour();
+        }
+
+        foreach (range(1, 30) as $ignored) {
+            retryAfter(fn () => failSharedTimes(limiter(), 1));
+        }
+
+        Event::assertDispatchedTimes(SecurityEventRecorded::class, 2);
+    });
+
     it('gives back a sharing type\'s attempt to the day\'s ceiling too', function () {
         foreach (range(1, 4) as $ignored) {
             failSharedTimes(limiter(), 20);

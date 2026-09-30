@@ -30,6 +30,17 @@ describe('the hold', function () {
         $this->assertAuthenticatedAs($account);
     });
 
+    it('signs in without a challenge an account whose only challenge credential is of the first factor\'s type', function () {
+        $this->app->make(CredentialTypes::class)->register(new FormType(name: 'both', surfaces: ['sign-in', 'challenge']));
+        $account = $this->createAccount();
+        $this->arrangeCredential($account, new FormTypeSupport('both'), Surface::CHALLENGE);
+
+        $response = $this->post(route('login.submit', ['type' => 'both']), ['identifier' => 'jane@example.com', ...(new FormTypeSupport('both'))->validProof(Surface::SIGN_IN)]);
+
+        $response->assertRedirect('/');
+        $this->assertAuthenticatedAs($account);
+    });
+
     it('holds for a challenge an account whose only second factor is of a type keystone.methods no longer lists', function () {
         $this->createChallengedAccount(new FormTypeSupport('code'));
         config(['keystone.methods' => ['form']]);
@@ -100,7 +111,31 @@ describe('the challenge page', function () {
 
         $this->post(route('login.challenge.submit', ['type' => 'code']), (new FormTypeSupport('code'))->validProof(Surface::CHALLENGE))->assertRedirectToRoute('login');
         $this->assertGuest();
+        $this->assertDatabaseHas('user_security_events', ['type' => 'sign_in.voided', 'user_id' => $account->getKey()]);
     });
+
+    it('drops a held sign-in stamped after now, as when the clock moved back', function () {
+        $this->freezeSecond();
+        $this->createChallengedAccount(new FormTypeSupport('code'));
+        $this->passFirstFactor();
+        $this->travel(-1)->seconds();
+
+        $response = $this->get(route('login.challenge'));
+
+        $response->assertRedirectToRoute('login');
+        $this->assertDatabaseMissing('user_security_events', ['type' => 'sign_in.voided']);
+    });
+
+    it('sends a signed-in user away from answering and cancelling', function (string $method, string $route) {
+        $account = $this->createAccount();
+        $this->arrangeCredential($account, new FormTypeSupport, Surface::SIGN_IN);
+        $this->passFirstFactor();
+
+        $response = $this->{$method}(route($route, ['type' => 'code']), (new FormTypeSupport('code'))->validProof(Surface::CHALLENGE));
+
+        $response->assertRedirect('/');
+        $this->assertAuthenticatedAs($account);
+    })->with(['answering' => ['post', 'login.challenge.submit'], 'cancelling' => ['delete', 'login.challenge.cancel']]);
 });
 
 describe('answers', function () {

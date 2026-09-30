@@ -26,7 +26,7 @@ class SignInDecision
     {
         return match (true) {
             $this->isBarred($account) => Demand::REFUSE,
-            ! $proven->representsMultipleFactors() && $this->holdsSecondFactor($account) => Demand::CHALLENGE,
+            ! $proven->representsMultipleFactors() && $this->holdsSecondFactor($account, $proven->name()) => Demand::CHALLENGE,
             default => Demand::SIGN_IN,
         };
     }
@@ -47,11 +47,11 @@ class SignInDecision
     }
 
     /**
-     * Determine if the account holds a second factor, counting stamped credentials of types keystone.methods no longer lists.
+     * Determine if the account holds a second factor besides the first factor's type, counting stamped credentials of types keystone.methods no longer lists.
      */
-    public function holdsSecondFactor(Model&KeystoneUser $account): bool
+    public function holdsSecondFactor(Model&KeystoneUser $account, string $firstFactor): bool
     {
-        return (new Credentials($account))->holdsSecondFactor($account->getKey());
+        return (new Credentials($account))->holdsSecondFactor($account->getKey(), $firstFactor);
     }
 
     /**
