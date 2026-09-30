@@ -31,19 +31,22 @@ class AccountChanges
      */
     public function change(Model&KeystoneUser $account, Closure $apply): mixed
     {
-        $connection = $this->guard->userModel()->getConnection();
+        $connection = $account->getConnection();
 
         [$change, $result, $movedFrom] = $connection->transaction(function () use ($account, $apply) {
             $locked = $this->lock($account);
-            $recipients = (new Addresses($this->guard->userModel()))->recipientsOf($locked);
-            $change = new AccountChange($locked, $recipients, new Credentials($this->guard->userModel()));
+            $addresses = new Addresses($locked);
+            $recipients = $addresses->recipientsOf($locked);
+            $change = new AccountChange($locked, $recipients, new Credentials($locked));
             $result = $apply($change);
             $movedFrom = $change->movesEpoch() ? $this->moveEpoch($locked) : null;
 
             return [$change, $result, $movedFrom];
         });
 
-        $connection->afterCommit(fn () => $this->committed($change, $movedFrom));
+        $connection->afterCommit(function () use ($change, $movedFrom) {
+            $this->committed($change, $movedFrom);
+        });
 
         return $result;
     }
@@ -58,12 +61,9 @@ class AccountChanges
 
         $users->newQueryWithoutScopes()->toBase()->increment('credential_epoch', extra: ['credential_epoch_moved_at' => $movedAt]);
 
-        $users->getConnection()->afterCommit(fn () => $this->recorder->record(
-            SecurityEventType::SESSIONS_TERMINATED,
-            actor: Actor::OPERATOR,
-            reason: 'keystone.every_account',
-            operator: $operator,
-        ));
+        $users->getConnection()->afterCommit(function () use ($operator) {
+            $this->recorder->record(SecurityEventType::SESSIONS_TERMINATED, actor: Actor::OPERATOR, reason: 'keystone.every_account', operator: $operator);
+        });
     }
 
     /**
@@ -74,7 +74,7 @@ class AccountChanges
     protected function lock(Model&KeystoneUser $account): Model
     {
         /** @var Model&KeystoneUser */
-        return $this->guard->userModel()->newQueryWithoutScopes()->whereKey($account->getKey())->lockForUpdate()->firstOrFail();
+        return $account->newQueryWithoutScopes()->whereKey($account->getKey())->lockForUpdate()->firstOrFail();
     }
 
     /**

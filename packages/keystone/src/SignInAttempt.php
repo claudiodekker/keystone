@@ -167,7 +167,11 @@ class SignInAttempt
         rescue(function () use ($account, $type, $proof, $credential) {
             $secret = value($proof->updatedSecret);
 
-            (new AccountChanges($this->guard))->change($account, fn (AccountChange $change) => $change->rehash($credential, type: $type->name(), secret: $secret));
+            $changes = new AccountChanges($this->guard);
+
+            $changes->change($account, function (AccountChange $change) use ($credential, $type, $secret) {
+                return $change->rehash($credential, type: $type->name(), secret: $secret);
+            });
         });
     }
 
