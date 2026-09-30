@@ -11,6 +11,8 @@ enum Status: string
 {
     case SIGNED_OUT = 'signed-out';
     case SESSION_EXPIRED = 'session-expired';
+    case SIGN_IN_CANCELLED = 'sign-in-cancelled';
+    case SECOND_FACTOR_UNAVAILABLE = 'second-factor-unavailable';
 
     /**
      * The session key the status is flashed under.

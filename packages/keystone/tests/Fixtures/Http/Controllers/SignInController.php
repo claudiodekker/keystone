@@ -20,6 +20,11 @@ class SignInController extends Controller
         return to_route('login')->withErrors([self::IDENTIFIER => $message]);
     }
 
+    protected function sendChallengeOwed(Request $request): RedirectResponse
+    {
+        return to_route('login.challenge');
+    }
+
     protected function sendSignedIn(Request $request, string $intendedUrl): RedirectResponse
     {
         return redirect($intendedUrl);

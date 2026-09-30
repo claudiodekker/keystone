@@ -5,6 +5,7 @@ namespace ClaudioDekker\Keystone;
 use ClaudioDekker\Keystone\Exceptions\Misconfigured;
 use ClaudioDekker\Keystone\Http\Middleware\AddHardeningHeaders;
 use ClaudioDekker\Keystone\Http\Middleware\ClearSiteDataOnSessionEnd;
+use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
 use Illuminate\Database\Eloquent\Model;
@@ -68,6 +69,7 @@ class BootChecks
             ...$this->ipLocationFailures(),
             ...$this->hardeningFailures(),
             ...$this->methodFailures(),
+            ...$this->typeFailures(),
             ...$this->connectionFailures(),
             ...(app()->isProduction() ? $this->productionFailures() : []),
         ];
@@ -305,6 +307,18 @@ class BootChecks
         }
 
         return $failures;
+    }
+
+    /**
+     * Check every registered type's own configuration.
+     *
+     * @return list<string>
+     */
+    protected function typeFailures(): array
+    {
+        $failures = array_map(fn (CredentialType $type) => $type->configFailures(), $this->types->all());
+
+        return array_merge(...$failures);
     }
 
     /**

@@ -12,9 +12,18 @@ class FormTypeSupport implements CredentialTypeSupport
      */
     protected const string SECRET = 'correct horse battery staple';
 
+    /**
+     * Create a new form type support instance.
+     */
+    public function __construct(
+        protected string $type = 'form',
+    ) {
+        //
+    }
+
     public function type(): string
     {
-        return 'form';
+        return $this->type;
     }
 
     public function arrange(Surface $surface): array

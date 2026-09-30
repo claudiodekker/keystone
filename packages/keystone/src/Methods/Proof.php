@@ -21,6 +21,7 @@ readonly class Proof
         public ?int $credentialId,
         public ?string $reason,
         public ?Closure $updatedSecret = null,
+        #[\SensitiveParameter] public ?string $advancedSecret = null,
     ) {
         //
     }
@@ -33,6 +34,14 @@ readonly class Proof
     public static function proven(StoredCredential $credential, ?Closure $updatedSecret = null): static
     {
         return new static(proven: true, credentialId: $credential->id, reason: null, updatedSecret: $updatedSecret);
+    }
+
+    /**
+     * Prove the stored credential by moving its secret on, which core stores before the proof counts, refusing the proof when another moved it first.
+     */
+    public static function advanced(StoredCredential $credential, #[\SensitiveParameter] string $secret): static
+    {
+        return new static(proven: true, credentialId: $credential->id, reason: null, advancedSecret: $secret);
     }
 
     /**

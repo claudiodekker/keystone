@@ -8,7 +8,8 @@
         "ext-intl": "*",
         "illuminate/support": "^13.0",
         "inertiajs/inertia-laravel": "^3.0",
-        "laravel/wayfinder": "^0.1.14"
+        "laravel/wayfinder": "^0.1.14",
+        "paragonie/constant_time_encoding": "^3.1"
     },
     "require-dev": {
         "larastan/larastan": "^3.12",
@@ -21,7 +22,8 @@
     "replace": {
         "claudiodekker/keystone": "self.version",
         "claudiodekker/keystone-inertia-vue": "self.version",
-        "claudiodekker/keystone-password": "self.version"
+        "claudiodekker/keystone-password": "self.version",
+        "claudiodekker/keystone-totp": "self.version"
     },
     "repositories": [
         {
@@ -33,7 +35,8 @@
         "psr-4": {
             "ClaudioDekker\\Keystone\\": "packages/keystone/src/",
             "ClaudioDekker\\Keystone\\InertiaVue\\": "packages/keystone-inertia-vue/src/",
-            "ClaudioDekker\\Keystone\\Password\\": "packages/keystone-password/src/"
+            "ClaudioDekker\\Keystone\\Password\\": "packages/keystone-password/src/",
+            "ClaudioDekker\\Keystone\\Totp\\": "packages/keystone-totp/src/"
         }
     },
     "autoload-dev": {
@@ -45,6 +48,8 @@
             "ClaudioDekker\\Keystone\\Password\\AppTests\\": "packages/keystone-password/app-tests/",
             "ClaudioDekker\\Keystone\\Password\\Tests\\": "packages/keystone-password/tests/",
             "ClaudioDekker\\Keystone\\Tests\\": "packages/keystone/tests/",
+            "ClaudioDekker\\Keystone\\Totp\\AppTests\\": "packages/keystone-totp/app-tests/",
+            "ClaudioDekker\\Keystone\\Totp\\Tests\\": "packages/keystone-totp/tests/",
             "Tests\\": "tests/",
             "Workbench\\App\\": "workbench/app/",
             "Workbench\\Database\\Seeders\\": "workbench/database/seeders/"

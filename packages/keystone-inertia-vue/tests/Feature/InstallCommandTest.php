@@ -65,10 +65,13 @@ it('copies the stubs into the app', function () {
     expect("{$app}/app/Http/Controllers/Auth/SignInController.php")->toBeFile()
         ->and("{$app}/app/Http/Controllers/Auth/SignOutController.php")->toBeFile()
         ->and("{$app}/routes/keystone.php")->toBeFile()
+        ->and("{$app}/app/Http/Controllers/Auth/ChallengeController.php")->toBeFile()
         ->and("{$app}/resources/js/pages/auth/Login.vue")->toBeFile()
+        ->and("{$app}/resources/js/pages/auth/Challenge.vue")->toBeFile()
         ->and("{$app}/resources/js/partials/shapes/Form.vue")->toBeFile()
         ->and("{$app}/resources/js/types/auth.ts")->toBeFile()
         ->and("{$app}/tests/Keystone/Assertions/SignInAssertions.php")->toBeFile()
+        ->and("{$app}/tests/Keystone/Assertions/ChallengeAssertions.php")->toBeFile()
         ->and(file_get_contents("{$app}/routes/keystone.php"))->toBe(file_get_contents(StubsTestCase::STUBS.'/routes/keystone.php'));
 });
 
@@ -85,10 +88,11 @@ it('copies the partials of installed credential types only', function () {
 
     expect("{$app}/resources/js/partials/Password.vue")->toBeFile()
         ->and("{$app}/resources/js/components/PasswordField.vue")->toBeFile()
+        ->and("{$app}/resources/js/partials/Totp.vue")->toBeFile()
         ->and("{$app}/resources/js/partials/NotInstalled.vue")->not->toBeFile();
 });
 
-it('installs without keystone-password, leaving out its partial and field', function () {
+it('installs without any method package, leaving out their partials and fields', function () {
     $app = freshApp();
     app()->instance(CredentialTypes::class, new CredentialTypes);
 
@@ -96,7 +100,8 @@ it('installs without keystone-password, leaving out its partial and field', func
 
     expect("{$app}/resources/js/pages/auth/Login.vue")->toBeFile()
         ->and("{$app}/resources/js/partials/Password.vue")->not->toBeFile()
-        ->and("{$app}/resources/js/components/PasswordField.vue")->not->toBeFile();
+        ->and("{$app}/resources/js/components/PasswordField.vue")->not->toBeFile()
+        ->and("{$app}/resources/js/partials/Totp.vue")->not->toBeFile();
 });
 
 it('never copies the Wayfinder output generated at build', function () {
@@ -207,6 +212,7 @@ it('registers the Keystone testsuite once', function () {
         ->and(array_map('strval', $suites[0]->xpath('directory')))->toBe([
             'vendor/claudiodekker/keystone/app-tests',
             'vendor/claudiodekker/keystone-password/app-tests',
+            'vendor/claudiodekker/keystone-totp/app-tests',
             'vendor/claudiodekker/keystone-inertia-vue/app-tests',
         ]);
 });
@@ -221,6 +227,7 @@ it('maps the AppTests\' namespaces in the app\'s autoload-dev only', function ()
         'Tests\\' => 'tests/',
         'ClaudioDekker\\Keystone\\AppTests\\' => 'vendor/claudiodekker/keystone/app-tests/',
         'ClaudioDekker\\Keystone\\Password\\AppTests\\' => 'vendor/claudiodekker/keystone-password/app-tests/',
+        'ClaudioDekker\\Keystone\\Totp\\AppTests\\' => 'vendor/claudiodekker/keystone-totp/app-tests/',
         'ClaudioDekker\\Keystone\\InertiaVue\\AppTests\\' => 'vendor/claudiodekker/keystone-inertia-vue/app-tests/',
     ])->and($manifest['autoload']['psr-4'])->not->toHaveKey('ClaudioDekker\\Keystone\\AppTests\\');
 });

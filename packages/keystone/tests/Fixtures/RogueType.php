@@ -10,7 +10,7 @@ use ClaudioDekker\Keystone\Methods\Surface;
 use Closure;
 
 /**
- * A sign-in type whose verify answers whatever the test tells it to, and records what it was given.
+ * A type whose verify answers whatever the test tells it to, and records what it was given.
  */
 class RogueType implements CredentialType
 {
@@ -25,9 +25,11 @@ class RogueType implements CredentialType
      * Create a new rogue type instance.
      *
      * @param  Closure(): Proof  $answer
+     * @param  list<value-of<Surface>>  $surfaces
      */
     public function __construct(
         protected Closure $answer,
+        protected array $surfaces = ['sign-in'],
     ) {
         //
     }
@@ -39,12 +41,22 @@ class RogueType implements CredentialType
 
     public function surfaces(): array
     {
-        return ['sign-in' => InitiateShape::FORM];
+        return array_fill_keys($this->surfaces, InitiateShape::FORM);
     }
 
     public function representsMultipleFactors(): bool
     {
         return false;
+    }
+
+    public function sharesFailedAttempts(): bool
+    {
+        return false;
+    }
+
+    public function configFailures(): array
+    {
+        return [];
     }
 
     public function rules(Surface $surface): array

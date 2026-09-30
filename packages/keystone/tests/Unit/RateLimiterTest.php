@@ -3,6 +3,7 @@
 use ClaudioDekker\Keystone\Exceptions\Throttled;
 use ClaudioDekker\Keystone\Flow;
 use ClaudioDekker\Keystone\Keystone;
+use ClaudioDekker\Keystone\PendingStage;
 use ClaudioDekker\Keystone\RateLimiter;
 use ClaudioDekker\Keystone\SecurityEventRecorded;
 use ClaudioDekker\Keystone\StepKind;
@@ -33,11 +34,16 @@ function hitTimes(RateLimiter $limiter, StepKind $kind, int $times): void
     }
 }
 
-function failTimes(RateLimiter $limiter, int $times, string $identifier = 'nobody@example.com', ?User $account = null, string $type = 'form'): void
+function failTimes(RateLimiter $limiter, int $times, string $identifier = 'nobody@example.com', ?User $account = null, string $type = 'form', Flow $flow = Flow::SIGN_IN, bool $shares = false): void
 {
     foreach (range(1, $times) as $ignored) {
-        $limiter->takeFailedAttempt(Flow::SIGN_IN, new FormType($type), $account, $identifier);
+        $limiter->takeFailedAttempt($flow, new FormType($type, sharesFailedAttempts: $shares), $account, $identifier);
     }
+}
+
+function failSharedTimes(RateLimiter $limiter, int $times, Flow $flow = Flow::CHALLENGE): void
+{
+    failTimes($limiter, $times, flow: $flow, shares: true);
 }
 
 function retryAfter(Closure $callback): ?int
@@ -105,6 +111,14 @@ describe('request limit', function () {
     it('limits the account the session names across addresses', function () {
         $user = User::factory()->create();
         Keystone::guard()->setUser($user);
+        hitTimes(limiter('203.0.113.5'), StepKind::SUBMIT, 10);
+
+        expect(retryAfter(fn () => limiter('198.51.100.7')->hitRequest(StepKind::SUBMIT)))->toBe(60);
+    });
+
+    it('limits the account a held sign-in names across addresses', function () {
+        $user = User::factory()->create();
+        Keystone::guard()->hold($user, 'form', PendingStage::CHALLENGE, '/');
         hitTimes(limiter('203.0.113.5'), StepKind::SUBMIT, 10);
 
         expect(retryAfter(fn () => limiter('198.51.100.7')->hitRequest(StepKind::SUBMIT)))->toBe(60);
@@ -205,6 +219,53 @@ describe('failed-attempt limit', function () {
         'accents' => ['rené@example.com', 'rene@example.com'],
         'case' => ['Nobody@Example.com', 'nobody@example.com'],
     ]);
+
+    it('counts each flow separately for a type that shares no count', function () {
+        failTimes(limiter(), 20, flow: Flow::CHALLENGE);
+
+        expect(retryAfter(fn () => failTimes(limiter(), 1)))->toBeNull();
+    });
+
+    it('keeps a sharing type\'s challenge count apart from its sign-in count', function () {
+        failSharedTimes(limiter(), 20);
+
+        expect(retryAfter(fn () => failSharedTimes(limiter(), 1, Flow::SIGN_IN)))->toBeNull()
+            ->and(retryAfter(fn () => failSharedTimes(limiter(), 1)))->toBe(3600);
+    });
+
+    it('allows a sharing type 100 failed attempts a day, then refuses until the day ends', function () {
+        foreach (range(1, 5) as $ignored) {
+            failSharedTimes(limiter(), 20);
+            $this->travel(1)->hour();
+        }
+
+        expect(retryAfter(fn () => failSharedTimes(limiter(), 1)))->toBe(86400 - 5 * 3600);
+    });
+
+    it('allows a sharing type failed attempts again once the day has passed', function () {
+        foreach (range(1, 5) as $ignored) {
+            failSharedTimes(limiter(), 20);
+            $this->travel(1)->hour();
+        }
+
+        $this->travel(19)->hours();
+
+        expect(retryAfter(fn () => failSharedTimes(limiter(), 1)))->toBeNull();
+    });
+
+    it('gives back a sharing type\'s attempt to the day\'s ceiling too', function () {
+        foreach (range(1, 4) as $ignored) {
+            failSharedTimes(limiter(), 20);
+            $this->travel(1)->hour();
+        }
+        failSharedTimes(limiter(), 19);
+        $taken = limiter()->takeFailedAttempt(Flow::CHALLENGE, new FormType(sharesFailedAttempts: true), null, 'nobody@example.com');
+
+        limiter()->giveBack($taken);
+
+        expect(retryAfter(fn () => failSharedTimes(limiter(), 1)))->toBeNull()
+            ->and(retryAfter(fn () => failSharedTimes(limiter(), 1)))->toBe(86400 - 4 * 3600);
+    });
 
     it('refuses while the store is down, reporting the failure', function () {
         $this->mock(CacheRateLimiter::class)->shouldReceive('increment')->andThrow(new RuntimeException('Store down.'));

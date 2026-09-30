@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, type Component } from 'vue';
-import type { CredentialTypeOption } from '@/types/auth';
+import type { CredentialTypeOption, Surface } from '@/types/auth';
 
-const props = defineProps<{ option: CredentialTypeOption }>();
+const props = defineProps<{ option: CredentialTypeOption; surface: Surface }>();
 
 const partials = import.meta.glob<Component>('@/partials/*.vue', { eager: true, import: 'default' });
 const shapes = import.meta.glob<Component>('@/partials/shapes/*.vue', { eager: true, import: 'default' });
@@ -16,5 +16,5 @@ const component = computed(() => named(partials, props.option.type) ?? named(sha
 </script>
 
 <template>
-    <component :is="component" v-if="component" :option="option" />
+    <component :is="component" v-if="component" :option="option" :surface="surface" />
 </template>

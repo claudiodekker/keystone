@@ -5,6 +5,7 @@ providers:
     - Laravel\Wayfinder\WayfinderServiceProvider
     - ClaudioDekker\Keystone\KeystoneServiceProvider
     - ClaudioDekker\Keystone\Password\PasswordServiceProvider
+    - ClaudioDekker\Keystone\Totp\TotpServiceProvider
     - ClaudioDekker\Keystone\InertiaVue\InertiaVueServiceProvider
     - Workbench\App\Providers\WorkbenchServiceProvider
 

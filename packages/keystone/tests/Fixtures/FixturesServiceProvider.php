@@ -15,11 +15,13 @@ class FixturesServiceProvider extends ServiceProvider
         ]);
 
         $this->app->bind('keystone.test-support.form', FormTypeSupport::class);
+        $this->app->bind('keystone.test-support.code', fn () => new FormTypeSupport('code'));
     }
 
     public function boot(CredentialTypes $types): void
     {
         $types->register(new FormType);
+        $types->register(new FormType(name: 'code', surfaces: ['challenge']));
 
         $this->loadRoutesFrom(__DIR__.'/routes.php');
     }

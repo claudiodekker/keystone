@@ -21,10 +21,14 @@ class FormType implements CredentialType
      * Create a new form type instance.
      *
      * @param  list<value-of<Surface>>  $surfaces
+     * @param  list<string>  $configFailures
      */
     public function __construct(
         protected string $name = 'form',
         protected array $surfaces = ['sign-in'],
+        protected bool $multipleFactors = false,
+        protected bool $sharesFailedAttempts = false,
+        protected array $configFailures = [],
     ) {
         //
     }
@@ -41,7 +45,17 @@ class FormType implements CredentialType
 
     public function representsMultipleFactors(): bool
     {
-        return false;
+        return $this->multipleFactors;
+    }
+
+    public function sharesFailedAttempts(): bool
+    {
+        return $this->sharesFailedAttempts;
+    }
+
+    public function configFailures(): array
+    {
+        return $this->configFailures;
     }
 
     public function rules(Surface $surface): array
@@ -61,7 +75,7 @@ class FormType implements CredentialType
 
         hash_equals(self::DUMMY_HASH, $typed);
 
-        return Proof::rejected('form.mismatch', $credentials[0] ?? null);
+        return Proof::rejected("{$this->name}.mismatch", $credentials[0] ?? null);
     }
 
     /**

@@ -62,6 +62,16 @@ trait SignInAssertions
     }
 
     /**
+     * Assert the response sends a user whose sign-in is held for a challenge on to it.
+     *
+     * @param  TestResponse<Response>  $response
+     */
+    public function assertChallengeOwed(TestResponse $response): void
+    {
+        $response->assertRedirectToRoute('login.challenge');
+    }
+
+    /**
      * Assert the response sends the signed-in user on to the intended URL.
      *
      * @param  TestResponse<Response>  $response

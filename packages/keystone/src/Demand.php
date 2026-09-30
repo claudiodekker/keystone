@@ -8,5 +8,6 @@ namespace ClaudioDekker\Keystone;
 enum Demand: string
 {
     case SIGN_IN = 'sign-in';
+    case CHALLENGE = 'challenge';
     case REFUSE = 'refuse';
 }

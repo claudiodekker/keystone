@@ -24,6 +24,7 @@ class Installer
     protected const array APP_TESTS = [
         'claudiodekker/keystone' => 'ClaudioDekker\\Keystone\\AppTests\\',
         'claudiodekker/keystone-password' => 'ClaudioDekker\\Keystone\\Password\\AppTests\\',
+        'claudiodekker/keystone-totp' => 'ClaudioDekker\\Keystone\\Totp\\AppTests\\',
         'claudiodekker/keystone-inertia-vue' => 'ClaudioDekker\\Keystone\\InertiaVue\\AppTests\\',
     ];
 

@@ -9,10 +9,11 @@ readonly class TakenAttempt
 {
     /**
      * Create a new taken attempt instance.
+     *
+     * @param  non-empty-list<TakenCount>  $counts
      */
     public function __construct(
-        public string $key,
-        public ?int $windowEndsAt,
+        public array $counts,
     ) {
         //
     }

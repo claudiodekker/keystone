@@ -67,6 +67,14 @@ class AccountChange
     }
 
     /**
+     * Move the credential's secret on, only while it still holds the one that was verified.
+     */
+    public function advance(StoredCredential $credential, string $type, #[\SensitiveParameter] string $secret): bool
+    {
+        return $this->credentials->replaceSecret($credential, type: $type, secret: $secret);
+    }
+
+    /**
      * End every session of the account but the mover's own.
      */
     public function endSessions(): void

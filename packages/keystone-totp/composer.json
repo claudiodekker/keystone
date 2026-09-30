@@ -1,0 +1,23 @@
+{
+    "name": "claudiodekker/keystone-totp",
+    "description": "Authenticator-app codes as a second factor for Keystone.",
+    "license": "MIT",
+    "require": {
+        "php": "^8.4",
+        "claudiodekker/keystone": "self.version",
+        "illuminate/support": "^13.0",
+        "paragonie/constant_time_encoding": "^3.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "ClaudioDekker\\Keystone\\Totp\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "ClaudioDekker\\Keystone\\Totp\\TotpServiceProvider"
+            ]
+        }
+    }
+}

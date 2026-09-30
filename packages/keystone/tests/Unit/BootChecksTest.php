@@ -277,6 +277,14 @@ describe('the methods allow-list', function () {
         expect($failures)->toBe(['More than one credential type is named [form].']);
     });
 
+    it('refuses what an installed credential type finds wrong with its own config', function () {
+        app(CredentialTypes::class)->register(new FormType(name: 'picky', configFailures: ['picky.window must be at least 0.']));
+
+        $failures = bootFailures();
+
+        expect($failures)->toBe(['picky.window must be at least 0.']);
+    });
+
     it('refuses a credential type under core\'s reserved name', function () {
         app(CredentialTypes::class)->register(new FormType(name: 'recovery-code'));
 
