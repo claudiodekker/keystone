@@ -1,11 +1,11 @@
 <?php
 
+use ClaudioDekker\Keystone\Actions\SuspendAccount;
+use ClaudioDekker\Keystone\Actions\UnsuspendAccount;
 use ClaudioDekker\Keystone\Actor;
 use ClaudioDekker\Keystone\AppTests\AppTestCase;
 use ClaudioDekker\Keystone\Exceptions\AlreadySuspended;
 use ClaudioDekker\Keystone\Exceptions\NotSuspended;
-use ClaudioDekker\Keystone\Jobs\SuspendAccount;
-use ClaudioDekker\Keystone\Jobs\UnsuspendAccount;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\SecurityEvent;
 use ClaudioDekker\Keystone\SecurityEventType;
@@ -148,17 +148,17 @@ describe('keystone:unsuspend', function () {
     });
 });
 
-describe('the suspension jobs', function () {
+describe('the suspension actions', function () {
     it('refuses to suspend an account that already is', function () {
         $account = $this->createAccount();
-        SuspendAccount::dispatchSync($account, operator: 'jane@ops');
+        app(SuspendAccount::class)->handle($account, operator: 'jane@ops');
 
-        SuspendAccount::dispatchSync($account, operator: 'jane@ops');
+        app(SuspendAccount::class)->handle($account, operator: 'jane@ops');
     })->throws(AlreadySuspended::class);
 
     it('refuses to unsuspend an account that isn\'t suspended', function () {
         $account = $this->createAccount();
 
-        UnsuspendAccount::dispatchSync($account, operator: 'jane@ops');
+        app(UnsuspendAccount::class)->handle($account, operator: 'jane@ops');
     })->throws(NotSuspended::class);
 });

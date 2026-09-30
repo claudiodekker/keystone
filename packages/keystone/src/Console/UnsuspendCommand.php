@@ -2,8 +2,8 @@
 
 namespace ClaudioDekker\Keystone\Console;
 
+use ClaudioDekker\Keystone\Actions\UnsuspendAccount;
 use ClaudioDekker\Keystone\Exceptions\NotSuspended;
-use ClaudioDekker\Keystone\Jobs\UnsuspendAccount;
 use Illuminate\Console\Command;
 use Symfony\Component\Console\Attribute\AsCommand;
 
@@ -34,7 +34,7 @@ class UnsuspendCommand extends Command
     /**
      * Unsuspend the account, refusing one that isn't suspended.
      */
-    public function handle(): int
+    public function handle(UnsuspendAccount $unsuspend): int
     {
         $id = $this->argument('user');
         $account = $this->findAccountOrReport($id);
@@ -44,7 +44,7 @@ class UnsuspendCommand extends Command
         }
 
         try {
-            UnsuspendAccount::dispatchSync($account, $this->operator());
+            $unsuspend->handle($account, $this->operator());
         } catch (NotSuspended) {
             $this->components->error("Account [{$id}] isn't suspended.");
 

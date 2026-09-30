@@ -1,6 +1,6 @@
 <?php
 
-use ClaudioDekker\Keystone\Jobs\EndEverySession;
+use ClaudioDekker\Keystone\Actions\EndEverySession;
 use ClaudioDekker\Keystone\SecurityEventRecorded;
 use ClaudioDekker\Keystone\Tests\Fixtures\User;
 use Illuminate\Support\Facades\Auth;
@@ -44,7 +44,7 @@ it('logs one event about nobody, naming the operator', function () {
     ]);
     User::factory()->count(2)->create();
 
-    (new EndEverySession(operator: 'jane'))->handle();
+    (new EndEverySession)->handle(operator: 'jane');
 
     $records = Log::channel('keystone-test')->getLogger()->getHandlers()[0]->getRecords();
 

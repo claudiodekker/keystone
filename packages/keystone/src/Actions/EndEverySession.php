@@ -1,35 +1,22 @@
 <?php
 
-namespace ClaudioDekker\Keystone\Jobs;
+namespace ClaudioDekker\Keystone\Actions;
 
 use ClaudioDekker\Keystone\Actor;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\SecurityEventRecorder;
 use ClaudioDekker\Keystone\SecurityEventType;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Date;
 
 /**
  * @api
  */
-class EndEverySession implements ShouldQueue
+class EndEverySession
 {
-    use Queueable;
-
     /**
-     * Create a new job instance.
+     * End every session of every account, the mover's own included, in one update, and log once that an operator did.
      */
-    public function __construct(
-        public ?string $operator = null,
-    ) {
-        //
-    }
-
-    /**
-     * End every session of every account, the mover's own included, in one update, and log that an operator did once.
-     */
-    public function handle(): void
+    public function handle(?string $operator = null): void
     {
         $users = Keystone::guard()->userModel();
         $movedAt = $users->fromDateTime(Date::now());
@@ -40,7 +27,7 @@ class EndEverySession implements ShouldQueue
             SecurityEventType::SESSIONS_TERMINATED,
             actor: Actor::OPERATOR,
             reason: 'keystone.every_account',
-            operator: $this->operator,
+            operator: $operator,
         ));
     }
 }

@@ -1,14 +1,19 @@
 <?php
 
-use ClaudioDekker\Keystone\AccountChange;
-use ClaudioDekker\Keystone\Actions\ChangeAccount;
+use ClaudioDekker\Keystone\Actions\AddCredential;
+use ClaudioDekker\Keystone\Actions\EndSessions;
+use ClaudioDekker\Keystone\Actions\RehashCredential;
+use ClaudioDekker\Keystone\Actions\SuspendAccount;
+use ClaudioDekker\Keystone\Actions\UnsuspendAccount;
 use ClaudioDekker\Keystone\Actor;
+use ClaudioDekker\Keystone\Credentials;
 use ClaudioDekker\Keystone\KeystoneGuard;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
 use ClaudioDekker\Keystone\Notifications\SecurityAlert;
 use ClaudioDekker\Keystone\SecurityEvent;
 use ClaudioDekker\Keystone\SecurityEventType;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormType;
+use ClaudioDekker\Keystone\Tests\Fixtures\ProbeAccountWrite;
 use ClaudioDekker\Keystone\Tests\Fixtures\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
@@ -20,9 +25,9 @@ function guard(): KeystoneGuard
     return Auth::guard('web');
 }
 
-function changes(): ChangeAccount
+function write(User $user, Closure $write): mixed
 {
-    return new ChangeAccount(guard());
+    return (new ProbeAccountWrite)->handle($user, $write);
 }
 
 function epochOf(User $user): int
@@ -45,59 +50,41 @@ function holdAddresses(User $user, array $addresses): void
 
 function storeCredential(User $user, string $secret = 'old-hash'): StoredCredential
 {
-    $id = changes()->handle($user, fn (AccountChange $change) => $change->addCredential(new FormType, identifier: null, secret: $secret));
+    $id = (new AddCredential)->handle($user, new FormType, identifier: null, secret: $secret);
 
     return new StoredCredential($id, identifier: null, secret: $secret, label: null);
 }
 
-test('the credential epoch moves only for a change that removes, replaces or ends something', function (Closure $apply, bool $moves, ?string $suspendedAt = null) {
+test('the credential epoch moves only for a write that removes, replaces or ends something', function (Closure $apply, bool $moves, ?string $suspendedAt = null) {
     $this->freezeSecond();
     $user = User::factory()->create();
     DB::table('users')->where('id', $user->getKey())->update(['suspended_at' => $suspendedAt]);
     $credential = storeCredential($user);
 
-    changes()->handle($user, fn (AccountChange $change) => $apply($change, $credential));
+    $apply($user, $credential);
 
     $row = DB::table('users')->where('id', $user->getKey())->first();
 
     expect($row->credential_epoch)->toEqual($moves ? 1 : 0)
         ->and($row->credential_epoch_moved_at)->toEqual($moves ? now()->toDateTimeString() : null);
 })->with([
-    'nothing' => [fn (AccountChange $change) => null, false],
-    'adding a credential' => [fn (AccountChange $change) => $change->addCredential(new FormType, identifier: null, secret: 'new'), false],
-    'a rehash' => [fn (AccountChange $change, StoredCredential $credential) => $change->rehash($credential, type: 'form', secret: 'new-hash'), false],
-    'ending sessions' => [fn (AccountChange $change) => $change->endSessions(), true],
-    'suspending' => [fn (AccountChange $change) => $change->suspend(), true],
-    'unsuspending' => [fn (AccountChange $change) => $change->unsuspend(), false, '2026-09-01 12:00:00'],
+    'nothing' => [fn (User $user) => write($user, fn () => null), false],
+    'adding a credential' => [fn (User $user) => (new AddCredential)->handle($user, new FormType, identifier: null, secret: 'new'), false],
+    'a rehash' => [fn (User $user, StoredCredential $credential) => (new RehashCredential)->handle($user, $credential, type: 'form', secret: 'new-hash'), false],
+    'ending sessions' => [fn (User $user) => (new EndSessions)->handle($user), true],
+    'suspending' => [fn (User $user) => (new SuspendAccount)->handle($user), true],
+    'unsuspending' => [fn (User $user) => (new UnsuspendAccount)->handle($user), false, '2026-09-01 12:00:00'],
 ]);
 
-it('moves the epoch once however many times the change ends sessions', function () {
+it('moves the epoch once however many times the write ends sessions', function () {
     $user = User::factory()->create();
 
-    changes()->handle($user, function (AccountChange $change) {
-        $change->endSessions();
-        $change->endSessions();
+    write($user, function (User $account, ProbeAccountWrite $write) {
+        $write->endSessionsOf($account);
+        $write->endSessionsOf($account);
     });
 
     expect(epochOf($user))->toBe(1);
-});
-
-it('stamps the account suspended at the time it is suspended', function () {
-    $this->freezeSecond();
-    $user = User::factory()->create();
-
-    changes()->handle($user, fn (AccountChange $change) => $change->suspend());
-
-    expect(DB::table('users')->where('id', $user->getKey())->value('suspended_at'))->toEqual(now()->toDateTimeString());
-});
-
-it('clears the stamp to unsuspend the account', function () {
-    $user = User::factory()->create();
-    DB::table('users')->where('id', $user->getKey())->update(['suspended_at' => now()]);
-
-    changes()->handle($user, fn (AccountChange $change) => $change->unsuspend());
-
-    expect(DB::table('users')->where('id', $user->getKey())->value('suspended_at'))->toBeNull();
 });
 
 it('applies a rehash only while the credential still holds the secret that was verified', function () {
@@ -105,17 +92,17 @@ it('applies a rehash only while the credential still holds the secret that was v
     $credential = storeCredential($user);
     $stale = new StoredCredential($credential->id, identifier: null, secret: 'stale-hash', label: null);
 
-    $replaced = changes()->handle($user, fn (AccountChange $change) => $change->rehash($stale, type: 'form', secret: 'new-hash'));
+    $replaced = (new RehashCredential)->handle($user, $stale, type: 'form', secret: 'new-hash');
 
     expect($replaced)->toBeFalse()
         ->and(Crypt::decryptString(DB::table('user_credentials')->value('secret')))->toBe('old-hash');
 });
 
-it('hands the change the account read fresh, whatever the caller holds', function () {
+it('hands the write the account read fresh, whatever the caller holds', function () {
     $user = User::factory()->create();
     DB::table('users')->where('id', $user->getKey())->update(['credential_epoch' => 4]);
 
-    $seen = changes()->handle($user, fn (AccountChange $change) => $change->account->getRawOriginal('credential_epoch'));
+    $seen = write($user, fn (User $account) => $account->getRawOriginal('credential_epoch'));
 
     expect($seen)->toEqual(4);
 });
@@ -124,19 +111,19 @@ it('moves the epoch on from the one the account holds', function () {
     $user = User::factory()->create();
     DB::table('users')->where('id', $user->getKey())->update(['credential_epoch' => 4]);
 
-    changes()->handle($user, fn (AccountChange $change) => $change->endSessions());
+    write($user, fn (User $account, ProbeAccountWrite $write) => $write->endSessionsOf($account));
 
     expect(epochOf($user))->toBe(5);
 });
 
-it('reads the recipients before the change applies', function (array $addresses, array $recipients) {
+it('reads the recipients before the write applies', function (array $addresses, array $recipients) {
     $user = User::factory()->create();
     holdAddresses($user, $addresses);
 
-    $snapshot = changes()->handle($user, function (AccountChange $change) {
+    $snapshot = write($user, function (User $account, ProbeAccountWrite $write) {
         DB::table('user_emails')->delete();
 
-        return $change->recipients;
+        return $write->recipients();
     });
 
     expect($snapshot)->toBe($recipients);
@@ -146,11 +133,11 @@ it('reads the recipients before the change applies', function (array $addresses,
     'none' => [[], []],
 ]);
 
-it('records the change\'s events once it commits', function () {
+it('records the write\'s events once it commits', function () {
     $user = User::factory()->create();
 
-    changes()->handle($user, function (AccountChange $change) {
-        $change->record(SecurityEventType::SESSIONS_TERMINATED, actor: Actor::OPERATOR, operator: 'jane');
+    write($user, function (User $account, ProbeAccountWrite $write) {
+        $write->recordAbout($account, SecurityEventType::SESSIONS_TERMINATED, operator: 'jane');
 
         $this->assertDatabaseCount('user_security_events', 0);
     });
@@ -163,41 +150,41 @@ it('records the change\'s events once it commits', function () {
         ->and($event->operator)->toBe('jane');
 });
 
-it('alerts the recipients read before the change applies', function () {
+it('alerts the recipients read before the write applies', function () {
     Notification::fake();
     $user = User::factory()->create();
     holdAddresses($user, ['jane@example.com' => true]);
 
-    changes()->handle($user, function (AccountChange $change) {
+    write($user, function (User $account, ProbeAccountWrite $write) {
         DB::table('user_emails')->delete();
 
-        $change->record(SecurityEventType::SESSIONS_TERMINATED, actor: Actor::OPERATOR);
+        $write->recordAbout($account, SecurityEventType::SESSIONS_TERMINATED);
     });
 
     Notification::assertSentOnDemand(SecurityAlert::class, fn (SecurityAlert $alert, array $channels, object $notifiable) => $notifiable->routes['mail'] === 'jane@example.com');
 });
 
-it('records the event without alerting when the change suppresses the alert', function () {
+it('records the event without alerting when the write suppresses the alert', function () {
     Notification::fake();
     $user = User::factory()->create();
     holdAddresses($user, ['jane@example.com' => true]);
 
-    changes()->handle($user, fn (AccountChange $change) => $change->record(SecurityEventType::SESSIONS_TERMINATED, actor: Actor::OPERATOR, alert: false));
+    write($user, fn (User $account, ProbeAccountWrite $write) => $write->recordAbout($account, SecurityEventType::SESSIONS_TERMINATED, alert: false));
 
     Notification::assertNothingSent();
     $this->assertDatabaseCount('user_security_events', 1);
 });
 
-it('rolls back and records nothing when the change fails', function () {
+it('rolls back and records nothing when the write fails', function () {
     $user = User::factory()->create();
 
     try {
-        changes()->handle($user, function (AccountChange $change) {
-            $change->addCredential(new FormType, identifier: null, secret: 'new');
-            $change->endSessions();
-            $change->record(SecurityEventType::SESSIONS_TERMINATED, actor: Actor::OPERATOR);
+        write($user, function (User $account, ProbeAccountWrite $write) {
+            (new Credentials(guard()->userModel()))->store($account, new FormType, identifier: null, secret: 'new');
+            $write->endSessionsOf($account);
+            $write->recordAbout($account, SecurityEventType::SESSIONS_TERMINATED);
 
-            throw new RuntimeException('The change failed.');
+            throw new RuntimeException('The write failed.');
         });
     } catch (RuntimeException) {
         //
@@ -208,13 +195,13 @@ it('rolls back and records nothing when the change fails', function () {
     expect(epochOf($user))->toBe(0);
 });
 
-it('records nothing when a transaction around the change rolls back', function () {
+it('records nothing when a transaction around the write rolls back', function () {
     $user = User::factory()->create();
 
     DB::beginTransaction();
-    changes()->handle($user, function (AccountChange $change) {
-        $change->endSessions();
-        $change->record(SecurityEventType::SESSIONS_TERMINATED, actor: Actor::OPERATOR);
+    write($user, function (User $account, ProbeAccountWrite $write) {
+        $write->endSessionsOf($account);
+        $write->recordAbout($account, SecurityEventType::SESSIONS_TERMINATED);
     });
     DB::rollBack();
 
@@ -222,12 +209,12 @@ it('records nothing when a transaction around the change rolls back', function (
 });
 
 describe('the mover\'s own session', function () {
-    it('keeps it signed in, on a new session id, when the change ends sessions', function () {
+    it('keeps it signed in, on a new session id, when the write ends sessions', function () {
         $user = User::factory()->create();
         guard()->signIn($user);
         $before = session()->getId();
 
-        changes()->handle($user, fn (AccountChange $change) => $change->endSessions());
+        write($user, fn (User $account, ProbeAccountWrite $write) => $write->endSessionsOf($account));
 
         Auth::forgetGuards();
         expect(guard()->user()?->getKey())->toBe($user->getKey())
@@ -239,7 +226,7 @@ describe('the mover\'s own session', function () {
         guard()->signIn($user);
         $before = session()->getId();
 
-        changes()->handle($user, fn (AccountChange $change) => $change->addCredential(new FormType, identifier: null, secret: 'new'));
+        (new AddCredential)->handle($user, new FormType, identifier: null, secret: 'new');
 
         expect(session()->getId())->toBe($before);
     });
@@ -250,7 +237,7 @@ describe('the mover\'s own session', function () {
         guard()->signIn($admin);
         $before = session()->getId();
 
-        changes()->handle($user, fn (AccountChange $change) => $change->endSessions());
+        write($user, fn (User $account, ProbeAccountWrite $write) => $write->endSessionsOf($account));
 
         Auth::forgetGuards();
         expect(guard()->user()?->getKey())->toBe($admin->getKey())
@@ -262,7 +249,7 @@ describe('the mover\'s own session', function () {
         guard()->signIn($user);
         DB::table('users')->where('id', $user->getKey())->increment('credential_epoch');
 
-        changes()->handle($user, fn (AccountChange $change) => $change->endSessions());
+        write($user, fn (User $account, ProbeAccountWrite $write) => $write->endSessionsOf($account));
 
         Auth::forgetGuards();
         expect(guard()->user())->toBeNull();

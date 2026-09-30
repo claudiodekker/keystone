@@ -1,7 +1,7 @@
 <?php
 
+use ClaudioDekker\Keystone\Actions\EndSessions;
 use ClaudioDekker\Keystone\AppTests\AppTestCase;
-use ClaudioDekker\Keystone\Jobs\EndSessions;
 use ClaudioDekker\Keystone\Notifications\SecurityAlert;
 use ClaudioDekker\Keystone\SecurityEventType;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormTypeSupport;
@@ -49,11 +49,11 @@ describe('ending an account\'s sessions', function () {
         $this->assertDatabaseCount('user_security_events', 1);
     });
 
-    it('lets the job suppress the alert too', function () {
+    it('lets the action suppress the alert too', function () {
         Notification::fake();
         $account = $this->createAccount();
 
-        EndSessions::dispatchSync($account, operator: 'jane@ops', alert: false);
+        app(EndSessions::class)->handle($account, operator: 'jane@ops', alert: false);
 
         Notification::assertNothingSent();
         $this->assertDatabaseCount('user_security_events', 1);
@@ -89,7 +89,7 @@ describe('suspending and unsuspending an account', function () {
 describe('the queued alert', function () {
     beforeEach(function () {
         config(['queue.default' => 'database', 'queue.failed.database' => config('database.default')]);
-        Route::middleware(['web', 'auth'])->post('admin/end-my-sessions', fn () => EndSessions::dispatchSync(auth()->user(), 'jane@ops'));
+        Route::middleware(['web', 'auth'])->post('admin/end-my-sessions', fn (EndSessions $endSessions) => $endSessions->handle(auth()->user(), 'jane@ops'));
     });
 
     it('holds no IP address or user agent in clear on the queue, or once it failed', function () {

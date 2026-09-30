@@ -30,20 +30,24 @@ php artisan keystone:end-sessions 42 --operator="jane@ops" --no-alert
 
 ### From an admin panel
 
-Dispatch the jobs the command runs:
+Call the Actions the command runs. Inject them where you use them, for example in a controller method:
 
 ```php
-use ClaudioDekker\Keystone\Jobs\EndEverySession;
-use ClaudioDekker\Keystone\Jobs\EndSessions;
+use ClaudioDekker\Keystone\Actions\EndEverySession;
+use ClaudioDekker\Keystone\Actions\EndSessions;
 
-EndSessions::dispatch($user, operator: $request->user()->email);
+public function destroy(Request $request, User $user, EndSessions $endSessions)
+{
+    $endSessions->handle($user, operator: $request->user()->email);
 
-EndSessions::dispatch($user, operator: $request->user()->email, alert: false);
+    // Or without alerting the owner:
+    $endSessions->handle($user, operator: $request->user()->email, alert: false);
+}
 
-EndEverySession::dispatch(operator: $request->user()->email);
+$endEverySession->handle(operator: $request->user()->email);
 ```
 
-When the signed-in user ends their own account's sessions with `EndSessions::dispatchSync()`, their current session stays signed in on a new session id and every other one ends. `EndEverySession` ends the current session too.
+When the signed-in user ends their own account's sessions with `EndSessions`, their current session stays signed in on a new session id and every other one ends. `EndEverySession` ends the current session too.
 
 ## Suspending accounts
 
@@ -67,15 +71,15 @@ Each command records `account.suspended` or `account.unsuspended` [security even
 
 ### From an admin panel
 
-Dispatch the jobs the commands run:
+Call the Actions the commands run:
 
 ```php
-use ClaudioDekker\Keystone\Jobs\SuspendAccount;
-use ClaudioDekker\Keystone\Jobs\UnsuspendAccount;
+use ClaudioDekker\Keystone\Actions\SuspendAccount;
+use ClaudioDekker\Keystone\Actions\UnsuspendAccount;
 
-SuspendAccount::dispatch($user, operator: $request->user()->email);
+$suspendAccount->handle($user, operator: $request->user()->email);
 
-UnsuspendAccount::dispatch($user, operator: $request->user()->email);
+$unsuspendAccount->handle($user, operator: $request->user()->email);
 ```
 
-The jobs refuse an account already in the state they would put it in: `SuspendAccount` throws `ClaudioDekker\Keystone\Exceptions\AlreadySuspended`, and `UnsuspendAccount` throws `ClaudioDekker\Keystone\Exceptions\NotSuspended`. Queued, that fails the job; dispatched with `dispatchSync()`, the exception reaches your code.
+They refuse an account already in the state they would put it in: `SuspendAccount` throws `ClaudioDekker\Keystone\Exceptions\AlreadySuspended`, and `UnsuspendAccount` throws `ClaudioDekker\Keystone\Exceptions\NotSuspended`.

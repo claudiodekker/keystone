@@ -1,8 +1,8 @@
 <?php
 
+use ClaudioDekker\Keystone\Actions\EndSessions;
 use ClaudioDekker\Keystone\Actor;
 use ClaudioDekker\Keystone\AppTests\AppTestCase;
-use ClaudioDekker\Keystone\Jobs\EndSessions;
 use ClaudioDekker\Keystone\SecurityEvent;
 use ClaudioDekker\Keystone\SecurityEventType;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormTypeSupport;
@@ -13,7 +13,7 @@ pest()->extend(AppTestCase::class);
 
 beforeEach(function () {
     Route::middleware('web')->get('whoami', fn () => auth()->id() ?? 'guest');
-    Route::middleware(['web', 'auth'])->post('admin/end-my-sessions', fn () => EndSessions::dispatchSync(auth()->user(), 'jane@ops'));
+    Route::middleware(['web', 'auth'])->post('admin/end-my-sessions', fn (EndSessions $endSessions) => $endSessions->handle(auth()->user(), 'jane@ops'));
 });
 
 /**
@@ -97,7 +97,7 @@ describe('keystone:end-sessions', function () {
     });
 });
 
-describe('the end-sessions job', function () {
+describe('the end-sessions action', function () {
     it('keeps the session of the user who ends their own sessions signed in', function () {
         $account = $this->signInAccount(new FormTypeSupport);
 

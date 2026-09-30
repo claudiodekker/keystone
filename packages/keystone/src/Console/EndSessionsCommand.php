@@ -2,8 +2,8 @@
 
 namespace ClaudioDekker\Keystone\Console;
 
-use ClaudioDekker\Keystone\Jobs\EndEverySession;
-use ClaudioDekker\Keystone\Jobs\EndSessions;
+use ClaudioDekker\Keystone\Actions\EndEverySession;
+use ClaudioDekker\Keystone\Actions\EndSessions;
 use Illuminate\Console\Command;
 use Illuminate\Console\ConfirmableTrait;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -38,7 +38,7 @@ class EndSessionsCommand extends Command
     /**
      * Execute the console command.
      */
-    public function handle(): int
+    public function handle(EndSessions $endSessions, EndEverySession $endEverySession): int
     {
         $id = $this->argument('user');
         $all = $this->option('all') === true;
@@ -46,11 +46,11 @@ class EndSessionsCommand extends Command
         $alert = $this->option('no-alert') !== true;
 
         if ($all && is_null($id)) {
-            return $this->endEverySession($operator);
+            return $this->endEverySession($endEverySession, $operator);
         }
 
         if (! $all && ! is_null($id)) {
-            return $this->endSessionsOf($id, $operator, $alert);
+            return $this->endSessionsOf($endSessions, $id, $operator, $alert);
         }
 
         $this->components->error('Name one account by its id, or pass --all.');
@@ -61,7 +61,7 @@ class EndSessionsCommand extends Command
     /**
      * End every session of the account with the id, alerting its owner unless suppressed.
      */
-    protected function endSessionsOf(string $id, ?string $operator, bool $alert): int
+    protected function endSessionsOf(EndSessions $endSessions, string $id, ?string $operator, bool $alert): int
     {
         $account = $this->findAccountOrReport($id);
 
@@ -69,7 +69,7 @@ class EndSessionsCommand extends Command
             return self::FAILURE;
         }
 
-        EndSessions::dispatchSync($account, $operator, $alert);
+        $endSessions->handle($account, $operator, $alert);
 
         $this->components->info("Ended every session of account [{$id}].");
 
@@ -79,13 +79,13 @@ class EndSessionsCommand extends Command
     /**
      * End every session of every account, once the operator confirms in production.
      */
-    protected function endEverySession(?string $operator): int
+    protected function endEverySession(EndEverySession $endEverySession, ?string $operator): int
     {
         if (! $this->confirmToProceed()) {
             return self::FAILURE;
         }
 
-        EndEverySession::dispatchSync($operator);
+        $endEverySession->handle($operator);
 
         $this->components->info('Ended every session of every account.');
 
