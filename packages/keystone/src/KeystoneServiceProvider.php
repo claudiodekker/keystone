@@ -8,13 +8,18 @@ use ClaudioDekker\Keystone\Http\Middleware\CaptureRequestContext;
 use ClaudioDekker\Keystone\Http\Middleware\ClearSiteDataOnSessionEnd;
 use ClaudioDekker\Keystone\Http\Middleware\RefuseCrossSiteRequests;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Auth\AuthManager;
 use Illuminate\Auth\EloquentUserProvider;
+use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Foundation\CachesConfiguration;
 use Illuminate\Contracts\Http\Kernel;
+use Illuminate\Foundation\Exceptions\Handler;
 use Illuminate\Foundation\Http\Kernel as HttpKernel;
 use Illuminate\Foundation\Http\Middleware\TrimStrings;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Routing\Router;
 use Illuminate\Support\ServiceProvider;
 use LogicException;
@@ -57,6 +62,12 @@ class KeystoneServiceProvider extends ServiceProvider
         }
 
         $router->pushMiddlewareToGroup('web', RefuseCrossSiteRequests::class);
+
+        $this->callAfterResolving(ExceptionHandler::class, function (ExceptionHandler $handler) {
+            if ($handler instanceof Handler) {
+                $handler->renderable($this->renderExpiredSession(...));
+            }
+        });
 
         $this->app->booted(fn (Application $app) => (new BootChecks($app->make(CredentialTypes::class)))->check());
 
@@ -108,6 +119,21 @@ class KeystoneServiceProvider extends ServiceProvider
     protected function isMap(mixed $value): bool
     {
         return is_array($value) && $value !== [] && ! array_is_list($value);
+    }
+
+    /**
+     * Tell a JSON client that its session expired, leaving every other unauthenticated request to the app's handler.
+     */
+    protected function renderExpiredSession(AuthenticationException $e, Request $request): ?JsonResponse
+    {
+        if (! $request->attributes->getBoolean(KeystoneGuard::EXPIRED_SESSION) || ! $request->expectsJson()) {
+            return null;
+        }
+
+        return new JsonResponse([
+            'message' => Status::SESSION_EXPIRED->label(),
+            'reason' => 'expired',
+        ], 401);
     }
 
     /**

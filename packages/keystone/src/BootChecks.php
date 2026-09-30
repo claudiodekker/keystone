@@ -60,6 +60,7 @@ class BootChecks
 
         $failures = [
             ...$this->rateLimitFailures(),
+            ...$this->sessionFailures(),
             ...$this->eventFailures(),
             ...$this->hardeningFailures(),
             ...$this->methodFailures(),
@@ -109,6 +110,22 @@ class BootChecks
         $failing = array_filter($keys, fn (string $key) => ! is_int(config($key)) || config($key) < 1);
 
         return array_values(array_map(fn (string $key) => "{$key} must be a whole number of at least 1.", $failing));
+    }
+
+    /**
+     * Check that the absolute session lifetime is off or a whole number of at least 1.
+     *
+     * @return list<string>
+     */
+    protected function sessionFailures(): array
+    {
+        $lifetime = config('keystone.session.absolute_lifetime_seconds');
+
+        if ($lifetime === null || (is_int($lifetime) && $lifetime >= 1)) {
+            return [];
+        }
+
+        return ['keystone.session.absolute_lifetime_seconds must be null or a whole number of at least 1.'];
     }
 
     /**

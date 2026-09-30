@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 enum Status: string
 {
     case SIGNED_OUT = 'signed-out';
+    case SESSION_EXPIRED = 'session-expired';
 
     /**
      * The session key the status is flashed under.

@@ -115,6 +115,24 @@ describe('the log channel', function () {
     });
 });
 
+describe('the absolute session lifetime', function () {
+    it('refuses a lifetime that isn\'t null or a whole number of at least 1', function (mixed $seconds) {
+        config(['keystone.session.absolute_lifetime_seconds' => $seconds]);
+
+        $failures = bootFailures();
+
+        expect($failures)->toBe(['keystone.session.absolute_lifetime_seconds must be null or a whole number of at least 1.']);
+    })->with(['zero' => [0], 'a negative number' => [-1], 'a string' => ['43200'], 'false' => [false]]);
+
+    it('accepts a lifetime of one second, or none', function (?int $seconds) {
+        config(['keystone.session.absolute_lifetime_seconds' => $seconds]);
+
+        $failures = bootFailures();
+
+        expect($failures)->toBe([]);
+    })->with(['one second' => [1], 'off' => [null]]);
+});
+
 describe('the hardening opt-outs', function () {
     it('refuses frame ancestors that aren\'t a list of CSP sources', function (mixed $sources) {
         config(['keystone.hardening.frame_ancestors' => $sources]);

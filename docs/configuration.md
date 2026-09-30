@@ -13,6 +13,7 @@ Your `config/keystone.php` is merged over Keystone's, key by key. A setting that
 | Setting | Default | What loosening it costs |
 |---|---|---|
 | `methods` | `null`: every installed credential type, on every surface it serves | Nothing: it can only narrow what the installed types offer. See [Methods](#methods). |
+| `session.absolute_lifetime_seconds` | `43200` (12 hours) | A stolen session that is kept busy stays signed in longer. `null` lets it live forever. See [Session lifetime](#session-lifetime). |
 | `rate_limits.requests_per_minute.view` | `60` | Faster scripted probing of Keystone's pages per IP address and account. |
 | `rate_limits.requests_per_minute.start` / `.submit` / `.change` | `10` each | Faster scripted submissions per IP address and account. |
 | `rate_limits.failed_attempts_per_hour` | `20` | More online guesses at each account's credentials. See [Rate limiting](rate-limiting.md). |
@@ -22,7 +23,7 @@ Your `config/keystone.php` is merged over Keystone's, key by key. A setting that
 | `trusted_origins` | `[]`: only your app's own origin | Any page on a listed origin can submit to Keystone as your users. See [Hardening](hardening.md#cross-site-requests). |
 | `clear_site_data` | `['cache', 'storage']` | Whatever you leave out survives sign-out on a shared computer. See [Hardening](hardening.md#clearing-site-data). |
 
-Every limit is a whole number of at least 1. No setting takes a `0` or `null` that turns a control off without saying so.
+Every limit is a whole number of at least 1. No setting takes a `0` or `null` that turns a control off without saying so; the one `null` that turns a control off is `session.absolute_lifetime_seconds`'s.
 
 ## Methods
 
@@ -36,6 +37,20 @@ Every limit is a whole number of at least 1. No setting takes a `0` or `null` th
 ```
 
 A type you don't list isn't offered anywhere, and a listed surface only narrows what the type serves: listing a type on a surface it doesn't serve stops Keystone from booting. The surfaces are `sign-in`, `challenge`, `registration` and `enrollment`.
+
+## Session lifetime
+
+A session ends in two ways, whichever comes first:
+
+- **Idle:** Laravel's own `session.lifetime` (in minutes) ends a session nobody used for that long. Every request starts the count again.
+- **Absolute:** `session.absolute_lifetime_seconds` ends a signed-in session that long after the sign-in, however busy it was. Nothing extends it. A session whose sign-in time is missing or in the future counts as expired.
+
+Keystone checks the absolute lifetime whenever something asks who is signed in, so it needs no middleware of yours. When a session has expired, Keystone ends it, records `session.ended` with the reason `expired`, and sends `Clear-Site-Data`. Your `auth` middleware then sees a guest:
+
+- a browser is redirected to sign in, where the sign-in page's `status` reads "Your session has expired. Please sign in again.";
+- a request expecting JSON gets a `401` with `{"message": "Your session has expired. Please sign in again.", "reason": "expired"}`.
+
+The message is `keystone::messages.status.session-expired`, so you can translate it in `lang/vendor/keystone`.
 
 ## Boot checks
 
