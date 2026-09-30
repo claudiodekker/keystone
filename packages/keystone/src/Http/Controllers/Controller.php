@@ -2,56 +2,21 @@
 
 namespace ClaudioDekker\Keystone\Http\Controllers;
 
-use ClaudioDekker\Keystone\Keystone;
-use ClaudioDekker\Keystone\RateLimiter;
+use ClaudioDekker\Keystone\Http\Middleware\ThrottleKeystoneRequests;
 use ClaudioDekker\Keystone\StepKind;
-use ClaudioDekker\Keystone\Throttled;
-use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\Response;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 
 /**
  * @api
  */
-abstract class Controller
+abstract class Controller implements HasMiddleware
 {
     /**
-     * Run the action behind its request limit, refusing it once a limit is spent, even when a subclass replaced the action.
-     *
-     * @param  array<array-key, mixed>  $parameters
+     * Take the step kind's request limit before the given actions run.
      */
-    public function callAction(string $method, array $parameters): mixed
+    protected static function throttle(StepKind $kind, string ...$actions): Middleware
     {
-        $request = request();
-
-        try {
-            $this->limiter($request)->hitRequest($this->stepKind($method));
-
-            return $this->{$method}(...array_values($parameters));
-        } catch (Throttled $throttled) {
-            return $this->refuseThrottled($request, $throttled->retryAfterSeconds);
-        }
-    }
-
-    /**
-     * Get the kind of step the action is, which picks its request limit.
-     */
-    abstract protected function stepKind(string $method): StepKind;
-
-    /**
-     * Refuse a step whose rate limit is spent, saying when to try again.
-     */
-    protected function refuseThrottled(Request $request, int $retryAfterSeconds): Response
-    {
-        $message = __('keystone::messages.throttled', ['seconds' => $retryAfterSeconds]);
-
-        return response($message, Response::HTTP_TOO_MANY_REQUESTS, ['Retry-After' => $retryAfterSeconds]);
-    }
-
-    /**
-     * Get core's rate limiter for the request.
-     */
-    protected function limiter(Request $request): RateLimiter
-    {
-        return new RateLimiter($request, Keystone::guard());
+        return new Middleware(ThrottleKeystoneRequests::class.':'.$kind->value, only: $actions);
     }
 }

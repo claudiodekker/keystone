@@ -23,4 +23,4 @@ If the store fails, Keystone reports the exception and refuses every sign-in att
 
 ## Changing the response
 
-Each Keystone controller renders the refusal from its `refuseThrottled()` method. Override it in your published controller to change the response body; keep the status and the `Retry-After` header.
+The refusal is a 429 with a `Retry-After` header and one message. Change the words by publishing the `keystone::messages.throttled` translation. Keystone takes the request limit as controller middleware, so replacing `show()` or `store()` in your published controller doesn't drop it.

@@ -20,6 +20,14 @@ use Symfony\Component\HttpFoundation\Response;
 abstract class SignOutController extends Controller
 {
     /**
+     * Get the middleware that runs before the controller's actions.
+     */
+    public static function middleware(): array
+    {
+        return [static::throttle(StepKind::CHANGE, '__invoke')];
+    }
+
+    /**
      * Sign out, ending the session.
      */
     public function __invoke(Request $request): Response|Responsable
@@ -49,14 +57,6 @@ abstract class SignOutController extends Controller
      * Respond to a completed sign-out.
      */
     abstract protected function sendSignedOut(Request $request): Response|Responsable;
-
-    /**
-     * Get the kind of step the action is, which picks its request limit.
-     */
-    protected function stepKind(string $method): StepKind
-    {
-        return StepKind::CHANGE;
-    }
 
     /**
      * Send a guest away from a signed-in step.

@@ -9,6 +9,7 @@ use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
+use ClaudioDekker\Keystone\RateLimiter;
 use ClaudioDekker\Keystone\SignInAttempt;
 use ClaudioDekker\Keystone\Status;
 use ClaudioDekker\Keystone\StepKind;
@@ -29,6 +30,17 @@ abstract class SignInController extends Controller
      * The input field that names the account; the only field ever flashed back.
      */
     public const string IDENTIFIER = 'identifier';
+
+    /**
+     * Get the middleware that runs before the controller's actions.
+     */
+    public static function middleware(): array
+    {
+        return [
+            static::throttle(StepKind::VIEW, 'show'),
+            static::throttle(StepKind::SUBMIT, 'store'),
+        ];
+    }
 
     /**
      * Show the sign-in page.
@@ -78,7 +90,7 @@ abstract class SignInController extends Controller
         $identifier = $input[self::IDENTIFIER];
         $proofInput = Arr::except($input, self::IDENTIFIER);
 
-        $attempt = new SignInAttempt(Keystone::guard(), app(AccountLookup::class), $this->limiter($request));
+        $attempt = new SignInAttempt(Keystone::guard(), app(AccountLookup::class), new RateLimiter($request, Keystone::guard()));
         $account = $attempt->attempt($credentialType, $identifier, $proofInput);
 
         if ($account === null) {
@@ -134,14 +146,6 @@ abstract class SignInController extends Controller
         $identifier = $request->input(self::IDENTIFIER);
 
         $request->session()->flashInput(is_string($identifier) ? [self::IDENTIFIER => $identifier] : []);
-    }
-
-    /**
-     * Get the kind of step the action is, which picks its request limit.
-     */
-    protected function stepKind(string $method): StepKind
-    {
-        return $method === 'show' ? StepKind::VIEW : StepKind::SUBMIT;
     }
 
     /**
