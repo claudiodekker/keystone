@@ -92,11 +92,17 @@ test('every account write in every package has a row in the epoch table', functi
     foreach ($tree as $file) {
         $path = $file->getPathname();
 
-        if (! preg_match('#/packages/[^/]+/src/.+\.php$#', $path) || ! str_contains(file_get_contents($path), 'use ChangesAccounts;')) {
+        if (! preg_match('#/packages/[^/]+/src/.+\.php$#', $path)) {
             continue;
         }
 
-        preg_match('/^namespace (.+);$/m', file_get_contents($path), $namespace);
+        $contents = file_get_contents($path);
+
+        if (! preg_match('/^\s*use\s+[^;]*\bChangesAccounts\b[^;]*;/m', $contents) || str_ends_with($path, 'Concerns/ChangesAccounts.php')) {
+            continue;
+        }
+
+        preg_match('/^namespace (.+);$/m', $contents, $namespace);
         $writes[] = $namespace[1].'\\'.$file->getBasename('.php');
     }
 
@@ -292,12 +298,40 @@ it('joins a write run inside another write to the same account, moving the epoch
 
     write($user, function (AccountWrite $write) {
         $write->endSessions();
-        (new EndSessions)->handle($write->account);
+        (new EndSessions)->handle(User::query()->findOrFail($write->account->getKey()));
     });
 
     Auth::forgetGuards();
     expect(epochOf($user))->toBe(1)
         ->and(guard()->user()?->getKey())->toBe($user->getKey());
+});
+
+it('runs a write to another account inside a write as a write of its own', function () {
+    $user = User::factory()->create();
+    $other = User::factory()->create();
+
+    write($user, function (AccountWrite $write) use ($other) {
+        (new EndSessions)->handle($other, operator: 'jane');
+    });
+
+    expect(epochOf($user))->toBe(0)
+        ->and(epochOf($other))->toBe(1)
+        ->and(SecurityEvent::query()->sole()->user_id)->toEqual($other->getKey());
+});
+
+it('lets a write that failed be followed by a write of its own', function () {
+    $user = User::factory()->create();
+
+    try {
+        write($user, fn () => throw new RuntimeException('The write failed.'));
+    } catch (RuntimeException) {
+        //
+    }
+
+    (new EndSessions)->handle($user);
+
+    expect(epochOf($user))->toBe(1);
+    $this->assertDatabaseCount('user_security_events', 1);
 });
 
 it('records a joined write\'s events once the outer write commits', function () {

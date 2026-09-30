@@ -36,7 +36,8 @@ trait ChangesAccounts
         [$write, $result] = $connection->transaction(function () use ($account, $apply) {
             $locked = $this->lockAccount($account);
             $addresses = new Addresses($locked);
-            $write = new AccountWrite($locked, $addresses->recipientsOf($locked));
+            $recipients = $addresses->recipientsOf($locked);
+            $write = new AccountWrite($locked, $recipients);
 
             return [$write, $write->hold($apply)];
         });
