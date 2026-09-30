@@ -4,12 +4,10 @@ namespace ClaudioDekker\Keystone\Http\Controllers;
 
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\KeystoneUser;
-use ClaudioDekker\Keystone\RateLimiter;
 use ClaudioDekker\Keystone\SecurityEventRecorder;
 use ClaudioDekker\Keystone\SecurityEventType;
 use ClaudioDekker\Keystone\Status;
 use ClaudioDekker\Keystone\StepKind;
-use ClaudioDekker\Keystone\Throttled;
 use Illuminate\Contracts\Support\Responsable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
@@ -19,20 +17,22 @@ use Symfony\Component\HttpFoundation\Response;
 /**
  * @api
  */
-abstract class SignOutController
+abstract class SignOutController extends Controller
 {
+    /**
+     * Get the middleware that runs before the controller's actions.
+     */
+    public static function middleware(): array
+    {
+        return [static::throttle(StepKind::CHANGE, '__invoke')];
+    }
+
     /**
      * Sign out, ending the session.
      */
     public function __invoke(Request $request): Response|Responsable
     {
         $guard = Keystone::guard();
-
-        try {
-            $this->limiter($request)->hitRequest(StepKind::CHANGE);
-        } catch (Throttled $throttled) {
-            return $this->refuseThrottled($request, $throttled->retryAfterSeconds);
-        }
 
         if (! $guard->check()) {
             return $this->refuseGuest();
@@ -57,24 +57,6 @@ abstract class SignOutController
      * Respond to a completed sign-out.
      */
     abstract protected function sendSignedOut(Request $request): Response|Responsable;
-
-    /**
-     * Refuse the sign-out when its rate limit is spent, saying when to try again.
-     */
-    protected function refuseThrottled(Request $request, int $retryAfterSeconds): Response
-    {
-        $message = __('keystone::messages.throttled', ['seconds' => $retryAfterSeconds]);
-
-        return response($message, Response::HTTP_TOO_MANY_REQUESTS, ['Retry-After' => $retryAfterSeconds]);
-    }
-
-    /**
-     * Get core's rate limiter for the request.
-     */
-    protected function limiter(Request $request): RateLimiter
-    {
-        return new RateLimiter($request, Keystone::guard());
-    }
 
     /**
      * Send a guest away from a signed-in step.

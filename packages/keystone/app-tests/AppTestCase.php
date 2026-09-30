@@ -37,6 +37,17 @@ abstract class AppTestCase extends TestCase
     public const string ASSERTIONS_NAMESPACE = 'Tests\\Keystone\\Assertions\\';
 
     /**
+     * The headers of the hardening floor, besides Cache-Control, X-Frame-Options and Content-Security-Policy.
+     */
+    protected const array HARDENING_HEADERS = [
+        'Pragma' => 'no-cache',
+        'X-Content-Type-Options' => 'nosniff',
+        'Referrer-Policy' => 'strict-origin-when-cross-origin',
+        'Cross-Origin-Opener-Policy' => 'same-origin',
+        'Cross-Origin-Resource-Policy' => 'same-origin',
+    ];
+
+    /**
      * Set up the test environment, relaxing the timing floor and sending a same-origin browser's headers.
      */
     protected function setUp(): void
@@ -157,6 +168,24 @@ abstract class AppTestCase extends TestCase
     }
 
     /**
+     * Create an account holding a credential of the supported type, and sign it in.
+     *
+     * @return Model&KeystoneUser
+     */
+    protected function signInAccount(CredentialTypeSupport $support, string $address = 'jane@example.com'): Model
+    {
+        $account = $this->createAccount($address);
+        $this->arrangeCredential($account, $support, Surface::SIGN_IN);
+
+        $this->post(route('login.submit', ['type' => $support->type()]), [
+            'identifier' => $address,
+            ...$support->validProof(Surface::SIGN_IN),
+        ]);
+
+        return $account;
+    }
+
+    /**
      * Get the test support of every installed type serving the surface, skipping when there is none.
      *
      * @return non-empty-list<CredentialTypeSupport>
@@ -223,6 +252,60 @@ abstract class AppTestCase extends TestCase
         }
 
         return $override;
+    }
+
+    /**
+     * Assert the response carries the hardening floor core attaches to every Keystone response, framed only as the app allows.
+     *
+     * @param  TestResponse<Response>  $response
+     */
+    public function assertHardeningFloor(TestResponse $response): void
+    {
+        $headers = $response->headers;
+        $cacheControl = array_map($headers->getCacheControlDirective(...), ['no-store', 'max-age', 'must-revalidate']);
+        $frameAncestors = (array) config('keystone.hardening.frame_ancestors', []);
+        $expectedHeaders = [...self::HARDENING_HEADERS, 'X-Frame-Options' => $frameAncestors === [] ? 'DENY' : null];
+        $expectedDirectives = [
+            'object-src' => "'none'",
+            'base-uri' => "'none'",
+            'frame-ancestors' => $frameAncestors === [] ? "'none'" : implode(' ', $frameAncestors),
+        ];
+
+        $this->assertSame([true, '0', true], $cacheControl, 'The response may be cached.');
+
+        foreach ($expectedHeaders as $name => $value) {
+            $this->assertSame($value, $headers->get($name), "The response's {$name} header isn't the floor's.");
+        }
+
+        $policies = $headers->all('Content-Security-Policy');
+
+        $this->assertNotEmpty($policies, 'The response has no Content-Security-Policy.');
+
+        foreach ($policies as $policy) {
+            $directives = $this->policyDirectives((string) $policy);
+
+            foreach ($expectedDirectives as $name => $value) {
+                $this->assertSame($value, $directives[$name] ?? null, "The response's Content-Security-Policy doesn't force {$name} to {$value}.");
+            }
+        }
+    }
+
+    /**
+     * Get a policy's directives by name, keeping the first of each as a browser does.
+     *
+     * @return array<string, string>
+     */
+    protected function policyDirectives(string $policy): array
+    {
+        $directives = [];
+
+        foreach (explode(';', $policy) as $directive) {
+            $parts = preg_split('/\s+/', trim($directive), 2) ?: [''];
+
+            $directives[strtolower($parts[0])] ??= $parts[1] ?? '';
+        }
+
+        return $directives;
     }
 
     /**

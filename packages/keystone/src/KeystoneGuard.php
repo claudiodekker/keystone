@@ -18,6 +18,11 @@ use LogicException;
 class KeystoneGuard extends SessionGuard
 {
     /**
+     * The request attribute set when Keystone ends the session during the request.
+     */
+    public const string ENDED_SESSION = 'keystone.ended_session';
+
+    /**
      * Get the currently authenticated user.
      *
      * @return Authenticatable|null
@@ -86,6 +91,8 @@ class KeystoneGuard extends SessionGuard
 
         $this->session->invalidate();
         $this->session->regenerateToken();
+
+        $this->markSessionEnded();
     }
 
     /**
@@ -235,6 +242,16 @@ class KeystoneGuard extends SessionGuard
         $this->session->invalidate();
 
         $this->user = null;
+
+        $this->markSessionEnded();
+    }
+
+    /**
+     * Mark the request as the one that ended the session, so its response clears the site's data.
+     */
+    protected function markSessionEnded(): void
+    {
+        $this->getRequest()->attributes->set(self::ENDED_SESSION, true);
     }
 
     /**

@@ -97,6 +97,12 @@ A browser that carries the device cookie an account's earlier sign-in left behin
 **Abandoned challenge**:
 A sign-in that passed the first factor and never finished the second.
 
+**Hardening floor**:
+The headers core puts on every response from a Keystone route, over any value the application gave them.
+
+**Keystone route**:
+A route whose controller is one of core's controllers or the application's subclass of one. Core hardens its responses and refuses cross-site changes to it.
+
 **Security event**:
 A record that something security-relevant happened, of one type from a closed list.
 

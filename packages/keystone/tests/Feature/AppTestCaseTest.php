@@ -3,6 +3,7 @@
 use ClaudioDekker\Keystone\AppTests\AppTestCase;
 use ClaudioDekker\Keystone\AppTests\Assertions\SignInAssertions;
 use ClaudioDekker\Keystone\AppTests\Support\CredentialTypeSupport;
+use ClaudioDekker\Keystone\Http\Middleware\AddHardeningHeaders;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Proof;
 use ClaudioDekker\Keystone\Methods\Surface;
@@ -15,6 +16,7 @@ use Illuminate\Cache\ArrayStore;
 use Illuminate\Cache\RateLimiter as CacheRateLimiter;
 use Illuminate\Support\Facades\Route;
 use PHPUnit\Framework\AssertionFailedError;
+use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 
 pest()->extend(AppTestCase::class);
 
@@ -103,4 +105,75 @@ describe('assertions', function () {
 
         AppTestCase::assertions(UnrelatedProbeAssertions::class);
     })->throws(LogicException::class, 'Tests\Keystone\Assertions\UnrelatedProbeAssertions must use '.UnrelatedProbeAssertions::class);
+});
+
+describe('assertHardeningFloor', function () {
+    function routeHardeningProbe(Closure $weaken): void
+    {
+        Route::get('probe', function () use ($weaken) {
+            $response = response('')->withHeaders([
+                ...AddHardeningHeaders::HEADERS,
+                'X-Frame-Options' => 'DENY',
+                'Content-Security-Policy' => "img-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+            ]);
+
+            $weaken($response->headers);
+
+            return $response;
+        });
+    }
+
+    it('passes a response carrying the floor', function () {
+        routeHardeningProbe(fn () => null);
+
+        $this->assertHardeningFloor($this->get('probe'));
+    });
+
+    it('passes a response the app lets its own origins frame', function () {
+        config(['keystone.hardening.frame_ancestors' => ["'self'", 'https://partner.example']]);
+        routeHardeningProbe(function (ResponseHeaderBag $headers) {
+            $headers->remove('X-Frame-Options');
+            $headers->set('Content-Security-Policy', "object-src 'none'; base-uri 'none'; frame-ancestors 'self' https://partner.example");
+        });
+
+        $this->assertHardeningFloor($this->get('probe'));
+    });
+
+    it('fails a response framed otherwise than the app allows', function (Closure $weaken) {
+        config(['keystone.hardening.frame_ancestors' => ["'self'"]]);
+        routeHardeningProbe(function (ResponseHeaderBag $headers) use ($weaken) {
+            $headers->remove('X-Frame-Options');
+            $headers->set('Content-Security-Policy', "object-src 'none'; base-uri 'none'; frame-ancestors 'self'");
+            $weaken($headers);
+        });
+        $response = $this->get('probe');
+
+        expect(fn () => $this->assertHardeningFloor($response))->toThrow(AssertionFailedError::class);
+    })->with([
+        'other frame ancestors' => fn (ResponseHeaderBag $headers) => $headers->set('Content-Security-Policy', "object-src 'none'; base-uri 'none'; frame-ancestors *"),
+        'an X-Frame-Options that forbids them' => fn (ResponseHeaderBag $headers) => $headers->set('X-Frame-Options', 'DENY'),
+    ]);
+
+    it('fails a response missing any part of the floor', function (Closure $weaken) {
+        routeHardeningProbe($weaken);
+        $response = $this->get('probe');
+
+        expect(fn () => $this->assertHardeningFloor($response))->toThrow(AssertionFailedError::class);
+    })->with([
+        'a storable response' => fn (ResponseHeaderBag $headers) => $headers->set('Cache-Control', 'max-age=0, must-revalidate'),
+        'a cacheable response' => fn (ResponseHeaderBag $headers) => $headers->set('Cache-Control', 'no-store, max-age=60, must-revalidate'),
+        'a response served stale' => fn (ResponseHeaderBag $headers) => $headers->set('Cache-Control', 'no-store, max-age=0'),
+        'no Pragma' => fn (ResponseHeaderBag $headers) => $headers->remove('Pragma'),
+        'a sniffable type' => fn (ResponseHeaderBag $headers) => $headers->remove('X-Content-Type-Options'),
+        'a looser referrer policy' => fn (ResponseHeaderBag $headers) => $headers->set('Referrer-Policy', 'unsafe-url'),
+        'a shared opener' => fn (ResponseHeaderBag $headers) => $headers->set('Cross-Origin-Opener-Policy', 'unsafe-none'),
+        'a cross-origin resource' => fn (ResponseHeaderBag $headers) => $headers->set('Cross-Origin-Resource-Policy', 'cross-origin'),
+        'a frameable response' => fn (ResponseHeaderBag $headers) => $headers->set('X-Frame-Options', 'SAMEORIGIN'),
+        'no policy' => fn (ResponseHeaderBag $headers) => $headers->remove('Content-Security-Policy'),
+        'no forced object-src' => fn (ResponseHeaderBag $headers) => $headers->set('Content-Security-Policy', "base-uri 'none'; frame-ancestors 'none'"),
+        'no forced base-uri' => fn (ResponseHeaderBag $headers) => $headers->set('Content-Security-Policy', "object-src 'none'; frame-ancestors 'none'"),
+        'no forced frame-ancestors' => fn (ResponseHeaderBag $headers) => $headers->set('Content-Security-Policy', "object-src 'none'; base-uri 'none'"),
+        'a looser frame-ancestors first' => fn (ResponseHeaderBag $headers) => $headers->set('Content-Security-Policy', "frame-ancestors *; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"),
+        'a second policy without the floor' => fn (ResponseHeaderBag $headers) => $headers->set('Content-Security-Policy', ["object-src 'none'; base-uri 'none'; frame-ancestors 'none'", "img-src 'self'"]),
+    ]);
 });

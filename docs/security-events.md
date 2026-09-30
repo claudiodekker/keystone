@@ -26,6 +26,7 @@ To keep the audit trail but drop the log line, set `keystone.log_channel` to Lar
 | `proof.rejected` | a sign-in naming an account is refused: a rejected proof, a proof naming a credential the account doesn't hold, or an account that is suspended |
 | `signed_out` | the user signs out |
 | `limit.tripped` | a rate limit refuses its first attempt in a window; the reason names the limit (`keystone.request_limit` or `keystone.failed_attempt_limit`) |
+| `request.rejected` | a request to change something on a Keystone route is refused as cross-site; the reason is `keystone.cross_site` (see [Hardening](hardening.md)) |
 
 A refused sign-in for an address no account holds records nothing, so a typed identifier is never stored.
 
