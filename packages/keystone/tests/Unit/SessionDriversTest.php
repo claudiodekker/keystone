@@ -3,7 +3,8 @@
 namespace ClaudioDekker\Keystone\Tests\Unit;
 
 use ClaudioDekker\Keystone\AccountChange;
-use ClaudioDekker\Keystone\AccountChanges;
+use ClaudioDekker\Keystone\Actions\ChangeAccount;
+use ClaudioDekker\Keystone\Jobs\EndEverySession;
 use ClaudioDekker\Keystone\KeystoneGuard;
 use ClaudioDekker\Keystone\Tests\Fixtures\User;
 use Closure;
@@ -93,7 +94,7 @@ it('ends every other session of the account when a change ends them, keeping the
     visit($driver, $laptop, fn (KeystoneGuard $guard) => $guard->signIn($user));
     visit($driver, $phone, fn (KeystoneGuard $guard) => $guard->signIn($user));
 
-    visit($driver, $laptop, fn (KeystoneGuard $guard) => (new AccountChanges($guard))->change($user, fn (AccountChange $change) => $change->endSessions()));
+    visit($driver, $laptop, fn (KeystoneGuard $guard) => (new ChangeAccount($guard))->handle($user, fn (AccountChange $change) => $change->endSessions()));
 
     expect(visit($driver, $laptop, fn (KeystoneGuard $guard) => $guard->user()))->not->toBeNull()
         ->and(visit($driver, $phone, fn (KeystoneGuard $guard) => $guard->user()))->toBeNull();
@@ -107,7 +108,7 @@ it('ends every account\'s sessions', function (string $driver) {
     visit($driver, $laptop, fn (KeystoneGuard $guard) => $guard->signIn($jane));
     visit($driver, $phone, fn (KeystoneGuard $guard) => $guard->signIn($john));
 
-    (new AccountChanges(Auth::guard('web')))->endEverySession();
+    (new EndEverySession)->handle();
 
     expect(visit($driver, $laptop, fn (KeystoneGuard $guard) => $guard->user()))->toBeNull()
         ->and(visit($driver, $phone, fn (KeystoneGuard $guard) => $guard->user()))->toBeNull();

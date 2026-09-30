@@ -1,7 +1,13 @@
 <?php
 
-namespace ClaudioDekker\Keystone;
+namespace ClaudioDekker\Keystone\Actions;
 
+use ClaudioDekker\Keystone\AccountChange;
+use ClaudioDekker\Keystone\Addresses;
+use ClaudioDekker\Keystone\Credentials;
+use ClaudioDekker\Keystone\KeystoneGuard;
+use ClaudioDekker\Keystone\KeystoneUser;
+use ClaudioDekker\Keystone\SecurityEventRecorder;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Date;
@@ -9,10 +15,10 @@ use Illuminate\Support\Facades\Date;
 /**
  * @internal
  */
-class AccountChanges
+class ChangeAccount
 {
     /**
-     * Create a new account changes instance.
+     * Create a new change account action instance.
      */
     public function __construct(
         protected KeystoneGuard $guard,
@@ -29,7 +35,7 @@ class AccountChanges
      * @param  Closure(AccountChange): TResult  $apply
      * @return TResult
      */
-    public function change(Model&KeystoneUser $account, Closure $apply): mixed
+    public function handle(Model&KeystoneUser $account, Closure $apply): mixed
     {
         $connection = $this->guard->userModel()->getConnection();
 
@@ -46,24 +52,6 @@ class AccountChanges
         $connection->afterCommit(fn () => $this->committed($change, $movedFrom));
 
         return $result;
-    }
-
-    /**
-     * End every session of every account, the mover's own included, and log it once.
-     */
-    public function endEverySession(?string $operator = null): void
-    {
-        $users = $this->guard->userModel();
-        $movedAt = $users->fromDateTime(Date::now());
-
-        $users->newQueryWithoutScopes()->toBase()->increment('credential_epoch', extra: ['credential_epoch_moved_at' => $movedAt]);
-
-        $users->getConnection()->afterCommit(fn () => $this->recorder->record(
-            SecurityEventType::SESSIONS_TERMINATED,
-            actor: Actor::OPERATOR,
-            reason: 'keystone.every_account',
-            operator: $operator,
-        ));
     }
 
     /**

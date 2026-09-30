@@ -3,7 +3,7 @@
 namespace ClaudioDekker\Keystone\Jobs;
 
 use ClaudioDekker\Keystone\AccountChange;
-use ClaudioDekker\Keystone\AccountChanges;
+use ClaudioDekker\Keystone\Actions\ChangeAccount;
 use ClaudioDekker\Keystone\Actor;
 use ClaudioDekker\Keystone\Exceptions\NotSuspended;
 use ClaudioDekker\Keystone\Keystone;
@@ -43,7 +43,7 @@ class UnsuspendAccount implements ShouldQueue
      */
     public function handle(): void
     {
-        (new AccountChanges(Keystone::guard()))->change($this->account, function (AccountChange $change) {
+        (new ChangeAccount(Keystone::guard()))->handle($this->account, function (AccountChange $change) {
             $change->unsuspend();
 
             $change->record(SecurityEventType::ACCOUNT_UNSUSPENDED, actor: Actor::OPERATOR, operator: $this->operator);

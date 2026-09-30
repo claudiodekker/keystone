@@ -3,7 +3,7 @@
 namespace ClaudioDekker\Keystone\Jobs;
 
 use ClaudioDekker\Keystone\AccountChange;
-use ClaudioDekker\Keystone\AccountChanges;
+use ClaudioDekker\Keystone\Actions\ChangeAccount;
 use ClaudioDekker\Keystone\Actor;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\KeystoneUser;
@@ -41,7 +41,7 @@ class EndSessions implements ShouldQueue
      */
     public function handle(): void
     {
-        (new AccountChanges(Keystone::guard()))->change($this->account, function (AccountChange $change) {
+        (new ChangeAccount(Keystone::guard()))->handle($this->account, function (AccountChange $change) {
             $change->endSessions();
 
             $change->record(SecurityEventType::SESSIONS_TERMINATED, actor: Actor::OPERATOR, operator: $this->operator, alert: $this->alert);
