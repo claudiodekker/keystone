@@ -2,6 +2,7 @@
 
 namespace ClaudioDekker\Keystone\Actions;
 
+use ClaudioDekker\Keystone\AccountWrite;
 use ClaudioDekker\Keystone\Actions\Concerns\ChangesAccounts;
 use ClaudioDekker\Keystone\Actor;
 use ClaudioDekker\Keystone\KeystoneUser;
@@ -20,9 +21,9 @@ class EndSessions
      */
     public function handle(Model&KeystoneUser $account, ?string $operator = null, bool $alert = true): void
     {
-        $this->changeAccount($account, function (Model&KeystoneUser $account) use ($operator, $alert) {
-            $this->endSessions($account);
-            $this->record(SecurityEventType::SESSIONS_TERMINATED, $account, actor: Actor::OPERATOR, operator: $operator, alert: $alert);
+        $this->changeAccount($account, function (AccountWrite $write) use ($operator, $alert) {
+            $write->endSessions();
+            $write->record(SecurityEventType::SESSIONS_TERMINATED, actor: Actor::OPERATOR, operator: $operator, alert: $alert);
         });
     }
 }

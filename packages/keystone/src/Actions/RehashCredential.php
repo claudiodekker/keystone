@@ -2,6 +2,7 @@
 
 namespace ClaudioDekker\Keystone\Actions;
 
+use ClaudioDekker\Keystone\AccountWrite;
 use ClaudioDekker\Keystone\Actions\Concerns\ChangesAccounts;
 use ClaudioDekker\Keystone\Credentials;
 use ClaudioDekker\Keystone\KeystoneUser;
@@ -20,8 +21,8 @@ class RehashCredential
      */
     public function handle(Model&KeystoneUser $account, StoredCredential $credential, string $type, #[\SensitiveParameter] string $secret): bool
     {
-        return $this->changeAccount($account, function (Model&KeystoneUser $account) use ($credential, $type, $secret) {
-            $credentials = new Credentials($account);
+        return $this->changeAccount($account, function (AccountWrite $write) use ($credential, $type, $secret) {
+            $credentials = new Credentials($write->account);
 
             return $credentials->replaceSecret($credential, type: $type, secret: $secret);
         });

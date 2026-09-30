@@ -2,6 +2,7 @@
 
 namespace ClaudioDekker\Keystone\Actions;
 
+use ClaudioDekker\Keystone\AccountWrite;
 use ClaudioDekker\Keystone\Actions\Concerns\ChangesAccounts;
 use ClaudioDekker\Keystone\Actor;
 use ClaudioDekker\Keystone\Exceptions\AlreadySuspended;
@@ -24,14 +25,14 @@ class SuspendAccount
      */
     public function handle(Model&KeystoneUser $account, ?string $operator = null): void
     {
-        $this->changeAccount($account, function (Model&KeystoneUser $account) use ($operator) {
-            if (! is_null($account->getRawOriginal('suspended_at'))) {
+        $this->changeAccount($account, function (AccountWrite $write) use ($operator) {
+            if (! is_null($write->account->getRawOriginal('suspended_at'))) {
                 throw new AlreadySuspended;
             }
 
-            $this->writeColumns($account, ['suspended_at' => $account->fromDateTime(Date::now())]);
-            $this->endSessions($account);
-            $this->record(SecurityEventType::ACCOUNT_SUSPENDED, $account, actor: Actor::OPERATOR, operator: $operator);
+            $write->update(['suspended_at' => $write->account->fromDateTime(Date::now())]);
+            $write->endSessions();
+            $write->record(SecurityEventType::ACCOUNT_SUSPENDED, actor: Actor::OPERATOR, operator: $operator);
         });
     }
 }

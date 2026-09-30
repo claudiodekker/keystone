@@ -2,6 +2,7 @@
 
 namespace ClaudioDekker\Keystone\Actions;
 
+use ClaudioDekker\Keystone\AccountWrite;
 use ClaudioDekker\Keystone\Actions\Concerns\ChangesAccounts;
 use ClaudioDekker\Keystone\Credentials;
 use ClaudioDekker\Keystone\KeystoneUser;
@@ -25,10 +26,10 @@ class AddCredential
         #[\SensitiveParameter] ?string $secret,
         ?string $label = null,
     ): int {
-        return $this->changeAccount($account, function (Model&KeystoneUser $account) use ($type, $identifier, $secret, $label) {
-            $credentials = new Credentials($account);
+        return $this->changeAccount($account, function (AccountWrite $write) use ($type, $identifier, $secret, $label) {
+            $credentials = new Credentials($write->account);
 
-            return $credentials->store($account, $type, identifier: $identifier, secret: $secret, label: $label);
+            return $credentials->store($write->account, $type, identifier: $identifier, secret: $secret, label: $label);
         });
     }
 }

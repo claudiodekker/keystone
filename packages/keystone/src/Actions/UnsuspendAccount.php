@@ -2,6 +2,7 @@
 
 namespace ClaudioDekker\Keystone\Actions;
 
+use ClaudioDekker\Keystone\AccountWrite;
 use ClaudioDekker\Keystone\Actions\Concerns\ChangesAccounts;
 use ClaudioDekker\Keystone\Actor;
 use ClaudioDekker\Keystone\Exceptions\NotSuspended;
@@ -23,13 +24,13 @@ class UnsuspendAccount
      */
     public function handle(Model&KeystoneUser $account, ?string $operator = null): void
     {
-        $this->changeAccount($account, function (Model&KeystoneUser $account) use ($operator) {
-            if (is_null($account->getRawOriginal('suspended_at'))) {
+        $this->changeAccount($account, function (AccountWrite $write) use ($operator) {
+            if (is_null($write->account->getRawOriginal('suspended_at'))) {
                 throw new NotSuspended;
             }
 
-            $this->writeColumns($account, ['suspended_at' => null]);
-            $this->record(SecurityEventType::ACCOUNT_UNSUSPENDED, $account, actor: Actor::OPERATOR, operator: $operator);
+            $write->update(['suspended_at' => null]);
+            $write->record(SecurityEventType::ACCOUNT_UNSUSPENDED, actor: Actor::OPERATOR, operator: $operator);
         });
     }
 }

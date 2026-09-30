@@ -83,3 +83,7 @@ $unsuspendAccount->handle($user, operator: $request->user()->email);
 ```
 
 They refuse an account already in the state they would put it in: `SuspendAccount` throws `ClaudioDekker\Keystone\Exceptions\AlreadySuspended`, and `UnsuspendAccount` throws `ClaudioDekker\Keystone\Exceptions\NotSuspended`.
+
+## Replacing an Action
+
+The commands resolve these Actions from the container, so binding your own subclass changes what both the commands and your admin panel run. Keep calling `parent::handle()` around your own work: Keystone's AppTests fail in your app when a replaced Action stops ending sessions, barring sign-in or recording its event.
