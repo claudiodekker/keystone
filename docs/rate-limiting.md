@@ -9,6 +9,8 @@ Keystone rate limits its own endpoints. Nothing in your routes, middleware or co
 | Request limit | IP address, and separately the signed-in account, per kind of step | 60 page views, 10 submissions or sign-outs a minute |
 | Failed-attempt limit | account and credential type in each flow, from any IP address | 20 wrong answers an hour |
 
+Change the allowances in `keystone.rate_limits` (see [Configuration](configuration.md)). Each must be a whole number of at least 1: no value turns a limit off.
+
 The request limit is checked before anything else, so even invalid input or an unknown credential type is throttled. It is taken before your controller's action runs, so it still applies when you replace an action such as `show()` or `store()` in your published controller. A wrong answer counts against the account the typed identifier names; an identifier that names no account gets a bucket of its own, so a made-up address locks exactly like a real one.
 
 A successful sign-in doesn't count, but nothing ever resets a count: counts only expire at the end of their window.
@@ -17,7 +19,7 @@ The first refusal in each window records a `limit.tripped` [security event](secu
 
 ## The store
 
-Counts live in Laravel's rate-limiter cache store: the store named by `cache.limiter`, else your default cache store. It must increment atomically and must not evict entries early, so use `redis`, `database` or `memcached` in production. Keys are hashed with your app key, and no email address, username or IP address is stored in clear.
+Counts live in Laravel's rate-limiter cache store: the store named by `cache.limiter`, else your default cache store. It must increment atomically and must not evict entries early, so use `redis`, `database` or `memcached` in production. In production, Keystone refuses to boot when that store uses the `file`, `storage`, `array`, `null` or `session` driver. Keys are hashed with your app key, and no email address, username or IP address is stored in clear.
 
 If the store fails, Keystone reports the exception and refuses every sign-in attempt until it is back. Page views and other requests go through.
 

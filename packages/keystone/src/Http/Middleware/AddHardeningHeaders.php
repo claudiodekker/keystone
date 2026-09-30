@@ -81,19 +81,27 @@ class AddHardeningHeaders
      */
     protected function frameAncestors(): array
     {
-        $sources = config('keystone.hardening.frame_ancestors', []);
+        $sources = config('keystone.hardening.frame_ancestors');
 
         if (! is_array($sources) || ! array_is_list($sources)) {
             return [];
         }
 
         foreach ($sources as $source) {
-            if (! is_string($source) || preg_match(self::FRAME_ANCESTOR_PATTERN, $source) !== 1) {
+            if (! is_string($source) || ! static::isFrameAncestor($source)) {
                 return [];
             }
         }
 
         return $sources;
+    }
+
+    /**
+     * Determine if the value is a single CSP source a frame-ancestors directive can list.
+     */
+    public static function isFrameAncestor(string $source): bool
+    {
+        return preg_match(self::FRAME_ANCESTOR_PATTERN, $source) === 1;
     }
 
     /**

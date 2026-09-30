@@ -123,7 +123,7 @@ class RefuseCrossSiteRequests
      */
     protected function trustedOrigins(): array
     {
-        $origins = config('keystone.trusted_origins', []);
+        $origins = config('keystone.trusted_origins');
 
         if (! is_array($origins)) {
             return [];

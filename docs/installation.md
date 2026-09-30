@@ -18,7 +18,7 @@ The installer refuses while `laravel/fortify` is installed, since both would han
 - adds the `Keystone` testsuite to `phpunit.xml` and maps the AppTests' namespaces in your `autoload-dev`, so `php artisan test` proves your copies keep Keystone's guarantees.
 - adds the npm packages the pages need, keeping the versions you already pinned, then runs `npm install && npm run build`. A package your app already depends on keeps its version.
 
-When it can't make an edit, such as a `phpunit.xml` without a `<testsuites>` element, it prints what to add yourself. It leaves `app.cipher` alone. Keystone's migrations run from the package, so there is nothing to publish.
+When it can't make an edit, such as a `phpunit.xml` without a `<testsuites>` element, it prints what to add yourself. It leaves `app.cipher` alone. Keystone's migrations run from the package, so there is nothing to publish; publish Keystone's config only to change a setting (see [Configuration](configuration.md)).
 
 ## The user model
 

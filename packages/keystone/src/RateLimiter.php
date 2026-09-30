@@ -28,11 +28,6 @@ class RateLimiter
     public const int FAILED_ATTEMPT_WINDOW_SECONDS = 3600;
 
     /**
-     * How many failed attempts an account may have per credential type and flow in a window.
-     */
-    public const int FAILED_ATTEMPT_ALLOWANCE = 20;
-
-    /**
      * How long a refusal asks the client to wait while the store is down.
      */
     public const int OUTAGE_RETRY_AFTER_SECONDS = 60;
@@ -127,7 +122,9 @@ class RateLimiter
             throw new Throttled(self::OUTAGE_RETRY_AFTER_SECONDS);
         }
 
-        if ($count === self::FAILED_ATTEMPT_ALLOWANCE + 1) {
+        $allowance = config()->integer('keystone.rate_limits.failed_attempts_per_hour');
+
+        if ($count === $allowance + 1) {
             $this->recorder->record(
                 SecurityEventType::LIMIT_TRIPPED,
                 account: $account,
@@ -139,7 +136,7 @@ class RateLimiter
             $this->dispatchLockout();
         }
 
-        if ($count > self::FAILED_ATTEMPT_ALLOWANCE) {
+        if ($count > $allowance) {
             throw new Throttled($retryAfterSeconds);
         }
 

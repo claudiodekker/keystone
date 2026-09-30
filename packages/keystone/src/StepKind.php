@@ -17,9 +17,6 @@ enum StepKind: string
      */
     public function allowance(): int
     {
-        return match ($this) {
-            self::VIEW => 60,
-            self::START, self::SUBMIT, self::CHANGE => 10,
-        };
+        return config()->integer("keystone.rate_limits.requests_per_minute.{$this->value}");
     }
 }
