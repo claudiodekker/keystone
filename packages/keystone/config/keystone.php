@@ -1,5 +1,7 @@
 <?php
 
+use ClaudioDekker\Keystone\Notifications\SecurityAlert;
+
 return [
 
     /*
@@ -67,6 +69,36 @@ return [
     ],
 
     'log_channel' => null,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Security Alerts
+    |--------------------------------------------------------------------------
+    |
+    | The notification each type of security event mails its account's
+    | owner, keyed by type. Name your own class to change a mail, or
+    | set a type to null to silence it. Nothing silences them all.
+    |
+    */
+
+    'notifications' => [
+        'sessions.terminated' => SecurityAlert::class,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | IP Location
+    |--------------------------------------------------------------------------
+    |
+    | Whether stevebauman/location may use a driver that sends your
+    | users' IP addresses over plain http. Keystone skips such a
+    | driver unless you allow it, trying the next one instead.
+    |
+    */
+
+    'ip_location' => [
+        'allow_plaintext_driver' => false,
+    ],
 
     /*
     |--------------------------------------------------------------------------

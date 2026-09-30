@@ -28,6 +28,7 @@ class EndSessionsCommand extends Command
         {user? : The id of the account whose sessions end}
         {--all : End every account\'s sessions}
         {--operator= : Who is ending them, recorded on the security event}
+        {--no-alert : End one account\'s sessions without alerting its owner}
         {--force : End every account\'s sessions without asking, in production}';
 
     /**
@@ -46,13 +47,14 @@ class EndSessionsCommand extends Command
         $all = $this->option('all') === true;
         $operator = $this->option('operator');
         $operator = is_string($operator) ? $operator : null;
+        $alert = $this->option('no-alert') !== true;
 
         if ($all && is_null($id)) {
             return $this->endEverySession($operator);
         }
 
         if (! $all && ! is_null($id)) {
-            return $this->endSessionsOf($id, $operator);
+            return $this->endSessionsOf($id, $operator, $alert);
         }
 
         $this->components->error('Name one account by its id, or pass --all.');
@@ -61,9 +63,9 @@ class EndSessionsCommand extends Command
     }
 
     /**
-     * End every session of the account with the id.
+     * End every session of the account with the id, alerting its owner unless suppressed.
      */
-    protected function endSessionsOf(string $id, ?string $operator): int
+    protected function endSessionsOf(string $id, ?string $operator, bool $alert): int
     {
         /** @var (Model&KeystoneUser)|null $account */
         $account = Keystone::guard()->userModel()->newQueryWithoutScopes()->whereKey($id)->first();
@@ -74,7 +76,7 @@ class EndSessionsCommand extends Command
             return self::FAILURE;
         }
 
-        EndSessions::dispatchSync($account, $operator);
+        EndSessions::dispatchSync($account, $operator, $alert);
 
         $this->components->info("Ended every session of account [{$id}].");
 

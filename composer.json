@@ -13,8 +13,10 @@
     "require-dev": {
         "larastan/larastan": "^3.12",
         "laravel/pint": "^1.32",
+        "matomo/device-detector": "^6.5",
         "orchestra/testbench": "^11.0",
-        "pestphp/pest": "^5.2"
+        "pestphp/pest": "^5.2",
+        "stevebauman/location": "^7.6"
     },
     "replace": {
         "claudiodekker/keystone": "self.version",

@@ -113,6 +113,10 @@ _Avoid_: activity log
 **Security alert**:
 A notification to the user about one security event.
 
+**Notification slot**:
+The config entry naming the notification one type of security event sends as its security alert, or null to silence that type alone.
+_Avoid_: alert switch
+
 ### Sign-in state
 
 **Signed in**:

@@ -72,15 +72,17 @@ class AccountChange
     }
 
     /**
-     * Record the event about the account once the change commits.
+     * Record the event about the account once the change commits, alerting the recipients read before it unless suppressed.
      */
-    public function record(SecurityEventType $type, Actor $actor = Actor::USER, ?string $operator = null): void
+    public function record(SecurityEventType $type, Actor $actor = Actor::USER, ?string $operator = null, bool $alert = true): void
     {
         $this->events[] = fn (SecurityEventRecorder $recorder) => $recorder->record(
             $type,
             account: $this->account,
             actor: $actor,
             operator: $operator,
+            recipients: $this->recipients,
+            alert: $alert,
         );
     }
 

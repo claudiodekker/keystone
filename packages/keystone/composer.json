@@ -7,6 +7,10 @@
         "ext-intl": "*",
         "illuminate/support": "^13.0"
     },
+    "suggest": {
+        "matomo/device-detector": "Shows the platform and browser in security alerts (^6.5).",
+        "stevebauman/location": "Shows where an IP address is in security events and alerts (^7.6)."
+    },
     "autoload": {
         "psr-4": {
             "ClaudioDekker\\Keystone\\": "src/"

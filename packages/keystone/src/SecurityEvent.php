@@ -90,6 +90,6 @@ class SecurityEvent extends Model
 
                 return $utc->format($format);
             },
-        );
+        )->withoutObjectCaching();
     }
 }

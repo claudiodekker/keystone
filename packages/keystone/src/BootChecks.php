@@ -7,6 +7,7 @@ use ClaudioDekker\Keystone\Http\Middleware\ClearSiteDataOnSessionEnd;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Notifications\Notification;
 
 /**
  * @internal
@@ -62,6 +63,7 @@ class BootChecks
             ...$this->rateLimitFailures(),
             ...$this->sessionFailures(),
             ...$this->eventFailures(),
+            ...$this->alertFailures(),
             ...$this->hardeningFailures(),
             ...$this->methodFailures(),
             ...$this->connectionFailures(),
@@ -147,6 +149,43 @@ class BootChecks
         }
 
         return $failures;
+    }
+
+    /**
+     * Check that each alert slot names a type of security event and holds null or a notification class, and the plaintext switch.
+     *
+     * @return list<string>
+     */
+    protected function alertFailures(): array
+    {
+        $slots = config('keystone.notifications');
+        $failures = is_bool(config('keystone.ip_location.allow_plaintext_driver'))
+            ? []
+            : ['keystone.ip_location.allow_plaintext_driver must be true or false.'];
+
+        if (! $this->isMap($slots)) {
+            return ['keystone.notifications must map types of security event to a notification class or null.', ...$failures];
+        }
+
+        foreach ($slots as $type => $slot) {
+            if (SecurityEventType::tryFrom((string) $type) === null) {
+                $failures[] = "keystone.notifications.{$type} isn't a type of security event.";
+            } elseif ($slot !== null && ! (is_string($slot) && is_a($slot, Notification::class, true))) {
+                $failures[] = "keystone.notifications.{$type} must be null or the class name of a notification.";
+            }
+        }
+
+        return $failures;
+    }
+
+    /**
+     * Determine if the value is an array keyed by name.
+     *
+     * @phpstan-assert-if-true array<string, mixed> $value
+     */
+    protected function isMap(mixed $value): bool
+    {
+        return is_array($value) && $value !== [] && ! array_is_list($value);
     }
 
     /**

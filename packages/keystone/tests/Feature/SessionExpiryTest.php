@@ -2,6 +2,7 @@
 
 use ClaudioDekker\Keystone\Actions\RespondToExpiredSession;
 use ClaudioDekker\Keystone\AppTests\AppTestCase;
+use ClaudioDekker\Keystone\IpLocation;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormTypeSupport;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Auth\Middleware\Authenticate;
@@ -29,6 +30,17 @@ it('sends an expired browser to sign in, clearing the site\'s data', function ()
     $response = $this->get('dashboard');
 
     $response->assertRedirectToRoute('login')->assertHeader('Clear-Site-Data', '"cache", "storage"');
+});
+
+it('ends the session when recording why fails, rather than asking again who is signed in', function () {
+    $this->freezeSecond();
+    $this->signInAccount(new FormTypeSupport);
+    $this->travel(3600)->seconds();
+    $this->app->instance(IpLocation::class, Mockery::mock(IpLocation::class)->shouldReceive('locate')->andThrow(new RuntimeException('Lookup failed.'))->getMock());
+
+    $response = $this->get('welcome');
+
+    $response->assertContent('Welcome, guest.');
 });
 
 it('says on the sign-in page why the session ended', function () {

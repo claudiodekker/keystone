@@ -286,21 +286,21 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * End the session because it outlived its absolute lifetime, recording why and telling the user.
+     * End the session because it outlived its absolute lifetime, telling the user and then recording why, so a failure reported while recording finds nobody signed in.
      */
     protected function expire(Model&KeystoneUser $account): void
     {
-        (new SecurityEventRecorder)->record(
-            SecurityEventType::SESSION_ENDED,
-            account: $account,
-            reason: 'expired',
-        );
-
         $this->endSession();
 
         $this->session->flash(Status::SESSION_KEY, Status::SESSION_EXPIRED->value);
 
         $this->getRequest()->attributes->set(self::EXPIRED_SESSION, true);
+
+        (new SecurityEventRecorder)->record(
+            SecurityEventType::SESSION_ENDED,
+            account: $account,
+            reason: 'expired',
+        );
     }
 
     /**

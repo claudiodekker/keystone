@@ -2,12 +2,15 @@
 
 use Carbon\CarbonImmutable;
 use ClaudioDekker\Keystone\Actor;
+use ClaudioDekker\Keystone\IpLocation;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
+use ClaudioDekker\Keystone\Notifications\SecurityAlert;
 use ClaudioDekker\Keystone\RequestContext;
 use ClaudioDekker\Keystone\SecurityEvent;
 use ClaudioDekker\Keystone\SecurityEventRecorded;
 use ClaudioDekker\Keystone\SecurityEventRecorder;
 use ClaudioDekker\Keystone\SecurityEventType;
+use ClaudioDekker\Keystone\Tests\Fixtures\FlakyAlert;
 use ClaudioDekker\Keystone\Tests\Fixtures\User;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
@@ -15,6 +18,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 use Monolog\Handler\TestHandler;
 use Monolog\LogRecord;
 
@@ -43,6 +47,49 @@ function captureContext(string $ip = '203.0.113.7', string $path = 'login', stri
 function recorder(): SecurityEventRecorder
 {
     return new SecurityEventRecorder;
+}
+
+function holding(array $addresses): User
+{
+    $user = User::factory()->create();
+
+    foreach ($addresses as $address => $verified) {
+        DB::table('user_emails')->insert([
+            'user_id' => $user->getKey(),
+            'address' => $address,
+            'verified_at' => $verified ? now() : null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    return $user;
+}
+
+function alertedAddresses(): array
+{
+    $addresses = [];
+
+    Notification::assertSentOnDemand(SecurityAlert::class, function (SecurityAlert $alert, array $channels, object $notifiable) use (&$addresses) {
+        $addresses[] = $notifiable->routes['mail'];
+
+        return true;
+    });
+
+    return $addresses;
+}
+
+function locatingAs(?string $location): void
+{
+    app()->instance(IpLocation::class, new class($location) implements IpLocation
+    {
+        public function __construct(public ?string $location) {}
+
+        public function locate(string $ipAddress): ?string
+        {
+            return $this->location;
+        }
+    });
 }
 
 describe('the log line', function () {
@@ -253,6 +300,127 @@ describe('anonymous events', function () {
     });
 });
 
+describe('the location', function () {
+    it('holds where the IP address is, as the IP-location port names it', function () {
+        captureContext();
+        locatingAs('Amsterdam, Netherlands');
+        $user = User::factory()->create();
+
+        recorder()->record(SecurityEventType::SIGNED_IN, account: $user);
+
+        expect(loggedContext()[0]['location'])->toBe('Amsterdam, Netherlands')
+            ->and(SecurityEvent::sole()->location)->toBe('Amsterdam, Netherlands');
+    });
+
+    it('isn\'t looked up without an IP address', function () {
+        app()->instance(IpLocation::class, Mockery::mock(IpLocation::class)->shouldNotReceive('locate')->getMock());
+
+        recorder()->record(SecurityEventType::SIGNED_OUT, account: User::factory()->create());
+
+        expect(loggedContext()[0]['location'])->toBeNull();
+    });
+
+    it('is null, and the event still recorded, when the port throws', function () {
+        captureContext();
+        app()->instance(IpLocation::class, Mockery::mock(IpLocation::class)->shouldReceive('locate')->andThrow(new RuntimeException('Lookup failed.'))->getMock());
+
+        recorder()->record(SecurityEventType::SIGNED_OUT, account: User::factory()->create());
+
+        expect(SecurityEvent::sole()->location)->toBeNull();
+        Exceptions::assertReported(fn (RuntimeException $e) => $e->getMessage() === 'Lookup failed.');
+    });
+});
+
+describe('the alert', function () {
+    beforeEach(function () {
+        Notification::fake();
+    });
+
+    it('goes to every verified address, one mail each', function () {
+        $user = holding(['jane@example.com' => true, 'old@example.com' => false, 'work@example.com' => true]);
+
+        recorder()->record(SecurityEventType::SESSIONS_TERMINATED, account: $user, actor: Actor::OPERATOR);
+
+        expect(alertedAddresses())->toBe(['jane@example.com', 'work@example.com']);
+    });
+
+    it('goes to the unverified addresses when none is verified', function () {
+        $user = holding(['jane@example.com' => false, 'work@example.com' => false]);
+
+        recorder()->record(SecurityEventType::SESSIONS_TERMINATED, account: $user, actor: Actor::OPERATOR);
+
+        expect(alertedAddresses())->toBe(['jane@example.com', 'work@example.com']);
+    });
+
+    it('goes to the recipients read before the change, when it is given them', function () {
+        $user = holding(['jane@example.com' => true]);
+
+        recorder()->record(SecurityEventType::SESSIONS_TERMINATED, account: $user, actor: Actor::OPERATOR, recipients: ['old@example.com']);
+
+        expect(alertedAddresses())->toBe(['old@example.com']);
+    });
+
+    it('carries the event it alerts about', function () {
+        $user = holding(['jane@example.com' => true]);
+
+        recorder()->record(SecurityEventType::SESSIONS_TERMINATED, account: $user, actor: Actor::OPERATOR);
+
+        Notification::assertSentOnDemand(SecurityAlert::class, fn (SecurityAlert $alert) => $alert->type === SecurityEventType::SESSIONS_TERMINATED);
+    });
+
+    it('is sent for every event, however alike', function () {
+        $user = holding(['jane@example.com' => true]);
+
+        recorder()->record(SecurityEventType::SESSIONS_TERMINATED, account: $user, actor: Actor::OPERATOR);
+        recorder()->record(SecurityEventType::SESSIONS_TERMINATED, account: $user, actor: Actor::OPERATOR);
+
+        Notification::assertSentOnDemandTimes(SecurityAlert::class, 2);
+    });
+
+    it('is the notification the type\'s slot names', function () {
+        config(['keystone.notifications' => ['sessions.terminated' => FlakyAlert::class]]);
+        $user = holding(['jane@example.com' => true]);
+
+        recorder()->record(SecurityEventType::SESSIONS_TERMINATED, account: $user, actor: Actor::OPERATOR);
+
+        expect(FlakyAlert::$delivered)->toBe(['jane@example.com']);
+        Notification::assertNothingSent();
+    });
+
+    it('is silenced by a null slot', function () {
+        config(['keystone.notifications' => ['sessions.terminated' => null]]);
+        $user = holding(['jane@example.com' => true]);
+
+        recorder()->record(SecurityEventType::SESSIONS_TERMINATED, account: $user, actor: Actor::OPERATOR);
+
+        Notification::assertNothingSent();
+        $this->assertDatabaseCount('user_security_events', 1);
+    });
+
+    it('isn\'t sent for a type without a slot', function () {
+        $user = holding(['jane@example.com' => true]);
+
+        recorder()->record(SecurityEventType::SIGNED_OUT, account: $user);
+
+        Notification::assertNothingSent();
+    });
+
+    it('isn\'t sent when the caller suppresses it', function () {
+        $user = holding(['jane@example.com' => true]);
+
+        recorder()->record(SecurityEventType::SESSIONS_TERMINATED, account: $user, actor: Actor::OPERATOR, alert: false);
+
+        Notification::assertNothingSent();
+        $this->assertDatabaseCount('user_security_events', 1);
+    });
+
+    it('isn\'t sent for an event about nobody', function () {
+        recorder()->record(SecurityEventType::SESSIONS_TERMINATED, actor: Actor::OPERATOR, recipients: ['jane@example.com']);
+
+        Notification::assertNothingSent();
+    });
+});
+
 describe('the dispatched event', function () {
     it('carries the whole stored entry', function () {
         Event::fake([SecurityEventRecorded::class]);
@@ -309,6 +477,18 @@ describe('a failing step', function () {
         $this->assertDatabaseCount('user_security_events', 0);
         Event::assertNotDispatched(SecurityEventRecorded::class);
         Exceptions::assertReported(fn (RuntimeException $e) => $e->getMessage() === 'Key lost.');
+    });
+
+    it('still sends the other alerts, and dispatches, when one alert fails', function () {
+        Event::fake([SecurityEventRecorded::class]);
+        config(['keystone.notifications' => ['sessions.terminated' => FlakyAlert::class]]);
+        $user = holding(['broken@example.com' => true, 'jane@example.com' => true]);
+
+        recorder()->record(SecurityEventType::SESSIONS_TERMINATED, account: $user, actor: Actor::OPERATOR);
+
+        expect(FlakyAlert::$delivered)->toBe(['jane@example.com']);
+        Event::assertDispatched(SecurityEventRecorded::class);
+        Exceptions::assertReported(fn (RuntimeException $e) => $e->getMessage() === 'Mailer down.');
     });
 
     it('still logs and stores when a listener fails', function () {

@@ -10,6 +10,7 @@ use ClaudioDekker\Keystone\Http\Middleware\CaptureRequestContext;
 use ClaudioDekker\Keystone\Http\Middleware\ClearSiteDataOnSessionEnd;
 use ClaudioDekker\Keystone\Http\Middleware\RefuseCrossSiteRequests;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
+use DeviceDetector\DeviceDetector;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Auth\AuthManager;
 use Illuminate\Auth\EloquentUserProvider;
@@ -24,6 +25,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Router;
 use Illuminate\Support\ServiceProvider;
 use LogicException;
+use Stevebauman\Location\LocationManager;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -47,6 +49,8 @@ class KeystoneServiceProvider extends ServiceProvider
         $this->app->bindIf(AccountLookup::class);
         $this->app->bindIf(RespondToExpiredSession::class);
         $this->app->scoped(RequestContext::class, fn () => new RequestContext);
+        $this->app->bindIf(IpLocation::class, fn () => class_exists(LocationManager::class) ? new StevebaumanIpLocation : new NullIpLocation);
+        $this->app->bindIf(SessionInfo::class, fn () => class_exists(DeviceDetector::class) ? new DeviceDetectorSessionInfo : new NullSessionInfo);
     }
 
     /**
@@ -82,6 +86,7 @@ class KeystoneServiceProvider extends ServiceProvider
 
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
         $this->loadTranslationsFrom(__DIR__.'/../lang', 'keystone');
+        $this->loadViewsFrom(__DIR__.'/../resources/views', 'keystone');
     }
 
     /**

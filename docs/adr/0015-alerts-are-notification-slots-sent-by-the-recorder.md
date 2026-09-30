@@ -1,0 +1,17 @@
+# Alerts are notification slots sent by the recorder
+
+A security alert is sent by the recorder's third step, inline with the event it is about, never by a listener. Each type of security event has a slot in `keystone.notifications`: a notification class, or null to silence that type. Every default slot is the one `SecurityAlert` class, which picks a per-type view and per-type translation keys. The recorder sends the slot's notification on demand to each recipient, one mail each: every verified address of the account, or the unverified ones when none is verified, read before the change that caused the event.
+
+Sending from the recorder, like recording itself (ADR 0006), means an app can't lose an alert by forgetting a listener, and a broken mailer is rescued and reported without changing the response or skipping the other steps. A slot per type, with no global switch, replaces v3's `notifications.enabled`, whose one value muted every alert; an app can still silence a type it handles itself, one at a time. Recipients come from the account-change unit's snapshot (ADR 0014), so an address a change removes still hears about it.
+
+## Consequences
+
+- Alerts are queued and implement `ShouldBeEncrypted`, so the `jobs` and `failed_jobs` payloads hold no IP address, user agent or address in clear. An arch test holds every Keystone notification and mailable to that.
+- A mail says what, when (UTC), the IP address and its location, the device, the credential, and "If this wasn't you, sign in and review your security settings." It is a Blade view with every value escaped, not Markdown, and has no links, so nothing in an event can smuggle one in.
+- The device is only what the session-info port parses (platform and browser), or "Unknown device"; the raw user agent never reaches a mail. The alert parses it when it is built, so the queue carries the label rather than the user agent.
+- Two `@api` ports sit behind bindable interfaces and never throw: IP location (null by default; the `stevebauman/location` adapter when that package is installed) and session info (null by default; the `matomo/device-detector` adapter when installed). Both are optional: core suggests them rather than requiring them.
+- The IP-location adapter skips every driver whose URL isn't https, since that package's default driver sends IPs over plain http, unless `ip_location.allow_plaintext_driver` is true. The location is looked up when the event is recorded and stored in its encrypted `location` field, so a remote driver adds its latency to the request.
+- An app's own slot class is built through the container with the event as `$event`. The event may be unsaved when the trail's write failed, so a slot shouldn't rely on reloading it from the queue.
+- The recorder alerts only about an account. `keystone:end-sessions {user}` alerts unless the operator passes `--no-alert` (the `EndSessions` job's `alert: false`); `--all` records about nobody and alerts nobody.
+- A slot may name any type in the closed list, even one that doesn't alert by default; boot refuses a slot for an unknown type or holding anything but null or a notification class. Conditional defaults (a new device's `signed_in`, once-per-window `limit.tripped`) arrive with their own tickets.
+- A session outliving its absolute lifetime now ends before the recorder records why. Reporting a failure while recording asks the auth guard who is signed in, which used to find the expired session again and recurse without end.
