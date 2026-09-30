@@ -70,6 +70,8 @@ test('the credential epoch moves only for a change that removes, replaces or end
     'adding a credential' => [fn (AccountChange $change) => $change->addCredential(new FormType, identifier: null, secret: 'new'), false],
     'a rehash' => [fn (AccountChange $change, StoredCredential $credential) => $change->rehash($credential, type: 'form', secret: 'new-hash'), false],
     'ending sessions' => [fn (AccountChange $change) => $change->endSessions(), true],
+    'suspending' => [fn (AccountChange $change) => $change->suspend(), true],
+    'unsuspending' => [fn (AccountChange $change) => $change->unsuspend(), false],
 ]);
 
 it('moves the epoch once however many times the change ends sessions', function () {
@@ -81,6 +83,24 @@ it('moves the epoch once however many times the change ends sessions', function 
     });
 
     expect(epochOf($user))->toBe(1);
+});
+
+it('stamps the account suspended at the time it is suspended', function () {
+    $this->freezeSecond();
+    $user = User::factory()->create();
+
+    changes()->change($user, fn (AccountChange $change) => $change->suspend());
+
+    expect(DB::table('users')->where('id', $user->getKey())->value('suspended_at'))->toEqual(now()->toDateTimeString());
+});
+
+it('clears the stamp to unsuspend the account', function () {
+    $user = User::factory()->create();
+    DB::table('users')->where('id', $user->getKey())->update(['suspended_at' => now()]);
+
+    changes()->change($user, fn (AccountChange $change) => $change->unsuspend());
+
+    expect(DB::table('users')->where('id', $user->getKey())->value('suspended_at'))->toBeNull();
 });
 
 it('applies a rehash only while the credential still holds the secret that was verified', function () {

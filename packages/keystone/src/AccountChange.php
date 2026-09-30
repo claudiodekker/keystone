@@ -6,6 +6,7 @@ use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Date;
 
 /**
  * @internal
@@ -72,6 +73,36 @@ class AccountChange
     }
 
     /**
+     * Bar the account from signing in and end its sessions, unless it is already suspended.
+     */
+    public function suspend(): bool
+    {
+        if (! is_null($this->account->getRawOriginal('suspended_at'))) {
+            return false;
+        }
+
+        $this->stampSuspended($this->account->fromDateTime(Date::now()));
+
+        $this->endSessions();
+
+        return true;
+    }
+
+    /**
+     * Lift the account's suspension, unless it isn't suspended.
+     */
+    public function unsuspend(): bool
+    {
+        if (is_null($this->account->getRawOriginal('suspended_at'))) {
+            return false;
+        }
+
+        $this->stampSuspended(null);
+
+        return true;
+    }
+
+    /**
      * Record the event about the account once the change commits, alerting the recipients read before it unless suppressed.
      */
     public function record(SecurityEventType $type, Actor $actor = Actor::USER, ?string $operator = null, bool $alert = true): void
@@ -102,5 +133,18 @@ class AccountChange
     public function events(): array
     {
         return $this->events;
+    }
+
+    /**
+     * Write the account's suspension stamp to its row and to the locked model.
+     */
+    protected function stampSuspended(?string $suspendedAt): void
+    {
+        $this->account->newQueryWithoutScopes()->toBase()->where($this->account->getKeyName(), $this->account->getKey())->update(['suspended_at' => $suspendedAt]);
+
+        $this->account->setRawAttributes([
+            ...$this->account->getAttributes(),
+            'suspended_at' => $suspendedAt,
+        ], sync: true);
     }
 }

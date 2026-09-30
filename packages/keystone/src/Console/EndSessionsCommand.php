@@ -4,11 +4,8 @@ namespace ClaudioDekker\Keystone\Console;
 
 use ClaudioDekker\Keystone\Jobs\EndEverySession;
 use ClaudioDekker\Keystone\Jobs\EndSessions;
-use ClaudioDekker\Keystone\Keystone;
-use ClaudioDekker\Keystone\KeystoneUser;
 use Illuminate\Console\Command;
 use Illuminate\Console\ConfirmableTrait;
-use Illuminate\Database\Eloquent\Model;
 use Symfony\Component\Console\Attribute\AsCommand;
 
 /**
@@ -17,7 +14,7 @@ use Symfony\Component\Console\Attribute\AsCommand;
 #[AsCommand(name: 'keystone:end-sessions')]
 class EndSessionsCommand extends Command
 {
-    use ConfirmableTrait;
+    use ConfirmableTrait, FindsAccounts;
 
     /**
      * The name and signature of the console command.
@@ -45,8 +42,7 @@ class EndSessionsCommand extends Command
     {
         $id = $this->argument('user');
         $all = $this->option('all') === true;
-        $operator = $this->option('operator');
-        $operator = is_string($operator) ? $operator : null;
+        $operator = $this->operator();
         $alert = $this->option('no-alert') !== true;
 
         if ($all && is_null($id)) {
@@ -67,12 +63,9 @@ class EndSessionsCommand extends Command
      */
     protected function endSessionsOf(string $id, ?string $operator, bool $alert): int
     {
-        /** @var (Model&KeystoneUser)|null $account */
-        $account = Keystone::guard()->userModel()->newQueryWithoutScopes()->whereKey($id)->first();
+        $account = $this->findAccountOrReport($id);
 
         if (is_null($account)) {
-            $this->components->error("No account has the id [{$id}].");
-
             return self::FAILURE;
         }
 

@@ -44,3 +44,36 @@ EndEverySession::dispatch(operator: $request->user()->email);
 ```
 
 When the signed-in user ends their own account's sessions with `EndSessions::dispatchSync()`, their current session stays signed in on a new session id and every other one ends. `EndEverySession` ends the current session too.
+
+## Suspending accounts
+
+Suspend an account to bar it from signing in, for example while you look into abuse:
+
+```shell
+php artisan keystone:suspend 42 --operator="jane@ops"
+```
+
+Its sessions end on their next request, and it can't sign in with any credential until you unsuspend it. A suspended account's sign-in is refused exactly like a wrong credential, so the person signing in can't tell it was suspended. It keeps its addresses, so no other account can take them in the meantime.
+
+Unsuspend it to let it sign in again:
+
+```shell
+php artisan keystone:unsuspend 42 --operator="jane@ops"
+```
+
+Unsuspending doesn't bring back the sessions that suspending ended.
+
+Each command records `account.suspended` or `account.unsuspended` [security events](security-events.md) with actor `operator` and the `--operator` you give, and [alerts the owner](security-alerts.md). Suspending an account that is already suspended, or unsuspending one that isn't, changes nothing and records nothing.
+
+### From an admin panel
+
+Dispatch the jobs the commands run:
+
+```php
+use ClaudioDekker\Keystone\Jobs\SuspendAccount;
+use ClaudioDekker\Keystone\Jobs\UnsuspendAccount;
+
+SuspendAccount::dispatch($user, operator: $request->user()->email);
+
+UnsuspendAccount::dispatch($user, operator: $request->user()->email);
+```

@@ -14,14 +14,14 @@ pest()->extend(AppTestCase::class);
 
 const FIREFOX = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:130.0) Gecko/20100101 Firefox/130.0';
 
-function alertedTo(): array
+function alertedTo(SecurityEventType $type): array
 {
     $addresses = [];
 
-    Notification::assertSentOnDemand(SecurityAlert::class, function (SecurityAlert $alert, array $channels, object $notifiable) use (&$addresses) {
+    Notification::assertSentOnDemand(SecurityAlert::class, function (SecurityAlert $alert, array $channels, object $notifiable) use ($type, &$addresses) {
         $addresses[] = $notifiable->routes['mail'];
 
-        return $alert->type === SecurityEventType::SESSIONS_TERMINATED;
+        return $alert->type === $type;
     });
 
     return $addresses;
@@ -36,7 +36,7 @@ describe('ending an account\'s sessions', function () {
 
         $this->artisan('keystone:end-sessions', ['user' => (string) $account->getKey()])->assertSuccessful();
 
-        expect(alertedTo())->toBe(['jane@example.com', 'work@example.com']);
+        expect(alertedTo(SecurityEventType::SESSIONS_TERMINATED))->toBe(['jane@example.com', 'work@example.com']);
     });
 
     it('records the event without alerting when the operator suppresses the alert', function () {
@@ -67,6 +67,23 @@ describe('ending an account\'s sessions', function () {
 
         Notification::assertNothingSent();
     });
+});
+
+describe('suspending and unsuspending an account', function () {
+    it('alerts the owner at every verified address', function (string $command, ?string $suspendedAt, SecurityEventType $type) {
+        Notification::fake();
+        $account = $this->createAccount();
+        $this->holdAddress($account, 'work@example.com');
+        $this->holdAddress($account, 'old@example.com', verified: false);
+        DB::table('users')->update(['suspended_at' => $suspendedAt]);
+
+        $this->artisan($command, ['user' => (string) $account->getKey()])->assertSuccessful();
+
+        expect(alertedTo($type))->toBe(['jane@example.com', 'work@example.com']);
+    })->with([
+        'suspending' => ['keystone:suspend', null, SecurityEventType::ACCOUNT_SUSPENDED],
+        'unsuspending' => ['keystone:unsuspend', '2026-09-01 12:00:00', SecurityEventType::ACCOUNT_UNSUSPENDED],
+    ]);
 });
 
 describe('the queued alert', function () {
