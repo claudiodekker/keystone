@@ -39,7 +39,7 @@ class RefuseCrossSiteRequests
     }
 
     /**
-     * Refuse a Keystone mutation that can't show it came from the app itself, whatever the app's CSRF exceptions say.
+     * Refuse a Keystone mutation that can't show it came from the app or an origin it trusts, whatever the app's CSRF exceptions say.
      *
      * @param  Closure(Request): Response  $next
      *
@@ -106,11 +106,32 @@ class RefuseCrossSiteRequests
     }
 
     /**
-     * Determine if the request's Origin header names the app's own origin.
+     * Determine if the request's Origin header names the app's own origin or one keystone.trusted_origins lists.
      */
     protected function originMatches(Request $request): bool
     {
-        return $request->header('Origin') === $request->getSchemeAndHttpHost();
+        $origin = $request->header('Origin');
+        $origins = [$request->getSchemeAndHttpHost(), ...$this->trustedOrigins()];
+
+        return is_string($origin) && in_array(strtolower($origin), $origins, true);
+    }
+
+    /**
+     * Get the other origins keystone.trusted_origins lets make Keystone mutations, in the form an Origin header takes.
+     *
+     * @return list<string>
+     */
+    protected function trustedOrigins(): array
+    {
+        $origins = config('keystone.trusted_origins', []);
+
+        if (! is_array($origins)) {
+            return [];
+        }
+
+        $strings = array_filter($origins, is_string(...));
+
+        return array_values(array_map(fn (string $origin) => strtolower(rtrim($origin, '/')), $strings));
     }
 
     /**

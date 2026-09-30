@@ -113,6 +113,7 @@ describe('assertHardeningFloor', function () {
         Route::get('probe', function () use ($weaken) {
             $response = response('')->withHeaders([
                 ...AddHardeningHeaders::HEADERS,
+                'X-Frame-Options' => 'DENY',
                 'Content-Security-Policy' => "img-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
             ]);
 
@@ -127,6 +128,31 @@ describe('assertHardeningFloor', function () {
 
         $this->assertHardeningFloor($this->get('probe'));
     });
+
+    it('passes a response the app lets its own origins frame', function () {
+        config(['keystone.hardening.frame_ancestors' => ["'self'", 'https://partner.example']]);
+        routeHardeningProbe(function (ResponseHeaderBag $headers) {
+            $headers->remove('X-Frame-Options');
+            $headers->set('Content-Security-Policy', "object-src 'none'; base-uri 'none'; frame-ancestors 'self' https://partner.example");
+        });
+
+        $this->assertHardeningFloor($this->get('probe'));
+    });
+
+    it('fails a response framed otherwise than the app allows', function (Closure $weaken) {
+        config(['keystone.hardening.frame_ancestors' => ["'self'"]]);
+        routeHardeningProbe(function (ResponseHeaderBag $headers) use ($weaken) {
+            $headers->remove('X-Frame-Options');
+            $headers->set('Content-Security-Policy', "object-src 'none'; base-uri 'none'; frame-ancestors 'self'");
+            $weaken($headers);
+        });
+        $response = $this->get('probe');
+
+        expect(fn () => $this->assertHardeningFloor($response))->toThrow(AssertionFailedError::class);
+    })->with([
+        'other frame ancestors' => fn (ResponseHeaderBag $headers) => $headers->set('Content-Security-Policy', "object-src 'none'; base-uri 'none'; frame-ancestors *"),
+        'an X-Frame-Options that forbids them' => fn (ResponseHeaderBag $headers) => $headers->set('X-Frame-Options', 'DENY'),
+    ]);
 
     it('fails a response missing any part of the floor', function (Closure $weaken) {
         routeHardeningProbe($weaken);

@@ -51,6 +51,34 @@ describe('the hardening floor', function () {
         $response->assertTooManyRequests()->assertHeader('Retry-After');
     });
 
+    it('lets the sources the app lists frame Keystone\'s pages, dropping X-Frame-Options', function () {
+        config(['keystone.hardening.frame_ancestors' => ["'self'", 'https://partner.example']]);
+
+        $response = $this->get('overridden/login');
+
+        $response->assertHeaderMissing('X-Frame-Options');
+        expect($response->headers->all('Content-Security-Policy'))->toBe([
+            "default-src 'self'; script-src 'self' 'nonce-app'; object-src 'none'; base-uri 'none'; frame-ancestors 'self' https://partner.example",
+            "img-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'self' https://partner.example",
+        ]);
+    });
+
+    it('forbids framing when the listed frame ancestors are not all valid sources', function (mixed $sources) {
+        config(['keystone.hardening.frame_ancestors' => $sources]);
+
+        $response = $this->get(route('login'));
+
+        $response->assertHeader('X-Frame-Options', 'DENY')
+            ->assertHeader('Content-Security-Policy', "object-src 'none'; base-uri 'none'; frame-ancestors 'none'");
+    })->with([
+        'a source that ends the directive' => [["'self'; script-src *"]],
+        'two sources in one' => [["'self' https://partner.example"]],
+        'a source list' => [["'self',https://partner.example"]],
+        'a source that is not a string' => [[['self']]],
+        'sources keyed by name' => [['app' => "'self'"]],
+        'a single source' => ["'self'"],
+    ]);
+
     it('leaves the app\'s own responses alone', function () {
         $response = $this->get('elsewhere');
 
@@ -89,6 +117,26 @@ describe('cross-site requests', function () {
         'the encrypted XSRF token' => fn (string $token) => ['X-XSRF-TOKEN' => Crypt::encrypt(CookieValuePrefix::create('XSRF-TOKEN', Crypt::getKey()).$token, PreventRequestForgery::serialized())],
         'the app\'s own origin' => fn () => ['Origin' => 'http://localhost'],
     ]);
+
+    it('lets a Keystone mutation through from an origin the app trusts', function (string $origin) {
+        config(['keystone.trusted_origins' => ['https://other.example', 'https://WWW.example.com/']]);
+        $this->signInAccount(new FormTypeSupport);
+
+        $response = $this->withHeaders(['Sec-Fetch-Site' => 'same-site', 'Origin' => $origin])->post(route('logout'));
+
+        $response->assertRedirectToRoute('login');
+        $this->assertGuest();
+    })->with(['https://www.example.com', 'https://other.example']);
+
+    it('refuses a Keystone mutation from an origin the app doesn\'t trust', function (string $origin) {
+        config(['keystone.trusted_origins' => ['https://www.example.com']]);
+        $this->signInAccount(new FormTypeSupport);
+
+        $response = $this->withHeaders(['Sec-Fetch-Site' => 'same-site', 'Origin' => $origin])->post(route('logout'));
+
+        $response->assertStatus(419);
+        $this->assertAuthenticated();
+    })->with(['http://www.example.com', 'https://www.example.com:8443', 'https://evil.www.example.com']);
 
     it('lets a Keystone mutation through with the session token in its form', function () {
         $this->signInAccount(new FormTypeSupport);
@@ -147,6 +195,21 @@ describe('clearing site data', function () {
 
         $response->assertHeader('Clear-Site-Data', '"cache", "storage"');
     });
+
+    it('clears only the site data the app chose', function (array $types, ?string $header) {
+        config(['keystone.clear_site_data' => $types]);
+        $this->signInAccount(new FormTypeSupport);
+
+        $response = $this->post(route('logout'));
+
+        expect($response->headers->get('Clear-Site-Data'))->toBe($header);
+    })->with([
+        'cookies too' => [['cache', 'cookies', 'storage'], '"cache", "cookies", "storage"'],
+        'only the cache' => [['cache'], '"cache"'],
+        'nothing' => [[], null],
+        'an unknown kind, falling back to the defaults' => [['cache', 'everything'], '"cache", "storage"'],
+        'kinds keyed by name, falling back to the defaults' => [['first' => 'cache'], '"cache", "storage"'],
+    ]);
 
     it('leaves site data alone while the session goes on', function () {
         $this->signInAccount(new FormTypeSupport);

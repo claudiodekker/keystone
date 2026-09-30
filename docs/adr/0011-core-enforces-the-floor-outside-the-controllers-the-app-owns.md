@@ -9,6 +9,7 @@ The app owns its copies of Keystone's controllers and its route file, and may su
 
 ## Consequences
 
+- Three parts of the floor can be loosened in config, at Claudio's review, because real apps need them: `keystone.hardening.frame_ancestors` lists the sources that may frame Keystone's pages (and drops `X-Frame-Options`), `keystone.trusted_origins` lists other origins the cross-site check accepts, and `keystone.clear_site_data` picks what an ended session clears. A value that isn't well formed falls back to the strict default rather than to nothing.
 - A route counts as Keystone's by its controller class alone. A closure route or an app controller that doesn't extend core's gets none of this, which is what lets the app's own pages keep their own caching and framing.
 - Overriding `callAction()` itself, or removing the middleware from the kernel, still drops the floor. That is deliberate misuse rather than a customisation, and the AppTests catch it: every Keystone response they see must carry the floor.
 - Laravel's own CSRF check still runs first for routes it covers, so a cross-site request it refuses is not recorded. Only the requests Laravel lets through reach core's check.

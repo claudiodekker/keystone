@@ -37,7 +37,7 @@ abstract class AppTestCase extends TestCase
     public const string ASSERTIONS_NAMESPACE = 'Tests\\Keystone\\Assertions\\';
 
     /**
-     * The headers of the hardening floor, besides Cache-Control and Content-Security-Policy.
+     * The headers of the hardening floor, besides Cache-Control, X-Frame-Options and Content-Security-Policy.
      */
     protected const array HARDENING_HEADERS = [
         'Pragma' => 'no-cache',
@@ -45,7 +45,6 @@ abstract class AppTestCase extends TestCase
         'Referrer-Policy' => 'strict-origin-when-cross-origin',
         'Cross-Origin-Opener-Policy' => 'same-origin',
         'Cross-Origin-Resource-Policy' => 'same-origin',
-        'X-Frame-Options' => 'DENY',
     ];
 
     /**
@@ -256,7 +255,7 @@ abstract class AppTestCase extends TestCase
     }
 
     /**
-     * Assert the response carries the hardening floor core attaches to every Keystone response.
+     * Assert the response carries the hardening floor core attaches to every Keystone response, framed only as the app allows.
      *
      * @param  TestResponse<Response>  $response
      */
@@ -264,10 +263,17 @@ abstract class AppTestCase extends TestCase
     {
         $headers = $response->headers;
         $cacheControl = array_map($headers->getCacheControlDirective(...), ['no-store', 'max-age', 'must-revalidate']);
+        $frameAncestors = (array) config('keystone.hardening.frame_ancestors', []);
+        $expectedHeaders = [...self::HARDENING_HEADERS, 'X-Frame-Options' => $frameAncestors === [] ? 'DENY' : null];
+        $expectedDirectives = [
+            'object-src' => "'none'",
+            'base-uri' => "'none'",
+            'frame-ancestors' => $frameAncestors === [] ? "'none'" : implode(' ', $frameAncestors),
+        ];
 
         $this->assertSame([true, '0', true], $cacheControl, 'The response may be cached.');
 
-        foreach (self::HARDENING_HEADERS as $name => $value) {
+        foreach ($expectedHeaders as $name => $value) {
             $this->assertSame($value, $headers->get($name), "The response's {$name} header isn't the floor's.");
         }
 
@@ -278,8 +284,8 @@ abstract class AppTestCase extends TestCase
         foreach ($policies as $policy) {
             $directives = $this->policyDirectives((string) $policy);
 
-            foreach (['object-src', 'base-uri', 'frame-ancestors'] as $name) {
-                $this->assertSame("'none'", $directives[$name] ?? null, "The response's Content-Security-Policy doesn't force {$name} to 'none'.");
+            foreach ($expectedDirectives as $name => $value) {
+                $this->assertSame($value, $directives[$name] ?? null, "The response's Content-Security-Policy doesn't force {$name} to {$value}.");
             }
         }
     }

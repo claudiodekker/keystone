@@ -56,10 +56,12 @@ it('refuses a cross-site sign-out', function () {
     $this->assertDatabaseHas('user_security_events', ['type' => 'request.rejected', 'user_id' => $account->getKey(), 'reason' => 'keystone.cross_site']);
 });
 
-it('clears the browser\'s cache and storage for the site on sign-out', function () {
+it('clears the site data the app chose on sign-out', function () {
+    $types = (array) config('keystone.clear_site_data', ['cache', 'storage']);
+    $expected = $types === [] ? null : implode(', ', array_map(fn (string $type) => "\"{$type}\"", $types));
     $this->signInAccount($this->support);
 
     $response = $this->post(route('logout'));
 
-    expect($response->headers->get('Clear-Site-Data'))->toBe('"cache", "storage"');
+    expect($response->headers->get('Clear-Site-Data'))->toBe($expected);
 });
