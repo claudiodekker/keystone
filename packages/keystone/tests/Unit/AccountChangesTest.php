@@ -10,6 +10,7 @@ use ClaudioDekker\Keystone\SecurityEvent;
 use ClaudioDekker\Keystone\SecurityEventRecorded;
 use ClaudioDekker\Keystone\SecurityEventType;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormType;
+use ClaudioDekker\Keystone\Tests\Fixtures\GuardedUser;
 use ClaudioDekker\Keystone\Tests\Fixtures\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
@@ -323,4 +324,16 @@ describe('ending every account\'s sessions', function () {
 
         Event::assertNotDispatched(SecurityEventRecorded::class);
     });
+});
+
+it('writes to the account whatever the app\'s model guards or its observers refuse', function () {
+    $user = GuardedUser::query()->findOrFail(User::factory()->create()->getKey());
+    GuardedUser::updating(fn () => false);
+
+    changes()->change($user, fn (AccountChange $change) => $change->suspend());
+
+    $row = DB::table('users')->where('id', $user->getKey())->first();
+
+    expect($row->suspended_at)->not->toBeNull()
+        ->and($row->credential_epoch)->toEqual(1);
 });

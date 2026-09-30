@@ -83,18 +83,11 @@ class AccountChanges
     protected function moveEpoch(Model&KeystoneUser $account): int
     {
         $from = (int) $account->getRawOriginal('credential_epoch');
-        $to = $from + 1;
-        $moved = [
-            'credential_epoch' => $to,
-            'credential_epoch_moved_at' => $account->fromDateTime(Date::now()),
-        ];
 
-        $account->newQueryWithoutScopes()
-            ->toBase()
-            ->where($account->getKeyName(), $account->getKey())
-            ->update($moved);
-
-        $account->setRawAttributes([...$account->getAttributes(), ...$moved], sync: true);
+        $account->forceFill([
+            'credential_epoch' => $from + 1,
+            'credential_epoch_moved_at' => Date::now(),
+        ])->saveQuietly();
 
         return $from;
     }
