@@ -8,7 +8,7 @@ php artisan keystone:install
 php artisan migrate
 ```
 
-Each sign-in method is its own package, and none is required. To offer passwords, also require `claudiodekker/keystone-password` (see [Passwords](password.md)), before or after running the installer.
+Each sign-in method is its own package, and none is required. To offer passwords, also require `claudiodekker/keystone-password` (see [Passwords](password.md)); for authenticator-app codes as a second factor, `claudiodekker/keystone-totp` (see [TOTP](totp.md) and [The second-factor challenge](challenge.md)). Require them before or after running the installer.
 
 The installer refuses while `laravel/fortify` is installed, since both would handle authentication, and without Pest, which Keystone's AppTests run on. Otherwise it:
 
@@ -66,7 +66,7 @@ Keystone stores and matches an address trimmed, Unicode NFC-composed, lowercased
 
 - `app/Http/Controllers/Auth/`: one controller per Keystone controller, such as `SignInController`. Each response hook turns one outcome into a response, so change a hook to change what users see. Keystone decides the outcome before the hook runs.
 - `routes/keystone.php`: the routes, grouped under `/auth` and required from `routes/web.php`. Keystone relies on the route names, not the URLs, so you may change the URLs.
-- `resources/js/pages/`: one page per step, in the folder of the feature it belongs to, as your own pages would be: signing in is `auth/Login.vue`, and pages for managing email addresses will go in `emails/`. `auth/Login.vue` shows the status message Keystone passes it, already translated, and a form per credential type. `layouts/AuthLayout.vue` wraps them.
+- `resources/js/pages/`: one page per step, in the folder of the feature it belongs to, as your own pages would be: signing in is `auth/Login.vue`, and pages for managing email addresses will go in `emails/`. `auth/Login.vue` shows the status message Keystone passes it, already translated, and a form per credential type. `auth/Challenge.vue` asks a pending sign-in for its second factor. `layouts/AuthLayout.vue` wraps them.
 - `resources/js/partials/`: a partial per credential type, such as `Password.vue`. Without one, a type falls back to the partial for its initiate shape in `partials/shapes/`.
 - `resources/js/components/`: the pieces the pages and partials share, such as `CredentialTypeForm.vue` and `SignOutButton.vue`. A component only one type's partial uses, such as `PasswordField.vue`, arrives with that partial.
 - `resources/js/types/auth.ts`: the props each page receives.

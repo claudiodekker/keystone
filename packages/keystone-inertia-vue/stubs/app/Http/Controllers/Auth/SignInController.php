@@ -33,6 +33,14 @@ class SignInController extends Controller
     }
 
     /**
+     * Respond to a sign-in held for a challenge, sending the user on to it.
+     */
+    protected function sendChallengeOwed(Request $request): RedirectResponse
+    {
+        return to_route('login.challenge');
+    }
+
+    /**
      * Respond to a completed sign-in, sending the user on to the intended URL.
      */
     protected function sendSignedIn(Request $request, string $intendedUrl): RedirectResponse

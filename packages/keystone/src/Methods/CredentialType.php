@@ -25,6 +25,18 @@ interface CredentialType
     public function representsMultipleFactors(): bool;
 
     /**
+     * Determine if the type's failures share one count across the flows behind a first factor.
+     */
+    public function sharesFailedAttempts(): bool;
+
+    /**
+     * Get what is wrong with the type's configuration, for boot to refuse.
+     *
+     * @return list<string>
+     */
+    public function configFailures(): array;
+
+    /**
      * Get the validation rules for the input verify takes on the surface.
      *
      * @return array<string, mixed>

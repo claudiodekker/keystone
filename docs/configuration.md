@@ -38,7 +38,7 @@ Every limit is a whole number of at least 1. No setting takes a `0` or `null` th
 ],
 ```
 
-A type you don't list isn't offered anywhere, and a listed surface only narrows what the type serves: listing a type on a surface it doesn't serve stops Keystone from booting. The surfaces are `sign-in`, `challenge`, `registration` and `enrollment`.
+A type you don't list isn't offered anywhere, and a listed surface only narrows what the type serves: listing a type on a surface it doesn't serve stops Keystone from booting. The surfaces are `sign-in`, `challenge`, `registration` and `enrollment`. A second factor of a type you stop listing still makes its account owe the challenge (see [The second-factor challenge](challenge.md#the-challenge-page)).
 
 ## Session lifetime
 
@@ -82,6 +82,7 @@ In every environment, it refuses:
 - a setting above of the wrong type, or a limit below 1;
 - a `methods` entry that isn't a type name or a type name mapped to a list of surfaces, a type listed twice, a type no installed package registers, or a surface the type doesn't serve;
 - two installed packages registering credential types with one name, or a type named `recovery-code`, which Keystone keeps for recovery codes;
+- a setting of an installed method package's own config that the package refuses, such as a `keystone-totp.window_steps` below 0 (see [TOTP](totp.md#the-window));
 - a `log_channel` that isn't one of your `logging.channels`;
 - a `notifications` slot for a type that isn't a security event, or holding anything but `null` or a notification class;
 - a user model on another database connection than your default one, which Keystone's tables are migrated on.

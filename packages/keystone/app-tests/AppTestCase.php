@@ -184,6 +184,36 @@ abstract class AppTestCase extends TestCase
     }
 
     /**
+     * Create an account holding a first factor and a second factor of the supported challenge type.
+     *
+     * @return Model&KeystoneUser
+     */
+    public function createChallengedAccount(CredentialTypeSupport $challenge, string $address = 'jane@example.com'): Model
+    {
+        $account = $this->createAccount($address);
+
+        $this->arrangeCredential($account, $this->supportsFor(Surface::SIGN_IN)[0], Surface::SIGN_IN);
+        $this->arrangeCredential($account, $challenge, Surface::CHALLENGE);
+
+        return $account;
+    }
+
+    /**
+     * Pass the account's first factor, so its sign-in is held at the challenge.
+     *
+     * @return TestResponse<Response>
+     */
+    public function passFirstFactor(string $address = 'jane@example.com'): TestResponse
+    {
+        $support = $this->supportsFor(Surface::SIGN_IN)[0];
+
+        return $this->post(route('login.submit', ['type' => $support->type()]), [
+            'identifier' => $address,
+            ...$support->validProof(Surface::SIGN_IN),
+        ]);
+    }
+
+    /**
      * Get the test support of every installed type serving the surface, skipping when there is none.
      *
      * @return non-empty-list<CredentialTypeSupport>

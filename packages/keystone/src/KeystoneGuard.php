@@ -2,6 +2,7 @@
 
 namespace ClaudioDekker\Keystone;
 
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Auth\EloquentUserProvider;
 use Illuminate\Auth\SessionGuard;
@@ -82,8 +83,9 @@ class KeystoneGuard extends SessionGuard
             throw new LogicException('The account being signed in is disabled or suspended.');
         }
 
-        $this->rotate();
+        $this->changeAuthLevel();
 
+        $this->session->forget($this->pendingKey());
         $this->session->put($this->getName(), $user->getAuthIdentifier());
         $this->session->put($this->epochKey(), $this->epochOf($user));
         $this->session->put($this->signedInAtKey(), Date::now()->getTimestamp());
@@ -91,6 +93,95 @@ class KeystoneGuard extends SessionGuard
         $this->fireLoginEvent($user);
 
         $this->setUser($user);
+    }
+
+    /**
+     * Hold the account's sign-in until it passes the stage, replacing any pending one.
+     */
+    public function hold(Model&KeystoneUser $account, string $firstFactor, PendingStage $stage, string $intendedUrl): void
+    {
+        $this->changeAuthLevel();
+
+        $this->session->put($this->pendingKey(), [
+            'account' => $account->getAuthIdentifier(),
+            'first_factor' => $firstFactor,
+            'origin' => PendingOrigin::LOGIN->value,
+            'stage' => $stage->value,
+            'intended_url' => $intendedUrl,
+            'epoch' => $this->epochOf($account),
+            'held_at' => Date::now()->getTimestamp(),
+        ]);
+    }
+
+    /**
+     * Get the session's live pending sign-in, dropping or voiding one that is no longer valid.
+     */
+    public function pending(): ?PendingSignIn
+    {
+        $held = $this->session->get($this->pendingKey());
+
+        if (! is_array($held)) {
+            return null;
+        }
+
+        $heldAt = CarbonImmutable::createFromTimestamp($held['held_at']);
+
+        if ($heldAt->isFuture() || $heldAt->addSeconds(PendingSignIn::LIFETIME_SECONDS)->lessThanOrEqualTo(Date::now())) {
+            $this->forgetPending();
+
+            return null;
+        }
+
+        $account = $this->retrieveAccount($held['account']);
+
+        if (is_null($account) || ! $this->isActive($account) || $this->epochOf($account) !== $held['epoch']) {
+            $this->voidPending($account);
+
+            return null;
+        }
+
+        return new PendingSignIn(
+            account: $account,
+            firstFactor: $held['first_factor'],
+            origin: PendingOrigin::from($held['origin']),
+            stage: PendingStage::from($held['stage']),
+            intendedUrl: $held['intended_url'],
+            heldAt: $heldAt,
+        );
+    }
+
+    /**
+     * Determine if the session holds a pending sign-in at the stage, as it was held.
+     */
+    public function isPendingAt(PendingStage $stage): bool
+    {
+        return ($this->session->get($this->pendingKey())['stage'] ?? null) === $stage->value;
+    }
+
+    /**
+     * Get the id of the account the session names, signed in or pending.
+     */
+    public function namedAccountId(): int|string|null
+    {
+        return $this->id() ?? $this->session->get($this->pendingKey())['account'] ?? null;
+    }
+
+    /**
+     * Drop the pending sign-in, leaving a guest.
+     */
+    public function forgetPending(): void
+    {
+        $this->changeAuthLevel();
+
+        $this->session->forget($this->pendingKey());
+    }
+
+    /**
+     * Get the ceremony slots, which end no later than the sign-in, pending or signed in, that opens them.
+     */
+    public function slots(): CeremonySlots
+    {
+        return new CeremonySlots($this->session, $this->phaseEndsAt());
     }
 
     /**
@@ -304,6 +395,38 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
+     * Drop a pending sign-in its account's credential epoch left behind, recording that it was voided.
+     */
+    protected function voidPending((Model&KeystoneUser)|null $account): void
+    {
+        $this->forgetPending();
+
+        if (is_null($account)) {
+            return;
+        }
+
+        (new SecurityEventRecorder)->record(
+            SecurityEventType::SIGN_IN_VOIDED,
+            account: $account,
+        );
+    }
+
+    /**
+     * Get the time the session's current phase ends: a pending sign-in's end, a sign-in's absolute lifetime, or never.
+     */
+    protected function phaseEndsAt(): ?CarbonInterface
+    {
+        $heldAt = $this->session->get($this->pendingKey())['held_at'] ?? null;
+        $lifetimeSeconds = config('keystone.session.absolute_lifetime_seconds');
+
+        return match (true) {
+            $this->session->has($this->getName()) => is_int($lifetimeSeconds) ? $this->signedInAt()?->addSeconds($lifetimeSeconds) : null,
+            is_int($heldAt) => Date::createFromTimestamp($heldAt)->addSeconds(PendingSignIn::LIFETIME_SECONDS),
+            default => null,
+        };
+    }
+
+    /**
      * End the session and forget its user.
      */
     protected function endSession(): void
@@ -324,6 +447,16 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
+     * Rotate the session id and close every ceremony slot, as every change of auth level does.
+     */
+    protected function changeAuthLevel(): void
+    {
+        $this->rotate();
+
+        $this->slots()->flush();
+    }
+
+    /**
      * Rotate the session id, keeping its data.
      */
     protected function rotate(): void
@@ -337,6 +470,14 @@ class KeystoneGuard extends SessionGuard
     protected function epochKey(): string
     {
         return 'keystone_epoch_'.$this->name;
+    }
+
+    /**
+     * Get the session key holding the pending sign-in.
+     */
+    protected function pendingKey(): string
+    {
+        return 'keystone_pending_'.$this->name;
     }
 
     /**

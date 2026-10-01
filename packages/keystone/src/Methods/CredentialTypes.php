@@ -43,6 +43,16 @@ class CredentialTypes
     }
 
     /**
+     * Get every registered type, whatever keystone.methods lists.
+     *
+     * @return list<CredentialType>
+     */
+    public function all(): array
+    {
+        return array_values($this->types);
+    }
+
+    /**
      * Get the registered type with the name, whatever keystone.methods lists.
      */
     public function registered(string $name): ?CredentialType

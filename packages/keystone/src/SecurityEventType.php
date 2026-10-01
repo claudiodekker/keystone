@@ -8,6 +8,8 @@ namespace ClaudioDekker\Keystone;
 enum SecurityEventType: string
 {
     case SIGNED_IN = 'signed_in';
+    case SIGN_IN_HELD = 'sign_in.held';
+    case SIGN_IN_VOIDED = 'sign_in.voided';
     case PROOF_REJECTED = 'proof.rejected';
     case SIGNED_OUT = 'signed_out';
     case SESSION_ENDED = 'session.ended';

@@ -71,6 +71,7 @@ test('the credential epoch moves only for a change that removes, replaces or end
     'nothing' => [fn (AccountChange $change) => null, false],
     'adding a credential' => [fn (AccountChange $change) => $change->addCredential(new FormType, identifier: null, secret: 'new'), false],
     'a rehash' => [fn (AccountChange $change, StoredCredential $credential) => $change->rehash($credential, type: 'form', secret: 'new-hash'), false],
+    'an advance' => [fn (AccountChange $change, StoredCredential $credential) => $change->advance($credential, type: 'form', secret: 'next-step'), false],
     'ending sessions' => [fn (AccountChange $change) => $change->endSessions(), true],
     'suspending' => [fn (AccountChange $change) => $change->suspend(), true],
     'unsuspending' => [fn (AccountChange $change) => $change->unsuspend(), false, '2026-09-01 12:00:00'],
@@ -113,6 +114,17 @@ it('applies a rehash only while the credential still holds the secret that was v
     $replaced = changes()->change($user, fn (AccountChange $change) => $change->rehash($stale, type: 'form', secret: 'new-hash'));
 
     expect($replaced)->toBeFalse()
+        ->and(Crypt::decryptString(DB::table('user_credentials')->value('secret')))->toBe('old-hash');
+});
+
+it('applies an advance only while the credential still holds the secret that was verified', function () {
+    $user = User::factory()->create();
+    $credential = storeCredential($user);
+    $stale = new StoredCredential($credential->id, identifier: null, secret: 'stale-step', label: null);
+
+    $advanced = changes()->change($user, fn (AccountChange $change) => $change->advance($stale, type: 'form', secret: 'next-step'));
+
+    expect($advanced)->toBeFalse()
         ->and(Crypt::decryptString(DB::table('user_credentials')->value('secret')))->toBe('old-hash');
 });
 

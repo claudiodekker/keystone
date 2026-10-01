@@ -3,6 +3,7 @@
 namespace ClaudioDekker\Keystone\Http\Controllers;
 
 use ClaudioDekker\Keystone\Actions\AccountLookup;
+use ClaudioDekker\Keystone\Demand;
 use ClaudioDekker\Keystone\Http\PageValues\SignInPage;
 use ClaudioDekker\Keystone\IntendedUrl;
 use ClaudioDekker\Keystone\Keystone;
@@ -90,17 +91,23 @@ abstract class SignInController extends Controller
         $identifier = $input[self::IDENTIFIER];
         $proofInput = Arr::except($input, self::IDENTIFIER);
 
-        $attempt = new SignInAttempt(Keystone::guard(), app(AccountLookup::class), new RateLimiter($request, Keystone::guard()));
-        $account = $attempt->attempt($credentialType, $identifier, $proofInput);
+        $intended = $request->session()->get('url.intended');
+        $intendedUrl = IntendedUrl::sanitize($intended, (string) config('app.url'));
 
-        if ($account === null) {
+        $attempt = new SignInAttempt(Keystone::guard(), app(AccountLookup::class), new RateLimiter($request, Keystone::guard()));
+        $demand = $attempt->attempt($credentialType, $identifier, $proofInput, $intendedUrl);
+
+        if ($demand === Demand::REFUSE) {
             $this->flashIdentifier($request);
 
             return $this->sendSignInRefused($request, __('keystone::messages.failed'));
         }
 
-        $intended = $request->session()->pull('url.intended');
-        $intendedUrl = IntendedUrl::sanitize($intended, (string) config('app.url'));
+        $request->session()->forget('url.intended');
+
+        if ($demand === Demand::CHALLENGE) {
+            return $this->sendChallengeOwed($request);
+        }
 
         return $this->sendSignedIn($request, $intendedUrl);
     }
@@ -114,6 +121,11 @@ abstract class SignInController extends Controller
      * Respond to a refused sign-in, with the message for the identifier field.
      */
     abstract protected function sendSignInRefused(Request $request, string $message): Response|Responsable;
+
+    /**
+     * Respond to a sign-in held for a challenge, sending the user on to it.
+     */
+    abstract protected function sendChallengeOwed(Request $request): Response|Responsable;
 
     /**
      * Respond to a completed sign-in, sending the user on to the intended URL.

@@ -19,6 +19,10 @@
             <directory>packages/keystone-password/tests</directory>
             <directory>packages/keystone-password/app-tests</directory>
         </testsuite>
+        <testsuite name="keystone-totp">
+            <directory>packages/keystone-totp/tests</directory>
+            <directory>packages/keystone-totp/app-tests</directory>
+        </testsuite>
         <testsuite name="keystone-inertia-vue">
             <directory>packages/keystone-inertia-vue/tests</directory>
         </testsuite>
@@ -27,6 +31,7 @@
         <include>
             <directory>packages/keystone/src</directory>
             <directory>packages/keystone-password/src</directory>
+            <directory>packages/keystone-totp/src</directory>
             <directory>packages/keystone-inertia-vue/src</directory>
         </include>
     </source>

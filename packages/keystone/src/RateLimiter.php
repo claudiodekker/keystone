@@ -19,6 +19,21 @@ use Throwable;
 class RateLimiter
 {
     /**
+     * The flow part of the failed-attempt key a guessable type's failures share.
+     */
+    public const string SHARED_FLOWS = 'second-factor';
+
+    /**
+     * How many wrong answers a guessable type may get over its ceiling's window, whatever the hourly allowance.
+     */
+    public const int SHARED_CEILING = 100;
+
+    /**
+     * The window a guessable type's ceiling counts over.
+     */
+    public const int SHARED_CEILING_WINDOW_SECONDS = 86400;
+
+    /**
      * The window a request limit counts over.
      */
     public const int REQUEST_WINDOW_SECONDS = 60;
@@ -106,26 +121,31 @@ class RateLimiter
      */
     public function takeFailedAttempt(Flow $flow, CredentialType $type, (Model&KeystoneUser)|null $account, string $identifier): TakenAttempt
     {
-        $key = $this->key('failed-attempt', [
-            $this->subject($account, $identifier),
-            $type->name(),
-            $flow->value,
-            self::OTHER_SOURCE,
-        ]);
+        $limits = $this->failedAttemptLimits($flow, $type, $this->subject($account, $identifier));
 
         try {
-            $count = $this->counter()->increment($key, self::FAILED_ATTEMPT_WINDOW_SECONDS);
-            $retryAfterSeconds = $this->retryAfter([$key]);
-            $windowEndsAt = $this->windowEndsAt($key);
+            $counts = [];
+            $incremented = [];
+
+            // The ceiling counts only attempts the hourly limit let through, so a spent hour can't burn the day's allowance.
+            foreach ($limits as $index => $limit) {
+                $hourSpent = $index > 0 && $counts[0] > $limits[0]['allowance'];
+                $counts[$index] = $hourSpent ? (int) $this->counter()->attempts($limit['key']) : $this->counter()->increment($limit['key'], $limit['window_seconds']);
+                $incremented[$index] = ! $hourSpent;
+            }
+
+            $spent = array_filter($limits, fn (array $limit, int $index) => $counts[$index] > $limit['allowance'], ARRAY_FILTER_USE_BOTH);
+            $retryAfterSeconds = $this->retryAfter(array_column($spent, 'key'));
+            $taken = array_map(fn (array $limit) => new TakenCount($limit['key'], windowSeconds: $limit['window_seconds'], windowEndsAt: $this->windowEndsAt($limit['key'])), $limits);
         } catch (Throwable $e) {
             report($e);
 
             throw new Throttled(self::OUTAGE_RETRY_AFTER_SECONDS);
         }
 
-        $allowance = config()->integer('keystone.rate_limits.failed_attempts_per_hour');
+        $tripped = array_filter($limits, fn (array $limit, int $index) => $incremented[$index] && $counts[$index] === $limit['allowance'] + 1, ARRAY_FILTER_USE_BOTH);
 
-        if ($count === $allowance + 1) {
+        if ($tripped !== []) {
             $this->recorder->record(
                 SecurityEventType::LIMIT_TRIPPED,
                 account: $account,
@@ -137,11 +157,11 @@ class RateLimiter
             $this->dispatchLockout();
         }
 
-        if ($count > $allowance) {
+        if ($spent !== []) {
             throw new Throttled($retryAfterSeconds);
         }
 
-        return new TakenAttempt($key, $windowEndsAt);
+        return new TakenAttempt($taken);
     }
 
     /**
@@ -149,28 +169,58 @@ class RateLimiter
      */
     public function giveBack(TakenAttempt $attempt): void
     {
-        try {
-            $windowEndsAt = $this->windowEndsAt($attempt->key);
-            $availableInSeconds = $this->counter()->availableIn($attempt->key);
+        foreach ($attempt->counts as $count) {
+            try {
+                $windowEndsAt = $this->windowEndsAt($count->key);
+                $availableInSeconds = $this->counter()->availableIn($count->key);
 
-            // Laravel's decrement starts a new window when the key expires first.
-            if ($windowEndsAt === $attempt->windowEndsAt && $availableInSeconds > self::GIVE_BACK_MARGIN_SECONDS) {
-                $this->counter()->decrement($attempt->key, self::FAILED_ATTEMPT_WINDOW_SECONDS);
+                // Laravel's decrement starts a new window when the key expires first.
+                if ($windowEndsAt === $count->windowEndsAt && $availableInSeconds > self::GIVE_BACK_MARGIN_SECONDS) {
+                    $this->counter()->decrement($count->key, $count->windowSeconds);
+                }
+            } catch (Throwable $e) {
+                report($e);
             }
-        } catch (Throwable $e) {
-            report($e);
         }
     }
 
     /**
-     * Get the request limit's keys: the address's, and the signed-in account's.
+     * Get the failed-attempt limits a wrong answer counts against.
+     *
+     * @return non-empty-list<array{key: string, window_seconds: int, allowance: int}>
+     */
+    protected function failedAttemptLimits(Flow $flow, CredentialType $type, string $subject): array
+    {
+        $shared = $type->sharesFailedAttempts() && $flow->sharesFailedAttempts();
+
+        $hourly = [
+            'key' => $this->key('failed-attempt', [$subject, $type->name(), $shared ? self::SHARED_FLOWS : $flow->value, self::OTHER_SOURCE]),
+            'window_seconds' => self::FAILED_ATTEMPT_WINDOW_SECONDS,
+            'allowance' => config()->integer('keystone.rate_limits.failed_attempts_per_hour'),
+        ];
+
+        if (! $shared) {
+            return [$hourly];
+        }
+
+        $daily = [
+            'key' => $this->key('failed-attempt-ceiling', [$subject, $type->name(), self::OTHER_SOURCE]),
+            'window_seconds' => self::SHARED_CEILING_WINDOW_SECONDS,
+            'allowance' => self::SHARED_CEILING,
+        ];
+
+        return [$hourly, $daily];
+    }
+
+    /**
+     * Get the request limit's keys: the address's, and that of the account the session names, signed in or pending.
      *
      * @return non-empty-list<string>
      */
     protected function requestKeys(StepKind $kind): array
     {
         $keys = [$this->key('request', [$kind->value, 'address', $this->address()])];
-        $accountId = $this->guard->id();
+        $accountId = $this->guard->namedAccountId();
 
         if ($accountId !== null) {
             $keys[] = $this->key('request', [$kind->value, 'account', (string) $accountId]);
@@ -230,7 +280,7 @@ class RateLimiter
     {
         $seconds = array_map(fn (string $key) => $this->counter()->availableIn($key), $spent);
 
-        return max(1, ...$seconds);
+        return max([1, ...$seconds]);
     }
 
     /**

@@ -91,7 +91,8 @@ class InstallCommand extends Command
             $installer->backUp('resources/js/app.js');
         }
 
-        $partials = array_map(fn (CredentialType $type) => self::PARTIALS.Str::studly($type->name()).'.vue', $types->serving(Surface::SIGN_IN));
+        $served = array_merge(...array_map(fn (Surface $surface) => $types->serving($surface), Surface::cases()));
+        $partials = array_unique(array_map(fn (CredentialType $type) => self::PARTIALS.Str::studly($type->name()).'.vue', $served));
 
         $copies = $installer->copyStubs(dirname(__DIR__, 2).'/stubs', (bool) $this->option('force'), fn (string $path) => match (true) {
             in_array($path, self::BOOTSTRAP, true) => $bare,

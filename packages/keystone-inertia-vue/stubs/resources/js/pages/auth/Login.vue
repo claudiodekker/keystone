@@ -16,5 +16,5 @@ defineProps<SignInPage>();
 
     <p v-if="status" class="text-sm font-medium text-green-600">{{ status }}</p>
 
-    <CredentialTypeForm v-for="option in types" :key="option.type" :option="option" />
+    <CredentialTypeForm v-for="option in types" :key="option.type" :option="option" surface="sign-in" />
 </template>

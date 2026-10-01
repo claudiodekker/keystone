@@ -69,6 +69,31 @@ class Credentials
     }
 
     /**
+     * Get the names of the types the account holds a usable credential of.
+     *
+     * @return list<string>
+     */
+    public function typesOf(int|string $accountId): array
+    {
+        $types = $this->query()->where('user_id', $accountId)->whereNull('disabled_at')->distinct()->pluck('type');
+
+        return array_values($types->all());
+    }
+
+    /**
+     * Determine if the account holds a challenge credential of another type than the first factor's.
+     */
+    public function holdsSecondFactor(int|string $accountId, string $firstFactor): bool
+    {
+        return $this->query()
+            ->where('user_id', $accountId)
+            ->where('type', '!=', $firstFactor)
+            ->where('served_challenge', true)
+            ->whereNull('disabled_at')
+            ->exists();
+    }
+
+    /**
      * Replace the secret of the usable credential of the type, only while it still holds the secret that was verified.
      */
     public function replaceSecret(StoredCredential $credential, string $type, #[\SensitiveParameter] string $secret): bool

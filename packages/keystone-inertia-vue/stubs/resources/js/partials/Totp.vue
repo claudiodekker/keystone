@@ -1,0 +1,25 @@
+<script setup lang="ts">
+import FormShape from '@/partials/shapes/Form.vue';
+import type { CredentialTypeOption, Surface } from '@/types/auth';
+
+defineProps<{ option: CredentialTypeOption; surface: Surface }>();
+</script>
+
+<template>
+    <FormShape :option="option" :surface="surface" v-slot="{ errors }">
+        <div class="flex flex-col gap-2">
+            <label :for="`${option.type}-code`" class="text-sm font-medium text-gray-900">Code from your authenticator app</label>
+            <input
+                :id="`${option.type}-code`"
+                name="code"
+                type="text"
+                inputmode="numeric"
+                autocomplete="one-time-code"
+                required
+                autofocus
+                class="rounded-md border border-gray-300 px-3 py-2 text-sm tracking-widest"
+            />
+            <p v-if="errors.code" class="text-sm text-red-600">{{ errors.code }}</p>
+        </div>
+    </FormShape>
+</template>

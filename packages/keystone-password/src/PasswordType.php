@@ -61,6 +61,22 @@ class PasswordType implements CredentialType
     }
 
     /**
+     * Determine if password failures share one count across flows, which they don't: a password is too long to guess.
+     */
+    public function sharesFailedAttempts(): bool
+    {
+        return false;
+    }
+
+    /**
+     * Get what is wrong with the type's configuration, which has nothing to go wrong yet.
+     */
+    public function configFailures(): array
+    {
+        return [];
+    }
+
+    /**
      * Get the rules for the typed password, asking a new one to be confirmed and capping it at what the hashing driver takes.
      */
     public function rules(Surface $surface): array

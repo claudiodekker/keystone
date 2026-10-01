@@ -24,7 +24,9 @@ To keep the audit trail but drop the log line, set `keystone.log_channel` to Lar
 | Type | Recorded when |
 |---|---|
 | `signed_in` | a session signs in |
-| `proof.rejected` | a sign-in naming an account is refused: a rejected proof, a proof naming a credential the account doesn't hold, or an account that is suspended |
+| `sign_in.held` | a first factor is proven for an account that owes the [second-factor challenge](challenge.md); the reason is `keystone.challenge`, and the credential is the first factor |
+| `sign_in.voided` | a pending sign-in is dropped because its account was suspended or soft-deleted, or its sessions were ended, before the challenge was answered |
+| `proof.rejected` | a sign-in naming an account, or an answer to its challenge, is refused: a rejected proof, a proof naming a credential the account doesn't hold, an answer of the first factor's type (`keystone.first_factor`), or an account that is suspended |
 | `signed_out` | the user signs out |
 | `session.ended` | Keystone ended a session; the reason says why (`expired` once the [absolute lifetime](configuration.md#session-lifetime) passed) |
 | `sessions.terminated` | an operator ended every session of the account, or of every account with reason `keystone.every_account` (see [Operator commands](operator-commands.md#ending-sessions)); alerts the account's owner |
@@ -46,7 +48,7 @@ Every event has the same fields, and never typed input, secrets, codes, tokens o
 | `user_id` | the account, or null |
 | `actor` | `user`, `operator` or `system` |
 | `operator` | who acted, as the operator command or job named them, cut to 64 characters with control characters replaced by spaces; null otherwise |
-| `flow` | where it happened, such as `sign-in` |
+| `flow` | where it happened, such as `sign-in` or `challenge` |
 | `credential_type`, `credential_id`, `credential_label` | the credential involved and its label at the time; a refusal names only a credential the account holds |
 | `reason` | a short code such as `form.mismatch` or `keystone.barred`; a reason that isn't a lowercase code of at most 64 characters prefixed by its credential type or `keystone.` is stored as `<type>.invalid_reason` |
 | `ip_address`, `user_agent` | the request's, the user agent cut to 512 characters with control characters replaced by spaces |
