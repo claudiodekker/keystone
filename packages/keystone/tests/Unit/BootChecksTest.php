@@ -150,6 +150,16 @@ describe('the alert slots', function () {
     })->with(['silenced' => [null], 'the app\'s own' => [FlakyAlert::class]]);
 });
 
+describe('recovery codes', function () {
+    it('refuses a requirement that isn\'t true or false', function (mixed $value) {
+        config(['keystone.require_recovery_codes' => $value]);
+
+        $failures = bootFailures();
+
+        expect($failures)->toBe(['keystone.require_recovery_codes must be true or false.']);
+    })->with(['null' => [null], 'a string' => ['true']]);
+});
+
 describe('the IP-location port', function () {
     it('refuses a plaintext switch that isn\'t true or false', function (mixed $value) {
         config(['keystone.ip_location.allow_plaintext_driver' => $value]);

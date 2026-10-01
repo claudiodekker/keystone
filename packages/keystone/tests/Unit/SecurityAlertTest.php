@@ -5,9 +5,11 @@ use ClaudioDekker\Keystone\Actor;
 use ClaudioDekker\Keystone\Device;
 use ClaudioDekker\Keystone\IpLocation;
 use ClaudioDekker\Keystone\Notifications\SecurityAlert;
+use ClaudioDekker\Keystone\RecoveryCodes;
 use ClaudioDekker\Keystone\SecurityEvent;
 use ClaudioDekker\Keystone\SecurityEventType;
 use ClaudioDekker\Keystone\SessionInfo;
+use ClaudioDekker\Keystone\Tests\Fixtures\User;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\AnonymousNotifiable;
@@ -77,7 +79,27 @@ it('is worded by its type\'s translation keys', function (SecurityEventType $typ
     'sessions terminated' => [SecurityEventType::SESSIONS_TERMINATED],
     'account suspended' => [SecurityEventType::ACCOUNT_SUSPENDED],
     'account unsuspended' => [SecurityEventType::ACCOUNT_UNSUSPENDED],
+    'recovery code used' => [SecurityEventType::RECOVERY_CODE_USED],
 ]);
+
+it('tells the owner of a used recovery code how many they have left', function (int $left) {
+    $user = User::factory()->create();
+    $codes = new RecoveryCodes($user);
+    $codes->replace($user->getKey(), array_slice($codes->generate(), 0, $left));
+
+    $mail = renderedAlert(alertEvent(['type' => SecurityEventType::RECOVERY_CODE_USED, 'user_id' => $user->getKey()]));
+
+    expect($mail)->toContain(e(trans_choice('keystone::alerts.types.recovery_code.used.remaining', $left)));
+})->with(['several' => [7], 'one' => [1], 'none' => [0]]);
+
+it('counts no recovery codes for an alert about anything else', function () {
+    $user = User::factory()->create();
+    (new RecoveryCodes($user))->replace($user->getKey(), ['CODE-1']);
+
+    $alert = new SecurityAlert(alertEvent(['user_id' => $user->getKey()]));
+
+    expect($alert->remainingRecoveryCodes)->toBeNull();
+});
 
 it('says when, in UTC, from which IP address and where', function () {
     $this->travelTo(CarbonImmutable::parse('2026-09-30 14:05:00', 'Europe/Amsterdam'));

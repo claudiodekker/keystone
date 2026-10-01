@@ -2,6 +2,7 @@
 
 namespace ClaudioDekker\Keystone\AppTests\Assertions;
 
+use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Status;
 use Illuminate\Testing\TestResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -42,6 +43,17 @@ trait ChallengeAssertions
     {
         $response->assertRedirectToRoute('login.challenge')
             ->assertSessionHasErrors([$type => __('keystone::messages.invalid_credential')]);
+    }
+
+    /**
+     * Assert the response refuses the account's last recovery code, saying it is kept for account recovery.
+     *
+     * @param  TestResponse<Response>  $response
+     */
+    public function assertLastRecoveryCodeKept(TestResponse $response): void
+    {
+        $response->assertRedirectToRoute('login.challenge')
+            ->assertSessionHasErrors([CredentialTypes::RECOVERY_CODE => __('keystone::messages.last_recovery_code')]);
     }
 
     /**

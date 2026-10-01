@@ -92,7 +92,8 @@ class InstallCommand extends Command
         }
 
         $served = array_merge(...array_map(fn (Surface $surface) => $types->serving($surface), Surface::cases()));
-        $partials = array_unique(array_map(fn (CredentialType $type) => self::PARTIALS.Str::studly($type->name()).'.vue', $served));
+        $names = [...array_map(fn (CredentialType $type) => $type->name(), $served), CredentialTypes::RECOVERY_CODE];
+        $partials = array_unique(array_map(fn (string $name) => self::PARTIALS.Str::studly($name).'.vue', $names));
 
         $copies = $installer->copyStubs(dirname(__DIR__, 2).'/stubs', (bool) $this->option('force'), fn (string $path) => match (true) {
             in_array($path, self::BOOTSTRAP, true) => $bare,

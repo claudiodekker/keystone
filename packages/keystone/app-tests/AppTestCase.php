@@ -10,6 +10,7 @@ use ClaudioDekker\Keystone\KeystoneUser;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
+use ClaudioDekker\Keystone\RecoveryCodes;
 use Closure;
 use Illuminate\Cache\RateLimiter as CacheRateLimiter;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -163,6 +164,25 @@ abstract class AppTestCase extends TestCase
         $changes->change($account, function (AccountChange $change) use ($type, $arranged) {
             return $change->addCredential($type, identifier: $arranged['identifier'], secret: $arranged['secret'], label: $arranged['label']);
         });
+    }
+
+    /**
+     * Give the account the first of a new set of recovery codes, all of them by default, returning them as shown to its user.
+     *
+     * @return list<string>
+     */
+    protected function arrangeRecoveryCodes(Model&KeystoneUser $account, int $count = RecoveryCodes::SET_SIZE): array
+    {
+        $set = (new RecoveryCodes($account))->generate();
+        $codes = array_slice($set, 0, $count);
+
+        $changes = new AccountChanges(Keystone::guard());
+
+        $changes->change($account, function (AccountChange $change) use ($codes) {
+            $change->replaceRecoveryCodes($codes);
+        });
+
+        return $codes;
     }
 
     /**

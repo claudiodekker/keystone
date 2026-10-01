@@ -4,6 +4,7 @@ namespace ClaudioDekker\Keystone\Notifications;
 
 use Carbon\CarbonImmutable;
 use ClaudioDekker\Keystone\IpLocation;
+use ClaudioDekker\Keystone\RecoveryCodes;
 use ClaudioDekker\Keystone\SecurityEvent;
 use ClaudioDekker\Keystone\SecurityEventType;
 use ClaudioDekker\Keystone\SessionInfo;
@@ -52,6 +53,11 @@ class SecurityAlert extends Notification implements ShouldBeEncrypted, ShouldQue
     public ?string $credentialType;
 
     /**
+     * How many recovery codes the account had left once one was used, for an alert about a used recovery code.
+     */
+    public ?int $remainingRecoveryCodes;
+
+    /**
      * Create a new notification instance.
      */
     public function __construct(SecurityEvent $event)
@@ -61,6 +67,7 @@ class SecurityAlert extends Notification implements ShouldBeEncrypted, ShouldQue
         $this->ipAddress = $event->ip_address;
         $this->device = $this->describe($event->user_agent);
         $this->credentialType = $event->credential_type;
+        $this->remainingRecoveryCodes = $this->countRemainingRecoveryCodes($event);
     }
 
     /**
@@ -90,6 +97,7 @@ class SecurityAlert extends Notification implements ShouldBeEncrypted, ShouldQue
                 'location' => $this->locate(),
                 'device' => $this->device ?? __('keystone::alerts.unknown_device'),
                 'credential' => $this->credentialType,
+                'remainingRecoveryCodes' => $this->remainingRecoveryCodes,
             ]);
     }
 
@@ -109,6 +117,18 @@ class SecurityAlert extends Notification implements ShouldBeEncrypted, ShouldQue
 
             return null;
         }
+    }
+
+    /**
+     * Count the recovery codes the account has left when the event is about a used one, in the request, so the count is the one right after.
+     */
+    protected function countRemainingRecoveryCodes(SecurityEvent $event): ?int
+    {
+        if ($event->type !== SecurityEventType::RECOVERY_CODE_USED || $event->user_id === null) {
+            return null;
+        }
+
+        return (new RecoveryCodes($event))->remaining($event->user_id);
     }
 
     /**

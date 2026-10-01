@@ -4,6 +4,7 @@ namespace ClaudioDekker\Keystone\Http\Controllers;
 
 use ClaudioDekker\Keystone\ChallengeAttempt;
 use ClaudioDekker\Keystone\CredentialAttempt;
+use ClaudioDekker\Keystone\Exceptions\LastRecoveryCode;
 use ClaudioDekker\Keystone\Http\PageValues\ChallengePage;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\CredentialType;
@@ -48,7 +49,7 @@ abstract class ChallengeController extends Controller
     }
 
     /**
-     * Answer the challenge with a proof of the credential type, completing the sign-in.
+     * Answer the challenge with a proof of the credential type or a recovery code, completing the sign-in.
      */
     public function store(Request $request, string $type): Response|Responsable
     {
@@ -62,7 +63,7 @@ abstract class ChallengeController extends Controller
             return $this->refuseWithoutChallenge();
         }
 
-        $credentialType = $this->types()->find($type, Surface::CHALLENGE);
+        $credentialType = $this->types()->answering($type);
 
         if ($credentialType === null) {
             return $this->sendChallengeRefused($request, $type, __('keystone::messages.invalid_credential'));
@@ -76,7 +77,13 @@ abstract class ChallengeController extends Controller
 
         $attempt = new ChallengeAttempt(Keystone::guard(), new RateLimiter($request, Keystone::guard()));
 
-        if (! $attempt->attempt($pending, $credentialType, $validator->validated())) {
+        try {
+            $passed = $attempt->attempt($pending, $credentialType, $validator->validated());
+        } catch (LastRecoveryCode) {
+            return $this->sendChallengeRefused($request, $credentialType->name(), __('keystone::messages.last_recovery_code'));
+        }
+
+        if (! $passed) {
             return $this->sendChallengeRefused($request, $credentialType->name(), __('keystone::messages.invalid_credential'));
         }
 
