@@ -11,7 +11,6 @@ use Symfony\Component\HttpFoundation\Response;
  */
 trait EnrollmentAssertions
 {
-
     /**
      * Assert the response is the enrollment page, offering the types in order.
      *
