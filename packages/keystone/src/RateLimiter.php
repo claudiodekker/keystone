@@ -280,7 +280,7 @@ class RateLimiter
     {
         $seconds = array_map(fn (string $key) => $this->counter()->availableIn($key), $spent);
 
-        return max(1, ...$seconds);
+        return max([1, ...$seconds]);
     }
 
     /**

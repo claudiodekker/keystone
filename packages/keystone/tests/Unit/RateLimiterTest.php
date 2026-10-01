@@ -124,6 +124,12 @@ describe('request limit', function () {
         expect(retryAfter(fn () => limiter('198.51.100.7')->hitRequest(StepKind::SUBMIT)))->toBe(60);
     });
 
+    it('lets a request under its limit through without reporting anything', function () {
+        expect(retryAfter(fn () => limiter()->hitRequest(StepKind::SUBMIT)))->toBeNull();
+
+        Exceptions::assertNothingReported();
+    });
+
     it('lets requests through while the store is down, reporting the failure', function () {
         $this->mock(CacheRateLimiter::class)->shouldReceive('increment')->andThrow(new RuntimeException('Store down.'));
 
@@ -291,6 +297,12 @@ describe('failed-attempt limit', function () {
         expect(retryAfter(fn () => failSharedTimes(limiter(), 1)))->toBeNull()
             ->and(retryAfter(fn () => failSharedTimes(limiter(), 1)))->toBe(86400 - 4 * 3600);
     });
+
+    it('takes a failed attempt under its limit without reporting anything', function (bool $shares) {
+        expect(retryAfter(fn () => failTimes(limiter(), 1, flow: Flow::CHALLENGE, shares: $shares)))->toBeNull();
+
+        Exceptions::assertNothingReported();
+    })->with(['a type that shares no count' => false, 'a sharing type' => true]);
 
     it('refuses while the store is down, reporting the failure', function () {
         $this->mock(CacheRateLimiter::class)->shouldReceive('increment')->andThrow(new RuntimeException('Store down.'));
