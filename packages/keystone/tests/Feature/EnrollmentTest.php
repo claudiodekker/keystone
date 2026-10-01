@@ -124,6 +124,7 @@ describe('the offer', function () {
         $types = $this->app->make(CredentialTypes::class);
         $types->register(new FormType(name: 'passkey', surfaces: ['enrollment'], multipleFactors: true));
         $types->register(new FormType(name: 'phrase', surfaces: ['enrollment']));
+        config(['keystone.methods' => ['form', 'code', 'passkey', 'phrase']]);
         $this->createFirstFactorAccount();
         $this->passFirstFactor();
 
