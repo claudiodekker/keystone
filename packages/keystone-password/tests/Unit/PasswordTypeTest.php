@@ -1,8 +1,5 @@
 <?php
 
-use ClaudioDekker\Keystone\BootChecks;
-use ClaudioDekker\Keystone\Exceptions\Misconfigured;
-use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\InitiateShape;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
 use ClaudioDekker\Keystone\Methods\Surface;
@@ -10,6 +7,7 @@ use ClaudioDekker\Keystone\Password\PasswordType;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rules\Password;
 use Mockery\MockInterface;
 
 function passwordCredential(string $secret, int $id = 1): StoredCredential
@@ -23,17 +21,6 @@ function spyOnHash(): MockInterface
     Hash::swap($hash);
 
     return $hash;
-}
-
-function passwordBootFailures(): array
-{
-    try {
-        (new BootChecks(app(CredentialTypes::class)))->check();
-    } catch (Misconfigured $e) {
-        return $e->failures;
-    }
-
-    return [];
 }
 
 function passwordRulesPass(Surface $surface, mixed $password, mixed $confirmation = null): bool
@@ -77,21 +64,18 @@ describe('new password rules', function () {
         'the same' => ['correct horse battery staple', true],
     ]);
 
-    it('asks for at least 8 characters while a second factor is required, and 15 while it isn\'t', function (Surface $surface, bool $required, string $password, bool $passes) {
-        config(['keystone.require_second_factor' => $required]);
-
+    it('asks for at least 8 characters by default', function (Surface $surface, string $password, bool $passes) {
         $passed = passwordRulesPass($surface, $password);
 
         expect($passed)->toBe($passes);
     })->with([Surface::REGISTRATION, Surface::ENROLLMENT])->with([
-        '7 with a second factor' => [true, str_repeat('a', 7), false],
-        '8 with a second factor' => [true, str_repeat('a', 8), true],
-        '14 alone' => [false, str_repeat('a', 14), false],
-        '15 alone' => [false, str_repeat('a', 15), true],
+        '7 characters' => [str_repeat('a', 7), false],
+        '8 characters' => [str_repeat('a', 8), true],
     ]);
 
-    it('asks for the app\'s own minimum length in characters, whatever the mandate', function (Surface $surface, string $password, bool $passes) {
-        config(['keystone-password.min_length' => 10, 'keystone.require_second_factor' => false]);
+    it('applies the app\'s own password defaults', function (Surface $surface, string $password, bool $passes) {
+        Password::defaults(fn () => Password::min(10));
+        $this->beforeApplicationDestroyed(fn () => Password::defaults(fn () => Password::min(8)));
 
         $passed = passwordRulesPass($surface, $password);
 
@@ -135,20 +119,6 @@ describe('new password rules', function () {
         '1024 two-byte characters' => [str_repeat('é', 1024), true],
         '1025 characters' => [str_repeat('a', 1025), false],
     ]);
-});
-
-describe('the minimum length', function () {
-    it('boots with no minimum length, or one of at least 8', function (?int $minLength) {
-        config(['keystone-password.min_length' => $minLength]);
-
-        expect(passwordBootFailures())->toBe([]);
-    })->with(['null' => [null], 'the floor' => [8], 'a long one' => [64]]);
-
-    it('refuses to boot with a minimum length under 8 or not a whole number', function (mixed $minLength) {
-        config(['keystone-password.min_length' => $minLength]);
-
-        expect(passwordBootFailures())->toBe(['keystone-password.min_length must be null or a whole number of at least 8.']);
-    })->with(['under the floor' => [7], 'zero' => [0], 'a string' => ['12'], 'a fraction' => [8.5]]);
 });
 
 describe('verify', function () {

@@ -11,6 +11,7 @@ use Closure;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rules\Password;
 use LogicException;
 
 /**
@@ -32,21 +33,6 @@ class PasswordType implements CredentialType
      * The most characters of a new password under any other driver.
      */
     public const int MAX_CHARACTERS = 1024;
-
-    /**
-     * The fewest characters a new password may hold, whatever the app sets.
-     */
-    public const int MIN_LENGTH_FLOOR = 8;
-
-    /**
-     * The fewest characters a new password holds by default while the app requires a second factor.
-     */
-    public const int MIN_LENGTH_WITH_SECOND_FACTOR = 8;
-
-    /**
-     * The fewest characters a new password holds by default while a password alone may sign an account in.
-     */
-    public const int MIN_LENGTH_ALONE = 15;
 
     /**
      * Get the type's name.
@@ -85,42 +71,22 @@ class PasswordType implements CredentialType
     }
 
     /**
-     * Get what is wrong with the minimum length, which must be null or a whole number of at least the floor.
+     * Get what is wrong with the type's configuration, which has nothing to go wrong yet.
      */
     public function configFailures(): array
     {
-        $minLength = config('keystone-password.min_length');
-
-        if ($minLength === null || (is_int($minLength) && $minLength >= self::MIN_LENGTH_FLOOR)) {
-            return [];
-        }
-
-        return ['keystone-password.min_length must be null or a whole number of at least '.self::MIN_LENGTH_FLOOR.'.'];
+        return [];
     }
 
     /**
-     * Get the rules for the typed password, asking a new one to be confirmed and to hold between the minimum length and what the hashing driver takes.
+     * Get the rules for the typed password, asking a new one to be confirmed, to meet the app's password defaults and to fit what the hashing driver takes.
      */
     public function rules(Surface $surface): array
     {
         return match ($surface) {
             Surface::SIGN_IN => [self::FIELD => ['required', 'string']],
-            default => [self::FIELD => ['required', 'string', 'confirmed', 'min:'.$this->minLength(), $this->lengthCap()]],
+            default => [self::FIELD => ['required', 'string', 'confirmed', Password::default(), $this->lengthCap()]],
         };
-    }
-
-    /**
-     * Get the fewest characters a new password may hold: the app's own minimum, else the one that follows the second-factor mandate.
-     */
-    protected function minLength(): int
-    {
-        $minLength = config('keystone-password.min_length');
-
-        if (is_int($minLength)) {
-            return $minLength;
-        }
-
-        return config('keystone.require_second_factor') === true ? self::MIN_LENGTH_WITH_SECOND_FACTOR : self::MIN_LENGTH_ALONE;
     }
 
     /**
