@@ -58,6 +58,7 @@ describe('answers', function () {
 
     it('accepts a code imported from Fortify exactly as typed', function () {
         $account = $this->createChallengedAccount(new FormTypeSupport('code'));
+        $this->arrangeRecoveryCodes($account);
         DB::table('user_recovery_codes')->insert(['user_id' => $account->getKey(), 'code_hash' => hash('sha256', 'aBcDeFgHiJ-kLmNoPqRsT')]);
         $this->passFirstFactor();
 
