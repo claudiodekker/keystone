@@ -6,12 +6,12 @@ By default every account must hold a second factor and a set of recovery codes. 
 
 | Setting | Default | An account owes enrollment when |
 |---|---|---|
-| `require_second_factor` | `true` | it holds no second factor and its first factor doesn't prove two factors on its own, as a passkey that verified its user does. A credential of a type that proves two factors on its own counts as a held second factor |
+| `require_second_factor` | `true` | it holds no second factor and its first factor doesn't prove two factors on its own, as a passkey that verified its user does. A credential of a type that proves two factors on its own counts as a held second factor, and is asked for at the challenge (see [The challenge](challenge.md)) |
 | `require_recovery_codes` | `true` | it holds no recovery code |
 
 An account that holds a second factor answers the [challenge](challenge.md) first and enrolls whatever it still owes after. Turning `require_recovery_codes` off means codes are never owed, and also lets the last code answer the challenge (see [Recovery codes](challenge.md#recovery-codes)).
 
-In production, Keystone refuses to boot while `require_second_factor` is on and no type listed in `keystone.methods` can be enrolled as a second factor: one that serves `enrollment` and `challenge`, such as [TOTP](totp.md), or one that proves two factors on its own. See [Configuration](configuration.md#boot-checks).
+In production, Keystone refuses to boot while `require_second_factor` is on and no type listed in `keystone.methods` can be enrolled as a second factor: one that serves `enrollment` and `challenge`, such as [TOTP](totp.md). See [Configuration](configuration.md#boot-checks).
 
 ## The held sign-in
 
@@ -21,7 +21,7 @@ If the account gains a second factor elsewhere before this one is enrolled, the 
 
 ## Choosing a second factor
 
-The enrollment page (`login.enrollment`) lists every listed type that serves `enrollment` and either answers the challenge or proves two factors on its own, with its shape, and preselects the first. A password is never offered: it is a first factor only.
+The enrollment page (`login.enrollment`) lists every listed type that serves `enrollment` and answers the challenge, with its shape, and preselects the first. A password is never offered: it is a first factor only.
 
 Choosing a type (`login.enrollment.start`) starts its ceremony, such as TOTP making a new key, and shows what the user needs, such as the key and the link that adds it to an authenticator app. Reloading shows the same ceremony. The ceremony lasts as long as the held sign-in.
 

@@ -108,10 +108,18 @@ it('refuses a pending sign-in whose account was barred since', function () {
     expect((new SignInDecision)->next(pendingFor(readAccount($account))))->toBe(Demand::REFUSE);
 });
 
-it('offers for enrollment the types that answer a challenge or prove two factors on their own', function () {
+it('challenges a single-factor proof of an account whose other credential proves two factors on its own', function () {
+    $user = User::factory()->create();
+    DB::table('user_credentials')->insert(['user_id' => $user->getKey(), 'type' => 'passkey', 'proves_multiple_factors' => true, 'created_at' => now(), 'updated_at' => now()]);
+
+    expect((new SignInDecision)->demand(readAccount($user), new FormType))->toBe(Demand::CHALLENGE);
+});
+
+it('offers for enrollment the types that answer a challenge', function () {
     $types = new CredentialTypes;
     $types->register(new FormType(name: 'totp', surfaces: ['challenge', 'enrollment']));
-    $types->register(new FormType(name: 'key', surfaces: ['sign-in', 'enrollment'], multipleFactors: true));
+    $types->register(new FormType(name: 'key', surfaces: ['sign-in', 'challenge', 'enrollment'], multipleFactors: true));
+    $types->register(new FormType(name: 'phrase', surfaces: ['sign-in', 'enrollment'], multipleFactors: true));
     $types->register(new FormType(name: 'password', surfaces: ['sign-in', 'enrollment']));
     $types->register(new FormType(name: 'sms', surfaces: ['challenge']));
 

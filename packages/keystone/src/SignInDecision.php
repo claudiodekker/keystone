@@ -82,7 +82,7 @@ class SignInDecision
     }
 
     /**
-     * Get the listed types an account can enroll to hold a second factor: those serving enrollment that answer a challenge or prove two factors on their own.
+     * Get the listed types an account can enroll as its second factor: those serving enrollment that answer a challenge.
      *
      * @return list<CredentialType>
      */
@@ -90,7 +90,7 @@ class SignInDecision
     {
         $enrollable = array_filter(
             $types->serving(Surface::ENROLLMENT),
-            fn (CredentialType $type) => $type->representsMultipleFactors() || $types->find($type->name(), Surface::CHALLENGE) !== null,
+            fn (CredentialType $type) => $types->find($type->name(), Surface::CHALLENGE) !== null,
         );
 
         return array_values($enrollable);
@@ -105,7 +105,7 @@ class SignInDecision
     }
 
     /**
-     * Determine if the account holds a second factor of another type than the first factor's.
+     * Determine if the account holds a second factor of another type than the first factor's, a credential proving two factors on its own included.
      */
     public function holdsSecondFactor(Model&KeystoneUser $account, ?string $firstFactor): bool
     {

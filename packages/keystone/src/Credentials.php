@@ -82,25 +82,13 @@ class Credentials
     }
 
     /**
-     * Determine if the account holds a challenge credential, of another type than the first factor's when there is one.
+     * Determine if the account holds a challenge credential or one proving two factors on its own, of another type than the first factor's when there is one.
      */
     public function holdsSecondFactor(int|string $accountId, ?string $firstFactor = null): bool
     {
         return $this->query()
             ->where('user_id', $accountId)
             ->when($firstFactor !== null, fn (Builder $query) => $query->where('type', '!=', $firstFactor))
-            ->where('served_challenge', true)
-            ->whereNull('disabled_at')
-            ->exists();
-    }
-
-    /**
-     * Determine if the account holds a challenge credential or one that proves two factors on its own.
-     */
-    public function holdsAnySecondFactor(int|string $accountId): bool
-    {
-        return $this->query()
-            ->where('user_id', $accountId)
             ->where(fn (Builder $query) => $query->where('served_challenge', true)->orWhere('proves_multiple_factors', true))
             ->whereNull('disabled_at')
             ->exists();

@@ -18,7 +18,7 @@ The page offers every second-factor type the account holds that `keystone.method
 
 When the account holds a second factor but no listed type can answer it and it holds no recovery codes, for example after you removed a method from `keystone.methods`, the pending sign-in is kept and the user is sent on with "Your second factor is no longer available. Recover your account to sign in again." Until account recovery has its own page, the Inertia-Vue adapter shows that on the sign-in page. When the account no longer holds a second factor at all, the pending sign-in is dropped and the user is sent back to sign in.
 
-Only a credential of another type than the first factor's counts as a second factor. A second factor keeps counting after you unlist its type: an account with one still owes the challenge, so taking a method out of `keystone.methods` never lets its users skip it.
+Only a credential of another type than the first factor's counts as a second factor. A credential of a type that proves two factors on its own, such as a passkey, counts too: a password sign-in of an account holding one is challenged, and the passkey answers when its type serves `challenge`. A second factor keeps counting after you unlist its type: an account with one still owes the challenge, so taking a method out of `keystone.methods` never lets its users skip it.
 
 ## Answering
 

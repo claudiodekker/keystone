@@ -432,7 +432,7 @@ class BootChecks
         }
 
         if (config('keystone.require_second_factor') === true && ! (new SignInDecision)->mandateSatisfiable($this->types)) {
-            $failures[] = 'No credential type listed in keystone.methods can satisfy keystone.require_second_factor: list one that serves enrollment and challenge, or proves two factors on its own.';
+            $failures[] = 'No credential type listed in keystone.methods can satisfy keystone.require_second_factor: list one that serves enrollment and challenge.';
         }
 
         return $failures;

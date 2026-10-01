@@ -346,7 +346,7 @@ describe('in production', function () {
     })->with([
         'another guard driver' => [['auth.guards.web.driver' => 'session'], 'auth.guards.web.driver must be keystone in production.'],
         'no type serving sign-in' => [['keystone.methods' => []], 'No credential type listed in keystone.methods serves sign-in.'],
-        'no type to enroll as the required second factor' => [['keystone.require_second_factor' => true, 'keystone.methods' => ['form']], 'No credential type listed in keystone.methods can satisfy keystone.require_second_factor: list one that serves enrollment and challenge, or proves two factors on its own.'],
+        'no type to enroll as the required second factor' => [['keystone.require_second_factor' => true, 'keystone.methods' => ['form']], 'No credential type listed in keystone.methods can satisfy keystone.require_second_factor: list one that serves enrollment and challenge.'],
         'an insecure session cookie' => [['session.secure' => null], 'session.secure must be true in production.'],
         'a script-readable session cookie' => [['session.http_only' => false], 'session.http_only must be true in production.'],
         'a cross-site session cookie' => [['session.same_site' => 'none'], 'session.same_site must be lax or strict in production.'],

@@ -69,6 +69,17 @@ describe('the hold', function () {
         $this->assertAuthenticatedAs($account);
     });
 
+    it('challenges a first factor of an account whose other credential proves two factors on its own, offering it', function () {
+        $this->app->make(CredentialTypes::class)->register(new FormType(name: 'passkey', surfaces: ['challenge'], multipleFactors: true));
+        config(['keystone.methods' => ['form', 'passkey']]);
+        $this->createChallengedAccount(new FormTypeSupport('passkey'));
+
+        $response = $this->passFirstFactor();
+
+        $response->assertRedirectToRoute('login.challenge');
+        $this->get(route('login.challenge'))->assertJsonPath('types.0.type', 'passkey');
+    });
+
     it('moves a passed challenge on to the recovery codes the account still owes, recording why', function () {
         $account = $this->createChallengedAccount(new FormTypeSupport('code'));
         $this->passFirstFactor();
@@ -138,10 +149,10 @@ describe('the hold', function () {
 });
 
 describe('the offer', function () {
-    it('lists the types that answer a challenge or prove two factors on their own, with their shapes', function () {
+    it('lists the types that answer a challenge, with their shapes', function () {
         $types = $this->app->make(CredentialTypes::class);
-        $types->register(new FormType(name: 'passkey', surfaces: ['enrollment'], multipleFactors: true));
-        $types->register(new FormType(name: 'phrase', surfaces: ['enrollment']));
+        $types->register(new FormType(name: 'passkey', surfaces: ['challenge', 'enrollment'], multipleFactors: true));
+        $types->register(new FormType(name: 'phrase', surfaces: ['enrollment'], multipleFactors: true));
         config(['keystone.methods' => ['form', 'code', 'passkey', 'phrase']]);
         $this->createFirstFactorAccount();
         $this->passFirstFactor();
@@ -226,19 +237,6 @@ describe('the answer', function () {
         $response->assertRedirect('/');
         $this->assertAuthenticatedAs($account);
         $this->assertDatabaseHas('user_security_events', ['type' => 'signed_in', 'user_id' => $account->getKey(), 'flow' => 'enrollment', 'credential_type' => 'code']);
-    });
-
-    it('counts a type proving two factors on its own as the second factor it enrolls', function () {
-        $this->app->make(CredentialTypes::class)->register(new FormType(name: 'passkey', surfaces: ['enrollment'], multipleFactors: true));
-        config(['keystone.methods' => ['form', 'passkey']]);
-        $account = $this->createFirstFactorAccount();
-        $this->passFirstFactor();
-        $ceremony = startEnrollment($this, 'passkey');
-
-        $this->post(route('login.enrollment.submit', ['type' => 'passkey']), ['secret' => $ceremony]);
-
-        $this->get(route('login.recovery-codes'))->assertOk();
-        $this->assertDatabaseHas('users', ['id' => $account->getKey(), 'has_second_factor' => true]);
     });
 
     it('refuses a wrong answer, storing nothing and flashing no secret', function () {

@@ -75,7 +75,7 @@ class EnrollmentAttempt extends EnrollmentStep
                 return 'keystone.barred';
             }
 
-            if ((new Credentials($change->account))->holdsAnySecondFactor($change->account->getKey())) {
+            if ((new Credentials($change->account))->holdsSecondFactor($change->account->getKey())) {
                 return 'keystone.second_factor_held';
             }
 
