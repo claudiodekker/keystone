@@ -10,7 +10,7 @@ return [
     'status' => [
         'signed-out' => 'You have been logged out.',
         'session-expired' => 'Your session has expired. Please sign in again.',
-        'sign-in-cancelled' => 'Sign-in cancelled — you were not logged in.',
+        'sign-in-cancelled' => 'Sign-in cancelled. You were not logged in.',
         'second-factor-unavailable' => 'Your second factor is no longer available. Recover your account to sign in again.',
     ],
 ];

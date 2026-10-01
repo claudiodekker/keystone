@@ -26,7 +26,7 @@ A wrong answer is refused with "The provided credential is invalid." on the type
 
 ## Cancelling
 
-The page's cancel button (`DELETE` to `login.challenge.cancel`) drops the pending sign-in and sends the user to sign in again, reading "Sign-in cancelled — you were not logged in." Cancelling resets no rate limit.
+The page's cancel button (`DELETE` to `login.challenge.cancel`) drops the pending sign-in and sends the user to sign in again, reading "Sign-in cancelled. You were not logged in." Cancelling resets no rate limit.
 
 ## Changing the responses
 
