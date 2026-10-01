@@ -119,7 +119,7 @@ describe('second factor', function () {
         $this->createFirstFactorAccount();
         $this->passFirstFactor();
 
-        $response = $this->post(route('login.enrollment.submit', ['type' => $this->support->type()]), $this->support->validEnrollment(null));
+        $response = $this->post(route('login.enrollment.submit', ['type' => $this->support->type()]), []);
 
         $this->assertEnrollmentExpired($response, $this->support->type());
         $this->assertEnrollmentRestarted($this->get(route('login.enrollment.start', ['type' => $this->support->type()])), $this->support->type());
