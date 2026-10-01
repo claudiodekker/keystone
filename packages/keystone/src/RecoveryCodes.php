@@ -4,6 +4,8 @@ namespace ClaudioDekker\Keystone;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 /**
  * @internal
@@ -109,7 +111,7 @@ class RecoveryCodes
      */
     public static function normalize(#[\SensitiveParameter] string $typed): string
     {
-        return strtoupper((string) preg_replace('/[\s-]+/u', '', $typed));
+        return Str::of($typed)->replaceMatches('/[\s-]+/u', '')->upper()->value();
     }
 
     /**
@@ -117,9 +119,9 @@ class RecoveryCodes
      */
     protected function code(): string
     {
-        $characters = array_map(fn () => self::ALPHABET[random_int(0, strlen(self::ALPHABET) - 1)], range(1, self::LENGTH));
+        $code = Collection::times(self::LENGTH, fn () => self::ALPHABET[random_int(0, strlen(self::ALPHABET) - 1)])->implode('');
 
-        return implode('-', str_split(implode('', $characters), self::BLOCK_LENGTH));
+        return Str::of($code)->split(self::BLOCK_LENGTH)->implode('-');
     }
 
     /**
