@@ -47,7 +47,7 @@ class SignInDecision
     }
 
     /**
-     * Determine if the account holds a second factor besides the first factor's type, counting stamped credentials of types keystone.methods no longer lists.
+     * Determine if the account holds a second factor of another type than the first factor's.
      */
     public function holdsSecondFactor(Model&KeystoneUser $account, string $firstFactor): bool
     {

@@ -28,7 +28,7 @@ class CeremonySlots
     }
 
     /**
-     * Open the method's slot for the purpose, replacing any open one, until its own cap or its owner ends, whichever comes first.
+     * Open the method's slot for the purpose until its cap or its owner ends.
      */
     public function put(string $method, string $purpose, #[\SensitiveParameter] mixed $value, int $capSeconds): void
     {

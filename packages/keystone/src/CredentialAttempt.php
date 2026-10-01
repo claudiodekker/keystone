@@ -80,9 +80,9 @@ abstract class CredentialAttempt
     }
 
     /**
-     * Finish a proven attempt by advancing its credential, entering the account and returning early, or refuse it when another proof moved the credential first or the account is barred.
+     * Enter the account of a proven attempt, or refuse it.
      *
-     * @param  Closure(): void  $enter  Signs the account in or holds its sign-in, throwing a LogicException for a barred account.
+     * @param  Closure(): void  $enter
      */
     protected function finish(
         Model&KeystoneUser $account,

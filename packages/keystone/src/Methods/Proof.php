@@ -37,7 +37,7 @@ readonly class Proof
     }
 
     /**
-     * Prove the stored credential by moving its secret on, which core stores before the proof counts, refusing the proof when another moved it first.
+     * Prove the credential by moving its secret on to the next one.
      */
     public static function advanced(StoredCredential $credential, #[\SensitiveParameter] string $secret): static
     {

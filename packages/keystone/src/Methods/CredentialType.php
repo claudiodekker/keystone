@@ -25,7 +25,7 @@ interface CredentialType
     public function representsMultipleFactors(): bool;
 
     /**
-     * Determine if the type's answers are few enough to guess, so its failures share one count across the flows behind a first factor, under a daily ceiling.
+     * Determine if the type's failures share one count across the flows behind a first factor.
      */
     public function sharesFailedAttempts(): bool;
 

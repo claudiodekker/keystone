@@ -96,7 +96,7 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Hold the account's sign-in until it passes the stage, replacing any pending sign-in, stamped with the credential epoch it was read with.
+     * Hold the account's sign-in until it passes the stage, replacing any pending one.
      */
     public function hold(Model&KeystoneUser $account, string $firstFactor, PendingStage $stage, string $intendedUrl): void
     {
@@ -114,7 +114,7 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Get the session's live pending sign-in, dropping one that ended and voiding one its account's credential epoch left behind.
+     * Get the session's live pending sign-in, dropping or voiding one that is no longer valid.
      */
     public function pending(): ?PendingSignIn
     {

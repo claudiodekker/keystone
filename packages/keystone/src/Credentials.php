@@ -81,7 +81,7 @@ class Credentials
     }
 
     /**
-     * Determine if the account holds a usable credential of another type than the first factor's, stamped as serving the challenge when it was stored, whatever keystone.methods lists now.
+     * Determine if the account holds a challenge credential of another type than the first factor's.
      */
     public function holdsSecondFactor(int|string $accountId, string $firstFactor): bool
     {

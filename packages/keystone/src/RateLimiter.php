@@ -185,7 +185,7 @@ class RateLimiter
     }
 
     /**
-     * Get the failed-attempt limits a wrong answer counts against: the hourly one, which a guessable type shares across the flows behind a first factor, plus that shared count's daily ceiling.
+     * Get the failed-attempt limits a wrong answer counts against.
      *
      * @return non-empty-list<array{key: string, window_seconds: int, allowance: int}>
      */
