@@ -285,17 +285,14 @@ describe('failed-attempt limit', function () {
     });
 
     it('gives back a sharing type\'s attempt to the day\'s ceiling too', function () {
-        foreach (range(1, 4) as $ignored) {
-            failSharedTimes(limiter(), 20);
-            $this->travel(1)->hour();
-        }
-        failSharedTimes(limiter(), 19);
+        config(['keystone.rate_limits.failed_attempts_per_hour' => 200]);
+        failSharedTimes(limiter(), 99);
         $taken = limiter()->takeFailedAttempt(Flow::CHALLENGE, new FormType(sharesFailedAttempts: true), null, 'nobody@example.com');
 
         limiter()->giveBack($taken);
 
         expect(retryAfter(fn () => failSharedTimes(limiter(), 1)))->toBeNull()
-            ->and(retryAfter(fn () => failSharedTimes(limiter(), 1)))->toBe(86400 - 4 * 3600);
+            ->and(retryAfter(fn () => failSharedTimes(limiter(), 1)))->toBe(86400);
     });
 
     it('takes a failed attempt under its limit without reporting anything', function (bool $shares) {

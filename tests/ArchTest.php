@@ -16,6 +16,7 @@ const TEST_NAMESPACES = [
     'ClaudioDekker\Keystone\Password\AppTests',
     'ClaudioDekker\Keystone\Password\Tests',
     'ClaudioDekker\Keystone\WebAuthn\Tests',
+    'ClaudioDekker\Keystone\Totp\AppTests',
     'ClaudioDekker\Keystone\Totp\Tests',
     'ClaudioDekker\Keystone\MagicLink\Tests',
     'ClaudioDekker\Keystone\OAuth\Tests',

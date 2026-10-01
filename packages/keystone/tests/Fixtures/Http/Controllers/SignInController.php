@@ -12,7 +12,7 @@ class SignInController extends Controller
 {
     protected function sendSignInPage(Request $request, SignInPage $page): JsonResponse
     {
-        return response()->json(['types' => $page->types, 'status' => $page->status]);
+        return response()->json(['types' => $page->types, 'status' => $page->status], options: JSON_UNESCAPED_UNICODE);
     }
 
     protected function sendSignInRefused(Request $request, string $message): RedirectResponse

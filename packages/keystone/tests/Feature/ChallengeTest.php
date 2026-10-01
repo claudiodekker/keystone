@@ -65,6 +65,7 @@ describe('the challenge page', function () {
     it('offers the challenge types the account holds, leaving out the first factor\'s type', function () {
         $this->app->make(CredentialTypes::class)->register(new FormType(name: 'both', surfaces: ['sign-in', 'challenge']));
         $this->app->make(CredentialTypes::class)->register(new FormType(name: 'unheld', surfaces: ['challenge']));
+        $this->app->instance('keystone.test-support.both', new FormTypeSupport('both'));
         $account = $this->createChallengedAccount(new FormTypeSupport('code'));
         $this->arrangeCredential($account, new FormTypeSupport('both'), Surface::CHALLENGE);
         $this->post(route('login.submit', ['type' => 'both']), ['identifier' => 'jane@example.com', ...(new FormTypeSupport('both'))->validProof(Surface::SIGN_IN)]);
@@ -141,6 +142,7 @@ describe('the challenge page', function () {
 describe('answers', function () {
     it('refuses an answer of the first factor\'s type, counting it and recording why', function () {
         $this->app->make(CredentialTypes::class)->register(new FormType(name: 'both', surfaces: ['sign-in', 'challenge']));
+        $this->app->instance('keystone.test-support.both', new FormTypeSupport('both'));
         config(['keystone.rate_limits.failed_attempts_per_hour' => 1]);
         $account = $this->createChallengedAccount(new FormTypeSupport('code'));
         $this->arrangeCredential($account, new FormTypeSupport('both'), Surface::SIGN_IN);

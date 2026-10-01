@@ -72,7 +72,7 @@ it('closes every slot when the auth level changes', function (Closure $change) {
 
     expect(Keystone::guard()->slots()->get('form', 'challenge'))->toBeNull();
 })->with([
-    'held' => fn () => fn () => Keystone::guard()->hold(User::factory()->create(), 'form', PendingStage::CHALLENGE, '/'),
-    'signed in' => fn () => fn () => Keystone::guard()->signIn(User::factory()->create()),
-    'held sign-in dropped' => fn () => fn () => Keystone::guard()->forgetPending(),
+    'held' => fn () => Keystone::guard()->hold(User::factory()->create(), 'form', PendingStage::CHALLENGE, '/'),
+    'signed in' => fn () => Keystone::guard()->signIn(User::factory()->create()),
+    'pending sign-in dropped' => fn () => Keystone::guard()->forgetPending(),
 ]);
