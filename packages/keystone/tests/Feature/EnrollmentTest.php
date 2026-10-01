@@ -7,6 +7,7 @@ use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\EnrolledCredential;
 use ClaudioDekker\Keystone\Methods\Initiation;
 use ClaudioDekker\Keystone\Methods\Proof;
+use ClaudioDekker\Keystone\Methods\StoredCredential;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Notifications\SecurityAlert;
 use ClaudioDekker\Keystone\PendingSignIn;
@@ -105,24 +106,24 @@ describe('the hold', function () {
         $this->withoutMandates();
         $this->signInAccount(new FormTypeSupport);
 
-        $response = $this->call($method, route($route, ['type' => 'code']));
+        $response = $this->{$method}(route($route, ['type' => 'code']));
 
         $response->assertRedirect('/');
     })->with([
-        'the offer' => ['GET', 'login.enrollment'],
-        'the form' => ['GET', 'login.enrollment.start'],
-        'the answer' => ['POST', 'login.enrollment.submit'],
-        'cancelling' => ['DELETE', 'login.enrollment.cancel'],
-        'the recovery codes' => ['GET', 'login.recovery-codes'],
-        'saving recovery codes' => ['POST', 'login.recovery-codes.submit'],
+        'the offer' => ['get', 'login.enrollment'],
+        'the form' => ['get', 'login.enrollment.start'],
+        'the answer' => ['post', 'login.enrollment.submit'],
+        'cancelling' => ['delete', 'login.enrollment.cancel'],
+        'the recovery codes' => ['get', 'login.recovery-codes'],
+        'saving recovery codes' => ['post', 'login.recovery-codes.submit'],
     ]);
 });
 
 describe('the offer', function () {
     it('lists the types that answer a challenge or prove two factors on their own, with their shapes', function () {
         $types = $this->app->make(CredentialTypes::class);
-        $types->register(new FormType(name: 'passkey', surfaces: ['sign-in', 'enrollment'], multipleFactors: true));
-        $types->register(new FormType(name: 'phrase', surfaces: ['sign-in', 'enrollment']));
+        $types->register(new FormType(name: 'passkey', surfaces: ['enrollment'], multipleFactors: true));
+        $types->register(new FormType(name: 'phrase', surfaces: ['enrollment']));
         $this->createFirstFactorAccount();
         $this->passFirstFactor();
 
@@ -159,6 +160,7 @@ describe('the ceremony', function () {
     });
 
     it('reports a ceremony that fails to start and sends the user back to the offer', function () {
+        Exceptions::fake();
         $this->app->make(CredentialTypes::class)->register(new class(name: 'broken', surfaces: ['challenge', 'enrollment']) extends FormType
         {
             public function initiate(Surface $surface, string $accountName): Initiation
@@ -222,6 +224,7 @@ describe('the answer', function () {
     });
 
     it('refuses an answer the type fails to verify, reporting the failure and storing nothing', function () {
+        Exceptions::fake();
         $this->app->make(CredentialTypes::class)->register(new RogueType(fn () => throw new RuntimeException('Verifier down.'), surfaces: ['challenge', 'enrollment']));
         $this->createFirstFactorAccount();
         $this->passFirstFactor();
@@ -235,7 +238,7 @@ describe('the answer', function () {
     });
 
     it('refuses a proof that enrolls nothing', function () {
-        $this->app->make(CredentialTypes::class)->register(new RogueType(fn () => Proof::rejected(), surfaces: ['challenge', 'enrollment']));
+        $this->app->make(CredentialTypes::class)->register(new RogueType(fn () => Proof::proven(new StoredCredential(1, identifier: null, secret: null, label: null)), surfaces: ['challenge', 'enrollment']));
         $account = $this->createFirstFactorAccount();
         $this->passFirstFactor();
         startEnrollment($this, 'rogue');

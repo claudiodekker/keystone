@@ -30,13 +30,13 @@ it('passes for the page each assertion names', function () {
     $this->assertRecoveryCodesPage($this->get('recovery-codes'), ['AAAAA-AAAAA', 'BBBBB-BBBBB']);
 });
 
-it('fails for anything else', function (Closure $assert) {
-    expect(fn () => $assert->call($this))->toThrow(AssertionFailedError::class);
+it('fails for anything else', function (string $assertion, string $uri, mixed $expected) {
+    expect(fn () => $this->{$assertion}($this->get($uri), $expected))->toThrow(AssertionFailedError::class);
 })->with([
-    'another component for the offer' => fn () => fn () => $this->assertEnrollmentPage($this->get('other-component'), ['totp', 'code']),
-    'another order' => fn () => fn () => $this->assertEnrollmentPage($this->get('enrollment-page'), ['code', 'totp']),
-    'another preselect' => fn () => fn () => $this->assertEnrollmentPage($this->get('other-preselect'), ['totp', 'code']),
-    'another type\'s form' => fn () => fn () => $this->assertEnrollmentForm($this->get('enrollment-form'), 'code'),
-    'a form without the expiry' => fn () => fn () => $this->assertEnrollmentRestarted($this->get('enrollment-form'), 'totp'),
-    'other codes' => fn () => fn () => $this->assertRecoveryCodesPage($this->get('recovery-codes'), ['AAAAA-AAAAA']),
+    'another component for the offer' => ['assertEnrollmentPage', 'other-component', ['totp', 'code']],
+    'another order' => ['assertEnrollmentPage', 'enrollment-page', ['code', 'totp']],
+    'another preselect' => ['assertEnrollmentPage', 'other-preselect', ['totp', 'code']],
+    'another type\'s form' => ['assertEnrollmentForm', 'enrollment-form', 'code'],
+    'a form without the expiry' => ['assertEnrollmentRestarted', 'enrollment-form', 'totp'],
+    'other codes' => ['assertRecoveryCodesPage', 'recovery-codes', ['AAAAA-AAAAA']],
 ]);
