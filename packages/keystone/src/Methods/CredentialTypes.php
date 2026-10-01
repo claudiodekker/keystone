@@ -81,6 +81,14 @@ class CredentialTypes
     }
 
     /**
+     * Get the type that answers a challenge under the name: core's recovery codes, or a registered type serving the challenge.
+     */
+    public function answering(string $name): ?CredentialType
+    {
+        return $name === self::RECOVERY_CODE ? new RecoveryCodeType : $this->find($name, Surface::CHALLENGE);
+    }
+
+    /**
      * Get every type that serves the surface.
      *
      * @return list<CredentialType>

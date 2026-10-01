@@ -5,6 +5,8 @@ return [
 
     'invalid_credential' => 'The provided credential is invalid.',
 
+    'last_recovery_code' => 'This is your last recovery code. It is kept for account recovery and cannot be used here.',
+
     'throttled' => 'Too many attempts. Please try again in :seconds seconds.',
 
     'status' => [

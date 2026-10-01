@@ -3,6 +3,7 @@
 use ClaudioDekker\Keystone\AccountChange;
 use ClaudioDekker\Keystone\AccountChanges;
 use ClaudioDekker\Keystone\Actor;
+use ClaudioDekker\Keystone\Flow;
 use ClaudioDekker\Keystone\KeystoneGuard;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
 use ClaudioDekker\Keystone\Notifications\SecurityAlert;
@@ -72,6 +73,7 @@ test('the credential epoch moves only for a change that removes, replaces or end
     'adding a credential' => [fn (AccountChange $change) => $change->addCredential(new FormType, identifier: null, secret: 'new'), false],
     'a rehash' => [fn (AccountChange $change, StoredCredential $credential) => $change->rehash($credential, type: 'form', secret: 'new-hash'), false],
     'an advance' => [fn (AccountChange $change, StoredCredential $credential) => $change->advance($credential, type: 'form', secret: 'next-step'), false],
+    'spending a recovery code' => [fn (AccountChange $change) => $change->spendRecoveryCode('NO-SUCH-CODE', flow: Flow::CHALLENGE, keepLast: false), false],
     'ending sessions' => [fn (AccountChange $change) => $change->endSessions(), true],
     'suspending' => [fn (AccountChange $change) => $change->suspend(), true],
     'unsuspending' => [fn (AccountChange $change) => $change->unsuspend(), false, '2026-09-01 12:00:00'],

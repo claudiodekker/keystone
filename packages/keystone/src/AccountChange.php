@@ -3,8 +3,10 @@
 namespace ClaudioDekker\Keystone;
 
 use ClaudioDekker\Keystone\Exceptions\AlreadySuspended;
+use ClaudioDekker\Keystone\Exceptions\LastRecoveryCode;
 use ClaudioDekker\Keystone\Exceptions\NotSuspended;
 use ClaudioDekker\Keystone\Methods\CredentialType;
+use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
@@ -36,6 +38,7 @@ class AccountChange
         public readonly Model&KeystoneUser $account,
         public readonly array $recipients,
         protected Credentials $credentials,
+        protected RecoveryCodes $recoveryCodes,
     ) {
         //
     }
@@ -72,6 +75,35 @@ class AccountChange
     public function advance(StoredCredential $credential, string $type, #[\SensitiveParameter] string $secret): bool
     {
         return $this->credentials->replaceSecret($credential, type: $type, secret: $secret);
+    }
+
+    /**
+     * Spend the account's recovery code the typed one matches, recording its use in the flow, unless it is the last one and must be kept.
+     *
+     * @throws LastRecoveryCode
+     */
+    public function spendRecoveryCode(#[\SensitiveParameter] string $typed, Flow $flow, bool $keepLast): bool
+    {
+        $accountId = $this->account->getKey();
+        $id = $this->recoveryCodes->find($accountId, $typed);
+
+        if ($id === null) {
+            return false;
+        }
+
+        $remaining = $this->recoveryCodes->remaining($accountId);
+
+        if ($keepLast && $remaining === 1) {
+            throw new LastRecoveryCode;
+        }
+
+        if (! $this->recoveryCodes->spend($id)) {
+            return false;
+        }
+
+        $this->record(SecurityEventType::RECOVERY_CODE_USED, flow: $flow->value, credentialType: CredentialTypes::RECOVERY_CODE);
+
+        return true;
     }
 
     /**
@@ -115,12 +147,20 @@ class AccountChange
     /**
      * Record the event about the account once the change commits, alerting the recipients read before it unless suppressed.
      */
-    public function record(SecurityEventType $type, Actor $actor = Actor::USER, ?string $operator = null, bool $alert = true): void
-    {
+    public function record(
+        SecurityEventType $type,
+        Actor $actor = Actor::USER,
+        ?string $operator = null,
+        bool $alert = true,
+        ?string $flow = null,
+        ?string $credentialType = null,
+    ): void {
         $this->events[] = fn (SecurityEventRecorder $recorder) => $recorder->record(
             $type,
             account: $this->account,
             actor: $actor,
+            flow: $flow,
+            credentialType: $credentialType,
             operator: $operator,
             recipients: $this->recipients,
             alert: $alert,

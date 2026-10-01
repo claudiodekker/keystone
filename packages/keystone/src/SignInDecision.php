@@ -4,6 +4,7 @@ namespace ClaudioDekker\Keystone;
 
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
+use ClaudioDekker\Keystone\Methods\RecoveryCodeType;
 use ClaudioDekker\Keystone\Methods\Surface;
 use Illuminate\Database\Eloquent\Model;
 
@@ -32,7 +33,7 @@ class SignInDecision
     }
 
     /**
-     * Get the listed challenge types the account can answer with, leaving out the type of its first factor.
+     * Get the listed challenge types the account can answer with, leaving out the type of its first factor, then recovery codes while it holds one.
      *
      * @return list<CredentialType>
      */
@@ -40,10 +41,11 @@ class SignInDecision
     {
         $held = (new Credentials($account))->typesOf($account->getKey());
         $types = app(CredentialTypes::class)->serving(Surface::CHALLENGE);
+        $remainingCodes = (new RecoveryCodes($account))->remaining($account->getKey());
 
         $offered = array_filter($types, fn (CredentialType $type) => $type->name() !== $firstFactor && in_array($type->name(), $held, true));
 
-        return array_values($offered);
+        return $remainingCodes > 0 ? [...array_values($offered), new RecoveryCodeType] : array_values($offered);
     }
 
     /**

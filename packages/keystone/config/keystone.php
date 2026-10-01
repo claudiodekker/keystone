@@ -19,6 +19,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Recovery Codes
+    |--------------------------------------------------------------------------
+    |
+    | Whether every account must hold recovery codes. While it does, the
+    | last code can't answer a challenge: it is kept for recovery, so
+    | an account that spent the rest can still be recovered later.
+    |
+    */
+
+    'require_recovery_codes' => true,
+
+    /*
+    |--------------------------------------------------------------------------
     | Session Lifetime
     |--------------------------------------------------------------------------
     |
@@ -85,6 +98,7 @@ return [
         'sessions.terminated' => SecurityAlert::class,
         'account.suspended' => SecurityAlert::class,
         'account.unsuspended' => SecurityAlert::class,
+        'recovery_code.used' => SecurityAlert::class,
     ],
 
     /*

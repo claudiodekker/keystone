@@ -26,6 +26,13 @@ return [
                 'what' => 'An administrator lifted the suspension of your account, so it can sign in again.',
             ],
         ],
+        'recovery_code' => [
+            'used' => [
+                'subject' => 'A recovery code was used on your account',
+                'what' => 'One of your recovery codes was used to answer the second-factor challenge when signing in. Each code works only once.',
+                'remaining' => '{0} You have no recovery codes left.|{1} You have 1 recovery code left.|[2,*] You have :count recovery codes left.',
+            ],
+        ],
         'sessions' => [
             'terminated' => [
                 'subject' => 'Your account was signed out everywhere',

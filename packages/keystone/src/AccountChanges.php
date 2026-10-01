@@ -37,7 +37,7 @@ class AccountChanges
             $locked = $this->lock($account);
             $addresses = new Addresses($locked);
             $recipients = $addresses->recipientsOf($locked);
-            $change = new AccountChange($locked, $recipients, new Credentials($locked));
+            $change = new AccountChange($locked, $recipients, new Credentials($locked), new RecoveryCodes($locked));
             $result = $apply($change);
             $movedFrom = $change->movesEpoch() ? $this->moveEpoch($locked) : null;
 

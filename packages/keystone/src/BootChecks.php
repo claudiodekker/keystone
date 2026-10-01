@@ -63,6 +63,7 @@ class BootChecks
 
         $failures = [
             ...$this->rateLimitFailures(),
+            ...$this->recoveryCodeFailures(),
             ...$this->sessionFailures(),
             ...$this->eventFailures(),
             ...$this->alertFailures(),
@@ -103,6 +104,20 @@ class BootChecks
             ...$this->floorFailures([...$keys, 'keystone.rate_limits.failed_attempts_per_hour']),
             ...array_values($unknownFailures),
         ];
+    }
+
+    /**
+     * Check the switch that requires recovery codes.
+     *
+     * @return list<string>
+     */
+    protected function recoveryCodeFailures(): array
+    {
+        if (is_bool(config('keystone.require_recovery_codes'))) {
+            return [];
+        }
+
+        return ['keystone.require_recovery_codes must be true or false.'];
     }
 
     /**

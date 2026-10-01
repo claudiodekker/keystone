@@ -89,16 +89,18 @@ it('copies the partials of installed credential types only', function () {
     expect("{$app}/resources/js/partials/Password.vue")->toBeFile()
         ->and("{$app}/resources/js/components/PasswordField.vue")->toBeFile()
         ->and("{$app}/resources/js/partials/Totp.vue")->toBeFile()
+        ->and("{$app}/resources/js/partials/RecoveryCode.vue")->toBeFile()
         ->and("{$app}/resources/js/partials/NotInstalled.vue")->not->toBeFile();
 });
 
-it('installs without any method package, leaving out their partials and fields', function () {
+it('installs without any method package, leaving out their partials and fields but keeping core\'s recovery codes', function () {
     $app = freshApp();
     app()->instance(CredentialTypes::class, new CredentialTypes);
 
     $this->artisan('keystone:install')->assertSuccessful()->run();
 
     expect("{$app}/resources/js/pages/auth/Login.vue")->toBeFile()
+        ->and("{$app}/resources/js/partials/RecoveryCode.vue")->toBeFile()
         ->and("{$app}/resources/js/partials/Password.vue")->not->toBeFile()
         ->and("{$app}/resources/js/components/PasswordField.vue")->not->toBeFile()
         ->and("{$app}/resources/js/partials/Totp.vue")->not->toBeFile();

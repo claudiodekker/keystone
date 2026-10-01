@@ -101,6 +101,39 @@ abstract class CredentialAttempt
             return false;
         }
 
+        $entered = $this->complete(
+            account: $account,
+            flow: $flow,
+            type: $type,
+            credential: $credential,
+            taken: $taken,
+            enter: $enter,
+            recorded: $recorded,
+            reason: $reason,
+        );
+
+        if ($entered) {
+            $this->storeUpdatedSecret($account, $type, $proof, $credential);
+        }
+
+        return $entered;
+    }
+
+    /**
+     * Enter the account of an attempt whose credential is proven and written, giving its attempt back, or refuse an account barred from entering.
+     *
+     * @param  Closure(): void  $enter
+     */
+    protected function complete(
+        Model&KeystoneUser $account,
+        Flow $flow,
+        CredentialType $type,
+        ?StoredCredential $credential,
+        TakenAttempt $taken,
+        Closure $enter,
+        SecurityEventType $recorded,
+        ?string $reason = null,
+    ): bool {
         try {
             $enter();
         } catch (LogicException) {
@@ -109,7 +142,6 @@ abstract class CredentialAttempt
             return false;
         }
 
-        $this->storeUpdatedSecret($account, $type, $proof, $credential);
         $this->limiter->giveBack($taken);
 
         $this->recorder->record(
