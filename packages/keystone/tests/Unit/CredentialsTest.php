@@ -34,6 +34,12 @@ it('stamps whether the type served challenge when stored', function () {
     expect(DB::table('user_credentials')->value('served_challenge'))->toEqual(1);
 });
 
+it('stamps whether the type proves two factors on its own when stored', function (bool $multipleFactors) {
+    credentials()->store(User::factory()->create(), new FormType(multipleFactors: $multipleFactors), identifier: null, secret: 'hashed-secret');
+
+    expect(DB::table('user_credentials')->value('proves_multiple_factors'))->toEqual($multipleFactors);
+})->with(['one factor' => false, 'two factors' => true]);
+
 it('stores a credential without an identifier', function () {
     credentials()->store(User::factory()->create(), new FormType, identifier: null, secret: 'hashed-secret');
 

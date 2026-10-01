@@ -101,6 +101,14 @@ it('records whether the account holds a second factor and recovery codes as each
         ->and($holdings())->toEqual(['has_second_factor' => 1, 'has_recovery_codes' => 1]);
 });
 
+it('counts a credential proving two factors on its own as a held second factor', function () {
+    $user = User::factory()->create();
+
+    changes()->change($user, fn (AccountChange $change) => $change->addCredential(new FormType(name: 'passkey', surfaces: ['sign-in'], multipleFactors: true), identifier: null, secret: 'both-factors'));
+
+    expect(DB::table('users')->where('id', $user->getKey())->value('has_second_factor'))->toEqual(1);
+});
+
 it('records a first set of recovery codes without alerting, and a replacing set with an alert', function (bool $held, bool $alerts) {
     Notification::fake();
     $user = User::factory()->create();

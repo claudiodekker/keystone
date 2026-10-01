@@ -31,7 +31,11 @@ abstract class EnrollmentStep
         }
 
         if ((new SignInDecision)->pendingOwesEnrollment($pending)) {
-            $this->guard->moveTo(PendingStage::ENROLLMENT);
+            try {
+                $this->guard->moveTo(PendingStage::ENROLLMENT);
+            } catch (LogicException) {
+                return Demand::REFUSE;
+            }
 
             return Demand::ENROLLMENT;
         }

@@ -15,6 +15,7 @@ use ClaudioDekker\Keystone\Tests\Fixtures\FlakyAlert;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormType;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormTypeSupport;
 use ClaudioDekker\Keystone\Tests\Fixtures\RogueType;
+use Illuminate\Database\Connection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Notification;
@@ -78,6 +79,23 @@ describe('the hold', function () {
         $this->assertGuest();
         $this->assertDatabaseHas('user_security_events', ['type' => 'sign_in.held', 'user_id' => $account->getKey(), 'flow' => 'challenge', 'reason' => 'keystone.enrollment']);
         $this->get(route('login.challenge'))->assertRedirectToRoute('login');
+    });
+
+    it('refuses a passed challenge whose account is suspended before it moves on to enrollment', function () {
+        $account = $this->createChallengedAccount(new FormTypeSupport('code'));
+        $this->passFirstFactor();
+        $suspended = false;
+        DB::beforeExecuting(function (string $query) use (&$suspended, $account) {
+            if (! $suspended && str_contains($query, 'user_credentials')) {
+                $suspended = true;
+                DB::table('users')->where('id', $account->getKey())->update(['suspended_at' => now()]);
+            }
+        });
+
+        $this->post(route('login.challenge.submit', ['type' => 'code']), (new FormTypeSupport('code'))->validProof(Surface::CHALLENGE));
+
+        $this->assertDatabaseHas('user_security_events', ['type' => 'proof.rejected', 'user_id' => $account->getKey(), 'flow' => 'challenge', 'reason' => 'keystone.barred']);
+        $this->assertDatabaseMissing('user_security_events', ['type' => 'sign_in.held', 'flow' => 'challenge']);
     });
 
     it('drops a held sign-in once its account gains a second factor elsewhere, so the next sign-in is challenged', function () {
@@ -210,6 +228,19 @@ describe('the answer', function () {
         $this->assertDatabaseHas('user_security_events', ['type' => 'signed_in', 'user_id' => $account->getKey(), 'flow' => 'enrollment', 'credential_type' => 'code']);
     });
 
+    it('counts a type proving two factors on its own as the second factor it enrolls', function () {
+        $this->app->make(CredentialTypes::class)->register(new FormType(name: 'passkey', surfaces: ['enrollment'], multipleFactors: true));
+        config(['keystone.methods' => ['form', 'passkey']]);
+        $account = $this->createFirstFactorAccount();
+        $this->passFirstFactor();
+        $ceremony = startEnrollment($this, 'passkey');
+
+        $this->post(route('login.enrollment.submit', ['type' => 'passkey']), ['secret' => $ceremony]);
+
+        $this->get(route('login.recovery-codes'))->assertOk();
+        $this->assertDatabaseHas('users', ['id' => $account->getKey(), 'has_second_factor' => true]);
+    });
+
     it('refuses a wrong answer, storing nothing and flashing no secret', function () {
         $account = $this->createFirstFactorAccount();
         $this->passFirstFactor();
@@ -236,6 +267,27 @@ describe('the answer', function () {
         $response->assertSessionHasErrors(['rogue' => __('keystone::messages.invalid_credential')]);
         Exceptions::assertReported(RuntimeException::class);
         $this->assertDatabaseMissing('user_credentials', ['type' => 'rogue']);
+    });
+
+    it('refuses an answer once the account gained a second factor elsewhere, storing nothing', function () {
+        $account = $this->createFirstFactorAccount();
+        $this->passFirstFactor();
+        $ceremony = startEnrollment($this);
+        $raced = false;
+        $outerLevel = DB::transactionLevel();
+        DB::beforeExecuting(function (string $query, array $bindings, Connection $connection) use (&$raced, $account, $outerLevel) {
+            if (! $raced && $connection->transactionLevel() > $outerLevel && str_contains($query, 'users')) {
+                $raced = true;
+                DB::table('user_credentials')->insert(['user_id' => $account->getKey(), 'type' => 'rogue', 'served_challenge' => true]);
+            }
+        });
+
+        $response = $this->post(route('login.enrollment.submit', ['type' => 'code']), ['secret' => $ceremony]);
+
+        $response->assertSessionHasErrors(['code' => __('keystone::messages.invalid_credential')]);
+        $this->assertGuest();
+        $this->assertDatabaseMissing('user_credentials', ['type' => 'code']);
+        $this->assertDatabaseHas('user_security_events', ['type' => 'proof.rejected', 'user_id' => $account->getKey(), 'flow' => 'enrollment', 'reason' => 'keystone.second_factor_held']);
     });
 
     it('refuses a proof that enrolls nothing', function () {
@@ -353,6 +405,26 @@ describe('recovery codes', function () {
         $this->assertGuest();
         $this->assertDatabaseCount('user_recovery_codes', 0);
         $this->assertDatabaseHas('user_security_events', ['type' => 'proof.rejected', 'user_id' => $this->account->getKey(), 'flow' => 'enrollment', 'reason' => 'recovery-code.mismatch']);
+    });
+
+    it('refuses the staged set once the account saved a set elsewhere, keeping that one', function () {
+        $codes = $this->get(route('login.recovery-codes'))->json('codes');
+        $raced = false;
+        $outerLevel = DB::transactionLevel();
+        DB::beforeExecuting(function (string $query, array $bindings, Connection $connection) use (&$raced, $outerLevel) {
+            if (! $raced && $connection->transactionLevel() > $outerLevel && str_contains($query, 'users')) {
+                $raced = true;
+                $this->arrangeRecoveryCodes($this->account, count: 1);
+            }
+        });
+
+        $response = $this->post(route('login.recovery-codes.submit'), ['code' => $codes[0]]);
+
+        $response->assertSessionHasErrors(['code']);
+        $this->assertGuest();
+        $this->assertDatabaseCount('user_recovery_codes', 1);
+        $this->assertDatabaseHas('user_security_events', ['type' => 'proof.rejected', 'user_id' => $this->account->getKey(), 'flow' => 'enrollment', 'reason' => 'keystone.recovery_codes_held']);
+        $this->assertDatabaseMissing('user_security_events', ['type' => 'recovery_codes.generated']);
     });
 
     it('refuses an empty answer', function () {

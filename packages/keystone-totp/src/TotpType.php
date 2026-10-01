@@ -116,7 +116,7 @@ class TotpType implements CredentialType
     /**
      * Check the typed code against the steps in the window: at the challenge accepting it only from a step after the last one accepted, at enrollment against the new key.
      */
-    public function verify(Surface $surface, array $input, array $credentials, mixed $ceremony = null): Proof
+    public function verify(Surface $surface, #[\SensitiveParameter] array $input, array $credentials, #[\SensitiveParameter] mixed $ceremony = null): Proof
     {
         $typed = (string) preg_replace('/\s+/', '', $input[self::FIELD]);
         $now = $this->totp->stepAt(Date::now()->getTimestamp());

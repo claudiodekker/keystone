@@ -86,7 +86,7 @@ class AccountChanges
         $accountId = $account->getKey();
 
         $holdings = [
-            'has_second_factor' => (new Credentials($account))->holdsSecondFactor($accountId),
+            'has_second_factor' => (new Credentials($account))->holdsAnySecondFactor($accountId),
             'has_recovery_codes' => (new RecoveryCodes($account))->remaining($accountId) > 0,
         ];
 

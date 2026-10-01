@@ -41,6 +41,7 @@ class Credentials
             'label' => $label,
             'secret' => $secret === null ? null : Crypt::encryptString($secret),
             'served_challenge' => isset($type->surfaces()[Surface::CHALLENGE->value]),
+            'proves_multiple_factors' => $type->representsMultipleFactors(),
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -89,6 +90,18 @@ class Credentials
             ->where('user_id', $accountId)
             ->when($firstFactor !== null, fn (Builder $query) => $query->where('type', '!=', $firstFactor))
             ->where('served_challenge', true)
+            ->whereNull('disabled_at')
+            ->exists();
+    }
+
+    /**
+     * Determine if the account holds a challenge credential or one that proves two factors on its own.
+     */
+    public function holdsAnySecondFactor(int|string $accountId): bool
+    {
+        return $this->query()
+            ->where('user_id', $accountId)
+            ->where(fn (Builder $query) => $query->where('served_challenge', true)->orWhere('proves_multiple_factors', true))
             ->whereNull('disabled_at')
             ->exists();
     }

@@ -6,7 +6,7 @@ By default every account must hold a second factor and a set of recovery codes. 
 
 | Setting | Default | An account owes enrollment when |
 |---|---|---|
-| `require_second_factor` | `true` | it holds no second factor and its first factor doesn't prove two factors on its own, as a passkey that verified its user does |
+| `require_second_factor` | `true` | it holds no second factor and its first factor doesn't prove two factors on its own, as a passkey that verified its user does. A credential of a type that proves two factors on its own counts as a held second factor |
 | `require_recovery_codes` | `true` | it holds no recovery code |
 
 An account that holds a second factor answers the [challenge](challenge.md) first and enrolls whatever it still owes after. Turning `require_recovery_codes` off means codes are never owed, and also lets the last code answer the challenge (see [Recovery codes](challenge.md#recovery-codes)).
@@ -31,11 +31,13 @@ A correct answer (`login.enrollment.submit`) stores the new credential and recor
 
 A wrong answer stores nothing, is refused with "The provided credential is invalid." on the type's field, and records `proof.rejected` with flow `enrollment`. Nothing typed is flashed back. An answer sent again after it was accepted enrolls nothing twice.
 
+An answer that arrives once the account holds a second factor after all, for example because the same answer was sent twice at once or another sign-in enrolled one first, stores nothing and is refused the same way, recording `proof.rejected` with the reason `keystone.second_factor_held`.
+
 An answer that arrives when no ceremony is running, for example after the user left the page open, sends the user back to the type's form with a new ceremony, reading "Your enrollment session expired. Please start again."
 
 ## Recovery codes
 
-The recovery-codes page (`login.recovery-codes`) shows a new set of 8 codes. The set is kept in the session until it is saved, so a reload shows the same codes. To save them, the user types one back (`login.recovery-codes.submit`, field `code`): that stores the set, records `recovery_codes.generated` with flow `enrollment`, and signs the session in. A first set alerts nobody. A code that isn't one of the set is refused with "The recovery code you entered is incorrect." and saves nothing; nothing typed is flashed back.
+The recovery-codes page (`login.recovery-codes`) shows a new set of 8 codes. The set is kept in the session until it is saved, so a reload shows the same codes. To save them, the user types one back (`login.recovery-codes.submit`, field `code`): that stores the set, records `recovery_codes.generated` with flow `enrollment`, and signs the session in. A first set alerts nobody. If the account saved a set elsewhere in the meantime, this one is refused, recording `proof.rejected` with the reason `keystone.recovery_codes_held`, and the saved set is kept. A code that isn't one of the set is refused with "The recovery code you entered is incorrect." and saves nothing; nothing typed is flashed back.
 
 ## Cancelling
 

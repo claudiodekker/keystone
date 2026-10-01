@@ -30,8 +30,10 @@ class EnrollmentAttempt extends EnrollmentStep
             return Demand::REFUSE;
         }
 
-        if (! $this->store($pending->account, $type, $proof->enrolled)) {
-            $this->recordRejected($pending, $type->name(), reason: 'keystone.barred');
+        $refusal = $this->store($pending->account, $type, $proof->enrolled);
+
+        if ($refusal !== null) {
+            $this->recordRejected($pending, $type->name(), reason: $refusal);
 
             return Demand::REFUSE;
         }
@@ -62,15 +64,19 @@ class EnrollmentAttempt extends EnrollmentStep
     }
 
     /**
-     * Store the enrolled credential on the account and record it, unless the account is barred by the time it is locked.
+     * Store the enrolled credential on the account and record it, or give why not once the account is locked: barred, or holding a second factor already.
      */
-    protected function store(Model&KeystoneUser $account, CredentialType $type, EnrolledCredential $enrolled): bool
+    protected function store(Model&KeystoneUser $account, CredentialType $type, EnrolledCredential $enrolled): ?string
     {
         $changes = new AccountChanges($this->guard, $this->recorder);
 
         return $changes->change($account, function (AccountChange $change) use ($type, $enrolled) {
             if ((new SignInDecision)->isBarred($change->account)) {
-                return false;
+                return 'keystone.barred';
+            }
+
+            if ((new Credentials($change->account))->holdsAnySecondFactor($change->account->getKey())) {
+                return 'keystone.second_factor_held';
             }
 
             $id = $change->addCredential($type, identifier: $enrolled->identifier, secret: $enrolled->secret, label: $enrolled->label);
@@ -82,7 +88,7 @@ class EnrollmentAttempt extends EnrollmentStep
                 credential: new StoredCredential($id, identifier: null, secret: null, label: $enrolled->label),
             );
 
-            return true;
+            return null;
         });
     }
 }

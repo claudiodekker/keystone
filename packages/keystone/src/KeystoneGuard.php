@@ -126,7 +126,7 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Move the pending sign-in on to the stage, keeping the time it was held, and note that its second factor was passed.
+     * Move the pending sign-in of an active account on to the stage, keeping the time it was held, and note that its second factor was passed.
      */
     public function moveTo(PendingStage $stage): void
     {
@@ -134,6 +134,12 @@ class KeystoneGuard extends SessionGuard
 
         if (! is_array($held)) {
             throw new LogicException('The session holds no pending sign-in to move on.');
+        }
+
+        $account = $this->retrieveAccount($held['account'] ?? null);
+
+        if (is_null($account) || ! $this->isActive($account)) {
+            throw new LogicException('The account being moved on no longer exists, or is disabled or suspended.');
         }
 
         $this->changeAuthLevel();

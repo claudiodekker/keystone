@@ -46,8 +46,10 @@ class RecoveryCodeSetup extends EnrollmentStep
             return Demand::REFUSE;
         }
 
-        if (! $this->commit($pending->account, $staged)) {
-            $this->recordRejected($pending, CredentialTypes::RECOVERY_CODE, reason: 'keystone.barred');
+        $refusal = $this->commit($pending->account, $staged);
+
+        if ($refusal !== null) {
+            $this->recordRejected($pending, CredentialTypes::RECOVERY_CODE, reason: $refusal);
 
             return Demand::REFUSE;
         }
@@ -75,23 +77,27 @@ class RecoveryCodeSetup extends EnrollmentStep
     }
 
     /**
-     * Store the set as the account's recovery codes, unless the account is barred by the time it is locked.
+     * Store the set as the account's recovery codes, or give why not once the account is locked: barred, or holding codes already.
      *
      * @param  array<array-key, mixed>  $staged
      */
-    protected function commit(Model&KeystoneUser $account, #[\SensitiveParameter] array $staged): bool
+    protected function commit(Model&KeystoneUser $account, #[\SensitiveParameter] array $staged): ?string
     {
         $changes = new AccountChanges($this->guard, $this->recorder);
         $codes = array_values(array_map(strval(...), $staged));
 
         return $changes->change($account, function (AccountChange $change) use ($codes) {
             if ((new SignInDecision)->isBarred($change->account)) {
-                return false;
+                return 'keystone.barred';
+            }
+
+            if ((new RecoveryCodes($change->account))->remaining($change->account->getKey()) > 0) {
+                return 'keystone.recovery_codes_held';
             }
 
             $change->commitRecoveryCodes($codes, flow: Flow::ENROLLMENT);
 
-            return true;
+            return null;
         });
     }
 }
