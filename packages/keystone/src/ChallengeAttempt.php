@@ -60,7 +60,7 @@ class ChallengeAttempt extends CredentialAttempt
     }
 
     /**
-     * Spend the account's recovery code the typed one matches and complete the sign-in, refusing the last code while the gate keeps it.
+     * Spend the account's recovery code the typed one matches and complete the sign-in, refusing a barred account and the last code while the gate keeps it.
      *
      * @throws LastRecoveryCode
      */
@@ -70,12 +70,22 @@ class ChallengeAttempt extends CredentialAttempt
 
         try {
             $spent = $changes->change($account, function (AccountChange $change) use ($typed, $flow) {
+                if ((new SignInDecision)->isBarred($change->account)) {
+                    return null;
+                }
+
                 return $change->spendRecoveryCode($typed, flow: $flow, keepLast: config()->boolean('keystone.require_recovery_codes'));
             });
         } catch (LastRecoveryCode $e) {
             $this->recordRejected($account, $flow, $type, credential: null, reason: 'keystone.last_recovery_code');
 
             throw $e;
+        }
+
+        if ($spent === null) {
+            $this->recordRejected($account, $flow, $type, credential: null, reason: 'keystone.barred');
+
+            return false;
         }
 
         if (! $spent) {

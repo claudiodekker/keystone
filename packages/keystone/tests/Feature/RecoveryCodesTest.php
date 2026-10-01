@@ -6,6 +6,7 @@ use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Notifications\SecurityAlert;
 use ClaudioDekker\Keystone\SecurityEventType;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormTypeSupport;
+use Illuminate\Database\Connection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Sleep;
@@ -24,6 +25,17 @@ describe('the offer', function () {
             'types' => [['type' => 'code', 'shape' => 'form'], ['type' => CredentialTypes::RECOVERY_CODE, 'shape' => 'form']],
             'preselect' => 'code',
         ]);
+    });
+
+    it('sends a session to sign in once its account holds recovery codes but no second factor', function () {
+        $account = $this->createChallengedAccount(new FormTypeSupport('code'));
+        $this->arrangeRecoveryCodes($account);
+        $this->passFirstFactor();
+        DB::table('user_credentials')->where('user_id', $account->getKey())->where('type', 'code')->delete();
+
+        $this->get(route('login.challenge'))->assertRedirectToRoute('login');
+
+        $this->post(route('login.challenge.submit', ['type' => CredentialTypes::RECOVERY_CODE]), ['code' => 'ANY-CODE'])->assertRedirectToRoute('login');
     });
 });
 
@@ -100,6 +112,59 @@ describe('answers', function () {
         $this->assertDatabaseHas('user_security_events', ['type' => 'proof.rejected', 'credential_type' => CredentialTypes::RECOVERY_CODE, 'reason' => 'keystone.last_recovery_code']);
         $this->assertDatabaseMissing('user_security_events', ['type' => 'recovery_code.used']);
         $this->post(route('login.challenge.submit', ['type' => CredentialTypes::RECOVERY_CODE]), ['code' => $last])->assertTooManyRequests();
+    });
+
+    it('spends a code while it is not the last, with recovery codes required', function () {
+        $account = $this->createChallengedAccount(new FormTypeSupport('code'));
+        [$code] = $this->arrangeRecoveryCodes($account, count: 2);
+        $this->passFirstFactor();
+
+        $response = $this->post(route('login.challenge.submit', ['type' => CredentialTypes::RECOVERY_CODE]), ['code' => $code]);
+
+        $response->assertRedirect('/');
+        $this->assertAuthenticatedAs($account);
+        $this->assertDatabaseCount('user_recovery_codes', 1);
+    });
+
+    it('refuses a code another submission spent first, recording no use', function () {
+        $account = $this->createChallengedAccount(new FormTypeSupport('code'));
+        [$code] = $this->arrangeRecoveryCodes($account);
+        $this->passFirstFactor();
+        $raced = false;
+        DB::beforeExecuting(function (string $query) use (&$raced) {
+            if (! $raced && str_starts_with($query, 'delete') && str_contains($query, 'user_recovery_codes')) {
+                $raced = true;
+                DB::table('user_recovery_codes')->delete();
+            }
+        });
+
+        $response = $this->post(route('login.challenge.submit', ['type' => CredentialTypes::RECOVERY_CODE]), ['code' => $code]);
+
+        $response->assertSessionHasErrors([CredentialTypes::RECOVERY_CODE => __('keystone::messages.invalid_credential')]);
+        $this->assertGuest();
+        $this->assertDatabaseMissing('user_security_events', ['type' => 'recovery_code.used']);
+    });
+
+    it('keeps the code of an account suspended while it answers', function () {
+        $account = $this->createChallengedAccount(new FormTypeSupport('code'));
+        [$code] = $this->arrangeRecoveryCodes($account);
+        $this->passFirstFactor();
+        $suspended = false;
+        $outerLevel = DB::transactionLevel();
+        DB::beforeExecuting(function (string $query, array $bindings, Connection $connection) use (&$suspended, $account, $outerLevel) {
+            if (! $suspended && $connection->transactionLevel() > $outerLevel && str_contains($query, 'users')) {
+                $suspended = true;
+                DB::table('users')->where('id', $account->getKey())->update(['suspended_at' => now()]);
+            }
+        });
+
+        $response = $this->post(route('login.challenge.submit', ['type' => CredentialTypes::RECOVERY_CODE]), ['code' => $code]);
+
+        $response->assertSessionHasErrors([CredentialTypes::RECOVERY_CODE => __('keystone::messages.invalid_credential')]);
+        $this->assertGuest();
+        $this->assertDatabaseCount('user_recovery_codes', 8);
+        $this->assertDatabaseHas('user_security_events', ['type' => 'proof.rejected', 'credential_type' => CredentialTypes::RECOVERY_CODE, 'reason' => 'keystone.barred']);
+        $this->assertDatabaseMissing('user_security_events', ['type' => 'recovery_code.used']);
     });
 
     it('spends the last code when recovery codes are optional', function () {

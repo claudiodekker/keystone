@@ -78,16 +78,6 @@ class AccountChange
     }
 
     /**
-     * Replace the account's recovery codes with the set.
-     *
-     * @param  list<string>  $codes
-     */
-    public function replaceRecoveryCodes(#[\SensitiveParameter] array $codes): void
-    {
-        $this->recoveryCodes->replace($this->account->getKey(), $codes);
-    }
-
-    /**
      * Spend the account's recovery code the typed one matches, recording its use in the flow, unless it is the last one and must be kept.
      *
      * @throws LastRecoveryCode
@@ -101,7 +91,9 @@ class AccountChange
             return false;
         }
 
-        if ($keepLast && $this->recoveryCodes->remaining($accountId) === 1) {
+        $remaining = $this->recoveryCodes->remaining($accountId);
+
+        if ($keepLast && $remaining === 1) {
             throw new LastRecoveryCode;
         }
 

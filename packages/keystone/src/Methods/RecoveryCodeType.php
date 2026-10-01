@@ -15,6 +15,11 @@ class RecoveryCodeType implements CredentialType
     public const string FIELD = 'code';
 
     /**
+     * The most characters a typed code may hold, spaces and dashes included.
+     */
+    public const int MAX_TYPED_LENGTH = 64;
+
+    /**
      * Get the name core keeps for recovery codes.
      */
     public function name(): string
@@ -61,7 +66,7 @@ class RecoveryCodeType implements CredentialType
      */
     public function rules(Surface $surface): array
     {
-        return [self::FIELD => ['required', 'string']];
+        return [self::FIELD => ['required', 'string', 'max:'.self::MAX_TYPED_LENGTH]];
     }
 
     /**

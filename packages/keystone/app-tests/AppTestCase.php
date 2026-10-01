@@ -173,14 +173,10 @@ abstract class AppTestCase extends TestCase
      */
     protected function arrangeRecoveryCodes(Model&KeystoneUser $account, int $count = RecoveryCodes::SET_SIZE): array
     {
-        $set = (new RecoveryCodes($account))->generate();
-        $codes = array_slice($set, 0, $count);
+        $recoveryCodes = new RecoveryCodes($account);
+        $codes = array_slice($recoveryCodes->generate(), 0, $count);
 
-        $changes = new AccountChanges(Keystone::guard());
-
-        $changes->change($account, function (AccountChange $change) use ($codes) {
-            $change->replaceRecoveryCodes($codes);
-        });
+        $recoveryCodes->replace($account->getKey(), $codes);
 
         return $codes;
     }
