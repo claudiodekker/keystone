@@ -6,8 +6,6 @@ use ClaudioDekker\Keystone\Exceptions\Throttled;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\Proof;
 use ClaudioDekker\Keystone\Methods\Surface;
-use Illuminate\Support\Timebox;
-use LogicException;
 
 /**
  * @internal
@@ -23,7 +21,7 @@ class ChallengeAttempt extends CredentialAttempt
      */
     public function attempt(PendingSignIn $pending, CredentialType $type, #[\SensitiveParameter] array $input): bool
     {
-        return $this->timebox->call(function (Timebox $timebox) use ($pending, $type, $input) {
+        return $this->timebox->call(function () use ($pending, $type, $input) {
             $account = $pending->account;
             $flow = Flow::of($this->guard, Surface::CHALLENGE);
             $taken = $this->limiter->takeFailedAttempt($flow, $type, $account, identifier: '');
@@ -38,34 +36,18 @@ class ChallengeAttempt extends CredentialAttempt
                 return false;
             }
 
-            if (! $this->advance($account, $type, $proof, $credential)) {
-                $this->recordRejected($account, $flow, $type, $credential, reason: 'keystone.superseded');
-
-                return false;
-            }
-
-            try {
-                $this->guard->signIn($account);
-            } catch (LogicException) {
-                $this->recordRejected($account, $flow, $type, $credential, reason: 'keystone.barred');
-
-                return false;
-            }
-
-            $this->storeUpdatedSecret($account, $type, $proof, $credential);
-            $this->limiter->giveBack($taken);
-
-            $this->recorder->record(
-                SecurityEventType::SIGNED_IN,
+            return $this->finish(
                 account: $account,
-                flow: $flow->value,
-                credentialType: $type->name(),
+                flow: $flow,
+                type: $type,
+                proof: $proof,
                 credential: $credential,
+                taken: $taken,
+                enter: function () use ($account) {
+                    $this->guard->signIn($account);
+                },
+                recorded: SecurityEventType::SIGNED_IN,
             );
-
-            $timebox->returnEarly();
-
-            return true;
         }, self::TIMING_FLOOR_MICROSECONDS);
     }
 }

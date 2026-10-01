@@ -37,7 +37,7 @@ class SignInAttempt extends CredentialAttempt
      */
     public function attempt(?CredentialType $type, string $identifier, #[\SensitiveParameter] array $input, string $intendedUrl): Demand
     {
-        return $this->timebox->call(function (Timebox $timebox) use ($type, $identifier, $input, $intendedUrl) {
+        return $this->timebox->call(function () use ($type, $identifier, $input, $intendedUrl) {
             if ($type === null) {
                 return Demand::REFUSE;
             }
@@ -65,35 +65,21 @@ class SignInAttempt extends CredentialAttempt
                 return Demand::REFUSE;
             }
 
-            if (! $this->advance($account, $type, $proof, $credential)) {
-                $this->recordRejected($account, $flow, $type, $credential, reason: 'keystone.superseded');
-
-                return Demand::REFUSE;
-            }
-
-            try {
-                $this->enter($account, $type, $demand, $intendedUrl);
-            } catch (LogicException) {
-                $this->recordRejected($account, $flow, $type, $credential, reason: 'keystone.barred');
-
-                return Demand::REFUSE;
-            }
-
-            $this->storeUpdatedSecret($account, $type, $proof, $credential);
-            $this->limiter->giveBack($taken);
-
-            $this->recorder->record(
-                $demand === Demand::CHALLENGE ? SecurityEventType::SIGN_IN_HELD : SecurityEventType::SIGNED_IN,
+            $entered = $this->finish(
                 account: $account,
-                flow: $flow->value,
-                credentialType: $type->name(),
+                flow: $flow,
+                type: $type,
+                proof: $proof,
                 credential: $credential,
+                taken: $taken,
+                enter: function () use ($account, $type, $demand, $intendedUrl) {
+                    $this->enter($account, $type, $demand, $intendedUrl);
+                },
+                recorded: $demand === Demand::CHALLENGE ? SecurityEventType::SIGN_IN_HELD : SecurityEventType::SIGNED_IN,
                 reason: $demand === Demand::CHALLENGE ? 'keystone.challenge' : null,
             );
 
-            $timebox->returnEarly();
-
-            return $demand;
+            return $entered ? $demand : Demand::REFUSE;
         }, self::TIMING_FLOOR_MICROSECONDS);
     }
 

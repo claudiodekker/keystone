@@ -6,8 +6,10 @@ use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\Proof;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
 use ClaudioDekker\Keystone\Methods\Surface;
+use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Timebox;
+use LogicException;
 use Throwable;
 
 /**
@@ -75,6 +77,53 @@ abstract class CredentialAttempt
         $owner = $credentials->ownerOf($proof->credentialId, $type->name());
 
         return $owner !== null && (string) $owner === (string) $account->getKey();
+    }
+
+    /**
+     * Finish a proven attempt by advancing its credential, entering the account and returning early, or refuse it when another proof moved the credential first or the account is barred.
+     *
+     * @param  Closure(): void  $enter  Signs the account in or holds its sign-in, throwing a LogicException for a barred account.
+     */
+    protected function finish(
+        Model&KeystoneUser $account,
+        Flow $flow,
+        CredentialType $type,
+        Proof $proof,
+        StoredCredential $credential,
+        TakenAttempt $taken,
+        Closure $enter,
+        SecurityEventType $recorded,
+        ?string $reason = null,
+    ): bool {
+        if (! $this->advance($account, $type, $proof, $credential)) {
+            $this->recordRejected($account, $flow, $type, $credential, reason: 'keystone.superseded');
+
+            return false;
+        }
+
+        try {
+            $enter();
+        } catch (LogicException) {
+            $this->recordRejected($account, $flow, $type, $credential, reason: 'keystone.barred');
+
+            return false;
+        }
+
+        $this->storeUpdatedSecret($account, $type, $proof, $credential);
+        $this->limiter->giveBack($taken);
+
+        $this->recorder->record(
+            $recorded,
+            account: $account,
+            flow: $flow->value,
+            credentialType: $type->name(),
+            credential: $credential,
+            reason: $reason,
+        );
+
+        $this->timebox->returnEarly();
+
+        return true;
     }
 
     /**
