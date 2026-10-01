@@ -70,9 +70,17 @@ class RecoveryCodeType implements CredentialType
     }
 
     /**
+     * Refuse to start a ceremony through the method contract: core stages a set of recovery codes itself.
+     */
+    public function initiate(Surface $surface, string $accountName): Initiation
+    {
+        throw new LogicException('Recovery codes are staged by core, never initiated through the method contract.');
+    }
+
+    /**
      * Refuse to verify through the method contract: core spends a recovery code under the account's lock instead.
      */
-    public function verify(Surface $surface, array $input, array $credentials): Proof
+    public function verify(Surface $surface, array $input, array $credentials, mixed $ceremony = null): Proof
     {
         throw new LogicException('Recovery codes are spent by core, never verified through the method contract.');
     }

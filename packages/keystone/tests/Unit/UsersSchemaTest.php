@@ -10,7 +10,17 @@ it('adds keystone columns to the users table', function () {
         'deleted_at',
         'invalidated_at',
         'suspended_at',
+        'has_second_factor',
+        'has_recovery_codes',
     ]))->toBeTrue();
+});
+
+it('starts a new account holding neither a second factor nor recovery codes', function () {
+    DB::table('users')->insert(['name' => 'Taylor']);
+
+    expect(DB::table('users')->first(['has_second_factor', 'has_recovery_codes']))
+        ->has_second_factor->toBeFalsy()
+        ->has_recovery_codes->toBeFalsy();
 });
 
 it('starts a new account at epoch zero', function () {

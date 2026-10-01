@@ -25,6 +25,11 @@ class ChallengeController extends Controller
         return to_route('login.challenge')->withErrors([$type => $message]);
     }
 
+    protected function sendEnrollmentOwedAfterChallenge(Request $request): RedirectResponse
+    {
+        return to_route('login.enrollment');
+    }
+
     protected function sendChallengePassed(Request $request, string $intendedUrl): RedirectResponse
     {
         return redirect($intendedUrl);

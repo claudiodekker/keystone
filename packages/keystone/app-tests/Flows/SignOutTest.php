@@ -9,6 +9,10 @@ use Illuminate\Support\Facades\Exceptions;
 
 pest()->extend(AppTestCase::class)->use(AppTestCase::assertions(SignOutAssertions::class));
 
+beforeEach(function () {
+    $this->withoutMandates();
+});
+
 it('signs out, ending the session and regenerating the CSRF token', function () {
     $support = $this->supportsFor(Surface::SIGN_IN)[0];
     $account = $this->createAccount();

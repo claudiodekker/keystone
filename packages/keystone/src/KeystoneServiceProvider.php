@@ -3,6 +3,7 @@
 namespace ClaudioDekker\Keystone;
 
 use ClaudioDekker\Keystone\Actions\AccountLookup;
+use ClaudioDekker\Keystone\Actions\RespondToDemotedSession;
 use ClaudioDekker\Keystone\Actions\RespondToExpiredSession;
 use ClaudioDekker\Keystone\Console\EndSessionsCommand;
 use ClaudioDekker\Keystone\Console\SuspendCommand;
@@ -50,6 +51,7 @@ class KeystoneServiceProvider extends ServiceProvider
         $this->app->singleton(CredentialTypes::class);
         $this->app->bindIf(AccountLookup::class);
         $this->app->bindIf(RespondToExpiredSession::class);
+        $this->app->bindIf(RespondToDemotedSession::class);
         $this->app->scoped(RequestContext::class, fn () => new RequestContext);
         $this->app->bindIf(IpLocation::class, fn () => class_exists(LocationManager::class) ? new StevebaumanIpLocation : new NullIpLocation);
         $this->app->bindIf(SessionInfo::class, fn () => class_exists(DeviceDetector::class) ? new DeviceDetectorSessionInfo : new NullSessionInfo);
@@ -75,6 +77,7 @@ class KeystoneServiceProvider extends ServiceProvider
         $this->callAfterResolving(ExceptionHandler::class, function (ExceptionHandler $handler) {
             if ($handler instanceof Handler) {
                 $handler->renderable($this->renderExpiredSession(...));
+                $handler->renderable($this->renderDemotedSession(...));
             }
         });
 
@@ -149,6 +152,18 @@ class KeystoneServiceProvider extends ServiceProvider
         }
 
         return $this->app->make(RespondToExpiredSession::class)->handle($request, $e);
+    }
+
+    /**
+     * Respond to a request whose signed-in session was held back at enrollment, leaving every other unauthenticated request to the app's handler.
+     */
+    protected function renderDemotedSession(AuthenticationException $e, Request $request): ?Response
+    {
+        if (! $request->attributes->getBoolean(KeystoneGuard::DEMOTED_SESSION)) {
+            return null;
+        }
+
+        return $this->app->make(RespondToDemotedSession::class)->handle($request, $e);
     }
 
     /**

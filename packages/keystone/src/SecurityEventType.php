@@ -19,4 +19,6 @@ enum SecurityEventType: string
     case ACCOUNT_SUSPENDED = 'account.suspended';
     case ACCOUNT_UNSUSPENDED = 'account.unsuspended';
     case RECOVERY_CODE_USED = 'recovery_code.used';
+    case RECOVERY_CODES_GENERATED = 'recovery_codes.generated';
+    case CREDENTIAL_ADDED = 'credential.added';
 }

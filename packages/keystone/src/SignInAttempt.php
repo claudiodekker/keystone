@@ -75,8 +75,8 @@ class SignInAttempt extends CredentialAttempt
                 enter: function () use ($account, $type, $demand, $intendedUrl) {
                     $this->enter($account, $type, $demand, $intendedUrl);
                 },
-                recorded: $demand === Demand::CHALLENGE ? SecurityEventType::SIGN_IN_HELD : SecurityEventType::SIGNED_IN,
-                reason: $demand === Demand::CHALLENGE ? 'keystone.challenge' : null,
+                recorded: $demand === Demand::SIGN_IN ? SecurityEventType::SIGNED_IN : SecurityEventType::SIGN_IN_HELD,
+                reason: $demand === Demand::SIGN_IN ? null : "keystone.{$demand->value}",
             );
 
             return $entered ? $demand : Demand::REFUSE;
@@ -84,19 +84,21 @@ class SignInAttempt extends CredentialAttempt
     }
 
     /**
-     * Sign the account in, or hold its sign-in at the challenge, as the decision demands.
+     * Sign the account in, or hold its sign-in at the challenge or an enrollment, as the decision demands.
      *
      * @throws LogicException
      */
     protected function enter(Model&KeystoneUser $account, CredentialType $type, Demand $demand, string $intendedUrl): void
     {
-        if ($demand === Demand::CHALLENGE) {
-            $this->guard->hold($account, firstFactor: $type->name(), stage: PendingStage::CHALLENGE, intendedUrl: $intendedUrl);
+        if ($demand === Demand::SIGN_IN) {
+            $this->guard->signIn($account);
 
             return;
         }
 
-        $this->guard->signIn($account);
+        $stage = $demand === Demand::CHALLENGE ? PendingStage::CHALLENGE : PendingStage::ENROLLMENT;
+
+        $this->guard->hold($account, firstFactor: $type->name(), stage: $stage, intendedUrl: $intendedUrl);
     }
 
     /**

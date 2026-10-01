@@ -3,11 +3,16 @@
 namespace ClaudioDekker\Keystone\Totp;
 
 use ClaudioDekker\Keystone\Methods\CredentialType;
+use ClaudioDekker\Keystone\Methods\EnrolledCredential;
+use ClaudioDekker\Keystone\Methods\Initiation;
 use ClaudioDekker\Keystone\Methods\InitiateShape;
 use ClaudioDekker\Keystone\Methods\Proof;
+use ClaudioDekker\Keystone\Methods\StoredCredential;
 use ClaudioDekker\Keystone\Methods\Surface;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Date;
 use LogicException;
+use ParagonIE\ConstantTime\Base32;
 
 /**
  * @internal
@@ -18,6 +23,11 @@ class TotpType implements CredentialType
      * The input field holding the typed code.
      */
     public const string FIELD = 'code';
+
+    /**
+     * How many random bytes a new key holds: 160 bits, as RFC 4226 recommends.
+     */
+    public const int KEY_BYTES = 20;
 
     /**
      * Create a new TOTP type instance.
@@ -43,6 +53,7 @@ class TotpType implements CredentialType
     {
         return [
             Surface::CHALLENGE->value => InitiateShape::FORM,
+            Surface::ENROLLMENT->value => InitiateShape::FORM,
         ];
     }
 
@@ -85,17 +96,45 @@ class TotpType implements CredentialType
     }
 
     /**
-     * Check the typed code against the steps in the window, accepting it only from a step after the last one accepted.
+     * Make a new key for enrollment, shown as its Base32 form and the otpauth URI an authenticator app reads.
      */
-    public function verify(Surface $surface, array $input, array $credentials): Proof
+    public function initiate(Surface $surface, string $accountName): Initiation
     {
-        if ($surface !== Surface::CHALLENGE) {
-            throw new LogicException("Verifying a TOTP code on {$surface->value} isn't built yet.");
+        if ($surface !== Surface::ENROLLMENT) {
+            throw new LogicException("A TOTP code needs no ceremony on {$surface->value}.");
         }
 
+        $secret = new TotpSecret(random_bytes(self::KEY_BYTES), lastStep: null);
+        $key = Base32::encodeUpperUnpadded($secret->key);
+
+        return new Initiation(ceremony: $secret->toStored(), page: [
+            'key' => $key,
+            'uri' => $this->provisioningUri($key, $accountName),
+        ]);
+    }
+
+    /**
+     * Check the typed code against the steps in the window: at the challenge accepting it only from a step after the last one accepted, at enrollment against the new key.
+     */
+    public function verify(Surface $surface, array $input, array $credentials, mixed $ceremony = null): Proof
+    {
         $typed = (string) preg_replace('/\s+/', '', $input[self::FIELD]);
         $now = $this->totp->stepAt(Date::now()->getTimestamp());
 
+        return match ($surface) {
+            Surface::CHALLENGE => $this->answer($typed, $now, $credentials),
+            Surface::ENROLLMENT => $this->enroll($typed, $now, $ceremony),
+            default => throw new LogicException("Verifying a TOTP code on {$surface->value} isn't built yet."),
+        };
+    }
+
+    /**
+     * Check the typed code against the account's TOTP credentials, accepting it only from a step after the last one accepted.
+     *
+     * @param  list<StoredCredential>  $credentials
+     */
+    protected function answer(#[\SensitiveParameter] string $typed, int $now, array $credentials): Proof
+    {
         foreach ($credentials as $credential) {
             $secret = TotpSecret::fromStored((string) $credential->secret);
             $matched = $this->matchingSteps($secret, $typed, $now);
@@ -111,6 +150,44 @@ class TotpType implements CredentialType
         }
 
         return Proof::rejected('totp.mismatch', $credentials[0] ?? null);
+    }
+
+    /**
+     * Check the typed code against the key the enrollment made, storing the key with the code's step as the last one accepted.
+     */
+    protected function enroll(#[\SensitiveParameter] string $typed, int $now, #[\SensitiveParameter] mixed $ceremony): Proof
+    {
+        if (! is_string($ceremony)) {
+            throw new LogicException('A TOTP enrollment needs the key its ceremony made.');
+        }
+
+        $secret = TotpSecret::fromStored($ceremony);
+        $matched = $this->matchingSteps($secret, $typed, $now);
+
+        if ($matched === []) {
+            return Proof::rejected('totp.mismatch');
+        }
+
+        return Proof::enrolled(new EnrolledCredential(identifier: null, secret: $secret->acceptedAt(max($matched))->toStored()));
+    }
+
+    /**
+     * Get the otpauth URI that adds the key to an authenticator app, labelled with the app's name and the account's.
+     */
+    protected function provisioningUri(#[\SensitiveParameter] string $key, string $accountName): string
+    {
+        $issuer = (string) config('app.name');
+        $label = rawurlencode($issuer).':'.rawurlencode($accountName);
+
+        $query = Arr::query([
+            'secret' => $key,
+            'issuer' => $issuer,
+            'algorithm' => 'SHA1',
+            'digits' => Totp::DIGITS,
+            'period' => Totp::STEP_SECONDS,
+        ]);
+
+        return "otpauth://totp/{$label}?{$query}";
     }
 
     /**

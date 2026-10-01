@@ -34,4 +34,18 @@ interface CredentialTypeSupport
      * @return array<string, mixed>
      */
     public function rejectedProof(Surface $surface): array;
+
+    /**
+     * Get input that completes the type's enrollment ceremony, given what core kept of it in the ceremony slot.
+     *
+     * @return array<string, mixed>
+     */
+    public function validEnrollment(mixed $ceremony): array;
+
+    /**
+     * Get input that the type's enrollment ceremony rejects, given what core kept of it in the ceremony slot.
+     *
+     * @return array<string, mixed>
+     */
+    public function rejectedEnrollment(mixed $ceremony): array;
 }

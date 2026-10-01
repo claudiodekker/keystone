@@ -126,6 +126,17 @@ A session that has proven who it is and owes nothing more. A session that comes 
 A session that has named an account but still owes a challenge, an enrollment or a recovery before it is signed in. At most one per session.
 _Avoid_: park, half-authenticated, held user
 
+**Enrollment**:
+Adding a credential to an account. Owed at sign-in when a mandate requires something the account doesn't hold: a second factor (`require_second_factor`) or recovery codes (`require_recovery_codes`).
+_Avoid_: setup, onboarding
+
+**Holdings**:
+Whether an account holds a second factor and recovery codes, written on its row by every account change so a request can tell what it owes without counting credentials.
+
+**Demotion**:
+Turning a signed-in session whose account newly owes an enrollment back into a pending sign-in at enrollment.
+_Avoid_: downgrade, forced logout
+
 **Credential epoch**:
 A per-account counter that moves whenever the account's other sessions must end, such as on a password change, credential removal, recovery, suspension or "sign out others". A session or remember-me cookie from an older epoch is dead.
 

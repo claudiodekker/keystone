@@ -36,4 +36,14 @@ class PasswordTypeSupport implements CredentialTypeSupport
     {
         return [PasswordType::FIELD => 'wrong '.self::PASSWORD];
     }
+
+    public function validEnrollment(mixed $ceremony): array
+    {
+        return [PasswordType::FIELD => self::PASSWORD, PasswordType::FIELD.'_confirmation' => self::PASSWORD];
+    }
+
+    public function rejectedEnrollment(mixed $ceremony): array
+    {
+        return [PasswordType::FIELD => self::PASSWORD, PasswordType::FIELD.'_confirmation' => 'wrong '.self::PASSWORD];
+    }
 }

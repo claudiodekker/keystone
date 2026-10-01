@@ -7,6 +7,10 @@ use ClaudioDekker\Keystone\Methods\Surface;
 
 pest()->extend(AppTestCase::class)->use(AppTestCase::assertions(ChallengeAssertions::class));
 
+beforeEach(function () {
+    $this->withoutMandates();
+});
+
 it('completes the sign-in with a valid answer of every installed type', function () {
     $this->eachSupportFor(Surface::CHALLENGE, function (CredentialTypeSupport $support) {
         $account = $this->createChallengedAccount($support, "{$support->type()}@example.com");

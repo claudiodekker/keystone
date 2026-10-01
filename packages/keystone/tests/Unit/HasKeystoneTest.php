@@ -8,11 +8,17 @@ $columns = [
     'deleted_at',
     'invalidated_at',
     'suspended_at',
+    'has_second_factor',
+    'has_recovery_codes',
 ];
 
 test('keystone columns are kept out of the array form', function (string $column) {
     $user = User::factory()->create();
-    $user->forceFill([$column => $column === 'credential_epoch' ? 3 : now()]);
+    $user->forceFill([$column => match ($column) {
+        'credential_epoch' => 3,
+        'has_second_factor', 'has_recovery_codes' => true,
+        default => now(),
+    }]);
 
     expect($user->toArray())->not->toHaveKey($column);
 })->with($columns);

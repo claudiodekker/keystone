@@ -150,14 +150,14 @@ describe('the alert slots', function () {
     })->with(['silenced' => [null], 'the app\'s own' => [FlakyAlert::class]]);
 });
 
-describe('recovery codes', function () {
-    it('refuses a requirement that isn\'t true or false', function (mixed $value) {
-        config(['keystone.require_recovery_codes' => $value]);
+describe('the mandates', function () {
+    it('refuses a requirement that isn\'t true or false', function (string $key, mixed $value) {
+        config([$key => $value]);
 
         $failures = bootFailures();
 
-        expect($failures)->toBe(['keystone.require_recovery_codes must be true or false.']);
-    })->with(['null' => [null], 'a string' => ['true']]);
+        expect($failures)->toBe(["{$key} must be true or false."]);
+    })->with(['keystone.require_second_factor', 'keystone.require_recovery_codes'])->with(['null' => [null], 'a string' => ['true']]);
 });
 
 describe('the IP-location port', function () {
@@ -346,6 +346,7 @@ describe('in production', function () {
     })->with([
         'another guard driver' => [['auth.guards.web.driver' => 'session'], 'auth.guards.web.driver must be keystone in production.'],
         'no type serving sign-in' => [['keystone.methods' => []], 'No credential type listed in keystone.methods serves sign-in.'],
+        'no type to enroll as the required second factor' => [['keystone.require_second_factor' => true, 'keystone.methods' => ['form']], 'No credential type listed in keystone.methods can satisfy keystone.require_second_factor: list one that serves enrollment and challenge, or proves two factors on its own.'],
         'an insecure session cookie' => [['session.secure' => null], 'session.secure must be true in production.'],
         'a script-readable session cookie' => [['session.http_only' => false], 'session.http_only must be true in production.'],
         'a cross-site session cookie' => [['session.same_site' => 'none'], 'session.same_site must be lax or strict in production.'],
@@ -366,6 +367,14 @@ describe('in production', function () {
         'an array mailer' => [['mail.default' => 'array'], 'mail.default must deliver mail in production, not log or array.'],
         'a null queue' => [['queue.connections.null' => ['driver' => 'null'], 'queue.default' => 'null'], 'queue.default must not be the null queue in production.'],
     ]);
+
+    it('accepts a required second factor that a listed type can be enrolled as', function () {
+        config(['keystone.require_second_factor' => true, 'keystone.methods' => ['form', 'code']]);
+
+        $failures = bootFailures();
+
+        expect($failures)->toBe([]);
+    });
 
     it('accepts a secure-prefixed session cookie with a domain and a strict same-site attribute', function () {
         config(['session.cookie' => '__Secure-example-session', 'session.domain' => '.example.com', 'session.same_site' => 'strict']);

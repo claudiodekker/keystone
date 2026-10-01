@@ -40,4 +40,14 @@ class FormTypeSupport implements CredentialTypeSupport
     {
         return ['secret' => 'wrong '.self::SECRET];
     }
+
+    public function validEnrollment(mixed $ceremony): array
+    {
+        return ['secret' => (string) $ceremony];
+    }
+
+    public function rejectedEnrollment(mixed $ceremony): array
+    {
+        return ['secret' => 'wrong '.$ceremony];
+    }
 }

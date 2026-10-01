@@ -12,6 +12,7 @@ enum Flow: string
 {
     case SIGN_IN = 'sign-in';
     case CHALLENGE = 'challenge';
+    case ENROLLMENT = 'enrollment';
 
     /**
      * Derive the flow from the session's phase and the surface in use.
@@ -21,6 +22,7 @@ enum Flow: string
         return match (true) {
             $surface === Surface::SIGN_IN && $guard->guest() => self::SIGN_IN,
             $surface === Surface::CHALLENGE && $guard->guest() && $guard->isPendingAt(PendingStage::CHALLENGE) => self::CHALLENGE,
+            $surface === Surface::ENROLLMENT && $guard->guest() && $guard->isPendingAt(PendingStage::ENROLLMENT) => self::ENROLLMENT,
             default => throw new LogicException("No flow uses the [{$surface->value}] surface in this session's phase."),
         };
     }

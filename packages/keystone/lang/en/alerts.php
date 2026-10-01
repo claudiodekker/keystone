@@ -26,11 +26,23 @@ return [
                 'what' => 'An administrator lifted the suspension of your account, so it can sign in again.',
             ],
         ],
+        'credential' => [
+            'added' => [
+                'subject' => 'A sign-in method was added to your account',
+                'what' => 'A new way to sign in or confirm it\'s you was added to your account.',
+            ],
+        ],
         'recovery_code' => [
             'used' => [
                 'subject' => 'A recovery code was used on your account',
                 'what' => 'One of your recovery codes was used to answer the second-factor challenge when signing in. Each code works only once.',
                 'remaining' => '{0} You have no recovery codes left.|{1} You have 1 recovery code left.|[2,*] You have :count recovery codes left.',
+            ],
+        ],
+        'recovery_codes' => [
+            'generated' => [
+                'subject' => 'Your recovery codes were replaced',
+                'what' => 'A new set of recovery codes was saved for your account. Your old codes no longer work.',
             ],
         ],
         'sessions' => [

@@ -4,6 +4,7 @@ namespace ClaudioDekker\Keystone\Http\Controllers;
 
 use ClaudioDekker\Keystone\ChallengeAttempt;
 use ClaudioDekker\Keystone\CredentialAttempt;
+use ClaudioDekker\Keystone\Demand;
 use ClaudioDekker\Keystone\Exceptions\LastRecoveryCode;
 use ClaudioDekker\Keystone\Http\PageValues\ChallengePage;
 use ClaudioDekker\Keystone\Keystone;
@@ -78,16 +79,16 @@ abstract class ChallengeController extends Controller
         $attempt = new ChallengeAttempt(Keystone::guard(), new RateLimiter($request, Keystone::guard()));
 
         try {
-            $passed = $attempt->attempt($pending, $credentialType, $validator->validated());
+            $demand = $attempt->attempt($pending, $credentialType, $validator->validated());
         } catch (LastRecoveryCode) {
             return $this->sendChallengeRefused($request, $credentialType->name(), __('keystone::messages.last_recovery_code'));
         }
 
-        if (! $passed) {
-            return $this->sendChallengeRefused($request, $credentialType->name(), __('keystone::messages.invalid_credential'));
-        }
-
-        return $this->sendChallengePassed($request, $pending->intendedUrl);
+        return match ($demand) {
+            Demand::REFUSE => $this->sendChallengeRefused($request, $credentialType->name(), __('keystone::messages.invalid_credential')),
+            Demand::ENROLLMENT => $this->sendEnrollmentOwedAfterChallenge($request),
+            default => $this->sendChallengePassed($request, $pending->intendedUrl),
+        };
     }
 
     /**
@@ -124,6 +125,11 @@ abstract class ChallengeController extends Controller
      * Respond to a refused answer, with the message for the credential type's field.
      */
     abstract protected function sendChallengeRefused(Request $request, string $type, string $message): Response|Responsable;
+
+    /**
+     * Respond to a passed challenge whose account still owes an enrollment, sending the user on to enroll it.
+     */
+    abstract protected function sendEnrollmentOwedAfterChallenge(Request $request): Response|Responsable;
 
     /**
      * Respond to a passed challenge, sending the signed-in user on to the intended URL.

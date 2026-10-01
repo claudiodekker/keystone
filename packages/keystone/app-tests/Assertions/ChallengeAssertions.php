@@ -82,6 +82,16 @@ trait ChallengeAssertions
     }
 
     /**
+     * Assert the response sends a user who passed the challenge, but whose account still owes an enrollment, on to enroll.
+     *
+     * @param  TestResponse<Response>  $response
+     */
+    public function assertEnrollmentOwedAfterChallenge(TestResponse $response): void
+    {
+        $response->assertRedirectToRoute('login.enrollment');
+    }
+
+    /**
      * Assert the response sends the signed-in user on to the intended URL.
      *
      * @param  TestResponse<Response>  $response

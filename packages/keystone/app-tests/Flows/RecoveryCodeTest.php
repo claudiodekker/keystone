@@ -63,6 +63,7 @@ it('refuses a recovery code that was already spent', function () {
 });
 
 it('keeps the account\'s last recovery code for account recovery', function () {
+    config(['keystone.require_recovery_codes' => true]);
     $account = $this->createChallengedAccount($this->support);
     [$last] = $this->arrangeRecoveryCodes($account, count: 1);
     $this->passFirstFactor();

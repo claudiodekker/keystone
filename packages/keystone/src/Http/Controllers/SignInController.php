@@ -109,6 +109,10 @@ abstract class SignInController extends Controller
             return $this->sendChallengeOwed($request);
         }
 
+        if ($demand === Demand::ENROLLMENT) {
+            return $this->sendEnrollmentOwed($request);
+        }
+
         return $this->sendSignedIn($request, $intendedUrl);
     }
 
@@ -126,6 +130,11 @@ abstract class SignInController extends Controller
      * Respond to a sign-in held for a challenge, sending the user on to it.
      */
     abstract protected function sendChallengeOwed(Request $request): Response|Responsable;
+
+    /**
+     * Respond to a sign-in held until the account enrolls what it owes, sending the user on to enroll it.
+     */
+    abstract protected function sendEnrollmentOwed(Request $request): Response|Responsable;
 
     /**
      * Respond to a completed sign-in, sending the user on to the intended URL.

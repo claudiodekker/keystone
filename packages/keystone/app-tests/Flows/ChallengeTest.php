@@ -13,6 +13,7 @@ pest()->extend(AppTestCase::class)->use(
 );
 
 beforeEach(function () {
+    $this->withoutMandates();
     $this->support = $this->supportsFor(Surface::CHALLENGE)[0];
 });
 

@@ -22,7 +22,7 @@ class AccountChanges
     }
 
     /**
-     * Apply the change under the account's row lock, moving its credential epoch when the change calls for it, and record its events once committed.
+     * Apply the change under the account's row lock, recomputing what it holds and moving its credential epoch when the change calls for it, and record its events once committed.
      *
      * @template TResult
      *
@@ -39,6 +39,7 @@ class AccountChanges
             $recipients = $addresses->recipientsOf($locked);
             $change = new AccountChange($locked, $recipients, new Credentials($locked), new RecoveryCodes($locked));
             $result = $apply($change);
+            $this->recordHoldings($locked);
             $movedFrom = $change->movesEpoch() ? $this->moveEpoch($locked) : null;
 
             return [$change, $result, $movedFrom];
@@ -75,6 +76,27 @@ class AccountChanges
     {
         /** @var Model&KeystoneUser */
         return $account->newQueryWithoutScopes()->whereKey($account->getKey())->lockForUpdate()->firstOrFail();
+    }
+
+    /**
+     * Write on the locked account whether it holds a second factor and recovery codes, as read from its credentials and codes.
+     */
+    protected function recordHoldings(Model&KeystoneUser $account): void
+    {
+        $accountId = $account->getKey();
+
+        $holdings = [
+            'has_second_factor' => (new Credentials($account))->holdsSecondFactor($accountId),
+            'has_recovery_codes' => (new RecoveryCodes($account))->remaining($accountId) > 0,
+        ];
+
+        $changed = array_filter($holdings, fn (bool $held, string $column) => (bool) $account->getRawOriginal($column) !== $held, ARRAY_FILTER_USE_BOTH);
+
+        if ($changed === []) {
+            return;
+        }
+
+        $account->forceFill($changed)->saveQuietly();
     }
 
     /**

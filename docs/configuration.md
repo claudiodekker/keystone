@@ -13,7 +13,8 @@ Your `config/keystone.php` is merged over Keystone's, key by key. A setting that
 | Setting | Default | What loosening it costs |
 |---|---|---|
 | `methods` | `null`: every installed credential type, on every surface it serves | Nothing: it can only narrow what the installed types offer. See [Methods](#methods). |
-| `require_recovery_codes` | `true` | `false` lets the last recovery code answer the challenge, so an account can spend every code and be left with none for account recovery. See [Recovery codes](challenge.md#recovery-codes). |
+| `require_second_factor` | `true` | `false` lets an account sign in with its first factor alone until it chooses to add a second. See [Enrollment](enrollment.md). |
+| `require_recovery_codes` | `true` | `false` lets an account go without recovery codes, and lets the last one answer the challenge, so an account can be left with none for account recovery. See [Enrollment](enrollment.md) and [Recovery codes](challenge.md#recovery-codes). |
 | `session.absolute_lifetime_seconds` | `43200` (12 hours) | A stolen session that is kept busy stays signed in longer. `null` lets it live forever. See [Session lifetime](#session-lifetime). |
 | `rate_limits.requests_per_minute.view` | `60` | Faster scripted probing of Keystone's pages per IP address and account. |
 | `rate_limits.requests_per_minute.start` / `.submit` / `.change` | `10` each | Faster scripted submissions per IP address and account. |

@@ -17,14 +17,17 @@ readonly class PendingSignIn
 
     /**
      * Create a new pending sign-in instance.
+     *
+     * @param  string|null  $firstFactor  the type the account passed first, unknown for a signed-in session that was demoted
      */
     public function __construct(
         public Model&KeystoneUser $account,
-        public string $firstFactor,
+        public ?string $firstFactor,
         public PendingOrigin $origin,
         public PendingStage $stage,
         public string $intendedUrl,
         public CarbonImmutable $heldAt,
+        public bool $secondFactorPassed,
     ) {
         //
     }

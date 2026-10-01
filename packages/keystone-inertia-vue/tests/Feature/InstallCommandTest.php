@@ -72,6 +72,13 @@ it('copies the stubs into the app', function () {
         ->and("{$app}/resources/js/types/auth.ts")->toBeFile()
         ->and("{$app}/tests/Keystone/Assertions/SignInAssertions.php")->toBeFile()
         ->and("{$app}/tests/Keystone/Assertions/ChallengeAssertions.php")->toBeFile()
+        ->and("{$app}/app/Http/Controllers/Auth/EnrollmentController.php")->toBeFile()
+        ->and("{$app}/app/Http/Controllers/Auth/RecoveryCodesController.php")->toBeFile()
+        ->and("{$app}/resources/js/pages/auth/Enrollment.vue")->toBeFile()
+        ->and("{$app}/resources/js/pages/auth/EnrollmentForm.vue")->toBeFile()
+        ->and("{$app}/resources/js/pages/auth/RecoveryCodes.vue")->toBeFile()
+        ->and("{$app}/tests/Keystone/Assertions/EnrollmentAssertions.php")->toBeFile()
+        ->and("{$app}/tests/Keystone/Assertions/RecoveryCodesAssertions.php")->toBeFile()
         ->and(file_get_contents("{$app}/routes/keystone.php"))->toBe(file_get_contents(StubsTestCase::STUBS.'/routes/keystone.php'));
 });
 

@@ -16,6 +16,8 @@ return new class extends Migration
             $table->timestamp('credential_epoch_moved_at')->nullable();
             $table->timestamp('invalidated_at')->nullable();
             $table->timestamp('suspended_at')->nullable();
+            $table->boolean('has_second_factor')->default(false);
+            $table->boolean('has_recovery_codes')->default(false);
 
             if (! Schema::hasColumn('users', 'deleted_at')) {
                 $table->softDeletes();

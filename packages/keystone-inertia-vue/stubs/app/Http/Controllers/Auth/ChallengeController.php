@@ -41,6 +41,14 @@ class ChallengeController extends Controller
     }
 
     /**
+     * Respond to a passed challenge whose account still owes an enrollment, sending the user on to it.
+     */
+    protected function sendEnrollmentOwedAfterChallenge(Request $request): RedirectResponse
+    {
+        return to_route('login.enrollment');
+    }
+
+    /**
      * Respond to a passed challenge, sending the signed-in user on to the intended URL.
      */
     protected function sendChallengePassed(Request $request, string $intendedUrl): RedirectResponse

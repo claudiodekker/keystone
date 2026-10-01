@@ -41,6 +41,14 @@ class SignInController extends Controller
     }
 
     /**
+     * Respond to a sign-in held for the enrollment the account owes, sending the user on to it.
+     */
+    protected function sendEnrollmentOwed(Request $request): RedirectResponse
+    {
+        return to_route('login.enrollment');
+    }
+
+    /**
      * Respond to a completed sign-in, sending the user on to the intended URL.
      */
     protected function sendSignedIn(Request $request, string $intendedUrl): RedirectResponse

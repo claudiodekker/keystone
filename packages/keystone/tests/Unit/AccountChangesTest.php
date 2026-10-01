@@ -7,6 +7,7 @@ use ClaudioDekker\Keystone\Flow;
 use ClaudioDekker\Keystone\KeystoneGuard;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
 use ClaudioDekker\Keystone\Notifications\SecurityAlert;
+use ClaudioDekker\Keystone\RecoveryCodes;
 use ClaudioDekker\Keystone\SecurityEvent;
 use ClaudioDekker\Keystone\SecurityEventRecorded;
 use ClaudioDekker\Keystone\SecurityEventType;
@@ -77,6 +78,46 @@ test('the credential epoch moves only for a change that removes, replaces or end
     'ending sessions' => [fn (AccountChange $change) => $change->endSessions(), true],
     'suspending' => [fn (AccountChange $change) => $change->suspend(), true],
     'unsuspending' => [fn (AccountChange $change) => $change->unsuspend(), false, '2026-09-01 12:00:00'],
+    'a first set of recovery codes' => [fn (AccountChange $change) => $change->commitRecoveryCodes(['AAAAA-AAAAA'], flow: Flow::ENROLLMENT), false],
+    'replacing recovery codes' => [function (AccountChange $change) {
+        (new RecoveryCodes($change->account))->replace($change->account->getKey(), ['AAAAA-AAAAA']);
+
+        $change->commitRecoveryCodes(['BBBBB-BBBBB'], flow: Flow::ENROLLMENT);
+    }, true],
+]);
+
+it('records whether the account holds a second factor and recovery codes as each change leaves them', function () {
+    $user = User::factory()->create();
+    $holdings = fn () => (array) DB::table('users')->where('id', $user->getKey())->first(['has_second_factor', 'has_recovery_codes']);
+
+    changes()->change($user, fn (AccountChange $change) => $change->addCredential(new FormType, identifier: null, secret: 'first-factor'));
+    $afterFirstFactor = $holdings();
+    changes()->change($user, fn (AccountChange $change) => $change->addCredential(new FormType(name: 'code', surfaces: ['challenge']), identifier: null, secret: 'second-factor'));
+    $afterSecondFactor = $holdings();
+    changes()->change($user, fn (AccountChange $change) => $change->commitRecoveryCodes(['AAAAA-AAAAA'], flow: Flow::ENROLLMENT));
+
+    expect($afterFirstFactor)->toEqual(['has_second_factor' => 0, 'has_recovery_codes' => 0])
+        ->and($afterSecondFactor)->toEqual(['has_second_factor' => 1, 'has_recovery_codes' => 0])
+        ->and($holdings())->toEqual(['has_second_factor' => 1, 'has_recovery_codes' => 1]);
+});
+
+it('records a first set of recovery codes without alerting, and a replacing set with an alert', function (bool $held, bool $alerts) {
+    Notification::fake();
+    $user = User::factory()->create();
+    holdAddresses($user, ['jane@example.com' => true]);
+
+    if ($held) {
+        (new RecoveryCodes($user))->replace($user->getKey(), ['AAAAA-AAAAA']);
+    }
+
+    changes()->change($user, fn (AccountChange $change) => $change->commitRecoveryCodes(['BBBBB-BBBBB', 'CCCCC-CCCCC'], flow: Flow::ENROLLMENT));
+
+    $this->assertDatabaseHas('user_security_events', ['type' => 'recovery_codes.generated', 'flow' => 'enrollment', 'credential_type' => 'recovery-code']);
+    $this->assertDatabaseCount('user_recovery_codes', 2);
+    Notification::assertSentOnDemandTimes(SecurityAlert::class, $alerts ? 1 : 0);
+})->with([
+    'a first set' => [false, false],
+    'a replacing set' => [true, true],
 ]);
 
 it('moves the epoch once however many times the change ends sessions', function () {

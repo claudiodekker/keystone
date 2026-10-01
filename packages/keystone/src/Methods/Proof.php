@@ -22,6 +22,7 @@ readonly class Proof
         public ?string $reason,
         public ?Closure $updatedSecret = null,
         #[\SensitiveParameter] public ?string $advancedSecret = null,
+        public ?EnrolledCredential $enrolled = null,
     ) {
         //
     }
@@ -42,6 +43,14 @@ readonly class Proof
     public static function advanced(StoredCredential $credential, #[\SensitiveParameter] string $secret): static
     {
         return new static(proven: true, credentialId: $credential->id, reason: null, advancedSecret: $secret);
+    }
+
+    /**
+     * Prove a new credential for core to store, as an enrollment does.
+     */
+    public static function enrolled(EnrolledCredential $credential): static
+    {
+        return new static(proven: true, credentialId: null, reason: null, enrolled: $credential);
     }
 
     /**

@@ -3,6 +3,7 @@
 namespace ClaudioDekker\Keystone\Tests\Fixtures;
 
 use ClaudioDekker\Keystone\Methods\CredentialType;
+use ClaudioDekker\Keystone\Methods\Initiation;
 use ClaudioDekker\Keystone\Methods\InitiateShape;
 use ClaudioDekker\Keystone\Methods\Proof;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
@@ -64,7 +65,12 @@ class RogueType implements CredentialType
         return ['secret' => ['nullable', 'string']];
     }
 
-    public function verify(Surface $surface, array $input, array $credentials): Proof
+    public function initiate(Surface $surface, string $accountName): Initiation
+    {
+        return new Initiation(ceremony: 'rogue-ceremony');
+    }
+
+    public function verify(Surface $surface, array $input, array $credentials, mixed $ceremony = null): Proof
     {
         $this->calls[] = [$surface, $input, array_map(fn (StoredCredential $credential) => $credential->id, $credentials)];
 

@@ -12,6 +12,8 @@ Alerts are queued. Run a queue worker, or they are never sent: `queue.default` s
 | `account.suspended` | an operator suspended the account (see [Operator commands](operator-commands.md#suspending-accounts)) |
 | `account.unsuspended` | an operator lifted the account's suspension |
 | `recovery_code.used` | a [recovery code](challenge.md#recovery-codes) answered the challenge; the mail says how many codes the account has left |
+| `credential.added` | a credential was added to the account, such as a second factor at [enrollment](enrollment.md) |
+| `recovery_codes.generated` | a new set of recovery codes replaced the account's codes; a first set alerts nobody |
 
 Later releases add alerts to more types.
 
