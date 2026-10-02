@@ -2,13 +2,12 @@
 
 The reviewer reads this file. Apply every rule to each changed hunk in the diff. Skip anything the repo's tooling already enforces (Pint, PHPStan/Larastan, arch tests, ESLint, type coverage).
 
-The general rules for Laravel apps and packages live in the `claudio-mode` skill's `references/laravel-standards.md`, from the `claudio@claudiodekker` plugin this repo enables. Load the skill and apply that file too. The rules below are Keystone's own and win where the two differ.
+The general rules for Laravel apps and packages live in `references/laravel-standards.md` of the `claudio:claudio-mode` skill, from the `claudio@claudiodekker` plugin this repo enables. Read that file and apply it too. Without the Skill tool, read it at `~/.claude/plugins/marketplaces/claudiodekker/skills/claudio-mode/references/laravel-standards.md`. If neither works, say so in the review rather than reviewing against this file alone. The rules below are Keystone's own and win where the two differ.
 
 ## Keystone rules
 
 - Don't split a call's arguments into local variables unless a variable is reused or names something the call hides. `new SignInAttempt(Keystone::guard(), app(AccountLookup::class))` reads fine inline: resolving a dependency isn't a step that does real work.
 - A class that makes a security decision (a credential type, a sign-in decision) isn't Swappable: register a plain instance and never bind it in the container, so an app can't put its own in its place.
-- Exceptions live in `src/Exceptions`.
 - A command runs its job with `dispatchSync()`, never by calling `handle()` on it. A job that refuses (the account is already in the state it would set) throws, and the command catches that; the job doesn't return a value for the command to branch on.
 - The AppTests run against the app developer's own app, so they never assume a response shape (redirect, JSON, RPC). Each check of how the app answers goes through an overridable `assert*` helper, and the test body keeps only the security outcome.
 - An app customises the adapter's responses through one protected method per outcome on the controllers it owns, not through `*Using()` hooks: there are too many outcomes for static hooks.
