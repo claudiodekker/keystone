@@ -243,7 +243,7 @@ describe('the answer', function () {
         $response = $this->post(route('login.enrollment.submit', ['type' => 'code']), ['secret' => $ceremony]);
 
         $response->assertRedirectToRoute('login.recovery-codes');
-        $this->assertDatabaseHas('user_credentials', ['user_id' => $account->getKey(), 'type' => 'code', 'served_challenge' => true]);
+        $this->assertDatabaseHas('user_credentials', ['user_id' => $account->getKey(), 'type' => 'code']);
         $this->assertDatabaseHas('users', ['id' => $account->getKey(), 'credential_epoch' => 0]);
         $this->assertDatabaseHas('user_security_events', ['type' => 'credential.added', 'user_id' => $account->getKey(), 'flow' => 'enrollment', 'credential_type' => 'code']);
         Notification::assertSentOnDemandTimes(SecurityAlert::class, 1);
@@ -300,7 +300,7 @@ describe('the answer', function () {
         DB::beforeExecuting(function (string $query, array $bindings, Connection $connection) use (&$raced, $account, $outerLevel) {
             if (! $raced && $connection->transactionLevel() > $outerLevel && str_contains($query, 'users')) {
                 $raced = true;
-                DB::table('user_credentials')->insert(['user_id' => $account->getKey(), 'type' => 'rogue', 'served_challenge' => true]);
+                DB::table('user_credentials')->insert(['user_id' => $account->getKey(), 'type' => 'rogue']);
             }
         });
 

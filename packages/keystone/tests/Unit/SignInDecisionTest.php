@@ -24,7 +24,7 @@ function accountHolding(bool $secondFactor = false, bool $recoveryCodes = false)
     $user = User::factory()->create();
 
     if ($secondFactor) {
-        DB::table('user_credentials')->insert(['user_id' => $user->getKey(), 'type' => 'code', 'served_challenge' => true, 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('user_credentials')->insert(['user_id' => $user->getKey(), 'type' => 'code', 'created_at' => now(), 'updated_at' => now()]);
     }
 
     if ($recoveryCodes) {
@@ -87,7 +87,7 @@ it('reads what the account holds as it stands now, not as it was loaded', functi
     $account = accountHolding();
     $owedBefore = (new SignInDecision)->owesEnrollment($account);
 
-    DB::table('user_credentials')->insert(['user_id' => $account->getKey(), 'type' => 'code', 'served_challenge' => true, 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('user_credentials')->insert(['user_id' => $account->getKey(), 'type' => 'code', 'created_at' => now(), 'updated_at' => now()]);
     DB::table('user_recovery_codes')->insert(['user_id' => $account->getKey(), 'code_hash' => hash('sha256', 'AAAAA-AAAAA'), 'created_at' => now()]);
 
     expect($owedBefore)->toBeTrue()
@@ -145,8 +145,9 @@ it('refuses a pending sign-in whose account was barred since', function () {
 });
 
 it('challenges a single-factor proof of an account whose other credential proves two factors on its own', function () {
+    app(CredentialTypes::class)->register(new FormType(name: 'passkey', surfaces: ['sign-in', 'challenge'], multipleFactors: true));
     $user = User::factory()->create();
-    DB::table('user_credentials')->insert(['user_id' => $user->getKey(), 'type' => 'passkey', 'proves_multiple_factors' => true, 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('user_credentials')->insert(['user_id' => $user->getKey(), 'type' => 'passkey', 'created_at' => now(), 'updated_at' => now()]);
 
     expect((new SignInDecision)->demand(readAccount($user), new FormType))->toBe(Demand::CHALLENGE);
 });

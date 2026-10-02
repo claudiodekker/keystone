@@ -33,8 +33,6 @@ return new class extends Migration
             $table->string('label', 64)->nullable();
             $table->text('secret')->nullable();
             $table->timestamp('last_used_at')->nullable();
-            $table->boolean('served_challenge')->default(false);
-            $table->boolean('proves_multiple_factors')->default(false);
             $table->timestamp('disabled_at')->nullable();
             $table->timestamps();
 

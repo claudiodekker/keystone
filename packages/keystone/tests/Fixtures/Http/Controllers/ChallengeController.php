@@ -15,11 +15,6 @@ class ChallengeController extends Controller
         return response()->json(['types' => $page->types, 'preselect' => $page->preselect]);
     }
 
-    protected function sendSecondFactorUnavailable(Request $request): RedirectResponse
-    {
-        return to_route('login');
-    }
-
     protected function sendChallengeRefused(Request $request, string $type, string $message): RedirectResponse
     {
         return to_route('login.challenge')->withErrors([$type => $message]);

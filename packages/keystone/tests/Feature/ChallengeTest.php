@@ -41,14 +41,14 @@ describe('the hold', function () {
         $this->assertAuthenticatedAs($account);
     });
 
-    it('holds for a challenge an account whose only second factor is of a type keystone.methods no longer lists', function () {
-        $this->createChallengedAccount(new FormTypeSupport('code'));
+    it('signs in an account whose only second factor is of a type keystone.methods no longer lists', function () {
+        $account = $this->createChallengedAccount(new FormTypeSupport('code'));
         config(['keystone.methods' => ['form']]);
 
         $response = $this->passFirstFactor();
 
-        $response->assertRedirectToRoute('login.challenge');
-        $this->assertGuest();
+        $response->assertRedirect('/');
+        $this->assertAuthenticatedAs($account);
     });
 
     it('closes every ceremony slot when it holds the sign-in', function () {
@@ -184,7 +184,7 @@ describe('answers', function () {
         Exceptions::fake();
         $this->app->make(CredentialTypes::class)->register(new RogueType(fn () => throw new RuntimeException('Broken method.'), surfaces: ['challenge']));
         $account = $this->createChallengedAccount(new FormTypeSupport('code'));
-        DB::table('user_credentials')->insert(['user_id' => $account->getKey(), 'type' => 'rogue', 'served_challenge' => true]);
+        DB::table('user_credentials')->insert(['user_id' => $account->getKey(), 'type' => 'rogue']);
         $this->passFirstFactor();
 
         $this->post(route('login.challenge.submit', ['type' => 'rogue']))->assertSessionHasErrors(['rogue' => __('keystone::messages.invalid_credential')]);
@@ -196,7 +196,7 @@ describe('answers', function () {
     it('refuses a proof naming another account\'s credential', function () {
         $account = $this->createChallengedAccount(new FormTypeSupport('code'));
         $theirs = DB::table('user_credentials')->insertGetId(['user_id' => $this->createAccount('john@example.com')->getKey(), 'type' => 'rogue']);
-        DB::table('user_credentials')->insert(['user_id' => $account->getKey(), 'type' => 'rogue', 'served_challenge' => true]);
+        DB::table('user_credentials')->insert(['user_id' => $account->getKey(), 'type' => 'rogue']);
         $this->app->make(CredentialTypes::class)->register(new RogueType(fn () => Proof::proven(new StoredCredential($theirs, identifier: null, secret: null, label: null)), surfaces: ['challenge']));
         $this->passFirstFactor();
 
@@ -208,7 +208,7 @@ describe('answers', function () {
 
     it('stores the secret an advanced proof moves its credential on to', function () {
         $account = $this->createChallengedAccount(new FormTypeSupport('code'));
-        $id = DB::table('user_credentials')->insertGetId(['user_id' => $account->getKey(), 'type' => 'rogue', 'secret' => Crypt::encryptString('step-1'), 'served_challenge' => true]);
+        $id = DB::table('user_credentials')->insertGetId(['user_id' => $account->getKey(), 'type' => 'rogue', 'secret' => Crypt::encryptString('step-1')]);
         $this->app->make(CredentialTypes::class)->register(new RogueType(fn () => Proof::advanced(new StoredCredential($id, identifier: null, secret: 'step-1', label: null), 'step-2'), surfaces: ['challenge']));
         $this->passFirstFactor();
 
@@ -220,7 +220,7 @@ describe('answers', function () {
 
     it('refuses an advanced proof once another proof moved its credential on first', function () {
         $account = $this->createChallengedAccount(new FormTypeSupport('code'));
-        $id = DB::table('user_credentials')->insertGetId(['user_id' => $account->getKey(), 'type' => 'rogue', 'secret' => Crypt::encryptString('step-1'), 'served_challenge' => true]);
+        $id = DB::table('user_credentials')->insertGetId(['user_id' => $account->getKey(), 'type' => 'rogue', 'secret' => Crypt::encryptString('step-1')]);
         $this->app->make(CredentialTypes::class)->register(new RogueType(function () use ($id) {
             DB::table('user_credentials')->where('id', $id)->update(['secret' => Crypt::encryptString('step-2')]);
 

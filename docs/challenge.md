@@ -16,9 +16,9 @@ Every time a session is held, signed in, cancelled or dropped, its id is rotated
 
 The page offers every second-factor type the account holds that `keystone.methods` lists on the `challenge` surface, leaving out the first factor's type, so a password can't answer for a password, and then [recovery codes](#recovery-codes) while the account holds any. The first type offered is preselected.
 
-When the account holds a second factor but no listed type can answer it and it holds no recovery codes, for example after you removed a method from `keystone.methods`, the pending sign-in is kept and the user is sent on with "Your second factor is no longer available. Recover your account to sign in again." Until account recovery has its own page, the Inertia-Vue adapter shows that on the sign-in page. When the account no longer holds a second factor at all, the pending sign-in is dropped and the user is sent back to sign in.
+When the account holds no second factor a listed type can answer, the pending sign-in is dropped and the user is sent back to sign in.
 
-Only a credential of another type than the first factor's counts as a second factor. A credential of a type that proves two factors on its own, such as a passkey, counts too: a password sign-in of an account holding one is challenged, and the passkey answers when its type serves `challenge`. A second factor keeps counting after you unlist its type: an account with one still owes the challenge, so taking a method out of `keystone.methods` never lets its users skip it.
+Only a credential of another type than the first factor's counts as a second factor. A credential of a type that proves two factors on its own, such as a passkey, counts when its type serves `challenge`: a password sign-in of an account holding one is challenged, and the passkey answers. Only a credential of a type that `keystone.methods` lists on the `challenge` surface counts. When you unlist a type, its credentials stop counting but stay stored: its users are no longer challenged for them, and with `require_second_factor` on they enroll a second factor again. Listing the type again brings the credentials back.
 
 ## Answering
 
@@ -26,7 +26,7 @@ A wrong answer is refused with "The provided credential is invalid." on the type
 
 ## Recovery codes
 
-Recovery codes are core's own second factor, for a user who lost their usual one. The challenge offers them, after the account's other second factors, whenever the account holds at least one, even when no listed type can answer its other second factor. They answer only the challenge: never a sign-in, and they never count as the second factor an account must hold. A code is submitted as type `recovery-code` with its value in `code`.
+Recovery codes are core's own second factor, for a user who lost their usual one. The challenge offers them, after the account's other second factors, whenever the account holds at least one. They answer only the challenge: never a sign-in, and they never count as the second factor an account must hold. A code is submitted as type `recovery-code` with its value in `code`.
 
 A set is 8 codes of 26 characters from A to Z and 0 to 9, drawn by a cryptographically secure generator and shown in dash-separated blocks of 5, such as `K7Q2M-ZP4XD-9WB3N-HT6RC-E8YJA-5`. Users may type a code in any case, with or without its dashes, and with spaces. Keystone stores only the SHA-256 digest of each code, so a database leak doesn't give the codes away and rotating `APP_KEY` leaves them working. A code imported from Fortify, two blocks of 10 letters and digits, matches only exactly as Fortify issued it, case and dash included.
 
@@ -40,4 +40,4 @@ The page's cancel button (`DELETE` to `login.challenge.cancel`) drops the pendin
 
 ## Changing the responses
 
-The adapter's `ChallengeController` has one hook per outcome: `sendChallengePage`, `sendSecondFactorUnavailable`, `sendChallengeRefused`, `sendChallengePassed` and `sendChallengeCancelled`. The sign-in controller's `sendChallengeOwed` sends a pending sign-in to the challenge, and `sendEnrollmentOwedAfterChallenge` sends a passed challenge on to [enrollment](enrollment.md). A refused last recovery code goes through `sendChallengeRefused` too, checked by `assertLastRecoveryCodeKept`. If you change one, redefine its assertion in `tests/Keystone/Assertions/ChallengeAssertions.php` (or `SignInAssertions.php`), so Keystone's AppTests check your response instead.
+The adapter's `ChallengeController` has one hook per outcome: `sendChallengePage`, `sendChallengeRefused`, `sendChallengePassed` and `sendChallengeCancelled`. The sign-in controller's `sendChallengeOwed` sends a pending sign-in to the challenge, and `sendEnrollmentOwedAfterChallenge` sends a passed challenge on to [enrollment](enrollment.md). A refused last recovery code goes through `sendChallengeRefused` too, checked by `assertLastRecoveryCodeKept`. If you change one, redefine its assertion in `tests/Keystone/Assertions/ChallengeAssertions.php` (or `SignInAssertions.php`), so Keystone's AppTests check your response instead.

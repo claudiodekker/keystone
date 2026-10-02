@@ -39,8 +39,7 @@ it('enrolls the key its form shows once a code it makes is typed back, signing i
 
     $response->assertRedirect('/');
     $stored = DB::table('user_credentials')->where('type', 'totp')->sole();
-    expect($stored->served_challenge)->toEqual(1)
-        ->and(TotpSecret::fromStored(Crypt::decryptString($stored->secret)))->toEqual(new TotpSecret($key, lastStep: $now));
+    expect(TotpSecret::fromStored(Crypt::decryptString($stored->secret)))->toEqual(new TotpSecret($key, lastStep: $now));
 });
 
 it('refuses a code the new key doesn\'t make, storing nothing', function () {

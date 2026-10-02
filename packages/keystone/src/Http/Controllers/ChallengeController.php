@@ -120,11 +120,6 @@ abstract class ChallengeController extends Controller
     abstract protected function sendChallengePage(Request $request, ChallengePage $page): Response|Responsable;
 
     /**
-     * Respond to a held account that holds a second factor no listed type can answer, sending the user on to recover it.
-     */
-    abstract protected function sendSecondFactorUnavailable(Request $request): Response|Responsable;
-
-    /**
      * Respond to a refused answer, with the message for the credential type's field.
      */
     abstract protected function sendChallengeRefused(Request $request, string $type, string $message): Response|Responsable;
@@ -166,12 +161,6 @@ abstract class ChallengeController extends Controller
             Keystone::guard()->forgetPending();
 
             return $this->refuseWithoutChallenge();
-        }
-
-        if ($offer === []) {
-            Status::SECOND_FACTOR_UNAVAILABLE->flash($request);
-
-            return $this->sendSecondFactorUnavailable($request);
         }
 
         $types = array_map(fn (CredentialType $type) => [
