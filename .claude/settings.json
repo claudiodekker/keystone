@@ -15,7 +15,7 @@
     },
     "enabledPlugins": {
         "mattpocock-skills@mattpocock": true,
-        "claudio@claudiodekker": true
+        "skills@claudiodekker": true
     },
     "hooks": {
         "SessionStart": [

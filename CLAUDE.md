@@ -3,9 +3,9 @@
 - TDD for all code (`/mattpocock-skills:tdd`): red, green, refactor. No untested logic.
 - No documentation beyond `CONTEXT.md`, ADRs, `docs/agents/` and the user docs in `docs/`. A PR that changes behaviour updates its user docs page. No docblocks that restate types, no README prose.
 - `.scratch/` holds research that fed past decisions. Don't read it unless a decision (spec, ticket, ADR) lacks the specifics you need.
-- Work in the `claudio-mode` skill.
+- Work in the `skills:claudio-mode` skill.
 - One PR delivers one complete, reviewable feature or fix. Never split a feature into "part 1, 2, 3" PRs; if it is too big to review, split the ticket.
-- Laravel, Pest and Boost MCP guidance: @docs/agents/laravel.md
+- Boost MCP tools and guardrails: @docs/agents/laravel.md
 
 ## Opening PRs
 
@@ -21,7 +21,7 @@ If the diff changes after the PR is open, re-run /mattpocock-skills:pr to update
 - Open at most two PRs ahead of review. Each stacked PR is reviewed against its own base.
 - Fix review feedback in the PR it was left on, even when later PRs extend that code.
 - With more than one PR open, give the review and merge order in the thread.
-- After a retro changes `CODING_STANDARDS.md`, re-review every open PR against it.
+- After a retro changes `CODING_STANDARDS.md` or the claudio-mode rulebook, re-review every open PR against it.
 - Only a PR that is green and next to merge is ready for review; keep every other PR a draft. Mark a PR draft before pushing to it, and ready again once its checks pass.
 
 ## Agent skills
