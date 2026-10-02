@@ -4,9 +4,9 @@ namespace ClaudioDekker\Keystone\Http\Controllers;
 
 use ClaudioDekker\Keystone\Demand;
 use ClaudioDekker\Keystone\EnrollmentAttempt;
-use ClaudioDekker\Keystone\Http\Controllers\Concerns\RefusesSignedInUsers;
-use ClaudioDekker\Keystone\Http\Controllers\Concerns\ResolvesEnrollmentSignIn;
-use ClaudioDekker\Keystone\Http\Controllers\Concerns\StartsEnrollmentCeremonies;
+use ClaudioDekker\Keystone\Http\Concerns\RefusesSignedInUsers;
+use ClaudioDekker\Keystone\Http\Concerns\ResolvesEnrollmentSignIn;
+use ClaudioDekker\Keystone\Http\Concerns\StartsEnrollmentCeremonies;
 use ClaudioDekker\Keystone\Http\PageValues\EnrollmentFormPage;
 use ClaudioDekker\Keystone\Http\PageValues\EnrollmentPage;
 use ClaudioDekker\Keystone\Keystone;

@@ -4,7 +4,7 @@ namespace ClaudioDekker\Keystone\Http\Controllers;
 
 use ClaudioDekker\Keystone\Actions\AccountLookup;
 use ClaudioDekker\Keystone\Demand;
-use ClaudioDekker\Keystone\Http\Controllers\Concerns\RefusesSignedInUsers;
+use ClaudioDekker\Keystone\Http\Concerns\RefusesSignedInUsers;
 use ClaudioDekker\Keystone\Http\PageValues\SignInPage;
 use ClaudioDekker\Keystone\IntendedUrl;
 use ClaudioDekker\Keystone\Keystone;

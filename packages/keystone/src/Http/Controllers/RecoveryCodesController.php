@@ -3,8 +3,8 @@
 namespace ClaudioDekker\Keystone\Http\Controllers;
 
 use ClaudioDekker\Keystone\Demand;
-use ClaudioDekker\Keystone\Http\Controllers\Concerns\RefusesSignedInUsers;
-use ClaudioDekker\Keystone\Http\Controllers\Concerns\ResolvesEnrollmentSignIn;
+use ClaudioDekker\Keystone\Http\Concerns\RefusesSignedInUsers;
+use ClaudioDekker\Keystone\Http\Concerns\ResolvesEnrollmentSignIn;
 use ClaudioDekker\Keystone\Http\PageValues\RecoveryCodesPage;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\RecoveryCodeType;

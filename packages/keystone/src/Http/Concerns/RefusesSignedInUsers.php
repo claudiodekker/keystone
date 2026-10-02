@@ -1,6 +1,6 @@
 <?php
 
-namespace ClaudioDekker\Keystone\Http\Controllers\Concerns;
+namespace ClaudioDekker\Keystone\Http\Concerns;
 
 use Illuminate\Http\RedirectResponse;
 
