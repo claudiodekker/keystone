@@ -292,6 +292,7 @@ describe('the answer', function () {
     });
 
     it('refuses an answer once the account gained a second factor elsewhere, storing nothing', function () {
+        $this->app->make(CredentialTypes::class)->register(new RogueType(fn () => throw new RuntimeException('Never answers.'), surfaces: ['challenge']));
         $account = $this->createFirstFactorAccount();
         $this->passFirstFactor();
         $ceremony = startEnrollment($this);
