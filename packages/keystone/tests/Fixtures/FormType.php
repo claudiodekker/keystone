@@ -66,7 +66,7 @@ class FormType implements CredentialType
         return ['secret' => ['required', 'string']];
     }
 
-    public function initiate(Surface $surface, string $accountName): Initiation
+    public function initiate(Surface $surface, string $accountName): ?Initiation
     {
         $code = Str::random(16);
 

@@ -92,9 +92,9 @@ class PasswordType implements CredentialType
     /**
      * Start no ceremony: a password form shows nothing but its fields.
      */
-    public function initiate(Surface $surface, string $accountName): Initiation
+    public function initiate(Surface $surface, string $accountName): ?Initiation
     {
-        return new Initiation;
+        return null;
     }
 
     /**

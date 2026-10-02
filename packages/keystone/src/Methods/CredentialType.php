@@ -44,9 +44,9 @@ interface CredentialType
     public function rules(Surface $surface): array;
 
     /**
-     * Start the type's ceremony on the surface for the named account, returning what core keeps in the ceremony slot and what the form shows.
+     * Start the type's ceremony on the surface for the named account, returning what core keeps in the ceremony slot and what the form shows, or null when the type has no ceremony.
      */
-    public function initiate(Surface $surface, string $accountName): Initiation;
+    public function initiate(Surface $surface, string $accountName): ?Initiation;
 
     /**
      * Verify the input against the subject's credentials of this type, and the ceremony initiate started, if any.

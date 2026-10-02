@@ -264,7 +264,7 @@ abstract class EnrollmentController extends Controller
         }
 
         $initiation = $type->initiate(Surface::ENROLLMENT, $this->accountName($pending));
-        $ceremony = ['ceremony' => $initiation->ceremony, 'page' => $initiation->page];
+        $ceremony = ['ceremony' => $initiation?->ceremony, 'page' => $initiation?->page ?? []];
 
         $slots->put($type->name(), Surface::ENROLLMENT->value, $ceremony, capSeconds: PendingSignIn::LIFETIME_SECONDS);
 

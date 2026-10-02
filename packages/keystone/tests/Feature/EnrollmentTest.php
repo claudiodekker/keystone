@@ -189,6 +189,30 @@ describe('the ceremony', function () {
         expect(Keystone::guard()->slots()->get('code', Surface::ENROLLMENT->value))->toBeNull();
     });
 
+    it('keeps a running ceremony for a type that starts none, showing nothing', function () {
+        $type = new class(name: 'plain', surfaces: ['challenge', 'enrollment']) extends FormType
+        {
+            public int $started = 0;
+
+            public function initiate(Surface $surface, string $accountName): ?Initiation
+            {
+                $this->started++;
+
+                return null;
+            }
+        };
+        $this->app->make(CredentialTypes::class)->register($type);
+        $this->createFirstFactorAccount();
+        $this->passFirstFactor();
+
+        $this->get(route('login.enrollment.start', ['type' => 'plain']))
+            ->assertExactJson(['type' => 'plain', 'shape' => 'form', 'ceremony' => [], 'status' => null]);
+        $this->get(route('login.enrollment.start', ['type' => 'plain']));
+
+        expect($type->started)->toBe(1)
+            ->and(Keystone::guard()->slots()->get('plain', Surface::ENROLLMENT->value))->not->toBeNull();
+    });
+
     it('reports a ceremony that fails to start and sends the user back to the offer', function () {
         Exceptions::fake();
         $this->app->make(CredentialTypes::class)->register(new class(name: 'broken', surfaces: ['challenge', 'enrollment']) extends FormType

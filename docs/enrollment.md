@@ -58,4 +58,4 @@ The adapter's `EnrollmentController` has one hook per outcome: `sendEnrollmentPa
 
 ## Credential types
 
-A type serves enrollment by listing the `enrollment` surface and implementing `initiate()`, which returns an `Initiation`: what core keeps of the ceremony in the session, and the strings the page shows. `verify()` on `enrollment` gets that ceremony back and returns `Proof::enrolled()` with the credential to store, or a rejected proof. Its test support's `validEnrollment()` and `rejectedEnrollment()` answer a ceremony for the AppTests.
+A type serves enrollment by listing the `enrollment` surface and implementing `initiate()`, which returns an `Initiation`: what core keeps of the ceremony in the session, and the strings the page shows. A type with no ceremony returns `null`. `verify()` on `enrollment` gets that ceremony back and returns `Proof::enrolled()` with the credential to store, or a rejected proof. Its test support's `validEnrollment()` and `rejectedEnrollment()` answer a ceremony for the AppTests.
