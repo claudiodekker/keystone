@@ -1,23 +1,18 @@
 #!/bin/bash
 set -euo pipefail
 
-# Cloud sessions start without dependencies or enabled marketplace plugins.
+# Cloud sessions start without enabled marketplace plugins.
 if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
   exit 0
 fi
 
-cd "$CLAUDE_PROJECT_DIR"
-
 # User scope: a project-scope install is bound to this directory, and project threads start in /home/user.
 # The marketplaces are declared in settings.json, but only a session started inside this repository registers them.
-install_plugin() {
-  timeout 60 claude plugin marketplace add "$1" >/dev/null \
-    && timeout 60 claude plugin install "$2" --scope user >/dev/null \
-    || echo "session-start: could not install $2" >&2
-}
+timeout 60 claude plugin marketplace add mattpocock/skills >/dev/null \
+  && timeout 60 claude plugin install mattpocock-skills@mattpocock --scope user >/dev/null \
+  || echo "session-start: could not install mattpocock-skills@mattpocock" >&2
 
-install_plugin mattpocock/skills mattpocock-skills@mattpocock
-# The private skills repo needs GitHub access.
-install_plugin claudiodekker/skills skills@claudiodekker
-
-npm install --no-audit --no-fund
+# The private skills repo is cloned next to this one, and a local directory needs no GitHub credentials.
+timeout 60 claude plugin marketplace add "$CLAUDE_PROJECT_DIR/../skills" >/dev/null \
+  && timeout 60 claude plugin install skills@claudiodekker --scope user >/dev/null \
+  || echo "session-start: could not install skills@claudiodekker" >&2
