@@ -3,7 +3,8 @@
 - TDD for all code (`/mattpocock-skills:tdd`): red, green, refactor. No untested logic.
 - No documentation beyond `CONTEXT.md`, ADRs, `docs/agents/` and the user docs in `docs/`. A PR that changes behaviour updates its user docs page. No docblocks that restate types, no README prose.
 - `.scratch/` holds research that fed past decisions. Don't read it unless a decision (spec, ticket, ADR) lacks the specifics you need.
-- Small PRs: one ticket, one tracer-bullet slice per PR.
+- Work in the `claudio-mode` skill.
+- One PR delivers one complete, reviewable feature or fix. Never split a feature into "part 1, 2, 3" PRs; if it is too big to review, split the ticket.
 - Laravel, Pest and Boost MCP guidance: @docs/agents/laravel.md
 
 ## Opening PRs

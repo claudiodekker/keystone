@@ -42,4 +42,6 @@ settings="$CLAUDE_PROJECT_DIR/.claude/settings.json"
 saved="$(cat "$settings")"
 timeout 60 claude plugin marketplace add mattpocock/skills >/dev/null 2>&1 || true
 timeout 60 claude plugin install mattpocock-skills@mattpocock --scope project >/dev/null 2>&1 || true
+timeout 60 claude plugin marketplace add claudiodekker/skills >/dev/null 2>&1 || true
+timeout 60 claude plugin install claudio@claudiodekker --scope project >/dev/null 2>&1 || true
 printf '%s\n' "$saved" > "$settings"
