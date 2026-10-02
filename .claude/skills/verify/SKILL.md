@@ -17,7 +17,7 @@ Once per machine, install the harness. Playwright goes into `~/.cache/keystone-v
 .claude/skills/verify/scripts/install-playwright.sh
 ```
 
-Once per checkout, run `composer install && npm install`.
+Once per checkout, run `composer install && npm install`. The helpers also call `sqlite3`, `lsof` and `curl`, which macOS ships.
 
 Start a run:
 
@@ -26,7 +26,7 @@ Start a run:
 # run=20261002-205742-55622 url=http://127.0.0.1:8100 evidence=/…/.verify/evidence/20261002-205742-55622
 ```
 
-`start` builds the frontend (`npm run build`), creates `.verify/runs/<run>/database.sqlite`, then runs `migrate:fresh` and seeds Jane into it. It serves on the first free port from 8100 and waits until `GET /auth/login` answers 200. It then runs `doctor` and prints `run=… url=…` only when every check passes. Pass the printed run id to every other command. Every process `app.sh` starts for a run gets `DB_DATABASE`, `CACHE_STORE=database` and `APP_URL` pointed at that run, so the run never touches the workbench's shared database in `vendor/orchestra/testbench-core/laravel/database/database.sqlite`.
+`start` runs `npm run build` when any file under `packages/*/stubs`, `workbench/resources` or `workbench/routes` is newer than the last build, creates `.verify/runs/<run>/database.sqlite`, then runs `migrate:fresh` and seeds Jane into it. It serves on the first free port from 8100 and waits until `GET /auth/login` answers 200. It then runs `doctor` and prints `run=… url=…` only when every check passes. Pass the printed run id to every other command. Every process `app.sh` starts for a run gets `DB_DATABASE`, `APP_URL`, `CACHE_STORE=database`, `QUEUE_CONNECTION=database` and `MAIL_MAILER=log` for that run, and never relies on a skeleton `.env`, so the run never touches the workbench's shared database in `vendor/orchestra/testbench-core/laravel/database/database.sqlite`.
 
 The challenge needs a second factor, and enrolling one has no UI yet. Give Jane a fresh TOTP secret and 8 recovery codes:
 
@@ -86,7 +86,7 @@ Each scenario writes to `.verify/evidence/<run>/<scenario>/`: the numbered scree
 .claude/skills/verify/scripts/app.sh sql <run> "select count(*) from user_recovery_codes"
 ```
 
-Security alerts are queued on the skeleton's `database` queue, so a run's `jobs` table holds one row per unsent alert. Send them and read the mails:
+`app.sh` puts each run on the `database` queue and the `log` mailer, so each unsent security alert waits as a row in the run's `jobs` table. Send them and read the mails:
 
 ```shell
 .claude/skills/verify/scripts/app.sh mail <run>
@@ -115,4 +115,4 @@ Proof standards:
 
 ## Isolation
 
-Runs in one checkout can run side by side. Each has its own port, database, cache and rate-limit counters. They share three things in the testbench skeleton under `vendor/orchestra/testbench-core/laravel/`. The first is `public/build`, which `start` rebuilds and every run serves. The second is the file sessions, which are keyed by random ids and so do not collide. The third is `storage/logs/laravel.log`. Do not run `npm run build` against a live run whose assets another agent is relying on. A separate git worktree has its own `vendor/` and so is fully isolated.
+Runs in one checkout can run side by side. Each has its own port, database, cache and rate-limit counters. They share three things in the testbench skeleton under `vendor/orchestra/testbench-core/laravel/`. The first is `public/build`, which every run serves and `start` rebuilds only when a source changed. The second is the file sessions, which are keyed by random ids and so do not collide. The third is `storage/logs/laravel.log`. Do not run `npm run build` against a live run whose assets another agent is relying on. A separate git worktree has its own `vendor/` and so is fully isolated. `testbench serve` copies `.env.example` into `vendor/orchestra/testbench-core/laravel/.env` and leaves it behind when killed. Its `APP_URL=http://localhost:8000` fails the Pest suite's same-origin tests, so `stop` deletes it once no `testbench serve` is left running, unless it differs from `.env.example`. Never run `testbench workbench:build` for verification, because it leaves the same file.

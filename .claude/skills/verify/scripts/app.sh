@@ -23,7 +23,7 @@ EOF
 run_env() {
   local dir="$runs/$1"
   [ -d "$dir" ] || { echo "no run $1 under $runs" >&2; exit 1; }
-  export DB_CONNECTION=sqlite DB_DATABASE="$dir/database.sqlite" CACHE_STORE=database APP_URL="$(cat "$dir/url")"
+  export DB_CONNECTION=sqlite DB_DATABASE="$dir/database.sqlite" CACHE_STORE=database QUEUE_CONNECTION=database MAIL_MAILER=log APP_URL="$(cat "$dir/url")"
 }
 
 free_port() {
@@ -61,7 +61,13 @@ case "$cmd" in
 
     abort() { "$0" stop "$run" >/dev/null; echo "$1, see $evidence/$run/$2" >&2; exit 1; }
 
-    npm run build > "$dir/build.log" 2>&1 || abort "asset build failed" build.log
+    # Every live run serves the one build directory, so rebuild only when a source is newer than the last build.
+    manifest=workbench/public/build/manifest.json
+    if [ ! -f "$manifest" ] || [ -n "$(find packages/*/stubs workbench/resources workbench/routes vite.config.ts package.json -newer "$manifest" -print -quit)" ]; then
+      npm run build > "$dir/build.log" 2>&1 || abort "asset build failed" build.log
+    else
+      echo "assets are newer than every source; skipped npm run build" > "$dir/build.log"
+    fi
     php vendor/bin/testbench migrate:fresh --seed --seeder='Workbench\Database\Seeders\DatabaseSeeder' --no-interaction > "$dir/migrate.log" 2>&1 \
       || abort "migrate failed" migrate.log
 
@@ -152,6 +158,12 @@ case "$cmd" in
       pid="$(cat "$dir/$file" 2>/dev/null || true)"
       if ours "$pid" "$port"; then kill -TERM "$pid" 2>/dev/null || true; fi
     done
+    # testbench serve copies .env.example into the skeleton and only removes it on a clean exit; left behind, it leaks into the Pest suite.
+    skeleton=vendor/orchestra/testbench-core/laravel
+    sleep 0.5
+    if cmp -s "$skeleton/.env" "$skeleton/.env.example" && ! pgrep -f 'testbench serve' >/dev/null; then
+      rm "$skeleton/.env"
+    fi
     mkdir -p "$evidence/$run"
     cp "$dir"/*.log "$dir/database.sqlite" "$evidence/$run/" 2>/dev/null || true
     rm -rf "$dir"
