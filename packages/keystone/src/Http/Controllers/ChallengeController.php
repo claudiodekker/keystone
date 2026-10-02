@@ -6,6 +6,7 @@ use ClaudioDekker\Keystone\ChallengeAttempt;
 use ClaudioDekker\Keystone\CredentialAttempt;
 use ClaudioDekker\Keystone\Demand;
 use ClaudioDekker\Keystone\Exceptions\LastRecoveryCode;
+use ClaudioDekker\Keystone\Http\Controllers\Concerns\RefusesSignedInUsers;
 use ClaudioDekker\Keystone\Http\PageValues\ChallengePage;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\CredentialType;
@@ -29,6 +30,8 @@ use Symfony\Component\HttpFoundation\Response;
  */
 abstract class ChallengeController extends Controller
 {
+    use RefusesSignedInUsers;
+
     /**
      * Get the middleware that runs before the controller's actions.
      */
@@ -192,14 +195,6 @@ abstract class ChallengeController extends Controller
         $pending = Keystone::guard()->pending();
 
         return $pending?->stage === PendingStage::CHALLENGE ? $pending : null;
-    }
-
-    /**
-     * Send a signed-in user away from the challenge.
-     */
-    protected function refuseSignedIn(): RedirectResponse
-    {
-        return redirect('/');
     }
 
     /**

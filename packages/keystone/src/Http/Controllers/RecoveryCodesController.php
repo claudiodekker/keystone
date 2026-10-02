@@ -3,17 +3,17 @@
 namespace ClaudioDekker\Keystone\Http\Controllers;
 
 use ClaudioDekker\Keystone\Demand;
+use ClaudioDekker\Keystone\Http\Controllers\Concerns\RefusesSignedInUsers;
+use ClaudioDekker\Keystone\Http\Controllers\Concerns\ResolvesEnrollmentSignIn;
 use ClaudioDekker\Keystone\Http\PageValues\RecoveryCodesPage;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\RecoveryCodeType;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\PendingSignIn;
-use ClaudioDekker\Keystone\PendingStage;
 use ClaudioDekker\Keystone\RecoveryCodeSetup;
 use ClaudioDekker\Keystone\SignInDecision;
 use ClaudioDekker\Keystone\StepKind;
 use Illuminate\Contracts\Support\Responsable;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\Response;
@@ -23,6 +23,9 @@ use Symfony\Component\HttpFoundation\Response;
  */
 abstract class RecoveryCodesController extends Controller
 {
+    use RefusesSignedInUsers;
+    use ResolvesEnrollmentSignIn;
+
     /**
      * Get the middleware that runs before the controller's actions.
      */
@@ -131,31 +134,5 @@ abstract class RecoveryCodesController extends Controller
         }
 
         return $decision->pendingOwesSecondFactor($pending) ? $this->sendSecondFactorOwed($request) : null;
-    }
-
-    /**
-     * Get the session's live sign-in held at enrollment.
-     */
-    protected function pending(): ?PendingSignIn
-    {
-        $pending = Keystone::guard()->pending();
-
-        return $pending?->stage === PendingStage::ENROLLMENT ? $pending : null;
-    }
-
-    /**
-     * Send a signed-in user away from saving recovery codes.
-     */
-    protected function refuseSignedIn(): RedirectResponse
-    {
-        return redirect('/');
-    }
-
-    /**
-     * Send a session with no sign-in held at enrollment to the sign-in page.
-     */
-    protected function refuseWithoutEnrollment(): RedirectResponse
-    {
-        return redirect()->route('login');
     }
 }
