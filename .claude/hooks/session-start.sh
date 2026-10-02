@@ -7,6 +7,20 @@ if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
 fi
 
 cd "$CLAUDE_PROJECT_DIR"
+
+# The install rewrites settings.json's formatting; keep the committed file as is.
+settings="$CLAUDE_PROJECT_DIR/.claude/settings.json"
+saved="$(cat "$settings")"
+trap 'printf "%s\n" "$saved" > "$settings"' EXIT
+
+# Plugins come first: a failing composer install must not leave the session without its skills.
+timeout 60 claude plugin marketplace add mattpocock/skills >/dev/null 2>&1 || true
+timeout 60 claude plugin install mattpocock-skills@mattpocock --scope project >/dev/null 2>&1 || true
+# The private skills repo needs GitHub access; say so instead of silently running without the rulebook.
+timeout 60 claude plugin marketplace add claudiodekker/skills >/dev/null 2>&1 \
+  && timeout 60 claude plugin install skills@claudiodekker --scope project >/dev/null 2>&1 \
+  || echo "session-start: could not install skills@claudiodekker; CODING_STANDARDS.md's general rulebook is unavailable" >&2
+
 export COMPOSER_ALLOW_SUPERUSER=1
 
 # The container refuses GitHub zipballs, so composer installs from source,
@@ -36,14 +50,3 @@ npm install --no-audit --no-fund
 
 # The session driver tests need the Redis server CI runs as a service.
 redis-cli ping >/dev/null 2>&1 || redis-server --daemonize yes >/dev/null
-
-# The install rewrites settings.json's formatting; keep the committed file as is.
-settings="$CLAUDE_PROJECT_DIR/.claude/settings.json"
-saved="$(cat "$settings")"
-timeout 60 claude plugin marketplace add mattpocock/skills >/dev/null 2>&1 || true
-timeout 60 claude plugin install mattpocock-skills@mattpocock --scope project >/dev/null 2>&1 || true
-# The private skills repo needs GitHub access; say so instead of silently running without the rulebook.
-timeout 60 claude plugin marketplace add claudiodekker/skills >/dev/null 2>&1 \
-  && timeout 60 claude plugin install skills@claudiodekker --scope project >/dev/null 2>&1 \
-  || echo "session-start: could not install skills@claudiodekker; CODING_STANDARDS.md's general rulebook is unavailable" >&2
-printf '%s\n' "$saved" > "$settings"
