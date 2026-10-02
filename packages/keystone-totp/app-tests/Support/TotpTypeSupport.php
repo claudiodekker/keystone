@@ -19,11 +19,17 @@ class TotpTypeSupport implements CredentialTypeSupport
      */
     protected const string KEY = '12345678901234567890';
 
+    /**
+     * Get the name of the TOTP type.
+     */
     public function type(): string
     {
         return 'totp';
     }
 
+    /**
+     * Arrange a TOTP credential holding the known key, at no step yet.
+     */
     public function arrange(Surface $surface): array
     {
         $secret = new TotpSecret(self::KEY, lastStep: null);
@@ -31,16 +37,25 @@ class TotpTypeSupport implements CredentialTypeSupport
         return ['identifier' => null, 'secret' => $secret->toStored(), 'label' => null];
     }
 
+    /**
+     * Get the code the known key makes now.
+     */
     public function validProof(Surface $surface): array
     {
         return [TotpType::FIELD => $this->codeAt($this->now())];
     }
 
+    /**
+     * Get a code the known key accepts from no step in the window.
+     */
     public function rejectedProof(Surface $surface): array
     {
         return [TotpType::FIELD => $this->wrongCode(self::KEY)];
     }
 
+    /**
+     * Get the code the ceremony's new key makes now.
+     */
     public function validEnrollment(mixed $ceremony): array
     {
         $secret = TotpSecret::fromStored((string) $ceremony);
@@ -48,6 +63,9 @@ class TotpTypeSupport implements CredentialTypeSupport
         return [TotpType::FIELD => $this->codeAt($this->now(), $secret->key)];
     }
 
+    /**
+     * Get a code the ceremony's new key accepts from no step in the window.
+     */
     public function rejectedEnrollment(mixed $ceremony): array
     {
         $secret = TotpSecret::fromStored((string) $ceremony);
