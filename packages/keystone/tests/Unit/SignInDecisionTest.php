@@ -22,10 +22,13 @@ function readAccount(User $user, string $model = User::class): User
 function accountHolding(bool $secondFactor = false, bool $recoveryCodes = false): User
 {
     $user = User::factory()->create();
-    DB::table('users')->where('id', $user->getKey())->update(['has_second_factor' => $secondFactor, 'has_recovery_codes' => $recoveryCodes]);
 
     if ($secondFactor) {
         DB::table('user_credentials')->insert(['user_id' => $user->getKey(), 'type' => 'code', 'served_challenge' => true, 'created_at' => now(), 'updated_at' => now()]);
+    }
+
+    if ($recoveryCodes) {
+        DB::table('user_recovery_codes')->insert(['user_id' => $user->getKey(), 'code_hash' => hash('sha256', 'AAAAA-AAAAA'), 'created_at' => now()]);
     }
 
     return readAccount($user);
@@ -55,7 +58,7 @@ it('refuses an account soft deleted under its own column name', function () {
     expect((new SignInDecision)->demand(readAccount($user, UserWithArchivedAt::class), new FormType))->toBe(Demand::REFUSE);
 });
 
-it('decides on the mandates as the account\'s holdings stand', function (bool $secondFactor, bool $recoveryCodes, bool $holdsSecondFactor, bool $holdsCodes, Demand $demand) {
+it('decides on the mandates as the account\'s credentials and codes stand', function (bool $secondFactor, bool $recoveryCodes, bool $holdsSecondFactor, bool $holdsCodes, Demand $demand) {
     config(['keystone.require_second_factor' => $secondFactor, 'keystone.require_recovery_codes' => $recoveryCodes]);
 
     expect((new SignInDecision)->demand(accountHolding($holdsSecondFactor, $holdsCodes), new FormType))->toBe($demand);
@@ -68,6 +71,39 @@ it('decides on the mandates as the account\'s holdings stand', function (bool $s
     'both required, second factor held' => [true, true, true, false, Demand::CHALLENGE],
     'both required, both held' => [true, true, true, true, Demand::CHALLENGE],
 ]);
+
+it('counts neither a disabled second factor nor a spent set of recovery codes as held', function () {
+    config(['keystone.require_second_factor' => true, 'keystone.require_recovery_codes' => true]);
+    $account = accountHolding(secondFactor: true, recoveryCodes: true);
+    DB::table('user_credentials')->update(['disabled_at' => now()]);
+    DB::table('user_recovery_codes')->delete();
+
+    expect((new SignInDecision)->owesSecondFactor($account))->toBeTrue()
+        ->and((new SignInDecision)->owesRecoveryCodes($account))->toBeTrue();
+});
+
+it('reads what the account holds as it stands now, not as it was loaded', function () {
+    config(['keystone.require_second_factor' => true, 'keystone.require_recovery_codes' => true]);
+    $account = accountHolding();
+    $owedBefore = (new SignInDecision)->owesEnrollment($account);
+
+    DB::table('user_credentials')->insert(['user_id' => $account->getKey(), 'type' => 'code', 'served_challenge' => true, 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('user_recovery_codes')->insert(['user_id' => $account->getKey(), 'code_hash' => hash('sha256', 'AAAAA-AAAAA'), 'created_at' => now()]);
+
+    expect($owedBefore)->toBeTrue()
+        ->and((new SignInDecision)->owesEnrollment($account))->toBeFalse();
+});
+
+it('reads nothing from the database while neither mandate is on', function () {
+    config(['keystone.require_second_factor' => false, 'keystone.require_recovery_codes' => false]);
+    $account = accountHolding();
+
+    DB::enableQueryLog();
+    $owes = (new SignInDecision)->owesEnrollment($account);
+
+    expect($owes)->toBeFalse()
+        ->and(DB::getQueryLog())->toBe([]);
+});
 
 it('owes no second factor after a proof that counts as two factors, while still owing recovery codes', function (bool $recoveryCodes, Demand $demand) {
     config(['keystone.require_second_factor' => true, 'keystone.require_recovery_codes' => $recoveryCodes]);

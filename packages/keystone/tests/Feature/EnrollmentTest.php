@@ -244,7 +244,7 @@ describe('the answer', function () {
 
         $response->assertRedirectToRoute('login.recovery-codes');
         $this->assertDatabaseHas('user_credentials', ['user_id' => $account->getKey(), 'type' => 'code', 'served_challenge' => true]);
-        $this->assertDatabaseHas('users', ['id' => $account->getKey(), 'has_second_factor' => true, 'credential_epoch' => 0]);
+        $this->assertDatabaseHas('users', ['id' => $account->getKey(), 'credential_epoch' => 0]);
         $this->assertDatabaseHas('user_security_events', ['type' => 'credential.added', 'user_id' => $account->getKey(), 'flow' => 'enrollment', 'credential_type' => 'code']);
         Notification::assertSentOnDemandTimes(SecurityAlert::class, 1);
         expect(Keystone::guard()->slots()->get('code', Surface::ENROLLMENT->value))->toBeNull();
@@ -409,7 +409,7 @@ describe('recovery codes', function () {
         $response->assertRedirect('/');
         $this->assertAuthenticatedAs($this->account);
         $this->assertDatabaseCount('user_recovery_codes', 8);
-        $this->assertDatabaseHas('users', ['id' => $this->account->getKey(), 'has_recovery_codes' => true, 'credential_epoch' => 0]);
+        $this->assertDatabaseHas('users', ['id' => $this->account->getKey(), 'credential_epoch' => 0]);
         $this->assertDatabaseHas('user_security_events', ['type' => 'recovery_codes.generated', 'user_id' => $this->account->getKey(), 'flow' => 'enrollment']);
         $this->assertDatabaseHas('user_security_events', ['type' => 'signed_in', 'user_id' => $this->account->getKey(), 'flow' => 'enrollment', 'credential_type' => 'recovery-code']);
         Notification::assertNothingSent();

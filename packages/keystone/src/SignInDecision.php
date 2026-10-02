@@ -113,7 +113,7 @@ class SignInDecision
     }
 
     /**
-     * Determine if the account, as read from its row, must enroll before it gets in: a second factor, unless one proven factor counts as two, or recovery codes.
+     * Determine if the account must enroll before it gets in: a second factor, unless one proven factor counts as two, or recovery codes.
      */
     public function owesEnrollment(Model&KeystoneUser $account, bool $multiFactorProven = false): bool
     {
@@ -121,19 +121,19 @@ class SignInDecision
     }
 
     /**
-     * Determine if the account, as read from its row, must hold a second factor it doesn't hold.
+     * Determine if the account must hold a second factor it doesn't hold.
      */
     public function owesSecondFactor(Model&KeystoneUser $account): bool
     {
-        return config('keystone.require_second_factor') === true && ! (bool) $account->getRawOriginal('has_second_factor');
+        return config('keystone.require_second_factor') === true && ! (new Credentials($account))->holdsSecondFactor($account->getKey());
     }
 
     /**
-     * Determine if the account, as read from its row, must hold recovery codes it doesn't hold.
+     * Determine if the account must hold recovery codes it doesn't hold.
      */
     public function owesRecoveryCodes(Model&KeystoneUser $account): bool
     {
-        return config('keystone.require_recovery_codes') === true && ! (bool) $account->getRawOriginal('has_recovery_codes');
+        return config('keystone.require_recovery_codes') === true && (new RecoveryCodes($account))->remaining($account->getKey()) === 0;
     }
 
     /**

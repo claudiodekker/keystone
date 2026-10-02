@@ -131,7 +131,7 @@ Adding a credential to an account. Owed at sign-in when a mandate requires somet
 _Avoid_: setup, onboarding
 
 **Holdings**:
-Whether an account holds a second factor and recovery codes, written on its row by every account change so a request can tell what it owes without counting credentials.
+Whether an account holds a second factor and recovery codes, read from its credentials and codes whenever a request needs to know what it owes.
 
 **Demotion**:
 Turning a signed-in session whose account newly owes an enrollment back into a pending sign-in at enrollment.

@@ -22,8 +22,6 @@ trait HasKeystone
         'deleted_at',
         'invalidated_at',
         'suspended_at',
-        'has_second_factor',
-        'has_recovery_codes',
     ];
 
     /**

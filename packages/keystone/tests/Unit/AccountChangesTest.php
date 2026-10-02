@@ -86,29 +86,6 @@ test('the credential epoch moves only for a change that removes, replaces or end
     }, true],
 ]);
 
-it('records whether the account holds a second factor and recovery codes as each change leaves them', function () {
-    $user = User::factory()->create();
-    $holdings = fn () => (array) DB::table('users')->where('id', $user->getKey())->first(['has_second_factor', 'has_recovery_codes']);
-
-    changes()->change($user, fn (AccountChange $change) => $change->addCredential(new FormType, identifier: null, secret: 'first-factor'));
-    $afterFirstFactor = $holdings();
-    changes()->change($user, fn (AccountChange $change) => $change->addCredential(new FormType(name: 'code', surfaces: ['challenge']), identifier: null, secret: 'second-factor'));
-    $afterSecondFactor = $holdings();
-    changes()->change($user, fn (AccountChange $change) => $change->commitRecoveryCodes(['AAAAA-AAAAA'], flow: Flow::ENROLLMENT));
-
-    expect($afterFirstFactor)->toEqual(['has_second_factor' => 0, 'has_recovery_codes' => 0])
-        ->and($afterSecondFactor)->toEqual(['has_second_factor' => 1, 'has_recovery_codes' => 0])
-        ->and($holdings())->toEqual(['has_second_factor' => 1, 'has_recovery_codes' => 1]);
-});
-
-it('counts a credential proving two factors on its own as a held second factor', function () {
-    $user = User::factory()->create();
-
-    changes()->change($user, fn (AccountChange $change) => $change->addCredential(new FormType(name: 'passkey', surfaces: ['sign-in'], multipleFactors: true), identifier: null, secret: 'both-factors'));
-
-    expect(DB::table('users')->where('id', $user->getKey())->value('has_second_factor'))->toEqual(1);
-});
-
 it('records a first set of recovery codes without alerting, and a replacing set with an alert', function (bool $held, bool $alerts) {
     Notification::fake();
     $user = User::factory()->create();

@@ -40,6 +40,17 @@ it('stamps whether the type proves two factors on its own when stored', function
     expect(DB::table('user_credentials')->value('proves_multiple_factors'))->toEqual($multipleFactors);
 })->with(['one factor' => false, 'two factors' => true]);
 
+it('holds a second factor once a credential serves the challenge or proves two factors on its own', function (array $surfaces, bool $multipleFactors, bool $holds) {
+    $user = User::factory()->create();
+    credentials()->store($user, new FormType(surfaces: $surfaces, multipleFactors: $multipleFactors), identifier: null, secret: 'hashed-secret');
+
+    expect(credentials()->holdsSecondFactor($user->getKey()))->toBe($holds);
+})->with([
+    'a challenge credential' => [['challenge'], false, true],
+    'a credential proving two factors on its own' => [['sign-in'], true, true],
+    'a first factor' => [['sign-in'], false, false],
+]);
+
 it('stores a credential without an identifier', function () {
     credentials()->store(User::factory()->create(), new FormType, identifier: null, secret: 'hashed-secret');
 
