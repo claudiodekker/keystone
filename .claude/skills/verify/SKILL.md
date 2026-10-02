@@ -45,11 +45,11 @@ Run it first whenever anything looks off. It is read-only:
 .claude/skills/verify/scripts/app.sh doctor <run>
 ```
 
-It checks that the server process is running, and that the port is held by that process's own `php -S` child rather than someone else's server. It checks that `/auth/login` renders the Inertia component `auth/Login` and that the served assets are not older than the latest build. It also checks that Jane exists in the run's database. Any `FAIL` line means you should not drive that run. Stop it and start a fresh one.
+It checks that the server process is running, and that the port is held by that process's own `php -S` child rather than someone else's server. It checks that `/auth/login` renders the Inertia component `auth/Login` and that the script the page loads from `/build/assets/` is served. It also checks that Jane exists in the run's database. Any `FAIL` line means you should not drive that run. Stop it and start a fresh one.
 
 ## Drive
 
-Write a scenario as a Node script that imports `scripts/pw.mjs`. `open(run, name)` returns a Playwright `page` whose `baseURL` is the run's URL. It also returns `step(label)`, which waits until no request has been in flight for 300 ms, then saves a numbered full-page screenshot and appends the path and first heading to `steps.log`. Every non-asset request goes to `network.log`. `fixture(run)` returns the `second-factor` JSON, and `totp(key)` computes the current code. The working example is `scripts/scenarios/sign-in-with-totp.mjs`:
+Write a scenario as a Node script that imports `scripts/pw.mjs`. `open(run, name)` returns a Playwright `page` whose `baseURL` is the run's URL. It also returns `step(label)`, which waits until no request has been in flight for 300 ms (and throws after 15 s), then saves a numbered full-page screenshot and appends the path and first heading to `steps.log`. Every non-asset request goes to `network.log`. `fixture(run)` returns the `second-factor` JSON, and `totp(key)` computes the current code. The working example is `scripts/scenarios/sign-in-with-totp.mjs`:
 
 ```shell
 node .claude/skills/verify/scripts/scenarios/sign-in-with-totp.mjs <run>
@@ -79,7 +79,7 @@ Jane is account id `1` in a fresh run.
 
 ## Evidence
 
-Each scenario writes to `.verify/evidence/<run>/<scenario>/`: the numbered screenshots, `steps.log` and `network.log`. `stop` adds the run's `server.log`. Read the side effects from the run's database:
+Each scenario writes to `.verify/evidence/<run>/<scenario>/`: the numbered screenshots, `steps.log` and `network.log`. `stop` adds the run's logs and a copy of its `database.sqlite`, so the side effects stay readable after cleanup. Read the side effects from the run's database:
 
 ```shell
 .claude/skills/verify/scripts/app.sh sql <run> "select id, type, flow, credential_type, reason from user_security_events order by id"
@@ -111,7 +111,7 @@ Proof standards:
 .claude/skills/verify/scripts/app.sh stop <run>
 ```
 
-`stop` kills only the server it started, by the pid in `.verify/runs/<run>/server.pid` and that pid's `php -S` child. It copies `server.log` into the evidence directory and deletes `.verify/runs/<run>`. Never kill `php` or `testbench` by name, because the user may be running `composer serve`. Evidence stays in `.verify/evidence/<run>/`, which git ignores. Delete it only when the user asks. Stop a run after a failed scenario too, before you start the next one.
+`stop` kills only the server it started: the pids in `.verify/runs/<run>/server.pid` and `listener.pid` (its `php -S` child), each only while its command line still names the run's port. It copies the run's logs and `database.sqlite` into the evidence directory and deletes `.verify/runs/<run>`. Never kill `php` or `testbench` by name, because the user may be running `composer serve`. Evidence stays in `.verify/evidence/<run>/`, which git ignores. Delete it only when the user asks. Stop a run after a failed scenario too, before you start the next one.
 
 ## Isolation
 

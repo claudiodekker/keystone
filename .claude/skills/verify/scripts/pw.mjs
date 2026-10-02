@@ -67,8 +67,14 @@ export async function open(run, name) {
     page.on('pageerror', (error) => appendFileSync(join(dir, 'steps.log'), `PAGE ERROR ${error.message}\n`));
 
     // Inertia navigates over XHR after the click resolves, so load states never reset; wait for the requests to settle instead.
-    const settled = async () => {
-        while (pending > 0 || Date.now() - lastActivity < 300) {
+    const settled = async (quietMs = 300, timeoutMs = 15_000) => {
+        const deadline = Date.now() + timeoutMs;
+
+        while (pending > 0 || Date.now() - lastActivity < quietMs) {
+            if (Date.now() > deadline) {
+                throw new Error(`requests did not settle within ${timeoutMs} ms (${pending} in flight)`);
+            }
+
             await page.waitForTimeout(50);
         }
     };

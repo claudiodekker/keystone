@@ -32,10 +32,16 @@ free_port() {
   echo "$port"
 }
 
+# A pid only counts as the run's when its command line still names the run's port, so a reused pid is never ours.
+ours() {
+  local pid="$1" port="$2"
+  [ -n "$pid" ] && ps -o command= -p "$pid" 2>/dev/null | grep -qE -- "[:=]$port( |\$)"
+}
+
+port_of() { local url; url="$(cat "$runs/$1/url")"; echo "${url##*:}"; }
+
 alive() {
-  local pid
-  pid="$(cat "$runs/$1/server.pid" 2>/dev/null)" || return 1
-  kill -0 "$pid" 2>/dev/null
+  ours "$(cat "$runs/$1/server.pid" 2>/dev/null)" "$(port_of "$1")"
 }
 
 cmd="${1:-}"
@@ -53,9 +59,11 @@ case "$cmd" in
     touch "$dir/database.sqlite"
     run_env "$run"
 
-    npm run build > "$dir/build.log" 2>&1 || { echo "asset build failed, see $dir/build.log" >&2; exit 1; }
+    abort() { "$0" stop "$run" >/dev/null; echo "$1, see $evidence/$run/$2" >&2; exit 1; }
+
+    npm run build > "$dir/build.log" 2>&1 || abort "asset build failed" build.log
     php vendor/bin/testbench migrate:fresh --seed --seeder='Workbench\Database\Seeders\DatabaseSeeder' --no-interaction > "$dir/migrate.log" 2>&1 \
-      || { echo "migrate failed, see $dir/migrate.log" >&2; exit 1; }
+      || abort "migrate failed" migrate.log
 
     php vendor/bin/testbench serve --port="$port" --no-reload > "$dir/server.log" 2>&1 &
     echo $! > "$dir/server.pid"
@@ -65,7 +73,10 @@ case "$cmd" in
       sleep 0.25
     done
 
-    "$0" doctor "$run" >/dev/null || { echo "server did not come up, see $dir/server.log" >&2; "$0" stop "$run" >&2; exit 1; }
+    listener="$(lsof -nP -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null | head -1 || true)"
+    echo "$listener" > "$dir/listener.pid"
+
+    "$0" doctor "$run" > "$dir/doctor.log" || abort "server did not come up" doctor.log
     echo "run=$run url=http://127.0.0.1:$port evidence=$evidence/$run"
     ;;
 
@@ -73,8 +84,8 @@ case "$cmd" in
     run="${1:?run id}"
     run_env "$run"
     url="$APP_URL"
-    port="${url##*:}"
-    pid="$(cat "$runs/$run/server.pid")"
+    port="$(port_of "$run")"
+    pid="$(cat "$runs/$run/server.pid" 2>/dev/null || true)"
     ok=1
     alive "$run" && echo "ok   server process $pid is running" || { echo "FAIL server process $pid is not running"; ok=0; }
     listener="$(lsof -nP -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null | head -1 || true)"
@@ -88,11 +99,11 @@ case "$cmd" in
       *'"component":"auth\/Login"'*) echo "ok   GET /auth/login renders auth/Login" ;;
       *) echo "FAIL GET /auth/login does not render auth/Login"; ok=0 ;;
     esac
-    manifest="vendor/orchestra/testbench-core/laravel/public/build/manifest.json"
-    if [ -f "$manifest" ] && ! [ workbench/public/build/manifest.json -nt "$manifest" ]; then
-      echo "ok   served assets match the latest build"
+    asset="$(printf '%s' "$body" | grep -oE '/build/assets/[^"]+\.js' | head -1 || true)"
+    if [ -n "$asset" ] && [ "$(curl -s -o /dev/null -w '%{http_code}' "$url$asset")" = 200 ]; then
+      echo "ok   GET $asset serves the page's script"
     else
-      echo "FAIL served assets are older than workbench/public/build; restart the run"; ok=0
+      echo "FAIL the page's script ${asset:-(none in the page)} is not served; restart the run"; ok=0
     fi
     accounts="$(sqlite3 "$DB_DATABASE" "select count(*) from user_emails where address = 'jane@example.com'" 2>/dev/null || echo 0)"
     [ "$accounts" = 1 ] && echo "ok   jane@example.com is seeded in $DB_DATABASE" || { echo "FAIL jane@example.com is missing"; ok=0; }
@@ -102,9 +113,11 @@ case "$cmd" in
   second-factor)
     run="${1:?run id}"
     run_env "$run"
-    php vendor/bin/testbench tinker --execute "require '$root/.claude/skills/verify/scripts/second-factor.php';" \
-      | grep '^{' > "$runs/$run/second-factor.json"
-    cat "$runs/$run/second-factor.json"
+    export VERIFY_FIXTURE="$root/.claude/skills/verify/scripts/second-factor.php"
+    output="$(php vendor/bin/testbench tinker --execute 'require getenv("VERIFY_FIXTURE");' 2>&1)" || true
+    json="$(printf '%s\n' "$output" | grep '^{' || true)"
+    [ -n "$json" ] || { printf '%s\n' "$output" >&2; echo "second-factor fixture failed" >&2; exit 1; }
+    echo "$json" | tee "$runs/$run/second-factor.json"
     ;;
 
   artisan)
@@ -134,12 +147,13 @@ case "$cmd" in
     run="${1:?run id}"
     dir="$runs/$run"
     [ -d "$dir" ] || { echo "no run $run" >&2; exit 1; }
-    if alive "$run"; then
-      pid="$(cat "$dir/server.pid")"
-      pkill -TERM -P "$pid" 2>/dev/null || true
-      kill -TERM "$pid" 2>/dev/null || true
-    fi
-    cp "$dir/server.log" "$evidence/$run/server.log" 2>/dev/null || true
+    port="$(port_of "$run")"
+    for file in listener.pid server.pid; do
+      pid="$(cat "$dir/$file" 2>/dev/null || true)"
+      if ours "$pid" "$port"; then kill -TERM "$pid" 2>/dev/null || true; fi
+    done
+    mkdir -p "$evidence/$run"
+    cp "$dir"/*.log "$dir/database.sqlite" "$evidence/$run/" 2>/dev/null || true
     rm -rf "$dir"
     echo "stopped $run; evidence kept in $evidence/$run"
     ;;

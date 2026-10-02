@@ -23,7 +23,8 @@ $key = random_bytes(20);
     secret: (new TotpSecret($key, lastStep: null))->toStored(),
 );
 
-$codes = (new RecoveryCodes($account))->generate();
-(new RecoveryCodes($account))->replace($account->getKey(), $codes);
+$recoveryCodes = new RecoveryCodes($account);
+$codes = $recoveryCodes->generate();
+$recoveryCodes->replace($account->getKey(), $codes);
 
 echo json_encode(['email' => 'jane@example.com', 'password' => 'password', 'totp_key' => Base32::encodeUpperUnpadded($key), 'recovery_codes' => $codes]).PHP_EOL;
