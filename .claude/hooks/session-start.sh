@@ -17,7 +17,11 @@ install_plugin() {
 }
 
 install_plugin mattpocock/skills mattpocock-skills@mattpocock
-# The private skills repo needs GitHub access.
-install_plugin claudiodekker/skills skills@claudiodekker
+# The private skills repo is already cloned next to this one, and a local directory needs no GitHub credentials.
+skills_source=claudiodekker/skills
+if [ -d "$CLAUDE_PROJECT_DIR/../skills/.claude-plugin" ]; then
+  skills_source="$(cd "$CLAUDE_PROJECT_DIR/../skills" && pwd)"
+fi
+install_plugin "$skills_source" skills@claudiodekker
 
 npm install --no-audit --no-fund
