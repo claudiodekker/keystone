@@ -51,3 +51,39 @@ it('refuses a proof for no account exactly like a rejected one, for every instal
         );
     });
 });
+
+it('holds a valid proof of every installed type for the enrollment the app requires', function (bool $secondFactor, bool $recoveryCodes) {
+    config(['keystone.require_second_factor' => $secondFactor, 'keystone.require_recovery_codes' => $recoveryCodes]);
+
+    $this->eachSupportFor(Surface::SIGN_IN, function (CredentialTypeSupport $support) {
+        $account = $this->createAccount("{$support->type()}@example.com");
+        $this->arrangeCredential($account, $support, Surface::SIGN_IN);
+
+        $response = submitSignIn($this, $support, "{$support->type()}@example.com", $support->validProof(Surface::SIGN_IN));
+
+        $this->assertEnrollmentOwed($response);
+        $this->assertGuest();
+    });
+})->with([
+    'both required' => [true, true],
+    'only recovery codes required' => [false, true],
+]);
+
+it('holds a valid proof of every installed type for a second factor unless it proves two factors on its own', function () {
+    config(['keystone.require_second_factor' => true, 'keystone.require_recovery_codes' => false]);
+
+    $this->eachSupportFor(Surface::SIGN_IN, function (CredentialTypeSupport $support) {
+        $account = $this->createAccount("{$support->type()}@example.com");
+        $this->arrangeCredential($account, $support, Surface::SIGN_IN);
+
+        $response = submitSignIn($this, $support, "{$support->type()}@example.com", $support->validProof(Surface::SIGN_IN));
+
+        if ($this->types()->find($support->type(), Surface::SIGN_IN)->representsMultipleFactors()) {
+            $this->assertSignedIn($response, '/');
+            $this->assertAuthenticatedAs($account);
+        } else {
+            $this->assertEnrollmentOwed($response);
+            $this->assertGuest();
+        }
+    });
+});

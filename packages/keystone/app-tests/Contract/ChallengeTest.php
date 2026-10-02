@@ -34,3 +34,32 @@ it('refuses a wrong answer of every installed type', function () {
         $this->assertGuest();
     });
 });
+
+it('moves a valid answer of every installed type on to the recovery codes the app requires', function () {
+    $this->withMandates();
+
+    $this->eachSupportFor(Surface::CHALLENGE, function (CredentialTypeSupport $support) {
+        $this->createChallengedAccount($support, "{$support->type()}@example.com");
+        $this->passFirstFactor("{$support->type()}@example.com");
+
+        $response = $this->post(route('login.challenge.submit', ['type' => $support->type()]), $support->validProof(Surface::CHALLENGE));
+
+        $this->assertEnrollmentOwedAfterChallenge($response);
+        $this->assertGuest();
+    });
+});
+
+it('completes the sign-in with a valid answer of every installed type once the account holds the recovery codes the app requires', function () {
+    $this->withMandates();
+
+    $this->eachSupportFor(Surface::CHALLENGE, function (CredentialTypeSupport $support) {
+        $account = $this->createChallengedAccount($support, "{$support->type()}@example.com");
+        $this->arrangeRecoveryCodes($account);
+        $this->passFirstFactor("{$support->type()}@example.com");
+
+        $response = $this->post(route('login.challenge.submit', ['type' => $support->type()]), $support->validProof(Surface::CHALLENGE));
+
+        $this->assertChallengePassed($response, '/');
+        $this->assertAuthenticatedAs($account);
+    });
+});
