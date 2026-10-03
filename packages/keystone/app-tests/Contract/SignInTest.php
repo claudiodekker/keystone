@@ -75,30 +75,21 @@ it('holds a valid proof of every installed type for the enrollment the app requi
     'only recovery codes required' => [false, true],
 ]);
 
-it('signs in a valid proof of every installed type that proves two factors on its own and answers the challenge', function () {
+it('signs in or holds a valid proof of every installed type for a second factor, as the type proves one factor or two', function () {
     config(['keystone.require_second_factor' => true, 'keystone.require_recovery_codes' => false]);
-    $supports = array_filter($this->supportsFor(Surface::SIGN_IN), fn (CredentialTypeSupport $support) => provesTwoFactorsAtTheChallenge($support));
 
-    $this->eachOf(array_values($supports), function (CredentialTypeSupport $support) {
+    $this->eachSupportFor(Surface::SIGN_IN, function (CredentialTypeSupport $support) {
         $account = $this->createAccount("{$support->type()}@example.com");
         $this->arrangeCredential($account, $support, Surface::SIGN_IN);
 
         $response = submitSignIn($this, $support, "{$support->type()}@example.com", $support->validProof(Surface::SIGN_IN));
 
-        $this->assertSignedIn($response, '/');
-        $this->assertAuthenticatedAs($account);
-    });
-});
+        if (provesTwoFactorsAtTheChallenge($support)) {
+            $this->assertSignedIn($response, '/');
+            $this->assertAuthenticatedAs($account);
 
-it('holds a valid proof of every other installed type for a second factor', function () {
-    config(['keystone.require_second_factor' => true, 'keystone.require_recovery_codes' => false]);
-    $supports = array_filter($this->supportsFor(Surface::SIGN_IN), fn (CredentialTypeSupport $support) => ! provesTwoFactorsAtTheChallenge($support));
-
-    $this->eachOf(array_values($supports), function (CredentialTypeSupport $support) {
-        $account = $this->createAccount("{$support->type()}@example.com");
-        $this->arrangeCredential($account, $support, Surface::SIGN_IN);
-
-        $response = submitSignIn($this, $support, "{$support->type()}@example.com", $support->validProof(Surface::SIGN_IN));
+            return;
+        }
 
         $this->assertEnrollmentOwed($response);
         $this->assertGuest();
