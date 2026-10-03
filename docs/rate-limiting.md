@@ -6,7 +6,7 @@ Keystone rate limits its own endpoints. Nothing in your routes, middleware or co
 
 | Limit | Counted per | Allowance |
 |---|---|---|
-| Request limit | IP address, and separately the account the session names (signed in or held at the challenge), per kind of step | 60 page views, 10 submissions or sign-outs a minute |
+| Request limit | IP address, and separately the account the session names (signed in, or held at the challenge or enrollment), per kind of step | 60 page views, 10 submissions or sign-outs a minute |
 | Failed-attempt limit | account and credential type in each flow, from any IP address | 20 wrong answers an hour |
 | Shared TOTP limit | account, for TOTP codes in the challenge, recovery and sudo together | 20 wrong codes an hour, and at most 100 in 24 hours |
 

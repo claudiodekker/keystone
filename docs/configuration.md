@@ -12,7 +12,7 @@ Your `config/keystone.php` is merged over Keystone's, key by key. A setting that
 
 | Setting | Default | What loosening it costs |
 |---|---|---|
-| `methods` | `null`: every installed credential type, on every surface it serves | Nothing: it can only narrow what the installed types offer. See [Methods](#methods). |
+| `methods` | `null`: every installed credential type, on every surface it serves | A type you leave out stops counting: its credentials no longer answer the challenge or meet `require_second_factor`, and with that off their accounts sign in on a first factor alone. See [Methods](#methods). |
 | `require_second_factor` | `true` | `false` lets an account sign in with its first factor alone until it chooses to add a second. See [Enrollment](enrollment.md). |
 | `require_recovery_codes` | `true` | `false` lets an account go without recovery codes, and lets the last one answer the challenge, so an account can be left with none for account recovery. See [Enrollment](enrollment.md) and [Recovery codes](challenge.md#recovery-codes). |
 | `session.absolute_lifetime_seconds` | `43200` (12 hours) | A stolen session that is kept busy stays signed in longer. `null` lets it live forever. See [Session lifetime](#session-lifetime). |
@@ -40,7 +40,7 @@ Every limit is a whole number of at least 1. No setting takes a `0` or `null` th
 ],
 ```
 
-A type you don't list isn't offered anywhere, and a listed surface only narrows what the type serves: listing a type on a surface it doesn't serve stops Keystone from booting. The surfaces are `sign-in`, `challenge`, `registration` and `enrollment`. A second factor of a type you stop listing still makes its account owe the challenge (see [The second-factor challenge](challenge.md#the-challenge-page)).
+A type you don't list isn't offered anywhere, and a listed surface only narrows what the type serves: listing a type on a surface it doesn't serve stops Keystone from booting. The surfaces are `sign-in`, `challenge`, `registration` and `enrollment`. A second factor of a type you stop listing stays stored but no longer counts: its account isn't challenged for it, and with `require_second_factor` on it enrolls another (see [The challenge page](challenge.md#the-challenge-page)).
 
 ## Session lifetime
 
@@ -94,7 +94,7 @@ In production it also refuses what's fine on a laptop but unsafe on a server:
 | Setting | Refused |
 |---|---|
 | your default guard's driver | anything but `keystone` |
-| `methods` | no listed type serves sign-in |
+| `methods` | no listed type serves sign-in, or `require_second_factor` is on and no listed type serves both `enrollment` and `challenge` (see [Enrollment](enrollment.md#the-mandates)) |
 | `session.secure`, `session.http_only` | anything but `true` |
 | `session.same_site` | anything but `lax` or `strict` |
 | `session.cookie` | a name without the `__Host-` prefix, or `__Secure-` when `session.domain` is set |

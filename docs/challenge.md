@@ -6,7 +6,7 @@ A first factor that proves more than one factor on its own, such as a passkey th
 
 ## The pending sign-in
 
-While a sign-in is held, the session is a guest everywhere but the challenge: `auth` middleware refuses it and `Auth::user()` is null. A session holds at most one; passing another account's first factor replaces it. It lasts 15 minutes from the first factor, however busy the user is, after which the challenge page sends them back to sign in.
+While a sign-in is held, the session is a guest everywhere but the step it is held at, the challenge or an [enrollment](enrollment.md): `auth` middleware refuses it and `Auth::user()` is null. A session holds at most one; passing another account's first factor replaces it. It lasts 15 minutes from the first factor, however busy the user is, after which the challenge page sends them back to sign in.
 
 A pending sign-in is dropped, and `sign_in.voided` recorded, when in the meantime its account is suspended or soft-deleted, or its sessions are ended, such as by a password change or `keystone:end-sessions`.
 
@@ -18,7 +18,7 @@ The page offers every second-factor type the account holds that `keystone.method
 
 When the account holds no second factor a listed type can answer, the pending sign-in is dropped and the user is sent back to sign in.
 
-Only a credential of another type than the first factor's counts as a second factor. A credential of a type that proves two factors on its own, such as a passkey, counts when its type serves `challenge`: a password sign-in of an account holding one is challenged, and the passkey answers. Only a credential of a type that `keystone.methods` lists on the `challenge` surface counts. When you unlist a type, its credentials stop counting but stay stored: its users are no longer challenged for them, and with `require_second_factor` on they enroll a second factor again. Listing the type again brings the credentials back.
+Only a credential of a type that `keystone.methods` lists on the `challenge` surface, and of another type than the first factor's, counts as a second factor. A credential of a type that proves two factors on its own, such as a passkey, counts when its type serves `challenge`: a password sign-in of an account holding one is challenged, and the passkey answers. When you unlist a type, its credentials stop counting but stay stored: its users are no longer challenged for them, and with `require_second_factor` on they enroll a second factor again. Listing the type again brings the credentials back.
 
 ## Answering
 

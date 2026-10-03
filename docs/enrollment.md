@@ -21,7 +21,7 @@ If the account gains a second factor elsewhere before this one is enrolled, even
 
 ## Choosing a second factor
 
-The enrollment page (`login.enrollment`) lists every listed type that serves `enrollment` and answers the challenge, with its shape, and preselects the first. A password is never offered: it is a first factor only.
+The enrollment page (`login.enrollment`) lists every listed type that serves `enrollment` and answers the challenge, with its shape. A password is never offered: it is a first factor only.
 
 Choosing a type (`login.enrollment.start`) starts its ceremony, such as TOTP making a new key, and shows what the user needs, such as the key and the link that adds it to an authenticator app. Reloading shows the same ceremony. The ceremony lasts as long as the held sign-in.
 
