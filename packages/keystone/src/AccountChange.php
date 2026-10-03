@@ -114,7 +114,7 @@ class AccountChange
     public function commitRecoveryCodes(#[\SensitiveParameter] array $codes, Flow $flow): void
     {
         $accountId = $this->account->getKey();
-        $replaces = $this->recoveryCodes->remaining($accountId) > 0;
+        $replaces = $this->recoveryCodes->hasRemaining($accountId);
 
         $this->recoveryCodes->replace($accountId, $codes);
 

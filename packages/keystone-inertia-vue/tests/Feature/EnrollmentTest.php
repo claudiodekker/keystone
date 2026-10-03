@@ -11,11 +11,17 @@ pest()->extend(StubsTestCase::class)->use(EnrollmentAssertions::class, RecoveryC
 beforeEach(function () {
     $this->withMandates();
     config(['keystone.methods' => ['form', 'totp']]);
-    $this->createFirstFactorAccount();
-    $this->passFirstFactor();
 });
 
+function holdAtEnrollment(StubsTestCase $test): void
+{
+    $test->createFirstFactorAccount();
+    $test->passFirstFactor();
+}
+
 it('renders the enrollment page with the page value\'s fields', function () {
+    holdAtEnrollment($this);
+
     $response = $this->get(route('login.enrollment'));
 
     $response->assertInertia(fn (AssertableInertia $page) => $page
@@ -26,6 +32,8 @@ it('renders the enrollment page with the page value\'s fields', function () {
 });
 
 it('renders the type\'s enrollment form with what its ceremony shows, encrypted in the browser\'s history', function () {
+    holdAtEnrollment($this);
+
     $response = $this->get(route('login.enrollment.start', ['type' => 'totp']));
 
     $response->assertInertia(fn (AssertableInertia $page) => $page
@@ -39,6 +47,7 @@ it('renders the type\'s enrollment form with what its ceremony shows, encrypted 
 });
 
 it('sends a refused answer back to the form with the message on the type', function () {
+    holdAtEnrollment($this);
     $this->get(route('login.enrollment.start', ['type' => 'totp']));
 
     $response = $this->post(route('login.enrollment.submit', ['type' => 'totp']), (new TotpTypeSupport)->rejectedEnrollment($this->enrollmentCeremony('totp')));
@@ -47,6 +56,8 @@ it('sends a refused answer back to the form with the message on the type', funct
 });
 
 it('sends an enrolled account on to its recovery codes, and shows the staged set', function () {
+    holdAtEnrollment($this);
+
     $response = $this->enrollSecondFactor(new TotpTypeSupport);
 
     $this->assertRecoveryCodesOwed($response);
@@ -55,6 +66,7 @@ it('sends an enrolled account on to its recovery codes, and shows the staged set
 });
 
 it('signs in once a staged code is typed back', function () {
+    holdAtEnrollment($this);
     $this->enrollSecondFactor(new TotpTypeSupport);
     $this->get(route('login.recovery-codes'));
 
@@ -64,5 +76,7 @@ it('signs in once a staged code is typed back', function () {
 });
 
 it('sends a cancelled enrollment to the sign-in page', function () {
+    holdAtEnrollment($this);
+
     $this->assertEnrollmentCancelled($this->delete(route('login.enrollment.cancel')));
 });

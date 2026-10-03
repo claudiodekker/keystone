@@ -22,7 +22,6 @@ enum Flow: string
         return match (true) {
             $surface === Surface::SIGN_IN && $guard->guest() => self::SIGN_IN,
             $surface === Surface::CHALLENGE && $guard->guest() && $guard->isPendingAt(PendingStage::CHALLENGE) => self::CHALLENGE,
-            $surface === Surface::ENROLLMENT && $guard->guest() && $guard->isPendingAt(PendingStage::ENROLLMENT) => self::ENROLLMENT,
             default => throw new LogicException("No flow uses the [{$surface->value}] surface in this session's phase."),
         };
     }

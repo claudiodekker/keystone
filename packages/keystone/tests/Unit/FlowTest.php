@@ -26,21 +26,9 @@ it('derives no flow for the challenge surface without a held sign-in', function 
     Flow::of(Keystone::guard(), Surface::CHALLENGE);
 })->throws(LogicException::class);
 
-it('derives the enrollment flow for a sign-in held at enrollment', function () {
-    Keystone::guard()->hold(User::factory()->create(), firstFactor: 'form', stage: PendingStage::ENROLLMENT, intendedUrl: '/');
-
-    expect(Flow::of(Keystone::guard(), Surface::ENROLLMENT))->toBe(Flow::ENROLLMENT);
-});
-
-it('derives no flow for the enrollment surface without a sign-in held at enrollment', function () {
-    Keystone::guard()->hold(User::factory()->create(), firstFactor: 'form', stage: PendingStage::CHALLENGE, intendedUrl: '/');
-
-    Flow::of(Keystone::guard(), Surface::ENROLLMENT);
-})->throws(LogicException::class);
-
-it('derives no flow for a surface no flow uses yet', function () {
-    Flow::of(Keystone::guard(), Surface::REGISTRATION);
-})->throws(LogicException::class);
+it('derives no flow for a surface no flow uses yet', function (Surface $surface) {
+    Flow::of(Keystone::guard(), $surface);
+})->throws(LogicException::class)->with([Surface::REGISTRATION, Surface::ENROLLMENT]);
 
 test('only the challenge flow shares a guessable type\'s failures', function (Flow $flow, bool $shares) {
     expect($flow->sharesFailedAttempts())->toBe($shares);

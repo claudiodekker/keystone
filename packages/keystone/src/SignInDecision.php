@@ -57,11 +57,11 @@ class SignInDecision
     {
         $held = (new Credentials($account))->typesOf($account->getKey());
         $types = app(CredentialTypes::class)->serving(Surface::CHALLENGE);
-        $remainingCodes = (new RecoveryCodes($account))->remaining($account->getKey());
+        $holdsCodes = (new RecoveryCodes($account))->hasRemaining($account->getKey());
 
         $offered = array_filter($types, fn (CredentialType $type) => $type->name() !== $firstFactor && in_array($type->name(), $held, true));
 
-        return $remainingCodes > 0 ? [...array_values($offered), new RecoveryCodeType] : array_values($offered);
+        return $holdsCodes ? [...array_values($offered), new RecoveryCodeType] : array_values($offered);
     }
 
     /**
@@ -116,7 +116,7 @@ class SignInDecision
      */
     public function owesRecoveryCodes(Model&KeystoneUser $account): bool
     {
-        return config('keystone.require_recovery_codes') === true && (new RecoveryCodes($account))->remaining($account->getKey()) === 0;
+        return config('keystone.require_recovery_codes') === true && ! (new RecoveryCodes($account))->hasRemaining($account->getKey());
     }
 
     /**

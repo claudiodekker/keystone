@@ -22,7 +22,7 @@ class AccountChanges
     }
 
     /**
-     * Apply the change under the account's row lock, recomputing what it holds and moving its credential epoch when the change calls for it, and record its events once committed.
+     * Apply the change under the account's row lock, moving its credential epoch when the change calls for it, and record its events once committed.
      *
      * @template TResult
      *
