@@ -128,22 +128,22 @@ trait EnrollmentAssertions
     }
 
     /**
-     * Assert the response sends a signed-in user whose account newly owes enrollment on to enroll.
+     * Assert the response tells a browser whose session ended because its account newly owes enrollment to sign in again.
      *
      * @param  TestResponse<Response>  $response
      */
-    public function assertDemotedToEnrollment(TestResponse $response): void
+    public function assertDemotedToSignIn(TestResponse $response): void
     {
-        $response->assertRedirectToRoute('login.enrollment');
+        $response->assertRedirectToRoute('login');
     }
 
     /**
-     * Assert the response refuses a JSON request from a signed-in session whose account newly owes enrollment.
+     * Assert the response refuses a JSON request whose session ended because its account newly owes enrollment.
      *
      * @param  TestResponse<Response>  $response
      */
     public function assertDemotedJsonRefused(TestResponse $response): void
     {
-        $response->assertForbidden()->assertJson(['message' => Status::ENROLLMENT_OWED->label(), 'reason' => 'demoted']);
+        $response->assertUnauthorized()->assertJson(['message' => Status::ENROLLMENT_OWED->label(), 'reason' => 'demoted']);
     }
 }

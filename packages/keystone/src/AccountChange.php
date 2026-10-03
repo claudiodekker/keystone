@@ -189,6 +189,14 @@ class AccountChange
     }
 
     /**
+     * Determine if the locked account is still on the credential epoch.
+     */
+    public function isOnEpoch(int $epoch): bool
+    {
+        return (int) $this->account->getRawOriginal('credential_epoch') === $epoch;
+    }
+
+    /**
      * Determine if the change must move the account's credential epoch.
      */
     public function movesEpoch(): bool

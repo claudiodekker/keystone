@@ -234,7 +234,7 @@ abstract class AppTestCase extends TestCase
      *
      * @return Model&KeystoneUser
      */
-    protected function signInAccount(CredentialTypeSupport $support, string $address = 'jane@example.com'): Model
+    public function signInAccount(CredentialTypeSupport $support, string $address = 'jane@example.com'): Model
     {
         $account = $this->createAccount($address);
         $this->arrangeCredential($account, $support, Surface::SIGN_IN);

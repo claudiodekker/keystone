@@ -31,6 +31,22 @@ it('signs out, ending the session and regenerating the CSRF token', function () 
         ->and(session('keystone.status'))->toBe('signed-out');
 });
 
+it('signs out a session whose account newly owes enrollment, ending it', function () {
+    $support = $this->supportsFor(Surface::SIGN_IN)[0];
+    $account = $this->signInAccount($support);
+    $this->withMandates();
+    session()->put('app-data', 'dropped on sign-out');
+    $sessionId = session()->getId();
+
+    $response = $this->post(route('logout'));
+
+    $this->assertGuestSentAway($response);
+    $this->assertGuest();
+    expect(session()->getId())->not->toBe($sessionId)
+        ->and(session()->has('app-data'))->toBeFalse();
+    $this->assertDatabaseHas('user_security_events', ['type' => 'session.ended', 'user_id' => $account->getKey(), 'reason' => 'demoted']);
+});
+
 it('sends a guest away', function () {
     $this->assertGuestSentAway($this->post(route('logout')));
     $this->assertGuest();

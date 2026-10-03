@@ -170,8 +170,9 @@ abstract class EnrollmentController extends Controller
 
         return match ($demand) {
             Demand::REFUSE => $this->sendEnrollmentRefused($request, $credentialType->name(), __('keystone::messages.invalid_credential')),
+            Demand::CHALLENGE => $this->refuseWithoutEnrollment(),
             Demand::ENROLLMENT => $this->sendRecoveryCodesOwed($request),
-            default => $this->sendEnrollmentCompleted($request, $pending->intendedUrl),
+            Demand::SIGN_IN => $this->sendEnrollmentCompleted($request, $pending->intendedUrl),
         };
     }
 

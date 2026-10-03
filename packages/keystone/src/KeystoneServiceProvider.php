@@ -155,7 +155,7 @@ class KeystoneServiceProvider extends ServiceProvider
     }
 
     /**
-     * Respond to a request whose signed-in session was held back at enrollment, leaving every other unauthenticated request to the app's handler.
+     * Respond to a request whose session ended because its account newly owes enrollment, leaving every other unauthenticated request to the app's handler.
      */
     protected function renderDemotedSession(AuthenticationException $e, Request $request): ?Response
     {

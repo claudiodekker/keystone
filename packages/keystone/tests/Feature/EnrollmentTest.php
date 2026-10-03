@@ -3,6 +3,7 @@
 use ClaudioDekker\Keystone\AppTests\AppTestCase;
 use ClaudioDekker\Keystone\CeremonySlots;
 use ClaudioDekker\Keystone\Keystone;
+use ClaudioDekker\Keystone\KeystoneUser;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\EnrolledCredential;
 use ClaudioDekker\Keystone\Methods\Initiation;
@@ -16,6 +17,7 @@ use ClaudioDekker\Keystone\Tests\Fixtures\FormType;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormTypeSupport;
 use ClaudioDekker\Keystone\Tests\Fixtures\RogueType;
 use Illuminate\Database\Connection;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Notification;
@@ -32,6 +34,37 @@ function startEnrollment(AppTestCase $test, string $type = 'code'): mixed
     $test->get(route('login.enrollment.start', ['type' => $type]));
 
     return Keystone::guard()->slots()->get($type, Surface::ENROLLMENT->value)['ceremony'] ?? null;
+}
+
+function passChallengeOwingCodes(AppTestCase $test): Model&KeystoneUser
+{
+    $account = $test->createChallengedAccount(new FormTypeSupport('code'));
+    $test->passFirstFactor();
+    $test->post(route('login.challenge.submit', ['type' => 'code']), (new FormTypeSupport('code'))->validProof(Surface::CHALLENGE));
+
+    return $account;
+}
+
+function signInBeforeTheMandates(AppTestCase $test): Model&KeystoneUser
+{
+    config(['keystone.require_second_factor' => false, 'keystone.require_recovery_codes' => false]);
+    $account = $test->signInAccount(new FormTypeSupport);
+    config(['keystone.require_second_factor' => true, 'keystone.require_recovery_codes' => true]);
+
+    return $account;
+}
+
+function raceInsideTheChange(AppTestCase $test, Closure $race): void
+{
+    $raced = false;
+    $outerLevel = DB::transactionLevel();
+
+    DB::beforeExecuting(function (string $query, array $bindings, Connection $connection) use (&$raced, $outerLevel, $race) {
+        if (! $raced && $connection->transactionLevel() > $outerLevel && str_contains($query, 'users')) {
+            $raced = true;
+            $race();
+        }
+    });
 }
 
 describe('the hold', function () {
@@ -296,14 +329,7 @@ describe('the answer', function () {
         $account = $this->createFirstFactorAccount();
         $this->passFirstFactor();
         $ceremony = startEnrollment($this);
-        $raced = false;
-        $outerLevel = DB::transactionLevel();
-        DB::beforeExecuting(function (string $query, array $bindings, Connection $connection) use (&$raced, $account, $outerLevel) {
-            if (! $raced && $connection->transactionLevel() > $outerLevel && str_contains($query, 'users')) {
-                $raced = true;
-                DB::table('user_credentials')->insert(['user_id' => $account->getKey(), 'type' => 'rogue']);
-            }
-        });
+        raceInsideTheChange($this, fn () => DB::table('user_credentials')->insert(['user_id' => $account->getKey(), 'type' => 'rogue']));
 
         $response = $this->post(route('login.enrollment.submit', ['type' => 'code']), ['secret' => $ceremony]);
 
@@ -311,6 +337,36 @@ describe('the answer', function () {
         $this->assertGuest();
         $this->assertDatabaseMissing('user_credentials', ['type' => 'code']);
         $this->assertDatabaseHas('user_security_events', ['type' => 'proof.rejected', 'user_id' => $account->getKey(), 'flow' => 'enrollment', 'reason' => 'keystone.second_factor_held']);
+    });
+
+    it('refuses an answer once the account\'s sessions were ended elsewhere, storing nothing', function () {
+        $account = $this->createFirstFactorAccount();
+        $this->passFirstFactor();
+        $ceremony = startEnrollment($this);
+        raceInsideTheChange($this, fn () => DB::table('users')->where('id', $account->getKey())->increment('credential_epoch'));
+
+        $response = $this->post(route('login.enrollment.submit', ['type' => 'code']), ['secret' => $ceremony]);
+
+        $response->assertSessionHasErrors(['code' => __('keystone::messages.invalid_credential')]);
+        $this->assertGuest();
+        $this->assertDatabaseMissing('user_credentials', ['type' => 'code']);
+        $this->assertDatabaseHas('user_security_events', ['type' => 'proof.rejected', 'user_id' => $account->getKey(), 'flow' => 'enrollment', 'reason' => 'keystone.superseded']);
+        $this->get(route('login.enrollment'))->assertRedirectToRoute('login');
+        $this->assertDatabaseHas('user_security_events', ['type' => 'sign_in.voided', 'user_id' => $account->getKey()]);
+    });
+
+    it('refuses an answer whose account is suspended while it is stored, storing nothing', function () {
+        $account = $this->createFirstFactorAccount();
+        $this->passFirstFactor();
+        $ceremony = startEnrollment($this);
+        raceInsideTheChange($this, fn () => DB::table('users')->where('id', $account->getKey())->update(['suspended_at' => now()]));
+
+        $response = $this->post(route('login.enrollment.submit', ['type' => 'code']), ['secret' => $ceremony]);
+
+        $response->assertSessionHasErrors(['code' => __('keystone::messages.invalid_credential')]);
+        $this->assertGuest();
+        $this->assertDatabaseMissing('user_credentials', ['type' => 'code']);
+        $this->assertDatabaseHas('user_security_events', ['type' => 'proof.rejected', 'user_id' => $account->getKey(), 'flow' => 'enrollment', 'reason' => 'keystone.barred']);
     });
 
     it('refuses a proof that enrolls nothing', function () {
@@ -385,13 +441,8 @@ describe('the answer', function () {
 });
 
 describe('recovery codes', function () {
-    beforeEach(function () {
-        $this->account = $this->createChallengedAccount(new FormTypeSupport('code'));
-        $this->passFirstFactor();
-        $this->post(route('login.challenge.submit', ['type' => 'code']), (new FormTypeSupport('code'))->validProof(Surface::CHALLENGE));
-    });
-
     it('stages a set in the session that every visit shows', function () {
+        passChallengeOwingCodes($this);
         $codes = $this->get(route('login.recovery-codes'))->json('codes');
 
         $response = $this->get(route('login.recovery-codes'));
@@ -403,21 +454,23 @@ describe('recovery codes', function () {
 
     it('saves the staged set once a code is typed back, recording it without an alert, and signs in', function () {
         Notification::fake();
+        $account = passChallengeOwingCodes($this);
         $codes = $this->get(route('login.recovery-codes'))->json('codes');
 
         $response = $this->post(route('login.recovery-codes.submit'), ['code' => strtolower($codes[5])]);
 
         $response->assertRedirect('/');
-        $this->assertAuthenticatedAs($this->account);
+        $this->assertAuthenticatedAs($account);
         $this->assertDatabaseCount('user_recovery_codes', 8);
-        $this->assertDatabaseHas('users', ['id' => $this->account->getKey(), 'credential_epoch' => 0]);
-        $this->assertDatabaseHas('user_security_events', ['type' => 'recovery_codes.generated', 'user_id' => $this->account->getKey(), 'flow' => 'enrollment']);
-        $this->assertDatabaseHas('user_security_events', ['type' => 'signed_in', 'user_id' => $this->account->getKey(), 'flow' => 'enrollment', 'credential_type' => 'recovery-code']);
+        $this->assertDatabaseHas('users', ['id' => $account->getKey(), 'credential_epoch' => 0]);
+        $this->assertDatabaseHas('user_security_events', ['type' => 'recovery_codes.generated', 'user_id' => $account->getKey(), 'flow' => 'enrollment']);
+        $this->assertDatabaseHas('user_security_events', ['type' => 'signed_in', 'user_id' => $account->getKey(), 'flow' => 'enrollment', 'credential_type' => 'recovery-code']);
         Notification::assertNothingSent();
         expect(session()->has(CeremonySlots::SESSION_KEY))->toBeFalse();
     });
 
     it('refuses a code that isn\'t one of the staged set, saving none and flashing nothing typed', function () {
+        $account = passChallengeOwingCodes($this);
         $this->get(route('login.recovery-codes'));
 
         $response = $this->post(route('login.recovery-codes.submit'), ['code' => 'WRONG-CODE']);
@@ -427,36 +480,77 @@ describe('recovery codes', function () {
             ->assertSessionMissing('_old_input');
         $this->assertGuest();
         $this->assertDatabaseCount('user_recovery_codes', 0);
-        $this->assertDatabaseHas('user_security_events', ['type' => 'proof.rejected', 'user_id' => $this->account->getKey(), 'flow' => 'enrollment', 'reason' => 'recovery-code.mismatch']);
+        $this->assertDatabaseHas('user_security_events', ['type' => 'proof.rejected', 'user_id' => $account->getKey(), 'flow' => 'enrollment', 'reason' => 'recovery-code.mismatch']);
     });
 
     it('refuses the staged set once the account saved a set elsewhere, keeping that one', function () {
+        $account = passChallengeOwingCodes($this);
         $codes = $this->get(route('login.recovery-codes'))->json('codes');
-        $raced = false;
-        $outerLevel = DB::transactionLevel();
-        DB::beforeExecuting(function (string $query, array $bindings, Connection $connection) use (&$raced, $outerLevel) {
-            if (! $raced && $connection->transactionLevel() > $outerLevel && str_contains($query, 'users')) {
-                $raced = true;
-                $this->arrangeRecoveryCodes($this->account, count: 1);
-            }
-        });
+        raceInsideTheChange($this, fn () => $this->arrangeRecoveryCodes($account, count: 1));
 
         $response = $this->post(route('login.recovery-codes.submit'), ['code' => $codes[0]]);
 
         $response->assertSessionHasErrors(['code']);
         $this->assertGuest();
         $this->assertDatabaseCount('user_recovery_codes', 1);
-        $this->assertDatabaseHas('user_security_events', ['type' => 'proof.rejected', 'user_id' => $this->account->getKey(), 'flow' => 'enrollment', 'reason' => 'keystone.recovery_codes_held']);
+        $this->assertDatabaseHas('user_security_events', ['type' => 'proof.rejected', 'user_id' => $account->getKey(), 'flow' => 'enrollment', 'reason' => 'keystone.recovery_codes_held']);
         $this->assertDatabaseMissing('user_security_events', ['type' => 'recovery_codes.generated']);
     });
 
+    it('refuses the staged set once the account\'s sessions were ended elsewhere, saving none', function () {
+        $account = passChallengeOwingCodes($this);
+        $codes = $this->get(route('login.recovery-codes'))->json('codes');
+        raceInsideTheChange($this, fn () => DB::table('users')->where('id', $account->getKey())->increment('credential_epoch'));
+
+        $response = $this->post(route('login.recovery-codes.submit'), ['code' => $codes[0]]);
+
+        $response->assertSessionHasErrors(['code']);
+        $this->assertGuest();
+        $this->assertDatabaseCount('user_recovery_codes', 0);
+        $this->assertDatabaseHas('user_security_events', ['type' => 'proof.rejected', 'user_id' => $account->getKey(), 'flow' => 'enrollment', 'reason' => 'keystone.superseded']);
+        $this->get(route('login.recovery-codes'))->assertRedirectToRoute('login');
+        $this->assertDatabaseHas('user_security_events', ['type' => 'sign_in.voided', 'user_id' => $account->getKey()]);
+    });
+
+    it('refuses the staged set of an account suspended while it is saved, saving none', function () {
+        $account = passChallengeOwingCodes($this);
+        $codes = $this->get(route('login.recovery-codes'))->json('codes');
+        raceInsideTheChange($this, fn () => DB::table('users')->where('id', $account->getKey())->update(['suspended_at' => now()]));
+
+        $response = $this->post(route('login.recovery-codes.submit'), ['code' => $codes[0]]);
+
+        $response->assertSessionHasErrors(['code']);
+        $this->assertGuest();
+        $this->assertDatabaseCount('user_recovery_codes', 0);
+        $this->assertDatabaseHas('user_security_events', ['type' => 'proof.rejected', 'user_id' => $account->getKey(), 'flow' => 'enrollment', 'reason' => 'keystone.barred']);
+    });
+
+    it('drops a held sign-in that saved its codes once the account gained a second factor meanwhile, so the next sign-in is challenged', function () {
+        config(['keystone.require_second_factor' => false]);
+        $account = $this->createFirstFactorAccount();
+        $this->passFirstFactor();
+        $codes = $this->get(route('login.recovery-codes'))->json('codes');
+        raceInsideTheChange($this, fn () => $this->arrangeCredential($account, new FormTypeSupport('code'), Surface::CHALLENGE));
+
+        $response = $this->post(route('login.recovery-codes.submit'), ['code' => $codes[0]]);
+
+        $response->assertRedirectToRoute('login');
+        $this->assertGuest();
+        expect(Keystone::guard()->pending())->toBeNull();
+        $this->assertDatabaseCount('user_recovery_codes', 8);
+        $this->assertDatabaseMissing('user_security_events', ['type' => 'signed_in', 'user_id' => $account->getKey()]);
+        $this->passFirstFactor()->assertRedirectToRoute('login.challenge');
+    });
+
     it('refuses an empty answer', function () {
+        passChallengeOwingCodes($this);
         $this->get(route('login.recovery-codes'));
 
         $this->post(route('login.recovery-codes.submit'), [])->assertRedirectToRoute('login.recovery-codes')->assertSessionHasErrors(['code']);
     });
 
     it('never owes recovery codes while they are optional', function () {
+        passChallengeOwingCodes($this);
         config(['keystone.require_recovery_codes' => false]);
 
         $response = $this->get(route('login.recovery-codes'));
@@ -468,43 +562,102 @@ describe('recovery codes', function () {
 describe('demotion', function () {
     beforeEach(function () {
         Route::middleware(['web', 'auth'])->get('keystone-tests/signed-in-only', fn () => 'Signed in.');
-        $this->withoutMandates();
-        $this->account = $this->signInAccount(new FormTypeSupport);
-        $this->withMandates();
+        Route::middleware(['web', 'auth'])->post('keystone-tests/signed-in-only', fn () => 'Changed.');
     });
 
-    it('holds a signed-in session that newly owes enrollment, rotating it and keeping the site data', function () {
-        Keystone::guard()->slots()->put('rogue', 'sign-in', 'challenge-bytes', capSeconds: 300);
+    it('ends a signed-in session whose account newly owes enrollment, clearing the site\'s data and recording why', function () {
+        $account = signInBeforeTheMandates($this);
+        session()->put('app-data', 'dropped on demotion');
         $sessionId = session()->getId();
 
         $response = $this->get('keystone-tests/signed-in-only?tab=2');
 
-        $response->assertRedirectToRoute('login.enrollment')->assertHeaderMissing('Clear-Site-Data');
+        $response->assertRedirectToRoute('login')->assertHeader('Clear-Site-Data', '"cache", "storage"');
         $this->assertGuest();
         expect(session()->getId())->not->toBe($sessionId)
-            ->and(session()->has(CeremonySlots::SESSION_KEY))->toBeFalse()
-            ->and(Keystone::guard()->pending()?->intendedUrl)->toBe('/keystone-tests/signed-in-only?tab=2');
-        $this->assertDatabaseHas('user_security_events', ['type' => 'sign_in.held', 'user_id' => $this->account->getKey(), 'reason' => 'demoted']);
+            ->and(session()->has('app-data'))->toBeFalse()
+            ->and(Keystone::guard()->pending())->toBeNull();
+        $this->assertDatabaseHas('user_security_events', ['type' => 'session.ended', 'user_id' => $account->getKey(), 'reason' => 'demoted']);
     });
 
-    it('refuses a JSON request with a 403 saying what is owed', function () {
+    it('says on the sign-in page why the session ended', function () {
+        signInBeforeTheMandates($this);
+        $this->get('keystone-tests/signed-in-only');
+
+        $response = $this->get(route('login'));
+
+        $response->assertJsonPath('status', __('keystone::messages.status.enrollment-owed'));
+    });
+
+    it('answers a JSON request with 401 and the reason', function () {
+        signInBeforeTheMandates($this);
+
         $response = $this->getJson('keystone-tests/signed-in-only');
 
-        $response->assertForbidden()->assertExactJson(['message' => __('keystone::messages.status.enrollment-owed'), 'reason' => 'demoted']);
+        $response->assertUnauthorized()
+            ->assertExactJson(['message' => __('keystone::messages.status.enrollment-owed'), 'reason' => 'demoted'])
+            ->assertHeader('Clear-Site-Data', '"cache", "storage"');
     });
 
-    it('lets the demoted session enroll and continue to the page it asked for', function () {
+    it('sends the user on to the page they asked for once they sign in again and enroll', function () {
+        $account = signInBeforeTheMandates($this);
         config(['keystone.require_recovery_codes' => false]);
-        $this->get('keystone-tests/signed-in-only');
+        $this->get('keystone-tests/signed-in-only?tab=2');
+        $this->passFirstFactor();
         $ceremony = startEnrollment($this);
 
         $response = $this->post(route('login.enrollment.submit', ['type' => 'code']), ['secret' => $ceremony]);
 
-        $response->assertRedirect('/keystone-tests/signed-in-only');
-        $this->assertAuthenticatedAs($this->account);
+        $response->assertRedirect('/keystone-tests/signed-in-only?tab=2');
+        $this->assertAuthenticatedAs($account);
+        $this->assertDatabaseHas('user_security_events', ['type' => 'signed_in', 'user_id' => $account->getKey(), 'flow' => 'enrollment']);
+    });
+
+    it('makes neither a change nor a JSON request the page the next sign-in lands on', function (Closure $request) {
+        signInBeforeTheMandates($this);
+        config(['keystone.require_recovery_codes' => false]);
+        $request->call($this);
+        $this->passFirstFactor();
+        $ceremony = startEnrollment($this);
+
+        $response = $this->post(route('login.enrollment.submit', ['type' => 'code']), ['secret' => $ceremony]);
+
+        $response->assertRedirect('/');
+    })->with([
+        'a change' => fn () => $this->post('keystone-tests/signed-in-only'),
+        'a JSON request' => fn () => $this->getJson('keystone-tests/signed-in-only'),
+    ]);
+
+    it('ends the session of an account holding a second factor that newly owes recovery codes, challenging its next sign-in', function () {
+        $this->withoutMandates();
+        $account = passChallengeOwingCodes($this);
+        config(['keystone.require_recovery_codes' => true]);
+
+        $response = $this->get('keystone-tests/signed-in-only');
+
+        $response->assertRedirectToRoute('login');
+        $this->assertGuest();
+        $this->assertDatabaseHas('user_security_events', ['type' => 'session.ended', 'user_id' => $account->getKey(), 'reason' => 'demoted']);
+        $this->passFirstFactor()->assertRedirectToRoute('login.challenge');
+    });
+
+    it('signs out a session whose account newly owes enrollment', function () {
+        $account = signInBeforeTheMandates($this);
+        session()->put('app-data', 'dropped on sign-out');
+        $sessionId = session()->getId();
+
+        $response = $this->post(route('logout'));
+
+        $response->assertRedirectToRoute('login')->assertHeader('Clear-Site-Data', '"cache", "storage"');
+        $this->assertGuest();
+        expect(session()->getId())->not->toBe($sessionId)
+            ->and(session()->has('app-data'))->toBeFalse()
+            ->and(Keystone::guard()->pending())->toBeNull();
+        $this->assertDatabaseHas('user_security_events', ['type' => 'session.ended', 'user_id' => $account->getKey(), 'reason' => 'demoted']);
     });
 
     it('leaves a session alone while its account owes nothing', function () {
+        signInBeforeTheMandates($this);
         $this->withoutMandates();
 
         $this->get('keystone-tests/signed-in-only')->assertSee('Signed in.');

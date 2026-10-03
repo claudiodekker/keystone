@@ -205,16 +205,16 @@ describe('demotion', function () {
         Route::middleware(['web', 'auth'])->get('keystone-app-tests/signed-in-only', fn () => 'Signed in.');
     });
 
-    it('holds a signed-in session whose account newly owes enrollment, sending it on to enroll', function () {
+    it('ends a signed-in session whose account newly owes enrollment, sending it to sign in again', function () {
         $this->withoutMandates();
         $account = $this->signInAccount($this->supportsFor(Surface::SIGN_IN)[0]);
         $this->withMandates();
 
         $response = $this->get('keystone-app-tests/signed-in-only');
 
-        $this->assertDemotedToEnrollment($response);
+        $this->assertDemotedToSignIn($response);
         $this->assertGuest();
-        $this->assertDatabaseHas('user_security_events', ['type' => 'sign_in.held', 'user_id' => $account->getKey(), 'reason' => 'demoted']);
+        $this->assertDatabaseHas('user_security_events', ['type' => 'session.ended', 'user_id' => $account->getKey(), 'reason' => 'demoted']);
     });
 
     it('refuses a JSON request from a session whose account newly owes enrollment', function () {
@@ -225,11 +225,21 @@ describe('demotion', function () {
         $this->assertDemotedJsonRefused($this->getJson('keystone-app-tests/signed-in-only'));
     });
 
-    it('lets the demoted session enroll and get back in', function () {
+    it('tells the user on the sign-in page to sign in again and enroll', function () {
+        $this->withoutMandates();
+        $this->signInAccount($this->supportsFor(Surface::SIGN_IN)[0]);
+        $this->withMandates();
+        $this->get('keystone-app-tests/signed-in-only');
+
+        $this->assertSignInPage($this->get(route('login')), __('keystone::messages.status.enrollment-owed'));
+    });
+
+    it('lets the user sign in again, enroll and get back to the page they asked for', function () {
         $this->withoutMandates();
         $account = $this->signInAccount($this->supportsFor(Surface::SIGN_IN)[0]);
         config(['keystone.require_second_factor' => true]);
         $this->get('keystone-app-tests/signed-in-only');
+        $this->passFirstFactor();
 
         $response = $this->enrollSecondFactor($this->support);
 

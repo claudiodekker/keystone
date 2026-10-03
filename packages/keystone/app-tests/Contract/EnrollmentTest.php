@@ -37,7 +37,7 @@ it('refuses a wrong answer of every installed type, storing nothing', function (
     });
 });
 
-it('holds a signed-in session of every installed sign-in type once the app requires enrollment', function () {
+it('ends a signed-in session of every installed sign-in type once the app requires enrollment', function () {
     Route::middleware(['web', 'auth'])->get('keystone-app-tests/signed-in-only', fn () => 'Signed in.');
 
     $this->eachSupportFor(Surface::SIGN_IN, function (CredentialTypeSupport $support) {
@@ -47,7 +47,7 @@ it('holds a signed-in session of every installed sign-in type once the app requi
 
         $response = $this->get('keystone-app-tests/signed-in-only');
 
-        $this->assertDemotedToEnrollment($response);
+        $this->assertDemotedToSignIn($response);
         $this->assertGuest();
     });
 });

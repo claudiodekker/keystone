@@ -37,6 +37,15 @@ it('replaces the account\'s earlier codes, leaving other accounts\' alone', func
         ->and($codes->find($john->getKey(), 'JOHN-OLD'))->not->toBeNull();
 });
 
+it('tells whether the account holds an unspent code', function () {
+    [$jane, $john] = User::factory()->count(2)->create();
+    $codes = new RecoveryCodes($jane);
+    $codes->replace($jane->getKey(), ['JANE-CODE']);
+
+    expect($codes->hasRemaining($jane->getKey()))->toBeTrue()
+        ->and($codes->hasRemaining($john->getKey()))->toBeFalse();
+});
+
 it('spends a code once, so a second spend deletes nothing', function () {
     $user = User::factory()->create();
     $codes = new RecoveryCodes($user);

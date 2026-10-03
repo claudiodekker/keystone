@@ -19,6 +19,6 @@ return [
         'sign-in-cancelled' => 'Sign-in cancelled. You were not logged in.',
         'enrollment-cancelled' => 'Two-factor setup cancelled. You were not logged in.',
         'enrollment-expired' => 'Your enrollment session expired. Please start again.',
-        'enrollment-owed' => 'Finish setting up two-factor authentication to continue.',
+        'enrollment-owed' => 'Please sign in again to finish setting up two-factor authentication.',
     ],
 ];

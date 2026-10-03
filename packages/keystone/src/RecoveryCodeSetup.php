@@ -4,7 +4,6 @@ namespace ClaudioDekker\Keystone;
 
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
-use Illuminate\Database\Eloquent\Model;
 
 /**
  * @internal
@@ -46,7 +45,7 @@ class RecoveryCodeSetup extends EnrollmentStep
             return Demand::REFUSE;
         }
 
-        $refusal = $this->commit($pending->account, $staged);
+        $refusal = $this->commit($pending, $staged);
 
         if ($refusal !== null) {
             $this->recordRejected($pending, CredentialTypes::RECOVERY_CODE, reason: $refusal);
@@ -77,21 +76,25 @@ class RecoveryCodeSetup extends EnrollmentStep
     }
 
     /**
-     * Store the set as the account's recovery codes, or give why not once the account is locked: barred, or holding codes already.
+     * Store the set as the account's recovery codes, or give why not once the account is locked: barred, off the pending sign-in's epoch, or holding codes already.
      *
      * @param  array<array-key, mixed>  $staged
      */
-    protected function commit(Model&KeystoneUser $account, #[\SensitiveParameter] array $staged): ?string
+    protected function commit(PendingSignIn $pending, #[\SensitiveParameter] array $staged): ?string
     {
         $changes = new AccountChanges($this->guard, $this->recorder);
         $codes = array_values(array_map(strval(...), $staged));
 
-        return $changes->change($account, function (AccountChange $change) use ($codes) {
+        return $changes->change($pending->account, function (AccountChange $change) use ($pending, $codes) {
             if ((new SignInDecision)->isBarred($change->account)) {
                 return 'keystone.barred';
             }
 
-            if ((new RecoveryCodes($change->account))->remaining($change->account->getKey()) > 0) {
+            if (! $change->isOnEpoch($pending->epoch)) {
+                return 'keystone.superseded';
+            }
+
+            if ((new RecoveryCodes($change->account))->hasRemaining($change->account->getKey())) {
                 return 'keystone.recovery_codes_held';
             }
 

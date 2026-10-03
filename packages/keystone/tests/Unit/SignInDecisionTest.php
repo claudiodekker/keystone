@@ -34,9 +34,9 @@ function accountHolding(bool $secondFactor = false, bool $recoveryCodes = false)
     return readAccount($user);
 }
 
-function pendingFor(User $account, ?string $firstFactor = 'form', bool $secondFactorPassed = false): PendingSignIn
+function pendingFor(User $account, string $firstFactor = 'form', bool $secondFactorPassed = false): PendingSignIn
 {
-    return new PendingSignIn($account, $firstFactor, PendingOrigin::LOGIN, PendingStage::CHALLENGE, '/', CarbonImmutable::now(), $secondFactorPassed);
+    return new PendingSignIn($account, $firstFactor, PendingOrigin::LOGIN, PendingStage::CHALLENGE, '/', CarbonImmutable::now(), epoch: 0, secondFactorPassed: $secondFactorPassed);
 }
 
 it('signs in an active account', function () {
@@ -130,12 +130,6 @@ it('reads what a pending sign-in still owes from its account as it stands', func
     'the challenge passed, nothing owed' => [true, true, true, Demand::SIGN_IN],
     'no second factor yet' => [false, false, false, Demand::ENROLLMENT],
 ]);
-
-it('treats a demoted session\'s unknown first factor as one factor', function () {
-    config(['keystone.require_second_factor' => true, 'keystone.require_recovery_codes' => false]);
-
-    expect((new SignInDecision)->pendingOwesSecondFactor(pendingFor(accountHolding(), firstFactor: null, secondFactorPassed: true)))->toBeTrue();
-});
 
 it('refuses a pending sign-in whose account was barred since', function () {
     $account = accountHolding();

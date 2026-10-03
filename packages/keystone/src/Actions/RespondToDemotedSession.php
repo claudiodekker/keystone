@@ -14,7 +14,7 @@ use Symfony\Component\HttpFoundation\Response;
 class RespondToDemotedSession
 {
     /**
-     * Respond to a request whose signed-in session Keystone held back at enrollment, because its account newly owes one.
+     * Respond to a request whose session Keystone ended because its account newly owes enrollment, keeping the page it asked for as the one its next sign-in lands on.
      */
     public function handle(Request $request, AuthenticationException $e): Response
     {
@@ -22,9 +22,9 @@ class RespondToDemotedSession
             return new JsonResponse([
                 'message' => Status::ENROLLMENT_OWED->label(),
                 'reason' => 'demoted',
-            ], 403);
+            ], 401);
         }
 
-        return redirect()->route('login.enrollment');
+        return redirect()->guest($e->redirectTo($request) ?? route('login'));
     }
 }

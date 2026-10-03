@@ -126,15 +126,19 @@ A session that has proven who it is and owes nothing more. A session that comes 
 A session that has named an account but still owes a challenge, an enrollment or a recovery before it is signed in. At most one per session.
 _Avoid_: park, half-authenticated, held user
 
+**Mandate**:
+A setting that requires every account to hold something: a second factor (`require_second_factor`) or recovery codes (`require_recovery_codes`). An account that doesn't owes enrollment.
+_Avoid_: requirement, policy
+
 **Enrollment**:
-Adding a credential to an account. Owed at sign-in when a mandate requires something the account doesn't hold: a second factor (`require_second_factor`) or recovery codes (`require_recovery_codes`).
+Adding to an account what a mandate requires and it doesn't hold: a second factor, or a set of recovery codes. Owed at sign-in, after the first factor and the challenge, and never while signed in.
 _Avoid_: setup, onboarding
 
 **Holdings**:
 Whether an account holds a second factor and recovery codes, read from its credentials and codes whenever a request needs to know what it owes.
 
 **Demotion**:
-Turning a signed-in session whose account newly owes an enrollment back into a pending sign-in at enrollment.
+Ending a signed-in session whose account newly owes an enrollment, so that its next sign-in proves the account again and enrolls it.
 _Avoid_: downgrade, forced logout
 
 **Credential epoch**:

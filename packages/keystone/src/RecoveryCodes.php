@@ -99,6 +99,14 @@ class RecoveryCodes
     }
 
     /**
+     * Determine if the account holds an unspent code.
+     */
+    public function hasRemaining(int|string $accountId): bool
+    {
+        return $this->query()->where('user_id', $accountId)->exists();
+    }
+
+    /**
      * Delete the code, only while nothing else spent it first.
      */
     public function spend(int $id): bool

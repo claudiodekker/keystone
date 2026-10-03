@@ -70,7 +70,7 @@ class SignInDecision
      *
      * @return list<CredentialType>
      */
-    public function challengeOffer(Model&KeystoneUser $account, ?string $firstFactor): array
+    public function challengeOffer(Model&KeystoneUser $account, string $firstFactor): array
     {
         $held = (new Credentials($account))->typesOf($account->getKey());
         $types = app(CredentialTypes::class)->serving(Surface::CHALLENGE);
@@ -107,7 +107,7 @@ class SignInDecision
     /**
      * Determine if the account holds a second factor of another type than the first factor's, a credential proving two factors on its own included.
      */
-    public function holdsSecondFactor(Model&KeystoneUser $account, ?string $firstFactor): bool
+    public function holdsSecondFactor(Model&KeystoneUser $account, string $firstFactor): bool
     {
         return (new Credentials($account))->holdsSecondFactor($account->getKey(), $firstFactor);
     }
@@ -155,12 +155,8 @@ class SignInDecision
     /**
      * Determine if a proof of the named type counts as two factors on its own.
      */
-    protected function provesMultipleFactors(?string $firstFactor): bool
+    protected function provesMultipleFactors(string $firstFactor): bool
     {
-        if ($firstFactor === null) {
-            return false;
-        }
-
         return app(CredentialTypes::class)->registered($firstFactor)?->representsMultipleFactors() ?? false;
     }
 }

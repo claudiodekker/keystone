@@ -8,6 +8,7 @@ use ClaudioDekker\Keystone\Methods\Proof;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
 use ClaudioDekker\Keystone\Methods\Surface;
 use Illuminate\Database\Eloquent\Model;
+use LogicException;
 use Throwable;
 
 /**
@@ -30,7 +31,7 @@ class EnrollmentAttempt extends EnrollmentStep
             return Demand::REFUSE;
         }
 
-        $refusal = $this->store($pending->account, $type, $proof->enrolled);
+        $refusal = $this->store($pending, $type, $proof->enrolled);
 
         if ($refusal !== null) {
             $this->recordRejected($pending, $type->name(), reason: $refusal);
@@ -39,6 +40,12 @@ class EnrollmentAttempt extends EnrollmentStep
         }
 
         $this->guard->slots()->forget($type->name(), Surface::ENROLLMENT->value);
+
+        try {
+            $this->guard->passSecondFactor();
+        } catch (LogicException) {
+            return Demand::REFUSE;
+        }
 
         return $this->proceed($type->name());
     }
@@ -64,15 +71,19 @@ class EnrollmentAttempt extends EnrollmentStep
     }
 
     /**
-     * Store the enrolled credential on the account and record it, or give why not once the account is locked: barred, or holding a second factor already.
+     * Store the enrolled credential on the account and record it, or give why not once the account is locked: barred, off the pending sign-in's epoch, or holding a second factor already.
      */
-    protected function store(Model&KeystoneUser $account, CredentialType $type, EnrolledCredential $enrolled): ?string
+    protected function store(PendingSignIn $pending, CredentialType $type, EnrolledCredential $enrolled): ?string
     {
         $changes = new AccountChanges($this->guard, $this->recorder);
 
-        return $changes->change($account, function (AccountChange $change) use ($type, $enrolled) {
+        return $changes->change($pending->account, function (AccountChange $change) use ($pending, $type, $enrolled) {
             if ((new SignInDecision)->isBarred($change->account)) {
                 return 'keystone.barred';
+            }
+
+            if (! $change->isOnEpoch($pending->epoch)) {
+                return 'keystone.superseded';
             }
 
             if ((new Credentials($change->account))->holdsSecondFactor($change->account->getKey())) {

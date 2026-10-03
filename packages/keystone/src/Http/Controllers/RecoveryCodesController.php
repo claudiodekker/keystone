@@ -95,8 +95,9 @@ abstract class RecoveryCodesController extends Controller
 
         return match ($demand) {
             Demand::REFUSE => $this->sendRecoveryCodeRefused($request, __('keystone::messages.recovery_code_mismatch')),
+            Demand::CHALLENGE => $this->refuseWithoutEnrollment(),
             Demand::ENROLLMENT => $this->sendSecondFactorOwed($request),
-            default => $this->sendRecoveryCodesSaved($request, $pending->intendedUrl),
+            Demand::SIGN_IN => $this->sendRecoveryCodesSaved($request, $pending->intendedUrl),
         };
     }
 

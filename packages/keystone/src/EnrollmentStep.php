@@ -20,7 +20,7 @@ abstract class EnrollmentStep
     }
 
     /**
-     * Sign the pending sign-in in once its account, read afresh, owes nothing more, or keep it at enrollment for what it still owes.
+     * Sign the pending sign-in in once its account, read afresh, owes nothing more, keep it at enrollment for what it still owes, or drop it when it now owes the challenge.
      */
     protected function proceed(string $enrolledType): Demand
     {
@@ -30,14 +30,16 @@ abstract class EnrollmentStep
             return Demand::REFUSE;
         }
 
-        if ((new SignInDecision)->pendingOwesEnrollment($pending)) {
-            try {
-                $this->guard->moveTo(PendingStage::ENROLLMENT);
-            } catch (LogicException) {
-                return Demand::REFUSE;
-            }
+        $demand = (new SignInDecision)->next($pending);
 
-            return Demand::ENROLLMENT;
+        if ($demand === Demand::CHALLENGE) {
+            $this->guard->forgetPending();
+
+            return Demand::CHALLENGE;
+        }
+
+        if ($demand !== Demand::SIGN_IN) {
+            return $demand;
         }
 
         try {

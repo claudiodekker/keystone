@@ -123,12 +123,12 @@ class ChallengeAttempt extends CredentialAttempt
     }
 
     /**
-     * Sign the account in, or move its pending sign-in on to the enrollment it still owes.
+     * Sign the account in, or hold its pending sign-in on at the enrollment it still owes.
      */
     protected function enter(Model&KeystoneUser $account, Demand $demand): void
     {
         if ($demand === Demand::ENROLLMENT) {
-            $this->guard->moveTo(PendingStage::ENROLLMENT);
+            $this->guard->passSecondFactor();
 
             return;
         }
