@@ -9,7 +9,6 @@ use Illuminate\Cache\RateLimiter as CacheRateLimiter;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Str;
 use Normalizer;
 use Throwable;
 
@@ -284,7 +283,7 @@ class RateLimiter
     }
 
     /**
-     * Get the key part naming the subject: the account's id, or the identifier folded the way Fortify folds it.
+     * Get the key part naming the subject: the account's id, or the identifier normalized the way addresses are stored and compared.
      *
      * @param  (Model&KeystoneUser)|null  $account
      */
@@ -294,9 +293,7 @@ class RateLimiter
             return 'account:'.$account->getKey();
         }
 
-        $folded = Str::lower(Str::transliterate($identifier));
-
-        return "identifier:{$folded}";
+        return 'identifier:'.Addresses::normalize($identifier);
     }
 
     /**

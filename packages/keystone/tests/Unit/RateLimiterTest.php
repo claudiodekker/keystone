@@ -222,7 +222,7 @@ describe('failed-attempt limit', function () {
 
         expect(retryAfter(fn () => failTimes(limiter(), 1, $other)))->toBe(3600);
     })->with([
-        'accents' => ['rené@example.com', 'rene@example.com'],
+        'composition' => ["rene\u{301}@example.com", 'rené@example.com'],
         'case' => ['Nobody@Example.com', 'nobody@example.com'],
     ]);
 

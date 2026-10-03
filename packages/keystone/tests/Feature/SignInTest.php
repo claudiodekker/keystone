@@ -432,6 +432,40 @@ describe('rate limits', function () {
 
         signInFrom($this, 21, 'form', (new FormTypeSupport)->validProof(Surface::SIGN_IN))->assertTooManyRequests();
     });
+
+    it('counts an address apart from its diacritic variant, whether or not it names an account', function (string $spent, string $variant) {
+        $this->createAccount();
+        $this->app->make(CredentialTypes::class)->register($rogue = new RogueType(fn () => Proof::rejected('rogue.mismatch')));
+        config(['keystone.rate_limits.failed_attempts_per_hour' => 3]);
+
+        foreach (range(1, 3) as $ignored) {
+            $this->post(route('login.submit', ['type' => 'rogue']), ['identifier' => $spent]);
+        }
+
+        $this->post(route('login.submit', ['type' => 'rogue']), ['identifier' => $variant]);
+
+        expect($rogue->calls)->toHaveCount(4);
+    })->with([
+        'a real account' => ['jane@example.com', 'jané@example.com'],
+        'a made-up address' => ['nobody@example.com', 'nóbody@example.com'],
+    ]);
+
+    it('counts every spelling of one address together, whether or not it names an account', function (string $spent, string $spelling) {
+        $this->createAccount('jane@xn--bcher-kva.example');
+        $this->app->make(CredentialTypes::class)->register($rogue = new RogueType(fn () => Proof::rejected('rogue.mismatch')));
+        config(['keystone.rate_limits.failed_attempts_per_hour' => 3]);
+
+        foreach (range(1, 3) as $ignored) {
+            $this->post(route('login.submit', ['type' => 'rogue']), ['identifier' => $spent]);
+        }
+
+        $this->post(route('login.submit', ['type' => 'rogue']), ['identifier' => $spelling]);
+
+        expect($rogue->calls)->toHaveCount(3);
+    })->with([
+        'a real account' => ['jane@bücher.example', 'Jane@xn--bcher-kva.example'],
+        'a made-up address' => ['nobody@bücher.example', 'Nobody@xn--bcher-kva.example'],
+    ]);
 });
 
 describe('the methods allow-list', function () {
