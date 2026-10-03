@@ -390,6 +390,21 @@ describe('rate limits', function () {
             ->assertSee('Too many attempts. Please try again in 60 seconds.');
     });
 
+    it('keeps a spent limit out of the exception reports', function () {
+        $this->freezeSecond();
+
+        foreach (range(1, 10) as $ignored) {
+            $this->post(route('login.submit', ['type' => 'form']));
+        }
+
+        Exceptions::fake();
+
+        $response = $this->post(route('login.submit', ['type' => 'form']));
+
+        $response->assertTooManyRequests();
+        Exceptions::assertNothingReported();
+    });
+
     it('takes the request limit from keystone.rate_limits', function () {
         $this->freezeSecond();
         config(['keystone.rate_limits.requests_per_minute.submit' => 2]);
