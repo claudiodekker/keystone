@@ -2,7 +2,7 @@
 
 The reviewer reads this file. Apply every rule to each changed hunk in the diff. Skip anything the repo's tooling already enforces (Pint, PHPStan/Larastan, arch tests, ESLint, type coverage).
 
-The general rules for Laravel apps and packages live in `references/laravel-standards.md` of the `skills:claudio-mode` skill, from the `skills@claudiodekker` plugin this repo enables. Read that file and apply it too. Without the Skill tool, read it at `~/.claude/plugins/marketplaces/claudiodekker/skills/claudio-mode/references/laravel-standards.md`. If neither works, say so in the review rather than reviewing against this file alone. The rules below are Keystone's own and win where the two differ.
+The general rules for Laravel apps and packages live in `references/laravel-standards.md` of the `skills:claudio-mode` skill, from the `skills@claudiodekker` plugin this repo enables. Read that file and apply it too. Without the Skill tool, read it at `../skills/skills/claudio-mode/references/laravel-standards.md` (relative to this repo's root) in a cloud session, or at `~/.claude/plugins/marketplaces/claudiodekker/skills/claudio-mode/references/laravel-standards.md` on a laptop. If neither works, say so in the review rather than reviewing against this file alone. The rules below are Keystone's own and win where the two differ.
 
 ## Keystone rules
 
