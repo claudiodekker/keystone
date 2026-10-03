@@ -11,11 +11,18 @@
                 "source": "github",
                 "repo": "claudiodekker/skills"
             }
+        },
+        "pstack-claude": {
+            "source": {
+                "source": "github",
+                "repo": "michael-denyer/pstack-claude"
+            }
         }
     },
     "enabledPlugins": {
         "mattpocock-skills@mattpocock": true,
-        "skills@claudiodekker": true
+        "skills@claudiodekker": true,
+        "pstack@pstack-claude": true
     },
     "hooks": {
         "SessionStart": [

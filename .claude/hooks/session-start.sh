@@ -16,3 +16,7 @@ timeout 60 claude plugin marketplace add mattpocock/skills >/dev/null \
 timeout 60 claude plugin marketplace add "$CLAUDE_PROJECT_DIR/../skills" >/dev/null \
   && timeout 60 claude plugin install skills@claudiodekker --scope user >/dev/null \
   || echo "session-start: could not install skills@claudiodekker" >&2
+
+timeout 60 claude plugin marketplace add michael-denyer/pstack-claude >/dev/null \
+  && timeout 60 claude plugin install pstack@pstack-claude --scope user >/dev/null \
+  || echo "session-start: could not install pstack@pstack-claude" >&2
