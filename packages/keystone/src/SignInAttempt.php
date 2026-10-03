@@ -3,12 +3,12 @@
 namespace ClaudioDekker\Keystone;
 
 use ClaudioDekker\Keystone\Actions\AccountLookup;
+use ClaudioDekker\Keystone\Exceptions\Barred;
 use ClaudioDekker\Keystone\Exceptions\Throttled;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\Surface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Timebox;
-use LogicException;
 
 /**
  * @internal
@@ -86,7 +86,7 @@ class SignInAttempt extends CredentialAttempt
     /**
      * Sign the account in, or hold its sign-in at the challenge, as the decision demands.
      *
-     * @throws LogicException
+     * @throws Barred
      */
     protected function enter(Model&KeystoneUser $account, CredentialType $type, Demand $demand, string $intendedUrl): void
     {

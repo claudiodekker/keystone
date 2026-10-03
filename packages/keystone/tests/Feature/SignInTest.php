@@ -348,6 +348,20 @@ describe('failures around the proof', function () {
         $this->assertDatabaseHas('user_security_events', ['type' => 'proof.rejected', 'credential_id' => $id, 'reason' => 'keystone.barred']);
     });
 
+    it('surfaces a Login listener\'s failure instead of refusing the signed-in account', function () {
+        Exceptions::fake();
+        Event::listen(Login::class, fn () => throw new InvalidArgumentException('Listener broke.'));
+        $account = $this->createAccount();
+        $this->arrangeCredential($account, new FormTypeSupport, Surface::SIGN_IN);
+
+        $response = $this->post(route('login.submit', ['type' => 'form']), ['identifier' => 'jane@example.com', ...(new FormTypeSupport)->validProof(Surface::SIGN_IN)]);
+
+        $response->assertServerError();
+        $this->assertAuthenticatedAs($account);
+        Exceptions::assertReported(fn (InvalidArgumentException $e) => $e->getMessage() === 'Listener broke.');
+        $this->assertDatabaseMissing('user_security_events', ['type' => 'proof.rejected']);
+    });
+
     it('flashes back nothing for an identifier that is not a string', function () {
         $this->post(route('login.submit', ['type' => 'form']), ['identifier' => ['jane@example.com'], 'secret' => 'typed']);
 
