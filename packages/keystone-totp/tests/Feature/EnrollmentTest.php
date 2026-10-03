@@ -42,6 +42,22 @@ it('enrolls the key its form shows once a code it makes is typed back, signing i
     expect(TotpSecret::fromStored(Crypt::decryptString($stored->secret)))->toEqual(new TotpSecret($key, lastStep: $now));
 });
 
+it('refuses the enrolling code at the next challenge as a replay, and accepts the step after', function () {
+    $key = enrollingTotpKey($this);
+    $totp = new Totp;
+    $now = $totp->stepAt(now()->getTimestamp());
+    $this->post(route('login.enrollment.submit', ['type' => 'totp']), ['code' => $totp->code($key, $now)]);
+    $this->post(route('logout'));
+    $this->passFirstFactor()->assertRedirectToRoute('login.challenge');
+
+    $this->post(route('login.challenge.submit', ['type' => 'totp']), ['code' => $totp->code($key, $now)])->assertSessionHasErrors('totp');
+
+    $this->assertGuest();
+    $this->assertDatabaseHas('user_security_events', ['type' => 'proof.rejected', 'flow' => 'challenge', 'reason' => 'totp.replayed']);
+    $this->post(route('login.challenge.submit', ['type' => 'totp']), ['code' => $totp->code($key, $now + 1)])->assertRedirect('/');
+    $this->assertAuthenticated();
+});
+
 it('refuses a code the new key doesn\'t make, storing nothing', function () {
     enrollingTotpKey($this);
 

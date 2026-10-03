@@ -74,6 +74,16 @@ class TotpTypeSupport implements CredentialTypeSupport
     }
 
     /**
+     * Get the code the ceremony's new key makes at the step after now, which the enrolling answer didn't spend.
+     */
+    public function validProofOfEnrolled(mixed $ceremony): array
+    {
+        $secret = TotpSecret::fromStored((string) $ceremony);
+
+        return [TotpType::FIELD => $this->codeAt($this->now() + 1, $secret->key)];
+    }
+
+    /**
      * Get a code the key accepts from no step in the window.
      */
     protected function wrongCode(string $key): string

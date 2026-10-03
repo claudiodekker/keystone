@@ -68,4 +68,12 @@ class FormTypeSupport implements CredentialTypeSupport
     {
         return ['secret' => 'wrong '.$ceremony];
     }
+
+    /**
+     * Get the secret the ceremony made, which the enrolled credential holds.
+     */
+    public function validProofOfEnrolled(mixed $ceremony): array
+    {
+        return ['secret' => (string) $ceremony];
+    }
 }

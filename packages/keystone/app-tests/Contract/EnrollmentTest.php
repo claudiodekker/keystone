@@ -1,12 +1,18 @@
 <?php
 
 use ClaudioDekker\Keystone\AppTests\AppTestCase;
+use ClaudioDekker\Keystone\AppTests\Assertions\ChallengeAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\EnrollmentAssertions;
+use ClaudioDekker\Keystone\AppTests\Assertions\SignInAssertions;
 use ClaudioDekker\Keystone\AppTests\Support\CredentialTypeSupport;
 use ClaudioDekker\Keystone\Methods\Surface;
 use Illuminate\Support\Facades\Route;
 
-pest()->extend(AppTestCase::class)->use(AppTestCase::assertions(EnrollmentAssertions::class));
+pest()->extend(AppTestCase::class)->use(
+    AppTestCase::assertions(SignInAssertions::class),
+    AppTestCase::assertions(ChallengeAssertions::class),
+    AppTestCase::assertions(EnrollmentAssertions::class),
+);
 
 beforeEach(function () {
     $this->withMandates();
@@ -34,6 +40,25 @@ it('refuses a wrong answer of every installed type, storing nothing', function (
 
         $this->assertEnrollmentRefused($response, $support->type());
         $this->assertDatabaseMissing('user_credentials', ['user_id' => $account->getKey(), 'type' => $support->type()]);
+    });
+});
+
+it('answers the next challenge with the credential every installed type enrolled', function () {
+    config(['keystone.require_recovery_codes' => false]);
+
+    $this->eachEnrollmentSupport(function (CredentialTypeSupport $support) {
+        $account = $this->createFirstFactorAccount("{$support->type()}@example.com");
+        $this->passFirstFactor("{$support->type()}@example.com");
+        $this->get(route('login.enrollment.start', ['type' => $support->type()]));
+        $ceremony = $this->enrollmentCeremony($support->type());
+        $this->post(route('login.enrollment.submit', ['type' => $support->type()]), $support->validEnrollment($ceremony));
+        $this->post(route('logout'));
+        $this->assertChallengeOwed($this->passFirstFactor("{$support->type()}@example.com"));
+
+        $response = $this->post(route('login.challenge.submit', ['type' => $support->type()]), $support->validProofOfEnrolled($ceremony));
+
+        $this->assertChallengePassed($response, '/');
+        $this->assertAuthenticatedAs($account);
     });
 });
 

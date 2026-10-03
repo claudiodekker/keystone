@@ -48,4 +48,11 @@ interface CredentialTypeSupport
      * @return array<string, mixed>
      */
     public function rejectedEnrollment(mixed $ceremony): array;
+
+    /**
+     * Get input that proves, at the challenge, the credential the ceremony enrolled, which the enrolling answer can't be replayed as.
+     *
+     * @return array<string, mixed>
+     */
+    public function validProofOfEnrolled(mixed $ceremony): array;
 }
