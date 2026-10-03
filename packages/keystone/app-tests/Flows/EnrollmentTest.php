@@ -5,8 +5,13 @@ use ClaudioDekker\Keystone\AppTests\Assertions\ChallengeAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\EnrollmentAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\RecoveryCodesAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\SignInAssertions;
+use ClaudioDekker\Keystone\Methods\CredentialType;
+use ClaudioDekker\Keystone\Methods\InitiateShape;
+use ClaudioDekker\Keystone\Methods\Initiation;
+use ClaudioDekker\Keystone\Methods\Proof;
 use ClaudioDekker\Keystone\Methods\RecoveryCodeType;
 use ClaudioDekker\Keystone\Methods\Surface;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Route;
 
 pest()->extend(AppTestCase::class)->use(
@@ -55,6 +60,17 @@ describe('hold', function () {
     it('sends a session without a sign-in held at enrollment to the sign-in page', function () {
         $this->assertSentToSignInFromEnrollment($this->get(route('login.enrollment')));
         $this->assertSentToSignInFromEnrollment($this->get(route('login.recovery-codes')));
+    });
+
+    it('holds for enrollment an account whose second factor\'s type is no longer listed, whatever codes it holds', function () {
+        $account = $this->createChallengedAccount($this->support);
+        $this->arrangeRecoveryCodes($account);
+        config(['keystone.methods' => [$this->supportsFor(Surface::SIGN_IN)[0]->type()]]);
+
+        $response = $this->passFirstFactor();
+
+        $this->assertEnrollmentOwed($response);
+        $this->assertGuest();
     });
 });
 
@@ -113,6 +129,71 @@ describe('second factor', function () {
         $this->assertEnrollmentRefused($response, $this->support->type());
         $this->assertGuest();
         $this->assertDatabaseMissing('user_credentials', ['user_id' => $account->getKey(), 'type' => $this->support->type()]);
+    });
+
+    it('refuses an empty answer with an error for each field', function () {
+        $this->createFirstFactorAccount();
+        $this->passFirstFactor();
+        $this->get(route('login.enrollment.start', ['type' => $this->support->type()]));
+        $fields = array_keys($this->support->validEnrollment($this->enrollmentCeremony($this->support->type())));
+
+        $response = $this->post(route('login.enrollment.submit', ['type' => $this->support->type()]), []);
+
+        $this->assertEnrollmentInvalid($response, $this->support->type(), $fields);
+    });
+
+    it('sends the user back to the offer when the type\'s ceremony can\'t start', function () {
+        Exceptions::fake();
+        $this->types()->register(new class implements CredentialType
+        {
+            public function name(): string
+            {
+                return 'broken';
+            }
+
+            public function surfaces(): array
+            {
+                return ['challenge' => InitiateShape::FORM, 'enrollment' => InitiateShape::FORM];
+            }
+
+            public function representsMultipleFactors(): bool
+            {
+                return false;
+            }
+
+            public function sharesFailedAttempts(): bool
+            {
+                return false;
+            }
+
+            public function configFailures(): array
+            {
+                return [];
+            }
+
+            public function rules(Surface $surface): array
+            {
+                return [];
+            }
+
+            public function initiate(Surface $surface, string $accountName): ?Initiation
+            {
+                throw new RuntimeException('Authenticator offline.');
+            }
+
+            public function verify(Surface $surface, array $input, array $credentials, mixed $ceremony = null): Proof
+            {
+                return Proof::rejected('broken.mismatch');
+            }
+        });
+        config(['keystone.methods' => null]);
+        $this->createFirstFactorAccount();
+        $this->passFirstFactor();
+
+        $response = $this->get(route('login.enrollment.start', ['type' => 'broken']));
+
+        $this->assertEnrollmentNotStarted($response, 'broken');
+        Exceptions::assertReported(RuntimeException::class);
     });
 
     it('starts a fresh ceremony when the answer has none running', function () {
@@ -197,6 +278,20 @@ describe('recovery codes', function () {
         $this->passFirstFactor();
 
         $this->assertSecondFactorOwed($this->get(route('login.recovery-codes')));
+    });
+
+    it('holds an account for its recovery codes alone while the app requires no second factor, then signs it in', function () {
+        config(['keystone.require_second_factor' => false]);
+        $account = $this->createFirstFactorAccount();
+        $this->assertEnrollmentOwed($this->passFirstFactor());
+        $this->assertRecoveryCodesOwed($this->get(route('login.enrollment')));
+        $this->get(route('login.recovery-codes'));
+        $codes = $this->stagedRecoveryCodes();
+
+        $response = $this->post(route('login.recovery-codes.submit'), [RecoveryCodeType::FIELD => $codes[0]]);
+
+        $this->assertRecoveryCodesSaved($response, '/');
+        $this->assertAuthenticatedAs($account);
     });
 });
 

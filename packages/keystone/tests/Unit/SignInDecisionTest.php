@@ -105,6 +105,21 @@ it('reads nothing from the database while neither mandate is on', function () {
         ->and(DB::getQueryLog())->toBe([]);
 });
 
+it('reads only what the one mandate that is on asks about', function (bool $secondFactor, bool $recoveryCodes, string $table) {
+    config(['keystone.require_second_factor' => $secondFactor, 'keystone.require_recovery_codes' => $recoveryCodes]);
+    $account = accountHolding();
+
+    DB::enableQueryLog();
+    $owes = (new SignInDecision)->owesEnrollment($account);
+
+    expect($owes)->toBeTrue()
+        ->and(DB::getQueryLog())->toHaveCount(1)
+        ->and(DB::getQueryLog()[0]['query'])->toContain($table);
+})->with([
+    'only a second factor required' => [true, false, 'user_credentials'],
+    'only recovery codes required' => [false, true, 'user_recovery_codes'],
+]);
+
 it('owes no second factor after a proof that counts as two factors and answers the challenge, while still owing recovery codes', function (bool $recoveryCodes, Demand $demand) {
     config(['keystone.require_second_factor' => true, 'keystone.require_recovery_codes' => $recoveryCodes]);
     $key = new FormType(name: 'key', surfaces: ['sign-in', 'challenge'], multipleFactors: true);

@@ -12,10 +12,12 @@ use ClaudioDekker\Keystone\Methods\StoredCredential;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Notifications\SecurityAlert;
 use ClaudioDekker\Keystone\PendingSignIn;
+use ClaudioDekker\Keystone\PendingStage;
 use ClaudioDekker\Keystone\Tests\Fixtures\FlakyAlert;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormType;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormTypeSupport;
 use ClaudioDekker\Keystone\Tests\Fixtures\RogueType;
+use ClaudioDekker\Keystone\Tests\Fixtures\User;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -177,6 +179,32 @@ describe('the hold', function () {
         expect(Keystone::guard()->pending())->toBeNull();
     });
 
+    it('drops a held sign-in once the mandates it was held for are turned off, so the next sign-in gets in', function () {
+        $account = $this->createFirstFactorAccount();
+        $this->passFirstFactor();
+        $this->withoutMandates();
+
+        $response = $this->get(route('login.enrollment'));
+
+        $response->assertRedirectToRoute('login');
+        expect(Keystone::guard()->pending())->toBeNull();
+        $this->passFirstFactor()->assertRedirect('/');
+        $this->assertAuthenticatedAs($account);
+    });
+
+    it('holds for enrollment an account whose only second factor is of a type keystone.methods no longer lists, and challenges it again once the type is listed', function () {
+        $this->createChallengedAccount(new FormTypeSupport('code'));
+        config(['keystone.methods' => ['form']]);
+        $this->passFirstFactor()->assertRedirectToRoute('login.enrollment');
+        config(['keystone.methods' => ['form', 'code']]);
+
+        $response = $this->get(route('login.enrollment'));
+
+        $response->assertRedirectToRoute('login');
+        expect(Keystone::guard()->pending())->toBeNull();
+        $this->passFirstFactor()->assertRedirectToRoute('login.challenge');
+    });
+
     it('sends a signed-in user away from every enrollment step', function (string $method, string $route) {
         $this->withoutMandates();
         $this->signInAccount(new FormTypeSupport);
@@ -219,7 +247,64 @@ describe('the offer', function () {
         $this->get(route('login.enrollment.start', ['type' => 'form']))->assertRedirectToRoute('login.enrollment');
         $this->post(route('login.enrollment.submit', ['type' => 'form']), ['secret' => 'x'])->assertRedirectToRoute('login.enrollment');
     });
+
+    it('sends a type keystone.methods leaves off enrollment back to the offer', function () {
+        config(['keystone.methods' => ['form', 'code' => ['challenge']]]);
+        $this->createFirstFactorAccount();
+        $this->passFirstFactor();
+
+        $this->get(route('login.enrollment.start', ['type' => 'code']))->assertRedirectToRoute('login.enrollment');
+        $this->post(route('login.enrollment.submit', ['type' => 'code']), ['secret' => 'x'])->assertRedirectToRoute('login.enrollment');
+    });
 });
+
+describe('every step', function () {
+    it('drops a held sign-in that expired without recording it as voided', function (string $method, string $route) {
+        $this->freezeSecond();
+        $this->createFirstFactorAccount();
+        $this->passFirstFactor();
+        $this->travel(15)->minutes();
+
+        $this->{$method}(route($route, ['type' => 'code']))->assertRedirectToRoute('login');
+
+        $this->assertDatabaseMissing('user_security_events', ['type' => 'sign_in.voided']);
+    })->with('the enrollment steps');
+
+    it('drops a held sign-in once its account\'s sessions were ended, recording it as voided', function (string $method, string $route) {
+        $account = $this->createFirstFactorAccount();
+        $this->passFirstFactor();
+        DB::table('users')->where('id', $account->getKey())->increment('credential_epoch');
+
+        $this->{$method}(route($route, ['type' => 'code']))->assertRedirectToRoute('login');
+
+        expect(Keystone::guard()->pending())->toBeNull();
+        $this->assertDatabaseHas('user_security_events', ['type' => 'sign_in.voided', 'user_id' => $account->getKey()]);
+    })->with('the enrollment steps');
+
+    it('counts a held session\'s submissions against its account from any address', function (string $route, array $payload) {
+        $this->createFirstFactorAccount();
+        $this->passFirstFactor();
+
+        foreach (range(1, 10) as $i) {
+            $this->withServerVariables(['REMOTE_ADDR' => "203.0.113.{$i}"]);
+            $this->post(route($route, ['type' => 'code']), $payload);
+        }
+
+        $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.1']);
+        $this->post(route($route, ['type' => 'code']), $payload)->assertTooManyRequests();
+    })->with([
+        'the answer' => ['login.enrollment.submit', ['secret' => 'wrong']],
+        'saving recovery codes' => ['login.recovery-codes.submit', ['code' => 'WRONG-CODE']],
+    ]);
+});
+
+dataset('the enrollment steps', [
+    'the offer' => ['get', 'login.enrollment'],
+    'the form' => ['get', 'login.enrollment.start'],
+    'the answer' => ['post', 'login.enrollment.submit'],
+    'the recovery codes' => ['get', 'login.recovery-codes'],
+    'saving recovery codes' => ['post', 'login.recovery-codes.submit'],
+]);
 
 describe('the ceremony', function () {
     it('starts the ceremony once, naming the account by its alert address, until the held sign-in ends', function () {
@@ -233,6 +318,15 @@ describe('the ceremony', function () {
         $response->assertExactJson(['type' => 'code', 'shape' => 'form', 'ceremony' => ['code' => $ceremony, 'account' => 'jane@example.com'], 'status' => null]);
         $this->travel(PendingSignIn::LIFETIME_SECONDS + 1)->seconds();
         expect(Keystone::guard()->slots()->get('code', Surface::ENROLLMENT->value))->toBeNull();
+    });
+
+    it('names an account with no address by its identifier', function () {
+        $user = User::factory()->create();
+        Keystone::guard()->hold($user, firstFactor: 'form', stage: PendingStage::ENROLLMENT, intendedUrl: '/');
+
+        $response = $this->get(route('login.enrollment.start', ['type' => 'code']));
+
+        $response->assertJsonPath('ceremony.account', (string) $user->getKey());
     });
 
     it('keeps a running ceremony for a type that starts none, showing nothing', function () {
