@@ -22,9 +22,9 @@ return [
     | Second Factor
     |--------------------------------------------------------------------------
     |
-    | Whether every account must hold a second factor. An account without
-    | one enrolls it before it gets in, unless the factor it signs in
-    | with proves two factors at once, as a verified passkey does.
+    | Whether every account must hold a second factor: a credential of a
+    | listed type that answers the challenge. An account without one
+    | enrolls it before it gets in.
     |
     */
 

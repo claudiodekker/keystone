@@ -78,8 +78,8 @@ describe('the hold', function () {
         $this->assertDatabaseHas('user_security_events', ['type' => 'sign_in.held', 'user_id' => $account->getKey(), 'flow' => 'sign-in', 'reason' => 'keystone.enrollment']);
     });
 
-    it('owes only recovery codes after a proof that counts as two factors', function () {
-        $this->app->make(CredentialTypes::class)->register(new FormType(name: 'passkey', multipleFactors: true));
+    it('owes only recovery codes after a proof that counts as two factors and answers the challenge', function () {
+        $this->app->make(CredentialTypes::class)->register(new FormType(name: 'passkey', surfaces: ['sign-in', 'challenge'], multipleFactors: true));
         $account = $this->createAccount();
         $this->arrangeCredential($account, new FormTypeSupport('passkey'), Surface::SIGN_IN);
         $this->post(route('login.submit', ['type' => 'passkey']), ['identifier' => 'jane@example.com', ...(new FormTypeSupport('passkey'))->validProof(Surface::SIGN_IN)]);
@@ -90,9 +90,9 @@ describe('the hold', function () {
         $this->assertGuest();
     });
 
-    it('signs in a proof that counts as two factors while recovery codes are optional', function () {
+    it('signs in a proof that counts as two factors and answers the challenge while recovery codes are optional', function () {
         config(['keystone.require_recovery_codes' => false]);
-        $this->app->make(CredentialTypes::class)->register(new FormType(name: 'passkey', multipleFactors: true));
+        $this->app->make(CredentialTypes::class)->register(new FormType(name: 'passkey', surfaces: ['sign-in', 'challenge'], multipleFactors: true));
         $account = $this->createAccount();
         $this->arrangeCredential($account, new FormTypeSupport('passkey'), Surface::SIGN_IN);
 
@@ -100,6 +100,19 @@ describe('the hold', function () {
 
         $response->assertRedirect('/');
         $this->assertAuthenticatedAs($account);
+    });
+
+    it('holds a proof that counts as two factors for a second factor while its type doesn\'t answer the challenge', function () {
+        config(['keystone.require_recovery_codes' => false]);
+        $this->app->make(CredentialTypes::class)->register(new FormType(name: 'passkey', multipleFactors: true));
+        $account = $this->createAccount();
+        $this->arrangeCredential($account, new FormTypeSupport('passkey'), Surface::SIGN_IN);
+
+        $response = $this->post(route('login.submit', ['type' => 'passkey']), ['identifier' => 'jane@example.com', ...(new FormTypeSupport('passkey'))->validProof(Surface::SIGN_IN)]);
+
+        $response->assertRedirectToRoute('login.enrollment');
+        $this->assertGuest();
+        $this->assertDatabaseHas('user_security_events', ['type' => 'sign_in.held', 'user_id' => $account->getKey(), 'reason' => 'keystone.enrollment']);
     });
 
     it('challenges a first factor of an account whose other credential proves two factors on its own, offering it', function () {

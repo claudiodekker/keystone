@@ -119,7 +119,7 @@ class ChallengeAttempt extends CredentialAttempt
      */
     protected function owed(PendingSignIn $pending): Demand
     {
-        return (new SignInDecision)->pendingOwesEnrollment($pending) ? Demand::ENROLLMENT : Demand::SIGN_IN;
+        return (new SignInDecision)->owesEnrollment($pending->account) ? Demand::ENROLLMENT : Demand::SIGN_IN;
     }
 
     /**

@@ -249,6 +249,6 @@ abstract class EnrollmentController extends Controller
             return $this->refuseWithoutEnrollment();
         }
 
-        return $decision->pendingOwesSecondFactor($pending) ? null : $this->sendRecoveryCodesOwed($request);
+        return $decision->owesSecondFactor($pending->account) ? null : $this->sendRecoveryCodesOwed($request);
     }
 }

@@ -105,14 +105,28 @@ it('reads nothing from the database while neither mandate is on', function () {
         ->and(DB::getQueryLog())->toBe([]);
 });
 
-it('owes no second factor after a proof that counts as two factors, while still owing recovery codes', function (bool $recoveryCodes, Demand $demand) {
+it('owes no second factor after a proof that counts as two factors and answers the challenge, while still owing recovery codes', function (bool $recoveryCodes, Demand $demand) {
     config(['keystone.require_second_factor' => true, 'keystone.require_recovery_codes' => $recoveryCodes]);
+    $key = new FormType(name: 'key', surfaces: ['sign-in', 'challenge'], multipleFactors: true);
+    app(CredentialTypes::class)->register($key);
+    $user = User::factory()->create();
+    DB::table('user_credentials')->insert(['user_id' => $user->getKey(), 'type' => 'key', 'created_at' => now(), 'updated_at' => now()]);
 
-    expect((new SignInDecision)->demand(accountHolding(), new FormType(name: 'key', multipleFactors: true)))->toBe($demand);
+    expect((new SignInDecision)->demand(readAccount($user), $key))->toBe($demand);
 })->with([
     'codes optional' => [false, Demand::SIGN_IN],
     'codes required' => [true, Demand::ENROLLMENT],
 ]);
+
+it('owes a second factor after a proof that counts as two factors but doesn\'t answer the challenge', function () {
+    config(['keystone.require_second_factor' => true, 'keystone.require_recovery_codes' => false]);
+    $key = new FormType(name: 'key', multipleFactors: true);
+    app(CredentialTypes::class)->register($key);
+    $user = User::factory()->create();
+    DB::table('user_credentials')->insert(['user_id' => $user->getKey(), 'type' => 'key', 'created_at' => now(), 'updated_at' => now()]);
+
+    expect((new SignInDecision)->demand(readAccount($user), $key))->toBe(Demand::ENROLLMENT);
+});
 
 it('never owes recovery codes while they are optional', function () {
     config(['keystone.require_second_factor' => false, 'keystone.require_recovery_codes' => false]);

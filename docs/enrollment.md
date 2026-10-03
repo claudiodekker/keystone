@@ -6,7 +6,7 @@ By default every account must hold a second factor and a set of recovery codes. 
 
 | Setting | Default | An account owes enrollment when |
 |---|---|---|
-| `require_second_factor` | `true` | it holds no second factor and its first factor doesn't prove two factors on its own, as a passkey that verified its user does. A credential of a type that proves two factors on its own counts as a held second factor, and is asked for at the challenge (see [The challenge](challenge.md)) |
+| `require_second_factor` | `true` | it holds no credential of a listed type that answers the [challenge](challenge.md). A first factor that proves two factors on its own, as a passkey that verified its user does, counts when its type answers the challenge, and is then not asked for again; a type that only signs in never counts, so its holders enroll a second factor like anyone else |
 | `require_recovery_codes` | `true` | it holds no recovery code |
 
 An account that holds a second factor answers the [challenge](challenge.md) first and enrolls whatever it still owes after. Turning `require_recovery_codes` off means codes are never owed, and also lets the last code answer the challenge (see [Recovery codes](challenge.md#recovery-codes)).

@@ -3,6 +3,7 @@
 use ClaudioDekker\Keystone\AppTests\AppTestCase;
 use ClaudioDekker\Keystone\AppTests\Assertions\SignInAssertions;
 use ClaudioDekker\Keystone\AppTests\Support\CredentialTypeSupport;
+use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
 
 pest()->extend(AppTestCase::class)->use(AppTestCase::assertions(SignInAssertions::class));
@@ -14,6 +15,11 @@ beforeEach(function () {
 function submitSignIn(AppTestCase $test, CredentialTypeSupport $support, string $identifier, array $proof)
 {
     return $test->post(route('login.submit', ['type' => $support->type()]), ['identifier' => $identifier, ...$proof]);
+}
+
+function provesTwoFactorsAtTheChallenge(CredentialTypeSupport $support): bool
+{
+    return app(CredentialTypes::class)->find($support->type(), Surface::CHALLENGE)?->representsMultipleFactors() ?? false;
 }
 
 it('signs in with a valid proof of every installed type', function () {
@@ -69,21 +75,32 @@ it('holds a valid proof of every installed type for the enrollment the app requi
     'only recovery codes required' => [false, true],
 ]);
 
-it('holds a valid proof of every installed type for a second factor unless it proves two factors on its own', function () {
+it('signs in a valid proof of every installed type that proves two factors on its own and answers the challenge', function () {
     config(['keystone.require_second_factor' => true, 'keystone.require_recovery_codes' => false]);
+    $supports = array_filter($this->supportsFor(Surface::SIGN_IN), fn (CredentialTypeSupport $support) => provesTwoFactorsAtTheChallenge($support));
 
-    $this->eachSupportFor(Surface::SIGN_IN, function (CredentialTypeSupport $support) {
+    $this->eachOf(array_values($supports), function (CredentialTypeSupport $support) {
         $account = $this->createAccount("{$support->type()}@example.com");
         $this->arrangeCredential($account, $support, Surface::SIGN_IN);
 
         $response = submitSignIn($this, $support, "{$support->type()}@example.com", $support->validProof(Surface::SIGN_IN));
 
-        if ($this->types()->find($support->type(), Surface::SIGN_IN)->representsMultipleFactors()) {
-            $this->assertSignedIn($response, '/');
-            $this->assertAuthenticatedAs($account);
-        } else {
-            $this->assertEnrollmentOwed($response);
-            $this->assertGuest();
-        }
+        $this->assertSignedIn($response, '/');
+        $this->assertAuthenticatedAs($account);
+    });
+});
+
+it('holds a valid proof of every other installed type for a second factor', function () {
+    config(['keystone.require_second_factor' => true, 'keystone.require_recovery_codes' => false]);
+    $supports = array_filter($this->supportsFor(Surface::SIGN_IN), fn (CredentialTypeSupport $support) => ! provesTwoFactorsAtTheChallenge($support));
+
+    $this->eachOf(array_values($supports), function (CredentialTypeSupport $support) {
+        $account = $this->createAccount("{$support->type()}@example.com");
+        $this->arrangeCredential($account, $support, Surface::SIGN_IN);
+
+        $response = submitSignIn($this, $support, "{$support->type()}@example.com", $support->validProof(Surface::SIGN_IN));
+
+        $this->assertEnrollmentOwed($response);
+        $this->assertGuest();
     });
 });

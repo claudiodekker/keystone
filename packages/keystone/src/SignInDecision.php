@@ -28,7 +28,7 @@ class SignInDecision
         return match (true) {
             $this->isBarred($account) => Demand::REFUSE,
             ! $proven->representsMultipleFactors() && $this->holdsSecondFactor($account, $proven->name()) => Demand::CHALLENGE,
-            $this->owesEnrollment($account, multiFactorProven: $proven->representsMultipleFactors()) => Demand::ENROLLMENT,
+            $this->owesEnrollment($account) => Demand::ENROLLMENT,
             default => Demand::SIGN_IN,
         };
     }
@@ -39,30 +39,13 @@ class SignInDecision
     public function next(PendingSignIn $pending): Demand
     {
         $account = $pending->account;
-        $multiFactorProven = $this->provesMultipleFactors($pending->firstFactor);
 
         return match (true) {
             $this->isBarred($account) => Demand::REFUSE,
-            ! $pending->secondFactorPassed && ! $multiFactorProven && $this->holdsSecondFactor($account, $pending->firstFactor) => Demand::CHALLENGE,
-            $this->pendingOwesEnrollment($pending) => Demand::ENROLLMENT,
+            ! $pending->secondFactorPassed && ! $this->provesMultipleFactors($pending->firstFactor) && $this->holdsSecondFactor($account, $pending->firstFactor) => Demand::CHALLENGE,
+            $this->owesEnrollment($account) => Demand::ENROLLMENT,
             default => Demand::SIGN_IN,
         };
-    }
-
-    /**
-     * Determine if the pending sign-in's account must enroll before it gets in, given the first factor it passed.
-     */
-    public function pendingOwesEnrollment(PendingSignIn $pending): bool
-    {
-        return $this->owesEnrollment($pending->account, multiFactorProven: $this->provesMultipleFactors($pending->firstFactor));
-    }
-
-    /**
-     * Determine if the pending sign-in's account must enroll a second factor before it gets in, given the first factor it passed.
-     */
-    public function pendingOwesSecondFactor(PendingSignIn $pending): bool
-    {
-        return ! $this->provesMultipleFactors($pending->firstFactor) && $this->owesSecondFactor($pending->account);
     }
 
     /**
@@ -113,11 +96,11 @@ class SignInDecision
     }
 
     /**
-     * Determine if the account must enroll before it gets in: a second factor, unless one proven factor counts as two, or recovery codes.
+     * Determine if the account must enroll before it gets in: a second factor or recovery codes.
      */
-    public function owesEnrollment(Model&KeystoneUser $account, bool $multiFactorProven = false): bool
+    public function owesEnrollment(Model&KeystoneUser $account): bool
     {
-        return (! $multiFactorProven && $this->owesSecondFactor($account)) || $this->owesRecoveryCodes($account);
+        return $this->owesSecondFactor($account) || $this->owesRecoveryCodes($account);
     }
 
     /**
