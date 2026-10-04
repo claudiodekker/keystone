@@ -272,8 +272,9 @@ class Installer
     {
         $path = $this->path('phpunit.xml');
         $xml = $this->files->exists($path) ? $this->files->get($path) : '';
+        $suite = '/<testsuite\s+name="Keystone"\s*(?:\/>|>(.*?)<\/testsuite>)/s';
 
-        if (! str_contains($xml, '<testsuite name="Keystone">')) {
+        if (preg_match($suite, $xml) !== 1) {
             if (! str_contains($xml, '</testsuites>')) {
                 return false;
             }
@@ -281,16 +282,20 @@ class Installer
             $xml = str_replace('</testsuites>', "    <testsuite name=\"Keystone\">\n        </testsuite>\n    </testsuites>", $xml);
         }
 
-        foreach ($directories as $directory) {
-            if (! str_contains($xml, "<directory>{$directory}</directory>")) {
-                $xml = preg_replace(
-                    '/(<testsuite name="Keystone">.*?)(\n\s*<\/testsuite>)/s',
-                    "\$1\n            <directory>{$directory}</directory>\$2",
-                    $xml,
-                    limit: 1,
-                ) ?? $xml;
+        $xml = preg_replace_callback($suite, function (array $match) use ($directories) {
+            $body = rtrim($match[1] ?? '');
+            $missing = array_filter($directories, fn (string $directory) => ! str_contains($body, "<directory>{$directory}</directory>"));
+
+            if ($missing === []) {
+                return $match[0];
             }
-        }
+
+            foreach ($missing as $directory) {
+                $body .= "\n            <directory>{$directory}</directory>";
+            }
+
+            return "<testsuite name=\"Keystone\">{$body}\n        </testsuite>";
+        }, $xml, limit: 1) ?? $xml;
 
         $this->files->put($path, $xml);
 

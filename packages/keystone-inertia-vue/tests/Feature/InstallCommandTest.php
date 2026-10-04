@@ -231,6 +231,32 @@ it('registers the Keystone testsuite once', function () {
         ]);
 });
 
+it('registers the Keystone testsuite once, however the app wrote it', function (string $suite, string $before) {
+    $app = freshApp();
+    $phpunit = file_get_contents("{$app}/phpunit.xml");
+    file_put_contents("{$app}/phpunit.xml", str_replace($before, "{$suite}\n{$before}", $phpunit));
+
+    $this->artisan('keystone:install')->assertSuccessful()->run();
+
+    $phpunit = simplexml_load_file("{$app}/phpunit.xml");
+    $directories = fn (string $name) => array_map('strval', $phpunit->xpath("//testsuite[@name=\"{$name}\"]/directory"));
+    expect($phpunit->xpath('//testsuite[@name="Keystone"]'))->toHaveCount(1)
+        ->and($directories('Keystone'))->toBe([
+            'vendor/claudiodekker/keystone/app-tests',
+            'vendor/claudiodekker/keystone-password/app-tests',
+            'vendor/claudiodekker/keystone-totp/app-tests',
+            'vendor/claudiodekker/keystone-inertia-vue/app-tests',
+        ])
+        ->and($directories('Unit'))->toBe(['tests/Unit'])
+        ->and($directories('Feature'))->toBe(['tests/Feature']);
+})->with([
+    'empty on one line, before another suite' => ['        <testsuite name="Keystone"></testsuite>', '        <testsuite name="Unit">'],
+    'empty on one line, as the last suite' => ['        <testsuite name="Keystone"></testsuite>', '    </testsuites>'],
+    'self-closing' => ['        <testsuite name="Keystone"/>', '        <testsuite name="Unit">'],
+    'with a space before the closing bracket' => ["        <testsuite name=\"Keystone\" >\n        </testsuite>", '    </testsuites>'],
+    'with a directory on one line' => ['        <testsuite name="Keystone"><directory>vendor/claudiodekker/keystone/app-tests</directory></testsuite>', '        <testsuite name="Unit">'],
+]);
+
 it('maps the AppTests\' namespaces in the app\'s autoload-dev only', function () {
     $app = freshApp();
 
