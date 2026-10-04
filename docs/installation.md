@@ -16,9 +16,9 @@ The installer refuses while `laravel/fortify` is installed, since both would han
 - requires `routes/keystone.php` from `routes/web.php`, makes your user model a Keystone user and sets the `web` guard's driver to `keystone`, as described below.
 - sets `SESSION_COOKIE=__Host-<app name>-session`, `SESSION_SECURE_COOKIE=true`, `SESSION_DOMAIN=null` and `SESSION_PATH=/` in `.env` and `.env.example`. The `__Host-` prefix keeps the session cookie to your own host, and browsers only accept it over HTTPS, so serve your app over HTTPS locally too (for example `herd secure`); `localhost` is the one exception.
 - adds the `Keystone` testsuite to `phpunit.xml` and maps the AppTests' namespaces in your `autoload-dev`, so `php artisan test` proves your copies keep Keystone's guarantees. The AppTests declare no global functions, so they can't clash with your own Pest helpers.
-- adds the npm packages the pages need, keeping the versions you already pinned, then runs `npm install && npm run build`. A package your app already depends on keeps its version.
+- adds the npm packages the pages need, keeping the versions you already pinned, then runs `npm install && npm run build`. A package your app already depends on keeps its version. Both `composer.json` and `package.json` keep their indentation and empty objects, and one the installer has nothing to add to isn't rewritten.
 
-When it can't make an edit, such as a `phpunit.xml` without a `<testsuites>` element, it prints what to add yourself. It leaves `app.cipher` alone. Keystone's migrations run from the package, so there is nothing to publish; publish Keystone's config only to change a setting (see [Configuration](configuration.md)).
+Every edit is skipped when it is already made, so you can run the installer again after a run that stopped part way. When it can't make an edit, such as a `phpunit.xml` without a `<testsuites>` element, it prints what to add yourself. It leaves `app.cipher` alone. Keystone's migrations run from the package, so there is nothing to publish; publish Keystone's config only to change a setting (see [Configuration](configuration.md)).
 
 ## The user model
 
@@ -34,6 +34,8 @@ class User extends Authenticatable implements KeystoneUser
     use HasKeystone;
 }
 ```
+
+The installer adds its imports before your first `use` line and appends the interface to your class line. It leaves a model it can't edit that way as it is, and prints what to add: a fully qualified parent with no `use` lines, interfaces over several lines, or any edit that wouldn't leave a file that parses.
 
 `HasKeystone` adds soft deletes and keeps Keystone's `users` columns out of the model's array form and out of mass assignment. The model may use its own table and key name; Keystone's migration only changes `users`, so add its columns to your table yourself.
 
@@ -74,6 +76,8 @@ Keystone stores and matches an address trimmed, Unicode NFC-composed, lowercased
 
 The pages build their URLs with [Wayfinder](https://github.com/laravel/wayfinder), generated when Vite builds; don't commit its output (`resources/js/actions`, `resources/js/routes` and `resources/js/wayfinder`).
 
-In an app without `resources/js/app.ts`, the installer also sets up Inertia and Vue: it copies `vite.config.ts`, `tsconfig.json`, `resources/js/app.ts`, the `app` root view and a `HandleInertiaRequests` middleware, which it adds to the `web` group. It keeps your `vite.config.js` and `resources/js/app.js` as `.bak` files and points `welcome.blade.php` at `app.ts`. An app that already has `resources/js/app.ts`, such as one made from the Laravel Vue starter kit, keeps its own setup.
+In a bare Laravel app, the installer also sets up Inertia and Vue. That is an app without `resources/js/app.ts`, whose `resources/js/app.js` is still the skeleton's (empty, comments, or the `./bootstrap` import) and which no view but `welcome.blade.php` loads. The installer then copies `vite.config.ts`, `tsconfig.json`, `resources/js/app.ts`, the `app` root view and a `HandleInertiaRequests` middleware, which it adds to the `web` group. It keeps your `vite.config.js` and `resources/js/app.js` as `.bak` files, numbering the copy (`.bak.1`) when a backup exists already, and points `welcome.blade.php` at `app.ts`.
+
+An app that already has `resources/js/app.ts`, such as one made from the Laravel Vue starter kit, keeps its own setup. So does an app with any other Vite setup, such as Livewire, or Blade layouts that load `resources/js/app.js`: the installer leaves its Vite files alone and lists the files that set up Inertia and Vue, for you to add yourself.
 
 Keystone's pages are kept encrypted in the browser's history, and signing out clears it, so Back after signing out shows none of them.

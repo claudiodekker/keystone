@@ -2,6 +2,7 @@
 
 use ClaudioDekker\Keystone\InertiaVue\Tests\StubsTestCase;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
+use Illuminate\Contracts\Filesystem\FileNotFoundException;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Process\PendingProcess;
 use Illuminate\Support\Facades\Process;
@@ -28,6 +29,24 @@ function freshApp(array $composer = []): string
     Process::fake();
 
     return $path;
+}
+
+function treeOf(string $path): array
+{
+    $hashes = [];
+
+    foreach ((new Filesystem)->allFiles($path, hidden: true) as $file) {
+        $hashes[$file->getRelativePathname()] = md5_file($file->getPathname());
+    }
+
+    ksort($hashes);
+
+    return $hashes;
+}
+
+function twoSpaceIndented(string $json): string
+{
+    return preg_replace_callback('/^(?: {4})+/m', fn (array $spaces) => str_repeat('  ', intdiv(strlen($spaces[0]), 4)), $json);
 }
 
 it('refuses while laravel/fortify is installed, changing nothing', function () {
@@ -226,6 +245,32 @@ it('registers the Keystone testsuite once', function () {
         ]);
 });
 
+it('registers the Keystone testsuite once, however the app wrote it', function (string $suite, string $before) {
+    $app = freshApp();
+    $phpunit = file_get_contents("{$app}/phpunit.xml");
+    file_put_contents("{$app}/phpunit.xml", str_replace($before, "{$suite}\n{$before}", $phpunit));
+
+    $this->artisan('keystone:install')->assertSuccessful()->run();
+
+    $phpunit = simplexml_load_file("{$app}/phpunit.xml");
+    $directories = fn (string $name) => array_map('strval', $phpunit->xpath("//testsuite[@name=\"{$name}\"]/directory"));
+    expect($phpunit->xpath('//testsuite[@name="Keystone"]'))->toHaveCount(1)
+        ->and($directories('Keystone'))->toBe([
+            'vendor/claudiodekker/keystone/app-tests',
+            'vendor/claudiodekker/keystone-password/app-tests',
+            'vendor/claudiodekker/keystone-totp/app-tests',
+            'vendor/claudiodekker/keystone-inertia-vue/app-tests',
+        ])
+        ->and($directories('Unit'))->toBe(['tests/Unit'])
+        ->and($directories('Feature'))->toBe(['tests/Feature']);
+})->with([
+    'empty on one line, before another suite' => ['        <testsuite name="Keystone"></testsuite>', '        <testsuite name="Unit">'],
+    'empty on one line, as the last suite' => ['        <testsuite name="Keystone"></testsuite>', '    </testsuites>'],
+    'self-closing' => ['        <testsuite name="Keystone"/>', '        <testsuite name="Unit">'],
+    'with a space before the closing bracket' => ["        <testsuite name=\"Keystone\" >\n        </testsuite>", '    </testsuites>'],
+    'with a directory on one line' => ['        <testsuite name="Keystone"><directory>vendor/claudiodekker/keystone/app-tests</directory></testsuite>', '        <testsuite name="Unit">'],
+]);
+
 it('maps the AppTests\' namespaces in the app\'s autoload-dev only', function () {
     $app = freshApp();
 
@@ -239,6 +284,49 @@ it('maps the AppTests\' namespaces in the app\'s autoload-dev only', function ()
         'ClaudioDekker\\Keystone\\Totp\\AppTests\\' => 'vendor/claudiodekker/keystone-totp/app-tests/',
         'ClaudioDekker\\Keystone\\InertiaVue\\AppTests\\' => 'vendor/claudiodekker/keystone-inertia-vue/app-tests/',
     ])->and($manifest['autoload']['psr-4'])->not->toHaveKey('ClaudioDekker\\Keystone\\AppTests\\');
+});
+
+it('keeps an empty object an object in the manifests it edits', function () {
+    $app = freshApp();
+    $empty = ['composer.json' => 'scripts', 'package.json' => 'overrides'];
+
+    foreach ($empty as $manifest => $key) {
+        file_put_contents("{$app}/{$manifest}", preg_replace('/^\{\n/', "{\n    \"{$key}\": {},\n", file_get_contents("{$app}/{$manifest}"), limit: 1));
+    }
+
+    $this->artisan('keystone:install')->assertSuccessful()->run();
+
+    expect(file_get_contents("{$app}/composer.json"))->toContain('"scripts": {}')
+        ->and(file_get_contents("{$app}/package.json"))->toContain('"overrides": {}');
+});
+
+it('keeps the indentation of the manifests it edits', function () {
+    $app = freshApp();
+
+    foreach (['composer.json', 'package.json'] as $manifest) {
+        file_put_contents("{$app}/{$manifest}", twoSpaceIndented(file_get_contents("{$app}/{$manifest}")));
+    }
+
+    $this->artisan('keystone:install')->assertSuccessful()->run();
+
+    expect(file_get_contents("{$app}/composer.json"))->toContain("\n      \"ClaudioDekker\\\\Keystone\\\\AppTests\\\\\"")->not->toMatch('/^ {8}/m')
+        ->and(file_get_contents("{$app}/package.json"))->toContain("\n    \"vue\"")->not->toMatch('/^ {8}/m');
+});
+
+it('leaves the manifests it has nothing to add to byte for byte', function () {
+    $app = freshApp();
+    $this->artisan('keystone:install')->assertSuccessful()->run();
+    $before = [];
+
+    foreach (['composer.json', 'package.json'] as $manifest) {
+        $before[$manifest] = twoSpaceIndented(file_get_contents("{$app}/{$manifest}"));
+        file_put_contents("{$app}/{$manifest}", $before[$manifest]);
+    }
+
+    $this->artisan('keystone:install')->assertSuccessful()->run();
+
+    expect(file_get_contents("{$app}/composer.json"))->toBe($before['composer.json'])
+        ->and(file_get_contents("{$app}/package.json"))->toBe($before['package.json']);
 });
 
 it('sets up Inertia and Vue in a bare app, keeping its old Vite files as backups', function () {
@@ -257,6 +345,91 @@ it('sets up Inertia and Vue in a bare app, keeping its old Vite files as backups
         ->and(file_get_contents("{$app}/vite.config.js.bak"))->toBe($viteConfig)
         ->and(file_get_contents("{$app}/resources/views/welcome.blade.php"))->toContain("@vite(['resources/css/app.css', 'resources/js/app.ts'])")
         ->and(file_get_contents("{$app}/bootstrap/app.php"))->toContain("\$middleware->web(append: [\n            \\App\\Http\\Middleware\\HandleInertiaRequests::class,\n        ]);");
+});
+
+it('keeps a backup the app already has when it backs up the old Vite files', function () {
+    $app = freshApp();
+    $viteConfig = file_get_contents("{$app}/vite.config.js");
+    file_put_contents("{$app}/vite.config.js.bak", 'an earlier backup');
+
+    $this->artisan('keystone:install')->assertSuccessful()->run();
+
+    expect(file_get_contents("{$app}/vite.config.js.bak"))->toBe('an earlier backup')
+        ->and(file_get_contents("{$app}/vite.config.js.bak.1"))->toBe($viteConfig)
+        ->and("{$app}/vite.config.js")->not->toBeFile();
+});
+
+it('sets up Inertia and Vue when app.js is only what Laravel\'s skeleton ships', function (string $js) {
+    $app = freshApp();
+    file_put_contents("{$app}/resources/js/app.js", $js);
+
+    $this->artisan('keystone:install')->assertSuccessful()->run();
+
+    expect("{$app}/resources/js/app.ts")->toBeFile()
+        ->and("{$app}/vite.config.ts")->toBeFile()
+        ->and("{$app}/resources/js/app.js")->not->toBeFile()
+        ->and(file_get_contents("{$app}/resources/js/app.js.bak"))->toBe($js);
+})->with([
+    'an empty file' => '',
+    'a comment' => "// mine\n",
+    'the bootstrap import' => "import './bootstrap';\n",
+]);
+
+it('leaves a Vite setup it doesn\'t recognise alone, and says how to set up Inertia and Vue', function (array $files) {
+    $app = freshApp();
+    $untouched = ['vite.config.js', 'resources/js/app.js', 'resources/views/welcome.blade.php', 'bootstrap/app.php'];
+
+    foreach ($files as $file => $contents) {
+        @mkdir(dirname("{$app}/{$file}"), recursive: true);
+        file_put_contents("{$app}/{$file}", $contents);
+    }
+
+    $snapshot = fn () => array_map(fn (string $file) => file_get_contents("{$app}/{$file}"), array_combine($untouched, $untouched));
+    $before = $snapshot();
+
+    $this->artisan('keystone:install')
+        ->expectsOutputToContain('resources/js/app.ts')
+        ->assertSuccessful()
+        ->run();
+
+    expect($snapshot())->toBe($before)
+        ->and("{$app}/vite.config.js.bak")->not->toBeFile()
+        ->and("{$app}/resources/js/app.js.bak")->not->toBeFile()
+        ->and("{$app}/vite.config.ts")->not->toBeFile()
+        ->and("{$app}/resources/js/app.ts")->not->toBeFile()
+        ->and("{$app}/app/Http/Middleware/HandleInertiaRequests.php")->not->toBeFile()
+        ->and("{$app}/app/Http/Controllers/Auth/SignInController.php")->toBeFile();
+})->with([
+    'its own code in app.js' => [['resources/js/app.js' => "import './bootstrap';\nimport Alpine from 'alpinejs';\n\nAlpine.start();\n"]],
+    'a layout that loads app.js' => [['resources/views/layouts/app.blade.php' => "<html>@vite(['resources/css/app.css', 'resources/js/app.js'])</html>"]],
+]);
+
+it('finishes wiring Inertia and Vue when an earlier run failed after copying the stubs', function () {
+    $app = freshApp();
+    $viteConfig = file_get_contents("{$app}/vite.config.js");
+    $web = file_get_contents("{$app}/routes/web.php");
+    unlink("{$app}/routes/web.php");
+
+    expect(fn () => $this->artisan('keystone:install')->run())->toThrow(FileNotFoundException::class);
+
+    file_put_contents("{$app}/routes/web.php", $web);
+    $this->artisan('keystone:install')->assertSuccessful()->run();
+
+    expect(file_get_contents("{$app}/bootstrap/app.php"))->toContain('\\App\\Http\\Middleware\\HandleInertiaRequests::class,')
+        ->and(file_get_contents("{$app}/resources/views/welcome.blade.php"))->toContain("'resources/js/app.ts'")
+        ->and(file_get_contents("{$app}/routes/web.php"))->toContain("require __DIR__.'/keystone.php';")
+        ->and(file_get_contents("{$app}/vite.config.js.bak"))->toBe($viteConfig)
+        ->and("{$app}/vite.config.js.bak.1")->not->toBeFile();
+});
+
+it('changes nothing when it runs again', function () {
+    $app = freshApp();
+    $this->artisan('keystone:install')->assertSuccessful()->run();
+    $before = treeOf($app);
+
+    $this->artisan('keystone:install')->assertSuccessful()->run();
+
+    expect(treeOf($app))->toBe($before);
 });
 
 it('leaves an app that already has Inertia and Vue set up as it is', function () {
@@ -347,6 +520,19 @@ it('says what the user model needs when it can\'t edit it', function () {
         ->expectsOutputToContain('Make App\Models\User implement ClaudioDekker\Keystone\KeystoneUser')
         ->assertSuccessful()
         ->run();
+});
+
+it('says what the user model needs, leaving it as it is, when it has no imports to add the new ones to', function () {
+    $app = freshApp();
+    $model = "<?php\n\nnamespace App\\Models;\n\nclass User extends \\Illuminate\\Foundation\\Auth\\User\n{\n}\n";
+    file_put_contents("{$app}/app/Models/User.php", $model);
+
+    $this->artisan('keystone:install')
+        ->expectsOutputToContain('Make App\Models\User implement ClaudioDekker\Keystone\KeystoneUser')
+        ->assertSuccessful()
+        ->run();
+
+    expect(file_get_contents("{$app}/app/Models/User.php"))->toBe($model);
 });
 
 it('says to set the guard driver when it can\'t edit config/auth.php', function () {

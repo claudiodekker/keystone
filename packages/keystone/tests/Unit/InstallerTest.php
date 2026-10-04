@@ -18,6 +18,17 @@ function installerIn(array $files): Installer
     return new Installer($filesystem, $path);
 }
 
+function parses(string $php): bool
+{
+    try {
+        token_get_all($php, TOKEN_PARSE);
+    } catch (ParseError) {
+        return false;
+    }
+
+    return true;
+}
+
 it('adds KeystoneUser to the interfaces a user model already implements', function () {
     $installer = installerIn(['app/Models/User.php' => "<?php\n\nnamespace App\\Models;\n\nuse Illuminate\\Foundation\\Auth\\User as Authenticatable;\n\nclass User extends Authenticatable implements MustVerifyEmail\n{\n    use Notifiable;\n}\n"]);
 
@@ -43,6 +54,29 @@ it('leaves a user model it can\'t match unchanged', function () {
     expect($installer->makeKeystoneUser('App\Models\User'))->toBeFalse()
         ->and(file_get_contents($installer->path('app/Models/User.php')))->toBe($model);
 });
+
+it('makes a user model whose trait use has a block a Keystone user without breaking it', function () {
+    $installer = installerIn(['app/Models/User.php' => "<?php\n\nnamespace App\\Models;\n\nuse Illuminate\\Foundation\\Auth\\User as Authenticatable;\n\nclass User extends Authenticatable\n{\n    use HasFactory, Notifiable {\n        notify as protected baseNotify;\n    }\n}\n"]);
+
+    expect($installer->makeKeystoneUser('App\Models\User'))->toBeTrue();
+
+    $model = file_get_contents($installer->path('app/Models/User.php'));
+    expect(parses($model))->toBeTrue()
+        ->and($model)->toContain("implements KeystoneUser\n{\n    use HasKeystone;\n")
+        ->toContain("use HasFactory, Notifiable {\n        notify as protected baseNotify;\n    }");
+});
+
+it('leaves a user model it can\'t edit safely unchanged', function (string $model) {
+    $installer = installerIn(['app/Models/User.php' => $model]);
+
+    expect($installer->makeKeystoneUser('App\Models\User'))->toBeFalse()
+        ->and(file_get_contents($installer->path('app/Models/User.php')))->toBe($model);
+})->with([
+    'a fully qualified parent and no imports to put the new ones before' => "<?php\n\nnamespace App\\Models;\n\nclass User extends \\Illuminate\\Foundation\\Auth\\User\n{\n}\n",
+    'interfaces over several lines' => "<?php\n\nnamespace App\\Models;\n\nuse Illuminate\\Foundation\\Auth\\User as Authenticatable;\n\nclass User extends Authenticatable implements MustVerifyEmail,\n    Foo\n{\n}\n",
+    'a comment after the interfaces' => "<?php\n\nnamespace App\\Models;\n\nuse Illuminate\\Foundation\\Auth\\User as Authenticatable;\n\nclass User extends Authenticatable implements MustVerifyEmail // verified\n{\n}\n",
+    'a file that doesn\'t parse' => "<?php\n\nnamespace App\\Models;\n\nuse Illuminate\\Foundation\\Auth\\User as Authenticatable;\n\nclass User extends Authenticatable\n{\n    public function name(): string\n    {\n        return 'a'\n    }\n}\n",
+]);
 
 it('replaces a variable the environment already sets', function () {
     $installer = installerIn(['.env' => "APP_NAME=\"My App\"\nSESSION_COOKIE=old\n"]);

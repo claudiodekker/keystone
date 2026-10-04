@@ -6,6 +6,8 @@ use Closure;
 use Composer\InstalledVersions;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Str;
+use ParseError;
+use stdClass;
 use Symfony\Component\Finder\SplFileInfo;
 
 /**
@@ -108,15 +110,21 @@ class Installer
     }
 
     /**
-     * Move the app's file aside to a .bak copy.
+     * Move the app's file aside to a .bak copy, numbering the copy when one exists already.
      */
     public function backUp(string $path): bool
     {
-        if (! $this->files->exists($this->path($path))) {
+        if (! $this->has($path)) {
             return false;
         }
 
-        return $this->files->move($this->path($path), $this->path("{$path}.bak"));
+        $backup = "{$path}.bak";
+
+        for ($copy = 1; $this->has($backup); $copy++) {
+            $backup = "{$path}.bak.{$copy}";
+        }
+
+        return $this->files->move($this->path($path), $this->path($backup));
     }
 
     /**
@@ -133,7 +141,7 @@ class Installer
     }
 
     /**
-     * Make the user model implement KeystoneUser and use HasKeystone, reporting false when its file can't be edited.
+     * Make the user model implement KeystoneUser and use HasKeystone, reporting false when its file can't be edited safely.
      */
     public function makeKeystoneUser(string $model): bool
     {
@@ -149,31 +157,59 @@ class Installer
             return true;
         }
 
-        $class = class_basename($model);
-        $imports = "use ClaudioDekker\\Keystone\\HasKeystone;\nuse ClaudioDekker\\Keystone\\KeystoneUser;\n";
+        $edited = $this->withKeystoneUser($source, class_basename($model));
 
-        $patterns = [
-            '/^use /m' => $imports.'use ',
-            "/^(class {$class} extends [\\w\\\\]+) implements ([^\\n{]+?)\\s*$/m" => '$1 implements $2, KeystoneUser',
-            "/^(class {$class} extends [\\w\\\\]+)\\s*$/m" => '$1 implements KeystoneUser',
-            '/^(    use [^;(]+);/m' => '$1, HasKeystone;',
-        ];
-
-        foreach ($patterns as $pattern => $replacement) {
-            $source = preg_replace($pattern, $replacement, $source, limit: 1) ?? $source;
-        }
-
-        if (! str_contains($source, 'implements KeystoneUser') && ! str_contains($source, ', KeystoneUser')) {
+        if ($edited === null || ! $this->parses($edited)) {
             return false;
         }
 
-        if (! str_contains($source, ', HasKeystone;')) {
-            $source = preg_replace('/^(class .+\n\{\n)/m', "\$1    use HasKeystone;\n\n", $source, limit: 1) ?? $source;
-        }
-
-        $this->files->put($path, $source);
+        $this->files->put($path, $edited);
 
         return true;
+    }
+
+    /**
+     * Get the model's source with KeystoneUser implemented and HasKeystone used, or null when it isn't shaped the way every step can match.
+     */
+    protected function withKeystoneUser(string $source, string $class): ?string
+    {
+        $imported = $this->replaceOnce('/^use /m', "use ClaudioDekker\\Keystone\\HasKeystone;\nuse ClaudioDekker\\Keystone\\KeystoneUser;\nuse ", $source);
+
+        if ($imported === null) {
+            return null;
+        }
+
+        $implemented = $this->replaceOnce("/^(class {$class} extends [\\w\\\\]+) implements ([\\w\\\\]+(?:, *[\\w\\\\]+)*)[ \\t]*$/m", '$1 implements $2, KeystoneUser', $imported)
+            ?? $this->replaceOnce("/^(class {$class} extends [\\w\\\\]+)[ \\t]*$/m", '$1 implements KeystoneUser', $imported);
+
+        if ($implemented === null) {
+            return null;
+        }
+
+        return $this->replaceOnce('/^(    use [\\w\\\\]+(?:, *[\\w\\\\]+)*);$/m', '$1, HasKeystone;', $implemented)
+            ?? $this->replaceOnce("/^(class {$class} .+\\n\\{\\n)/m", "\$1    use HasKeystone;\n\n", $implemented);
+    }
+
+    /**
+     * Replace the first match of the pattern, or get null when there is none.
+     */
+    protected function replaceOnce(string $pattern, string $replacement, string $subject): ?string
+    {
+        $replaced = preg_replace($pattern, $replacement, $subject, limit: 1, count: $count);
+
+        return $count === 1 ? $replaced : null;
+    }
+
+    /**
+     * Determine if the PHP source parses.
+     */
+    protected function parses(string $source): bool
+    {
+        try {
+            return token_get_all($source, TOKEN_PARSE) !== [];
+        } catch (ParseError) {
+            return false;
+        }
     }
 
     /**
@@ -242,8 +278,9 @@ class Installer
     {
         $path = $this->path('phpunit.xml');
         $xml = $this->files->exists($path) ? $this->files->get($path) : '';
+        $suite = '/<testsuite\s+name="Keystone"\s*(?:\/>|>(.*?)<\/testsuite>)/s';
 
-        if (! str_contains($xml, '<testsuite name="Keystone">')) {
+        if (preg_match($suite, $xml) !== 1) {
             if (! str_contains($xml, '</testsuites>')) {
                 return false;
             }
@@ -251,16 +288,20 @@ class Installer
             $xml = str_replace('</testsuites>', "    <testsuite name=\"Keystone\">\n        </testsuite>\n    </testsuites>", $xml);
         }
 
-        foreach ($directories as $directory) {
-            if (! str_contains($xml, "<directory>{$directory}</directory>")) {
-                $xml = preg_replace(
-                    '/(<testsuite name="Keystone">.*?)(\n\s*<\/testsuite>)/s',
-                    "\$1\n            <directory>{$directory}</directory>\$2",
-                    $xml,
-                    limit: 1,
-                ) ?? $xml;
+        $xml = preg_replace_callback($suite, function (array $match) use ($directories) {
+            $body = rtrim($match[1] ?? '');
+            $missing = array_filter($directories, fn (string $directory) => ! str_contains($body, "<directory>{$directory}</directory>"));
+
+            if ($missing === []) {
+                return $match[0];
             }
-        }
+
+            foreach ($missing as $directory) {
+                $body .= "\n            <directory>{$directory}</directory>";
+            }
+
+            return "<testsuite name=\"Keystone\">{$body}\n        </testsuite>";
+        }, $xml, limit: 1) ?? $xml;
 
         $this->files->put($path, $xml);
 
@@ -325,11 +366,12 @@ class Installer
      */
     public function mapAutoloadDev(array $namespaces): void
     {
-        $manifest = $this->readJson('composer.json');
-        $mapped = $manifest['autoload-dev']['psr-4'] ?? [];
-        $manifest['autoload-dev']['psr-4'] = [...$mapped, ...array_diff_key($namespaces, $mapped)];
+        $this->editJson('composer.json', function (stdClass $manifest) use ($namespaces) {
+            $autoload = $manifest->{'autoload-dev'} ??= new stdClass;
+            $mapped = (array) ($autoload->{'psr-4'} ?? []);
 
-        $this->writeJson('composer.json', $manifest);
+            $autoload->{'psr-4'} = (object) [...$mapped, ...array_diff_key($namespaces, $mapped)];
+        });
     }
 
     /**
@@ -339,18 +381,62 @@ class Installer
      */
     public function addNpmPackages(array $packages): void
     {
-        $manifest = $this->readJson('package.json');
-        $devDependencies = [...$manifest['devDependencies'] ?? []];
-        $installed = [...$manifest['dependencies'] ?? [], ...$devDependencies, ...$manifest['peerDependencies'] ?? []];
+        $this->editJson('package.json', function (stdClass $manifest) use ($packages) {
+            $devDependencies = (array) ($manifest->devDependencies ?? []);
+            $installed = [...(array) ($manifest->dependencies ?? []), ...$devDependencies, ...(array) ($manifest->peerDependencies ?? [])];
+            $missing = array_diff_key($packages, $installed);
 
-        foreach (array_diff_key($packages, $installed) as $package => $version) {
-            $devDependencies[$package] = $version;
+            if ($missing === []) {
+                return;
+            }
+
+            $devDependencies = [...$devDependencies, ...$missing];
+            ksort($devDependencies);
+
+            $manifest->devDependencies = (object) $devDependencies;
+        });
+    }
+
+    /**
+     * Determine if the app's file is the stub's, byte for byte.
+     */
+    public function matchesStub(string $stubs, string $path): bool
+    {
+        return $this->has($path) && $this->files->get($this->path($path)) === $this->files->get("{$stubs}/{$path}");
+    }
+
+    /**
+     * Determine if resources/js/app.js is Laravel's skeleton entry and no view but welcome.blade.php loads it, so replacing it breaks nothing else.
+     */
+    public function hasStockViteEntry(): bool
+    {
+        if (! $this->has('resources/js/app.js')) {
+            return false;
         }
 
-        ksort($devDependencies);
-        $manifest['devDependencies'] = $devDependencies;
+        $code = array_filter(
+            array_map('trim', explode("\n", $this->files->get($this->path('resources/js/app.js')))),
+            fn (string $line) => $line !== '' && ! str_starts_with($line, '//') && preg_match('/^import\s+[\'"]\.\/bootstrap[\'"];?$/', $line) !== 1,
+        );
 
-        $this->writeJson('package.json', $manifest);
+        return $code === [] && ! $this->isLoadedOutsideWelcome('resources/js/app.js');
+    }
+
+    /**
+     * Determine if a view other than welcome.blade.php mentions the Vite entry.
+     */
+    protected function isLoadedOutsideWelcome(string $entry): bool
+    {
+        if (! $this->files->isDirectory($this->path('resources/views'))) {
+            return false;
+        }
+
+        $views = array_filter(
+            $this->files->allFiles($this->path('resources/views')),
+            fn (SplFileInfo $view) => str_replace('\\', '/', $view->getRelativePathname()) !== 'welcome.blade.php',
+        );
+
+        return array_filter($views, fn (SplFileInfo $view) => str_contains($view->getContents(), $entry)) !== [];
     }
 
     /**
@@ -382,14 +468,27 @@ class Installer
     }
 
     /**
-     * Write a JSON file of the app the way composer and npm do.
+     * Edit a JSON file of the app, keeping its indentation and leaving the file alone when the edit changes nothing.
      *
-     * @param  array<string, mixed>  $data
+     * @param  Closure(stdClass): void  $edit
      */
-    protected function writeJson(string $path, array $data): void
+    protected function editJson(string $path, Closure $edit): void
     {
-        $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        $json = $this->files->exists($this->path($path)) ? $this->files->get($this->path($path)) : '{}';
+        $manifest = json_decode($json, flags: JSON_THROW_ON_ERROR);
+        $before = json_encode($manifest, JSON_THROW_ON_ERROR);
 
-        $this->files->put($this->path($path), $json."\n");
+        $edit($manifest);
+
+        if (json_encode($manifest, JSON_THROW_ON_ERROR) === $before) {
+            return;
+        }
+
+        $edited = json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        $indent = preg_match('/^([ \t]+)"/m', $json, $match) === 1 ? $match[1] : '    ';
+
+        $indented = preg_replace_callback('/^(?: {4})+/m', fn (array $spaces) => str_repeat($indent, intdiv(strlen($spaces[0]), 4)), $edited);
+
+        $this->files->put($this->path($path), $indented."\n");
     }
 }
