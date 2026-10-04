@@ -16,11 +16,13 @@ const routes = { 'sign-in': submit, challenge: submitChallenge, enrollment: subm
 
 const action = computed(() => routes[props.surface].form({ type: props.option.type }));
 
+const secretFields = ['password', 'code'];
+
 const labels = { 'sign-in': 'Sign in', challenge: 'Verify', enrollment: 'Set up' };
 </script>
 
 <template>
-    <Form v-bind="action" v-slot="{ errors, processing }" class="flex flex-col gap-4">
+    <Form v-bind="action" :reset-on-error="secretFields" v-slot="{ errors, processing }" class="flex flex-col gap-4">
         <div v-if="surface === 'sign-in'" class="flex flex-col gap-2">
             <label :for="`${option.type}-identifier`" class="text-sm font-medium text-gray-900">Email address</label>
             <input

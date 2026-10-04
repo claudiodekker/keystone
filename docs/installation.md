@@ -81,3 +81,5 @@ In a bare Laravel app, the installer also sets up Inertia and Vue. That is an ap
 An app that already has `resources/js/app.ts`, such as one made from the Laravel Vue starter kit, keeps its own setup. So does an app with any other Vite setup, such as Livewire, or Blade layouts that load `resources/js/app.js`: the installer leaves its Vite files alone and lists the files that set up Inertia and Vue, for you to add yourself.
 
 Keystone's pages are kept encrypted in the browser's history, and signing out clears it, so Back after signing out shows none of them.
+
+After a refused answer, the form clears the `password` and `code` fields so the user types them again, and keeps what else was typed. A partial for a type with another secret field adds its name to `secretFields` in `partials/shapes/Form.vue`.

@@ -23,7 +23,7 @@ defineProps<RecoveryCodesPage>();
         <li v-for="code in codes" :key="code">{{ code }}</li>
     </ul>
 
-    <Form v-bind="submit.form()" v-slot="{ errors, processing }" class="flex flex-col gap-4">
+    <Form v-bind="submit.form()" :reset-on-error="['code']" v-slot="{ errors, processing }" class="flex flex-col gap-4">
         <div class="flex flex-col gap-2">
             <label for="recovery-code" class="text-sm font-medium text-gray-900">Type one of the codes to confirm you saved them</label>
             <input
