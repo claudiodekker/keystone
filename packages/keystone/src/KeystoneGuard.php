@@ -130,6 +130,8 @@ class KeystoneGuard extends SessionGuard
 
     /**
      * Note that the pending sign-in of an active account passed its second factor, holding it on at enrollment for what it still owes and keeping the time it was held.
+     *
+     * @throws Barred
      */
     public function passSecondFactor(): void
     {
@@ -141,8 +143,12 @@ class KeystoneGuard extends SessionGuard
 
         $account = $this->retrieveAccount($held['account'] ?? null);
 
-        if (is_null($account) || ! $this->isActive($account)) {
-            throw new LogicException('The account being moved on no longer exists, or is disabled or suspended.');
+        if (is_null($account)) {
+            throw Barred::missing();
+        }
+
+        if (! $this->isActive($account)) {
+            throw Barred::inactive();
         }
 
         $this->changeAuthLevel();
