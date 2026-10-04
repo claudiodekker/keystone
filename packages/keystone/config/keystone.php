@@ -108,12 +108,12 @@ return [
     */
 
     'notifications' => [
-        'sessions.terminated' => SecurityAlert::class,
         'account.suspended' => SecurityAlert::class,
         'account.unsuspended' => SecurityAlert::class,
+        'credential.added' => SecurityAlert::class,
         'recovery_code.used' => SecurityAlert::class,
         'recovery_codes.generated' => SecurityAlert::class,
-        'credential.added' => SecurityAlert::class,
+        'sessions.terminated' => SecurityAlert::class,
     ],
 
     /*
