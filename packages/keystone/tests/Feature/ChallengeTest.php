@@ -87,9 +87,7 @@ describe('the challenge page', function () {
         $this->createChallengedAccount(new FormTypeSupport('code'));
         $this->passFirstFactor();
 
-        $this->get(route('login.challenge'))->assertOk();
-
-        Sleep::assertSleptTimes(1);
+        $this->assertWaitsOutTimingFloor(fn () => $this->get(route('login.challenge')))->assertOk();
     });
 
     it('drops a held sign-in that expired without recording it as voided', function () {
@@ -237,15 +235,14 @@ describe('answers', function () {
     it('refuses inside the timing floor, and returns early once signed in', function () {
         $this->createChallengedAccount(new FormTypeSupport('code'));
         $this->passFirstFactor();
+
+        $this->assertWaitsOutTimingFloor(fn () => $this->post(route('login.challenge.submit', ['type' => 'code']), (new FormTypeSupport('code'))->rejectedProof(Surface::CHALLENGE)));
+
         Sleep::fake();
-
-        $this->post(route('login.challenge.submit', ['type' => 'code']), (new FormTypeSupport('code'))->rejectedProof(Surface::CHALLENGE));
-
-        Sleep::assertSleptTimes(1);
 
         $this->post(route('login.challenge.submit', ['type' => 'code']), (new FormTypeSupport('code'))->validProof(Surface::CHALLENGE))->assertRedirect('/');
 
-        Sleep::assertSleptTimes(1);
+        Sleep::assertNeverSlept();
     });
 
     it('closes every ceremony slot when it signs in', function () {

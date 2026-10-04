@@ -214,14 +214,13 @@ describe('answers', function () {
         $account = $this->createChallengedAccount(new FormTypeSupport('code'));
         [$code] = $this->arrangeRecoveryCodes($account);
         $this->passFirstFactor();
+
+        $this->assertWaitsOutTimingFloor(fn () => $this->post(route('login.challenge.submit', ['type' => CredentialTypes::RECOVERY_CODE]), ['code' => 'WRONG-CODE']));
+
         Sleep::fake();
-
-        $this->post(route('login.challenge.submit', ['type' => CredentialTypes::RECOVERY_CODE]), ['code' => 'WRONG-CODE']);
-
-        Sleep::assertSleptTimes(1);
 
         $this->post(route('login.challenge.submit', ['type' => CredentialTypes::RECOVERY_CODE]), ['code' => $code])->assertRedirect('/');
 
-        Sleep::assertSleptTimes(1);
+        Sleep::assertNeverSlept();
     });
 });
