@@ -17,6 +17,29 @@ it('renders the sign-in page with the page value\'s fields', function () {
         ->where('status', null));
 });
 
+it('renders the sign-in page with no identifier when nothing was refused', function () {
+    $response = $this->get(route('login'));
+
+    $response->assertInertia(fn (AssertableInertia $page) => $page->component('auth/Login')->where('identifier', null));
+});
+
+it('fills the sign-in page with the identifier a refused sign-in flashed back', function () {
+    $this->arrangeCredential($this->createAccount(), new PasswordTypeSupport, Surface::SIGN_IN);
+    $this->post(route('login.submit', ['type' => 'password']), ['identifier' => 'jane@example.com', ...(new PasswordTypeSupport)->rejectedProof(Surface::SIGN_IN)]);
+
+    $response = $this->get(route('login'));
+
+    $response->assertInertia(fn (AssertableInertia $page) => $page->component('auth/Login')->where('identifier', 'jane@example.com'));
+});
+
+it('fills the sign-in page with the identifier that invalid input flashed back', function () {
+    $this->post(route('login.submit', ['type' => 'password']), ['identifier' => 'jane@example.com']);
+
+    $response = $this->get(route('login'));
+
+    $response->assertInertia(fn (AssertableInertia $page) => $page->component('auth/Login')->where('identifier', 'jane@example.com'));
+});
+
 it('encrypts the sign-in page in the browser\'s history', function () {
     $response = $this->get(route('login'));
 
