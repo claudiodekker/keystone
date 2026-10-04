@@ -12,4 +12,5 @@ Deriving the epoch move from what the change did, rather than having each flow r
 - `sessions.terminated` is recorded with actor `operator` and the operator the command or job names, in a fixed `operator` field (cut to 64 characters, control characters replaced), since events carry no free-form metadata.
 - `--all` moves every account's epoch in one query, the operator's own session included, and records one `sessions.terminated` about nobody, with reason `keystone.every_account`. Like every event about nobody it is a log line only, not a row on each account's trail, so ending every session costs one update however many accounts there are.
 - Ending an account's sessions doesn't yet forget its known devices: they don't exist yet, and arrive with their own ticket (#41), which hooks into the unit. It alerts the owner at the recipients the unit read before the change, unless the operator suppresses it (ADR 0015).
-- Owes state doesn't exist yet either; the unit recomputes it once the owed-challenge and enrollment tickets add it.
+- What an account owes is read from its credentials and recovery codes when it is needed (ADR 0018), so the unit stores nothing for it.
+- An arch test keeps the writers of `Credentials` and `RecoveryCodes` (`store`, `replaceSecret`, `replace`, `spend`) inside `AccountChange`, so a later flow can't write around the unit.
