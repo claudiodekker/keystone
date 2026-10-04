@@ -333,6 +333,18 @@ it('sets up Inertia and Vue in a bare app, keeping its old Vite files as backups
         ->and(file_get_contents("{$app}/bootstrap/app.php"))->toContain("\$middleware->web(append: [\n            \\App\\Http\\Middleware\\HandleInertiaRequests::class,\n        ]);");
 });
 
+it('keeps a backup the app already has when it backs up the old Vite files', function () {
+    $app = freshApp();
+    $viteConfig = file_get_contents("{$app}/vite.config.js");
+    file_put_contents("{$app}/vite.config.js.bak", 'an earlier backup');
+
+    $this->artisan('keystone:install')->assertSuccessful()->run();
+
+    expect(file_get_contents("{$app}/vite.config.js.bak"))->toBe('an earlier backup')
+        ->and(file_get_contents("{$app}/vite.config.js.bak.1"))->toBe($viteConfig)
+        ->and("{$app}/vite.config.js")->not->toBeFile();
+});
+
 it('leaves an app that already has Inertia and Vue set up as it is', function () {
     $app = freshApp();
     file_put_contents("{$app}/resources/js/app.ts", '// mine');

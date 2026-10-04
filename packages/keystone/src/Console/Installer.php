@@ -110,15 +110,21 @@ class Installer
     }
 
     /**
-     * Move the app's file aside to a .bak copy.
+     * Move the app's file aside to a .bak copy, numbering the copy when one exists already.
      */
     public function backUp(string $path): bool
     {
-        if (! $this->files->exists($this->path($path))) {
+        if (! $this->has($path)) {
             return false;
         }
 
-        return $this->files->move($this->path($path), $this->path("{$path}.bak"));
+        $backup = "{$path}.bak";
+
+        for ($copy = 1; $this->has($backup); $copy++) {
+            $backup = "{$path}.bak.{$copy}";
+        }
+
+        return $this->files->move($this->path($path), $this->path($backup));
     }
 
     /**

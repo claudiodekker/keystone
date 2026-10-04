@@ -76,6 +76,6 @@ Keystone stores and matches an address trimmed, Unicode NFC-composed, lowercased
 
 The pages build their URLs with [Wayfinder](https://github.com/laravel/wayfinder), generated when Vite builds; don't commit its output (`resources/js/actions`, `resources/js/routes` and `resources/js/wayfinder`).
 
-In an app without `resources/js/app.ts`, the installer also sets up Inertia and Vue: it copies `vite.config.ts`, `tsconfig.json`, `resources/js/app.ts`, the `app` root view and a `HandleInertiaRequests` middleware, which it adds to the `web` group. It keeps your `vite.config.js` and `resources/js/app.js` as `.bak` files and points `welcome.blade.php` at `app.ts`. An app that already has `resources/js/app.ts`, such as one made from the Laravel Vue starter kit, keeps its own setup.
+In an app without `resources/js/app.ts`, the installer also sets up Inertia and Vue: it copies `vite.config.ts`, `tsconfig.json`, `resources/js/app.ts`, the `app` root view and a `HandleInertiaRequests` middleware, which it adds to the `web` group. It keeps your `vite.config.js` and `resources/js/app.js` as `.bak` files, numbering the copy (`.bak.1`) when a backup exists already, and points `welcome.blade.php` at `app.ts`. An app that already has `resources/js/app.ts`, such as one made from the Laravel Vue starter kit, keeps its own setup.
 
 Keystone's pages are kept encrypted in the browser's history, and signing out clears it, so Back after signing out shows none of them.
