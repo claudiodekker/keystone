@@ -9,11 +9,9 @@ use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Notifications\SecurityAlert;
+use ClaudioDekker\Keystone\Notifications\SecurityEventAlert;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notification;
-use ReflectionClass;
-use ReflectionNamedType;
-use ReflectionParameter;
 
 /**
  * @internal
@@ -210,8 +208,8 @@ class BootChecks
             return "keystone.notifications.{$key} must be null or the class name of a notification.";
         }
 
-        if (! $this->takesEvent($slot)) {
-            return "keystone.notifications.{$key} must name a notification whose constructor takes the security event as \$event.";
+        if (! is_a($slot, SecurityEventAlert::class, true)) {
+            return "keystone.notifications.{$key} must name a notification that implements ".SecurityEventAlert::class.'.';
         }
 
         if ($slot === SecurityAlert::class && ! SecurityAlert::handles($type)) {
@@ -219,29 +217,6 @@ class BootChecks
         }
 
         return null;
-    }
-
-    /**
-     * Determine if the notification's constructor takes a security event as `$event`, the name the recorder passes it by, trusting a union or intersection type.
-     *
-     * @param  class-string<Notification>  $notification
-     */
-    protected function takesEvent(string $notification): bool
-    {
-        $parameters = (new ReflectionClass($notification))->getConstructor()?->getParameters() ?? [];
-        $event = array_find($parameters, fn (ReflectionParameter $parameter) => $parameter->getName() === 'event');
-
-        if ($event === null) {
-            return false;
-        }
-
-        $type = $event->getType();
-
-        if (! $type instanceof ReflectionNamedType) {
-            return true;
-        }
-
-        return in_array($type->getName(), ['mixed', 'object'], true) || is_a(SecurityEvent::class, $type->getName(), true);
     }
 
     /**

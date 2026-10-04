@@ -18,7 +18,7 @@ use Throwable;
 /**
  * @api
  */
-class SecurityAlert extends Notification implements ShouldBeEncrypted, ShouldQueue
+class SecurityAlert extends Notification implements SecurityEventAlert, ShouldBeEncrypted, ShouldQueue
 {
     use Queueable;
 

@@ -5,11 +5,9 @@ use ClaudioDekker\Keystone\Exceptions\Misconfigured;
 use ClaudioDekker\Keystone\KeystoneServiceProvider;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Notifications\SecurityAlert;
+use ClaudioDekker\Keystone\Notifications\SecurityEventAlert;
 use ClaudioDekker\Keystone\Tests\Fixtures\FlakyAlert;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormType;
-use ClaudioDekker\Keystone\Tests\Fixtures\LooseEventAlert;
-use ClaudioDekker\Keystone\Tests\Fixtures\MisnamedEventAlert;
-use ClaudioDekker\Keystone\Tests\Fixtures\MistypedEventAlert;
 use ClaudioDekker\Keystone\Tests\Fixtures\UserOnOtherConnection;
 use Illuminate\Notifications\Notification;
 
@@ -162,16 +160,16 @@ describe('the alert slots', function () {
         expect($failures)->toBe(["keystone.notifications.{$type} can't use SecurityAlert, which has no mail for that type: name your own notification class or null."]);
     })->with(['a rejected proof' => ['proof.rejected'], 'a sign-in' => ['signed_in']]);
 
-    it('refuses a notification whose constructor doesn\'t take the event as $event', function (string $slot) {
-        config(['keystone.notifications' => ['signed_out' => $slot]]);
+    it('refuses a notification that can\'t be built from the event', function () {
+        config(['keystone.notifications' => ['signed_out' => Notification::class]]);
 
         $failures = bootFailures();
 
-        expect($failures)->toBe(['keystone.notifications.signed_out must name a notification whose constructor takes the security event as $event.']);
-    })->with(['no constructor' => [Notification::class], 'the event under another name' => [MisnamedEventAlert::class], 'something else as $event' => [MistypedEventAlert::class]]);
+        expect($failures)->toBe(['keystone.notifications.signed_out must name a notification that implements '.SecurityEventAlert::class.'.']);
+    });
 
-    it('accepts the app\'s own notification taking any model as $event', function () {
-        config(['keystone.notifications' => ['proof.rejected' => LooseEventAlert::class]]);
+    it('accepts the app\'s own notification for a type SecurityAlert has no mail for', function () {
+        config(['keystone.notifications' => ['proof.rejected' => FlakyAlert::class]]);
 
         $failures = bootFailures();
 
