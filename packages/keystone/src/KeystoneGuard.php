@@ -319,13 +319,15 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Refuse to sign the user in; only Keystone signs anyone in.
+     * Refuse to sign the user in by throwing, so a caller expecting a session doesn't carry on without one.
      *
      * @param  bool  $remember
+     *
+     * @throws LogicException
      */
     public function login(Authenticatable $user, $remember = false)
     {
-        //
+        throw new LogicException("Auth::login() can't sign anyone in; only Keystone signs anyone in.");
     }
 
     /**

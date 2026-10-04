@@ -216,7 +216,7 @@ it('signs nobody in through the SessionGuard credential and session methods', fu
     'once' => fn (KeystoneGuard $guard) => expect($guard->once(['email' => 'taylor@example.com', 'password' => 'secret']))->toBeFalse(),
     'basic' => fn (KeystoneGuard $guard) => $guard->basic(),
     'onceBasic' => fn (KeystoneGuard $guard) => $guard->onceBasic(),
-    'login' => fn (KeystoneGuard $guard, User $user) => $guard->login($user, remember: true),
+    'login' => fn (KeystoneGuard $guard, User $user) => expect(fn () => $guard->login($user, remember: true))->toThrow(\LogicException::class, "Auth::login() can't sign anyone in"),
     'onceUsingId' => fn (KeystoneGuard $guard, User $user) => expect($guard->onceUsingId($user->getKey()))->toBeFalse(),
     'loginUsingId' => fn (KeystoneGuard $guard, User $user) => expect($guard->loginUsingId($user->getKey()))->toBeFalse(),
 ]);

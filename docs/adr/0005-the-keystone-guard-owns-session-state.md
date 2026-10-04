@@ -7,6 +7,6 @@ Checking inside the guard, rather than in middleware or listeners, means a route
 ## Consequences
 
 - Sessions and `remember_web_*` cookies from before Keystone carry no epoch stamp and end on their first request, so every user signs in again at cutover.
-- `Auth::attempt()`, `auth.basic` and `Auth::login()` stop working in the app. Anything that signed users in that way must go through Keystone. Tests still sign a user in with `actingAs()`, which sets the user for the test's requests without starting a session.
+- `Auth::attempt()`, `auth.basic` and `Auth::login()` stop working in the app: the first two refuse, and `Auth::login()` throws a `LogicException`, since it has no way to report a refusal. Anything that signed users in that way must go through Keystone. Tests still sign a user in with `actingAs()`, which sets the user for the test's requests without starting a session.
 - Each authenticated request costs one primary-key read of the user row, the same as Laravel's own guard.
 - Ending a session invalidates the whole session, so in an app with several guards on one session, a dead Keystone session signs the user out of the others too.
