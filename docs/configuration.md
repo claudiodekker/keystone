@@ -86,7 +86,7 @@ In every environment, it refuses:
 - two installed packages registering credential types with one name, or a type named `recovery-code`, which Keystone keeps for recovery codes;
 - a setting of an installed method package's own config that the package refuses, such as a `keystone-totp.window_steps` below 0 (see [TOTP](totp.md#the-window));
 - a `log_channel` that isn't one of your `logging.channels`;
-- a `notifications` slot for a type that isn't a security event, or holding anything but `null` or a notification class;
+- a `notifications` slot for a type that isn't a security event, holding anything but `null` or a notification class, naming a notification whose constructor doesn't take the event as `$event`, or naming `SecurityAlert` for a type it has no mail for (see [Security alerts](security-alerts.md#changing-or-silencing-an-alert));
 - a user model on another database connection than your default one, which Keystone's tables are migrated on.
 
 In production it also refuses what's fine on a laptop but unsafe on a server:

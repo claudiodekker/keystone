@@ -8,8 +8,12 @@ use ClaudioDekker\Keystone\Http\Middleware\ClearSiteDataOnSessionEnd;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
+use ClaudioDekker\Keystone\Notifications\SecurityAlert;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notification;
+use ReflectionClass;
+use ReflectionNamedType;
+use ReflectionParameter;
 
 /**
  * @internal
@@ -170,28 +174,74 @@ class BootChecks
     }
 
     /**
-     * Check that each alert slot names a type of security event and holds null or a notification class.
+     * Check that each alert slot names a type of security event and holds null or a notification that can alert about it.
      *
      * @return list<string>
      */
     protected function alertFailures(): array
     {
         $slots = config('keystone.notifications');
-        $failures = [];
 
         if (! $this->isMap($slots)) {
             return ['keystone.notifications must map types of security event to a notification class or null.'];
         }
 
-        foreach ($slots as $type => $slot) {
-            if (SecurityEventType::tryFrom((string) $type) === null) {
-                $failures[] = "keystone.notifications.{$type} isn't a type of security event.";
-            } elseif ($slot !== null && ! (is_string($slot) && is_a($slot, Notification::class, true))) {
-                $failures[] = "keystone.notifications.{$type} must be null or the class name of a notification.";
-            }
+        $failures = array_map($this->slotFailure(...), array_keys($slots), $slots);
+
+        return array_values(array_filter($failures));
+    }
+
+    /**
+     * Check one alert slot, returning why it is refused or null when it is fine.
+     */
+    protected function slotFailure(int|string $key, mixed $slot): ?string
+    {
+        $type = SecurityEventType::tryFrom((string) $key);
+
+        if ($type === null) {
+            return "keystone.notifications.{$key} isn't a type of security event.";
         }
 
-        return $failures;
+        if ($slot === null) {
+            return null;
+        }
+
+        if (! is_string($slot) || ! is_a($slot, Notification::class, true)) {
+            return "keystone.notifications.{$key} must be null or the class name of a notification.";
+        }
+
+        if (! $this->takesEvent($slot)) {
+            return "keystone.notifications.{$key} must name a notification whose constructor takes the security event as \$event.";
+        }
+
+        if ($slot === SecurityAlert::class && ! SecurityAlert::handles($type)) {
+            return "keystone.notifications.{$key} can't use SecurityAlert, which has no mail for that type: name your own notification class or null.";
+        }
+
+        return null;
+    }
+
+    /**
+     * Determine if the notification's constructor takes a security event as `$event`, the name the recorder passes it by, trusting a union or intersection type.
+     *
+     * @param  class-string<Notification>  $notification
+     */
+    protected function takesEvent(string $notification): bool
+    {
+        $parameters = (new ReflectionClass($notification))->getConstructor()?->getParameters() ?? [];
+        $event = array_find($parameters, fn (ReflectionParameter $parameter) => $parameter->getName() === 'event');
+
+        if ($event === null) {
+            return false;
+        }
+
+        $type = $event->getType();
+
+        if (! $type instanceof ReflectionNamedType) {
+            return true;
+        }
+
+        return in_array($type->getName(), ['mixed', 'object'], true) || is_a(SecurityEvent::class, $type->getName(), true);
     }
 
     /**

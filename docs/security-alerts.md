@@ -47,7 +47,7 @@ To change the wording, override the keys under `keystone::alerts` in `lang/vendo
 ],
 ```
 
-Keystone builds your notification through the container, passing the event as `$event`, and sends it on demand to each recipient's address:
+Keystone builds your notification through the container, passing the event as `$event`, and sends it on demand to each recipient's address. Its constructor must take a `SecurityEvent` under that name:
 
 ```php
 use Carbon\CarbonImmutable;
@@ -77,7 +77,9 @@ class SessionsEnded extends Notification implements ShouldBeEncrypted, ShouldQue
 
 Copy what you need from the event in the constructor rather than keeping the event itself: it isn't stored when writing the audit trail failed, and a queued notification reloads a model it keeps from the database. Implement `ShouldQueue` so the mail doesn't slow the request down, and `ShouldBeEncrypted` so the IP address it carries isn't readable in your `jobs` and `failed_jobs` tables.
 
-Set a slot to `null` to silence that type. There is no switch that silences every type at once, and any other value, or a slot for a type that doesn't exist, stops your app from booting.
+A slot may name any type of security event, including one that doesn't alert by default, such as `proof.rejected`. `SecurityAlert` only has a mail for the types in the [table above](#types-that-alert), so a slot for any other type names your own notification.
+
+Set a slot to `null` to silence that type. There is no switch that silences every type at once. Your app refuses to boot on a slot holding any other value, a slot for a type that doesn't exist, a notification whose constructor doesn't take the event as `$event`, or `SecurityAlert` for a type it has no mail for.
 
 ## Ports
 
