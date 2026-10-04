@@ -12,3 +12,4 @@ The general rules for Laravel apps and packages live in `references/laravel-stan
 - The AppTests run against the app developer's own app, so they never assume a response shape (redirect, JSON, RPC). Each check of how the app answers goes through an overridable `assert*` helper, and the test body keeps only the security outcome.
 - An app customises the adapter's responses through one protected method per outcome on the controllers it owns, not through `*Using()` hooks: there are too many outcomes for static hooks.
 - Credential types are optional packages. Core and the frontend adapters work with no `keystone-password` installed.
+- An expected failure that reaches the exception handler, such as a refusal rendered as a response, implements `ShouldntReport` instead of overriding `report()`. A `report()` returning `false` sends the exception on to the default logging, and `Exceptions::fake()` records it whatever `report()` does.

@@ -2,6 +2,7 @@
 
 namespace ClaudioDekker\Keystone\Exceptions;
 
+use Illuminate\Contracts\Debug\ShouldntReport;
 use Illuminate\Contracts\Support\Responsable;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\Response;
@@ -9,7 +10,7 @@ use Symfony\Component\HttpFoundation\Response;
 /**
  * @internal
  */
-class Throttled extends RuntimeException implements Responsable
+class Throttled extends RuntimeException implements Responsable, ShouldntReport
 {
     /**
      * Create a new throttled exception instance.

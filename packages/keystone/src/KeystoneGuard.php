@@ -4,12 +4,12 @@ namespace ClaudioDekker\Keystone;
 
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use ClaudioDekker\Keystone\Exceptions\Barred;
 use Illuminate\Auth\EloquentUserProvider;
 use Illuminate\Auth\SessionGuard;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Date;
-use LogicException;
 
 /**
  * @internal
@@ -81,17 +81,19 @@ class KeystoneGuard extends SessionGuard
 
     /**
      * Start a signed-in session for the user, stamped with the credential epoch they were read with.
+     *
+     * @throws Barred
      */
     public function signIn(Model&KeystoneUser $user): void
     {
         $account = $this->retrieveAccount($user->getAuthIdentifier());
 
         if (is_null($account)) {
-            throw new LogicException('The account being signed in no longer exists.');
+            throw Barred::missing();
         }
 
         if (! $this->isActive($account)) {
-            throw new LogicException('The account being signed in is disabled or suspended.');
+            throw Barred::inactive();
         }
 
         $this->changeAuthLevel();
