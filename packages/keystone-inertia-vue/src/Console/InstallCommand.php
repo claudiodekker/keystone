@@ -84,9 +84,9 @@ class InstallCommand extends Command
             return self::FAILURE;
         }
 
-        $bare = ! $installer->has('resources/js/app.ts');
+        $entry = $this->frontendEntry($installer);
 
-        if ($bare) {
+        if ($entry->isSetUpByKeystone()) {
             $installer->backUp('vite.config.js');
             $installer->backUp('resources/js/app.js');
         }
@@ -96,17 +96,29 @@ class InstallCommand extends Command
         $partials = array_unique(array_map(fn (string $name) => self::PARTIALS.Str::studly($name).'.vue', $names));
 
         $copies = $installer->copyStubs(dirname(__DIR__, 2).'/stubs', (bool) $this->option('force'), fn (string $path) => match (true) {
-            in_array($path, self::BOOTSTRAP, true) => $bare,
+            in_array($path, self::BOOTSTRAP, true) => $entry->isSetUpByKeystone(),
             dirname($path).'/' === self::PARTIALS => in_array($path, $partials, true),
             isset(self::PARTIAL_COMPONENTS[$path]) => in_array(self::PARTIAL_COMPONENTS[$path], $partials, true),
             default => true,
         });
 
         $this->reportCopies($copies);
-        $this->wireIntoApp($installer, $bare);
+        $this->wireIntoApp($installer, $entry);
         $this->installNpmPackages($installer);
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Get how the app sets up its frontend entry, which decides whether the installer sets up Inertia and Vue for it.
+     */
+    protected function frontendEntry(Installer $installer): FrontendEntry
+    {
+        if ($installer->has('resources/js/app.ts')) {
+            return FrontendEntry::OWN;
+        }
+
+        return $installer->hasStockViteEntry() ? FrontendEntry::STOCK : FrontendEntry::UNKNOWN;
     }
 
     /**
@@ -130,16 +142,21 @@ class InstallCommand extends Command
     /**
      * Wire the copied files, the user model, the guard, the session cookie and the AppTests into the app.
      */
-    protected function wireIntoApp(Installer $installer, bool $bare): void
+    protected function wireIntoApp(Installer $installer, FrontendEntry $entry): void
     {
         $installer->requireRouteFile('keystone.php');
 
-        if ($bare && ! $installer->appendWebMiddleware('App\Http\Middleware\HandleInertiaRequests')) {
+        if ($entry === FrontendEntry::UNKNOWN) {
+            $this->components->warn("Left this app's Vite setup alone, because resources/js/app.js isn't Laravel's own skeleton or other views load it. Set up Inertia and Vue yourself, the way these files in vendor/claudiodekker/keystone-inertia-vue/stubs do, and add HandleInertiaRequests to the web middleware:");
+            $this->components->bulletList(self::BOOTSTRAP);
+        }
+
+        if ($entry->isSetUpByKeystone() && ! $installer->appendWebMiddleware('App\Http\Middleware\HandleInertiaRequests')) {
             $this->components->warn('Add HandleInertiaRequests to the web middleware in bootstrap/app.php:');
             $this->line("    \$middleware->web(append: [\n        \\App\\Http\\Middleware\\HandleInertiaRequests::class,\n    ]);");
         }
 
-        if ($bare) {
+        if ($entry->isSetUpByKeystone()) {
             $installer->replaceIn('resources/views/welcome.blade.php', search: "'resources/js/app.js'", replace: "'resources/js/app.ts'");
         }
 

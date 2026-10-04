@@ -398,6 +398,40 @@ class Installer
     }
 
     /**
+     * Determine if resources/js/app.js is Laravel's skeleton entry and no view but welcome.blade.php loads it, so replacing it breaks nothing else.
+     */
+    public function hasStockViteEntry(): bool
+    {
+        if (! $this->has('resources/js/app.js')) {
+            return false;
+        }
+
+        $code = array_filter(
+            array_map('trim', explode("\n", $this->files->get($this->path('resources/js/app.js')))),
+            fn (string $line) => $line !== '' && ! str_starts_with($line, '//') && preg_match('/^import\s+[\'"]\.\/bootstrap[\'"];?$/', $line) !== 1,
+        );
+
+        return $code === [] && ! $this->isLoadedOutsideWelcome('resources/js/app.js');
+    }
+
+    /**
+     * Determine if a view other than welcome.blade.php mentions the Vite entry.
+     */
+    protected function isLoadedOutsideWelcome(string $entry): bool
+    {
+        if (! $this->files->isDirectory($this->path('resources/views'))) {
+            return false;
+        }
+
+        $views = array_filter(
+            $this->files->allFiles($this->path('resources/views')),
+            fn (SplFileInfo $view) => str_replace('\\', '/', $view->getRelativePathname()) !== 'welcome.blade.php',
+        );
+
+        return array_filter($views, fn (SplFileInfo $view) => str_contains($view->getContents(), $entry)) !== [];
+    }
+
+    /**
      * Determine if the app has the file.
      */
     public function has(string $path): bool

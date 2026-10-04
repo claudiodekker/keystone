@@ -345,6 +345,51 @@ it('keeps a backup the app already has when it backs up the old Vite files', fun
         ->and("{$app}/vite.config.js")->not->toBeFile();
 });
 
+it('sets up Inertia and Vue when app.js is only what Laravel\'s skeleton ships', function (string $js) {
+    $app = freshApp();
+    file_put_contents("{$app}/resources/js/app.js", $js);
+
+    $this->artisan('keystone:install')->assertSuccessful()->run();
+
+    expect("{$app}/resources/js/app.ts")->toBeFile()
+        ->and("{$app}/vite.config.ts")->toBeFile()
+        ->and("{$app}/resources/js/app.js")->not->toBeFile()
+        ->and(file_get_contents("{$app}/resources/js/app.js.bak"))->toBe($js);
+})->with([
+    'an empty file' => '',
+    'a comment' => "// mine\n",
+    'the bootstrap import' => "import './bootstrap';\n",
+]);
+
+it('leaves a Vite setup it doesn\'t recognise alone, and says how to set up Inertia and Vue', function (array $files) {
+    $app = freshApp();
+    $untouched = ['vite.config.js', 'resources/js/app.js', 'resources/views/welcome.blade.php', 'bootstrap/app.php'];
+
+    foreach ($files as $file => $contents) {
+        @mkdir(dirname("{$app}/{$file}"), recursive: true);
+        file_put_contents("{$app}/{$file}", $contents);
+    }
+
+    $snapshot = fn () => array_map(fn (string $file) => file_get_contents("{$app}/{$file}"), array_combine($untouched, $untouched));
+    $before = $snapshot();
+
+    $this->artisan('keystone:install')
+        ->expectsOutputToContain('resources/js/app.ts')
+        ->assertSuccessful()
+        ->run();
+
+    expect($snapshot())->toBe($before)
+        ->and("{$app}/vite.config.js.bak")->not->toBeFile()
+        ->and("{$app}/resources/js/app.js.bak")->not->toBeFile()
+        ->and("{$app}/vite.config.ts")->not->toBeFile()
+        ->and("{$app}/resources/js/app.ts")->not->toBeFile()
+        ->and("{$app}/app/Http/Middleware/HandleInertiaRequests.php")->not->toBeFile()
+        ->and("{$app}/app/Http/Controllers/Auth/SignInController.php")->toBeFile();
+})->with([
+    'its own code in app.js' => [['resources/js/app.js' => "import './bootstrap';\nimport Alpine from 'alpinejs';\n\nAlpine.start();\n"]],
+    'a layout that loads app.js' => [['resources/views/layouts/app.blade.php' => "<html>@vite(['resources/css/app.css', 'resources/js/app.js'])</html>"]],
+]);
+
 it('leaves an app that already has Inertia and Vue set up as it is', function () {
     $app = freshApp();
     file_put_contents("{$app}/resources/js/app.ts", '// mine');
