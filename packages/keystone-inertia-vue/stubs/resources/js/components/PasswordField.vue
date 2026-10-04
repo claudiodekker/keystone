@@ -4,10 +4,7 @@ defineProps<{ id: string; error?: string }>();
 
 <template>
     <div class="flex flex-col gap-2">
-        <div class="flex items-center justify-between">
-            <label :for="id" class="text-sm font-medium text-gray-900">Password</label>
-            <a href="#" class="text-sm text-gray-600 underline">Lost access?</a>
-        </div>
+        <label :for="id" class="text-sm font-medium text-gray-900">Password</label>
         <input
             :id="id"
             name="password"
