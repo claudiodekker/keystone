@@ -237,7 +237,10 @@ abstract class AppTestCase extends TestCase
      */
     public function submitSignIn(CredentialTypeSupport $support, string $identifier, array $proof): TestResponse
     {
-        return $this->post(route('login.submit', ['type' => $support->type()]), ['identifier' => $identifier, ...$proof]);
+        return $this->post(route('login.submit', ['type' => $support->type()]), [
+            'identifier' => $identifier,
+            ...$proof,
+        ]);
     }
 
     /**
