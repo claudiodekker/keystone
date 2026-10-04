@@ -6,6 +6,7 @@ use Closure;
 use Composer\InstalledVersions;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Str;
+use ParseError;
 use Symfony\Component\Finder\SplFileInfo;
 
 /**
@@ -133,7 +134,7 @@ class Installer
     }
 
     /**
-     * Make the user model implement KeystoneUser and use HasKeystone, reporting false when its file can't be edited.
+     * Make the user model implement KeystoneUser and use HasKeystone, reporting false when its file can't be edited safely.
      */
     public function makeKeystoneUser(string $model): bool
     {
@@ -149,31 +150,59 @@ class Installer
             return true;
         }
 
-        $class = class_basename($model);
-        $imports = "use ClaudioDekker\\Keystone\\HasKeystone;\nuse ClaudioDekker\\Keystone\\KeystoneUser;\n";
+        $edited = $this->withKeystoneUser($source, class_basename($model));
 
-        $patterns = [
-            '/^use /m' => $imports.'use ',
-            "/^(class {$class} extends [\\w\\\\]+) implements ([^\\n{]+?)\\s*$/m" => '$1 implements $2, KeystoneUser',
-            "/^(class {$class} extends [\\w\\\\]+)\\s*$/m" => '$1 implements KeystoneUser',
-            '/^(    use [^;(]+);/m' => '$1, HasKeystone;',
-        ];
-
-        foreach ($patterns as $pattern => $replacement) {
-            $source = preg_replace($pattern, $replacement, $source, limit: 1) ?? $source;
-        }
-
-        if (! str_contains($source, 'implements KeystoneUser') && ! str_contains($source, ', KeystoneUser')) {
+        if ($edited === null || ! $this->parses($edited)) {
             return false;
         }
 
-        if (! str_contains($source, ', HasKeystone;')) {
-            $source = preg_replace('/^(class .+\n\{\n)/m', "\$1    use HasKeystone;\n\n", $source, limit: 1) ?? $source;
-        }
-
-        $this->files->put($path, $source);
+        $this->files->put($path, $edited);
 
         return true;
+    }
+
+    /**
+     * Get the model's source with KeystoneUser implemented and HasKeystone used, or null when it isn't shaped the way every step can match.
+     */
+    protected function withKeystoneUser(string $source, string $class): ?string
+    {
+        $imported = $this->replaceOnce('/^use /m', "use ClaudioDekker\\Keystone\\HasKeystone;\nuse ClaudioDekker\\Keystone\\KeystoneUser;\nuse ", $source);
+
+        if ($imported === null) {
+            return null;
+        }
+
+        $implemented = $this->replaceOnce("/^(class {$class} extends [\\w\\\\]+) implements ([\\w\\\\]+(?:, *[\\w\\\\]+)*)[ \\t]*$/m", '$1 implements $2, KeystoneUser', $imported)
+            ?? $this->replaceOnce("/^(class {$class} extends [\\w\\\\]+)[ \\t]*$/m", '$1 implements KeystoneUser', $imported);
+
+        if ($implemented === null) {
+            return null;
+        }
+
+        return $this->replaceOnce('/^(    use [\\w\\\\]+(?:, *[\\w\\\\]+)*);$/m', '$1, HasKeystone;', $implemented)
+            ?? $this->replaceOnce("/^(class {$class} .+\\n\\{\\n)/m", "\$1    use HasKeystone;\n\n", $implemented);
+    }
+
+    /**
+     * Replace the first match of the pattern, or get null when there is none.
+     */
+    protected function replaceOnce(string $pattern, string $replacement, string $subject): ?string
+    {
+        $replaced = preg_replace($pattern, $replacement, $subject, limit: 1, count: $count);
+
+        return $count === 1 ? $replaced : null;
+    }
+
+    /**
+     * Determine if the PHP source parses.
+     */
+    protected function parses(string $source): bool
+    {
+        try {
+            return token_get_all($source, TOKEN_PARSE) !== [];
+        } catch (ParseError) {
+            return false;
+        }
     }
 
     /**

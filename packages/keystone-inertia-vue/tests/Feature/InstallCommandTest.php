@@ -349,6 +349,19 @@ it('says what the user model needs when it can\'t edit it', function () {
         ->run();
 });
 
+it('says what the user model needs, leaving it as it is, when it has no imports to add the new ones to', function () {
+    $app = freshApp();
+    $model = "<?php\n\nnamespace App\\Models;\n\nclass User extends \\Illuminate\\Foundation\\Auth\\User\n{\n}\n";
+    file_put_contents("{$app}/app/Models/User.php", $model);
+
+    $this->artisan('keystone:install')
+        ->expectsOutputToContain('Make App\Models\User implement ClaudioDekker\Keystone\KeystoneUser')
+        ->assertSuccessful()
+        ->run();
+
+    expect(file_get_contents("{$app}/app/Models/User.php"))->toBe($model);
+});
+
 it('says to set the guard driver when it can\'t edit config/auth.php', function () {
     $app = freshApp();
     file_put_contents("{$app}/config/auth.php", '<?php return [];');

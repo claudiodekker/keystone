@@ -35,6 +35,8 @@ class User extends Authenticatable implements KeystoneUser
 }
 ```
 
+The installer adds its imports before your first `use` line and appends the interface to your class line. It leaves a model it can't edit that way as it is, and prints what to add: a fully qualified parent with no `use` lines, interfaces over several lines, or any edit that wouldn't leave a file that parses.
+
 `HasKeystone` adds soft deletes and keeps Keystone's `users` columns out of the model's array form and out of mass assignment. The model may use its own table and key name; Keystone's migration only changes `users`, so add its columns to your table yourself.
 
 ## The guard
