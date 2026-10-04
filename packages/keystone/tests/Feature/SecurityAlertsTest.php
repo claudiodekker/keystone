@@ -86,6 +86,32 @@ describe('suspending and unsuspending an account', function () {
     ]);
 });
 
+describe('a tripped limit', function () {
+    it('alerts the owner once a window when wrong answers trip the failed-attempt limit', function () {
+        Notification::fake();
+        $this->createAccount();
+        config(['keystone.rate_limits.failed_attempts_per_hour' => 3]);
+
+        foreach (range(1, 6) as $i) {
+            $this->withServerVariables(['REMOTE_ADDR' => "203.0.113.{$i}"])->post(route('login.submit', ['type' => 'form']), ['identifier' => 'jane@example.com', 'secret' => 'wrong']);
+        }
+
+        expect(alertedTo(SecurityEventType::LIMIT_TRIPPED))->toBe(['jane@example.com']);
+    });
+
+    it('never alerts when a request limit trips', function () {
+        $this->signInAccount(new FormTypeSupport);
+        Notification::fake();
+
+        foreach (range(1, config()->integer('keystone.rate_limits.requests_per_minute.view') + 1) as $ignored) {
+            $this->get(route('login'));
+        }
+
+        $this->assertDatabaseHas('user_security_events', ['type' => 'limit.tripped', 'reason' => 'keystone.request_limit']);
+        Notification::assertNothingSent();
+    });
+});
+
 describe('the queued alert', function () {
     beforeEach(function () {
         config(['queue.default' => 'database', 'queue.failed.database' => config('database.default')]);

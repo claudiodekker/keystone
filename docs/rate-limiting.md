@@ -7,8 +7,8 @@ Keystone rate limits its own endpoints. Nothing in your routes, middleware or co
 | Limit | Counted per | Allowance |
 |---|---|---|
 | Request limit | IP address, and separately the account the session names (signed in, or held at the challenge or enrollment), per kind of step | 60 page views, 10 submissions or sign-outs a minute |
-| Failed-attempt limit | account and credential type in each flow, from any IP address | 20 wrong answers an hour |
-| Shared TOTP limit | account, for TOTP codes in the challenge, recovery and sudo together | 20 wrong codes an hour, and at most 100 in 24 hours |
+| Failed-attempt limit | account and credential type in each flow, from any IP address; each of the account's known devices counts apart from every other browser | 20 wrong answers an hour |
+| Shared TOTP limit | account, for TOTP codes in the challenge, recovery and sudo together; each known device counts apart | 20 wrong codes an hour, and at most 100 in 24 hours |
 
 Change the allowances in `keystone.rate_limits` (see [Configuration](configuration.md)). Each must be a whole number of at least 1: no value turns a limit off. Keystone's AppTests read the same allowances, so they check the limits you set.
 
@@ -18,17 +18,19 @@ The request limit is checked before anything else, so even invalid input or an u
 
 A successful sign-in doesn't count, but nothing ever resets a count: counts only expire at the end of their window.
 
-The first refusal in each window records a `limit.tripped` [security event](security-events.md), about the account when one is named, and dispatches Laravel's `Illuminate\Auth\Events\Lockout` with the request, as Fortify does. Listen for either to react to lockouts. Unlike Fortify, `Lockout` fires once per window, not on every throttled request.
+The first refusal in each window records a `limit.tripped` [security event](security-events.md), about the account when one is named, and dispatches Laravel's `Illuminate\Auth\Events\Lockout` with the request, as Fortify does. Listen for either to react to lockouts. Unlike Fortify, `Lockout` fires once per window, not on every throttled request. A failed-attempt trip also [alerts the account's owner](security-alerts.md), once per window; a request-limit trip never alerts.
 
 ## Locking an account's owner out
 
-The failed-attempt limit counts per account and ignores the IP address, so someone other than the owner can spend it. Anyone who knows an account's address can send 20 wrong passwords for it, from one IP address or many. Keystone then refuses every password sign-in for that account, the owner's correct password included, until the count expires an hour after the first wrong answer. The attacker can repeat this when the window ends. Counting by account is what holds a guesser who rotates through IP addresses to 20 guesses an hour, and Keystone makes this trade rather than count per address.
+The failed-attempt limit counts per account and ignores the IP address, so someone other than the owner can spend it. Anyone who knows an account's address can send 20 wrong passwords for it, from one IP address or many. Keystone then refuses every password sign-in for that account from a browser that isn't one of its [known devices](security-alerts.md#new-devices), the owner's correct password included, until the count expires an hour after the first wrong answer. The attacker can repeat this when the window ends. Counting by account is what holds a guesser who rotates through IP addresses to 20 guesses an hour, and Keystone makes this trade rather than count per address.
+
+Each known device of the account counts its own wrong answers, with its own allowance, so failures from other browsers never lock the owner out of a browser they signed in from before. A known device earns nothing else: it is challenged, alerted about and limited like any other browser, and its own wrong answers lock only itself. A device cookie copied from the owner's browser stops counting apart at the owner's next sign-in, when the browser gets a new value.
 
 The lock is narrow. It refuses only sign-in and the challenge, so sessions that are already signed in carry on. Each credential type counts apart, so locking an account's passwords leaves its other first-factor types alone. The refusal's `Retry-After` header says when the count expires.
 
 Nothing ends a lock early. A count is only reset by expiring, and no [operator command](operator-commands.md) touches one: they end sessions and suspend accounts. Raising `rate_limits.failed_attempts_per_hour` makes a lock cost more wrong passwords, and gives every guesser the same number more.
 
-Keystone mails no alert when a lock trips. The `limit.tripped` event with the reason `keystone.failed_attempt_limit` and the `Lockout` event are your hooks for telling the owner.
+The first trip of each count in a window mails the account's owner a `limit.tripped` alert, so they hear that someone is guessing. To silence it, set the `'limit.tripped'` slot in `keystone.notifications` to `null`. The event's reason is `keystone.failed_attempt_limit`, and Laravel's `Lockout` event fires with it.
 
 ## Sharing an IP address
 

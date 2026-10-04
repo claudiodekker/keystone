@@ -18,7 +18,7 @@ php artisan keystone:end-sessions --all --operator="jane@ops"
 
 In production `--all` asks before it runs; pass `--force` to skip the question in a script.
 
-Either way the sessions end on their next request, on every session driver: Keystone moves a counter on the account that every session is stamped with, rather than deleting session rows.
+Either way the sessions end on their next request, on every session driver: Keystone moves a counter on the account that every session is stamped with, rather than deleting session rows. Keystone also forgets the account's [known devices](security-alerts.md#new-devices), or every account's with `--all`, so the next sign-in from each browser alerts its owner.
 
 Each run records a `sessions.terminated` [security event](security-events.md) with actor `operator` and the `--operator` you give, cut to 64 characters. With one account the event goes on that account's audit trail and [alerts its owner](security-alerts.md). With `--all` it is logged once, about nobody, with reason `keystone.every_account`, rather than added to every account's trail, and alerts nobody.
 
@@ -61,7 +61,7 @@ Unsuspend it to let it sign in again:
 php artisan keystone:unsuspend 42 --operator="jane@ops"
 ```
 
-Unsuspending doesn't bring back the sessions that suspending ended.
+Unsuspending doesn't bring back the sessions that suspending ended, or the [known devices](security-alerts.md#new-devices) it forgot.
 
 Each command records `account.suspended` or `account.unsuspended` [security events](security-events.md) with actor `operator` and the `--operator` you give, and [alerts the owner](security-alerts.md). Suspending an account that is already suspended, or unsuspending one that isn't, is refused: the command fails and nothing is recorded.
 

@@ -159,7 +159,7 @@ Core's one limiter, holding three limits. A spent limit always refuses the same 
 How many requests one IP address, and separately the account the session names, may make to a kind of step in a short window.
 
 **Failed-attempt limit**:
-How many wrong answers an account may get per credential type, in each flow, over a long window. TOTP shares one count across flows.
+How many wrong answers an account may get per credential type, in each flow, over a long window. Each known device of the account counts apart from every other browser. TOTP shares one count across flows.
 
 **Delivery limit**:
 How many emails may be sent to one person per credential type, in each flow, over a window.

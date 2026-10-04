@@ -9,6 +9,7 @@ use ClaudioDekker\Keystone\AppTests\Support\CredentialTypeSupport;
 use ClaudioDekker\Keystone\CredentialAttempt;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\KeystoneUser;
+use ClaudioDekker\Keystone\KnownDevices;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
@@ -105,6 +106,26 @@ abstract class AppTestCase extends TestCase
         $this->defaultCookies[(string) config('session.cookie')] = $this->app['session.store']->getId();
 
         return parent::prepareCookiesForRequest();
+    }
+
+    /**
+     * Send the device cookie on every later request, as the browser holding it would, or none, as a browser that never signed in.
+     */
+    public function fromDevice(?string $value): static
+    {
+        unset($this->unencryptedCookies[KnownDevices::COOKIE]);
+
+        return $value === null ? $this : $this->withUnencryptedCookie(KnownDevices::COOKIE, $value);
+    }
+
+    /**
+     * Get the value of the device cookie the response handed the browser.
+     *
+     * @param  TestResponse<Response>  $response
+     */
+    public function deviceCookieOf(TestResponse $response): ?string
+    {
+        return $response->getCookie(KnownDevices::COOKIE, decrypt: false)?->getValue();
     }
 
     /**

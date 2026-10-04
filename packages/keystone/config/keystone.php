@@ -81,6 +81,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Retention
+    |--------------------------------------------------------------------------
+    |
+    | How long Keystone keeps what it learns about your users. A browser
+    | nobody signed in from for this long is a new device again, and
+    | it is pruned nightly. Every value must be at least 1 second.
+    |
+    */
+
+    'retention' => [
+        'known_devices_seconds' => 7776000,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Security Events
     |--------------------------------------------------------------------------
     |
@@ -111,9 +126,11 @@ return [
         'account.suspended' => SecurityAlert::class,
         'account.unsuspended' => SecurityAlert::class,
         'credential.added' => SecurityAlert::class,
+        'limit.tripped' => SecurityAlert::class,
         'recovery_code.used' => SecurityAlert::class,
         'recovery_codes.generated' => SecurityAlert::class,
         'sessions.terminated' => SecurityAlert::class,
+        'signed_in' => SecurityAlert::class,
     ],
 
     /*

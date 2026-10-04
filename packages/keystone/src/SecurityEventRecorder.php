@@ -60,6 +60,7 @@ class SecurityEventRecorder
         ?string $operator = null,
         ?array $recipients = null,
         bool $alert = true,
+        ?bool $knownDevice = null,
     ): void {
         if (! $this->enabled()) {
             return;
@@ -75,6 +76,7 @@ class SecurityEventRecorder
                 credential: $credential,
                 reason: $reason,
                 operator: $operator,
+                knownDevice: $knownDevice,
             );
         } catch (Throwable $e) {
             report($e);
@@ -110,6 +112,7 @@ class SecurityEventRecorder
         ?StoredCredential $credential,
         ?string $reason,
         ?string $operator,
+        ?bool $knownDevice,
     ): SecurityEvent {
         $context = $this->context();
         $userAgent = $this->clean($context->userAgent, self::USER_AGENT_LENGTH);
@@ -131,7 +134,7 @@ class SecurityEventRecorder
             'ip_address' => $context->ipAddress,
             'location' => null,
             'user_agent' => $userAgent,
-            'known_device' => null,
+            'known_device' => $knownDevice,
             'request_id' => $context->requestId,
         ]);
     }

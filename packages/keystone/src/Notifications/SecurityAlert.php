@@ -35,9 +35,11 @@ class SecurityAlert extends Notification implements SecurityEventAlertContract, 
         SecurityEventType::ACCOUNT_SUSPENDED,
         SecurityEventType::ACCOUNT_UNSUSPENDED,
         SecurityEventType::CREDENTIAL_ADDED,
+        SecurityEventType::LIMIT_TRIPPED,
         SecurityEventType::RECOVERY_CODE_USED,
         SecurityEventType::RECOVERY_CODES_GENERATED,
         SecurityEventType::SESSIONS_TERMINATED,
+        SecurityEventType::SIGNED_IN,
     ];
 
     /**

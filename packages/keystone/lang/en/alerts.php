@@ -32,6 +32,12 @@ return [
                 'what' => 'A new way to sign in or confirm it\'s you was added to your account.',
             ],
         ],
+        'limit' => [
+            'tripped' => [
+                'subject' => 'Sign-ins to your account were paused',
+                'what' => 'Too many wrong answers were given while signing in to your account, so further attempts with that kind of credential are refused for up to an hour. Browsers you signed in from recently can still sign in.',
+            ],
+        ],
         'recovery_code' => [
             'used' => [
                 'subject' => 'A recovery code was used on your account',
@@ -44,6 +50,10 @@ return [
                 'subject' => 'Your recovery codes were replaced',
                 'what' => 'A new set of recovery codes was saved for your account. Your old codes no longer work.',
             ],
+        ],
+        'signed_in' => [
+            'subject' => 'New sign-in to your account',
+            'what' => 'Your account was signed in to from a browser it hasn\'t signed in from recently.',
         ],
         'sessions' => [
             'terminated' => [

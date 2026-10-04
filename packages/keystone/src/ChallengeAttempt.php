@@ -52,9 +52,7 @@ class ChallengeAttempt extends CredentialAttempt
                 proof: $proof,
                 credential: $credential,
                 taken: $taken,
-                enter: function () use ($account, $demand) {
-                    $this->enter($account, $demand);
-                },
+                enter: fn () => $this->enter($account, $demand),
                 recorded: $this->recorded($demand),
                 reason: $this->reason($demand),
             );
@@ -104,9 +102,7 @@ class ChallengeAttempt extends CredentialAttempt
             type: $type,
             credential: null,
             taken: $taken,
-            enter: function () use ($account, $demand) {
-                $this->enter($account, $demand);
-            },
+            enter: fn () => $this->enter($account, $demand),
             recorded: $this->recorded($demand),
             reason: $this->reason($demand),
         );
@@ -123,17 +119,17 @@ class ChallengeAttempt extends CredentialAttempt
     }
 
     /**
-     * Sign the account in, or hold its pending sign-in on at the enrollment it still owes.
+     * Sign the account in, returning whether the browser was a known device of it, or hold its pending sign-in on at the enrollment it still owes.
      */
-    protected function enter(Model&KeystoneUser $account, Demand $demand): void
+    protected function enter(Model&KeystoneUser $account, Demand $demand): ?bool
     {
         if ($demand === Demand::ENROLLMENT) {
             $this->guard->passSecondFactor();
 
-            return;
+            return null;
         }
 
-        $this->guard->signIn($account);
+        return $this->guard->signIn($account);
     }
 
     /**

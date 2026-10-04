@@ -43,7 +43,7 @@ abstract class EnrollmentStep
         }
 
         try {
-            $this->guard->signIn($pending->account);
+            $knownDevice = $this->guard->signIn($pending->account);
         } catch (LogicException) {
             return Demand::REFUSE;
         }
@@ -53,6 +53,8 @@ abstract class EnrollmentStep
             account: $pending->account,
             flow: Flow::ENROLLMENT->value,
             credentialType: $enrolledType,
+            knownDevice: $knownDevice,
+            alert: ! $knownDevice,
         );
 
         return Demand::SIGN_IN;
