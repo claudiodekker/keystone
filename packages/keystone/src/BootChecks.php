@@ -8,6 +8,8 @@ use ClaudioDekker\Keystone\Http\Middleware\ClearSiteDataOnSessionEnd;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
+use ClaudioDekker\Keystone\Notifications\Contracts\SecurityEventAlertContract;
+use ClaudioDekker\Keystone\Notifications\SecurityAlert;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notification;
 
@@ -170,28 +172,51 @@ class BootChecks
     }
 
     /**
-     * Check that each alert slot names a type of security event and holds null or a notification class.
+     * Check that each alert slot names a type of security event and holds null or a notification that can alert about it.
      *
      * @return list<string>
      */
     protected function alertFailures(): array
     {
         $slots = config('keystone.notifications');
-        $failures = [];
 
         if (! $this->isMap($slots)) {
             return ['keystone.notifications must map types of security event to a notification class or null.'];
         }
 
-        foreach ($slots as $type => $slot) {
-            if (SecurityEventType::tryFrom((string) $type) === null) {
-                $failures[] = "keystone.notifications.{$type} isn't a type of security event.";
-            } elseif ($slot !== null && ! (is_string($slot) && is_a($slot, Notification::class, true))) {
-                $failures[] = "keystone.notifications.{$type} must be null or the class name of a notification.";
-            }
+        $failures = array_map($this->slotFailure(...), array_keys($slots), $slots);
+
+        return array_values(array_filter($failures));
+    }
+
+    /**
+     * Check one alert slot, returning why it is refused or null when it is fine.
+     */
+    protected function slotFailure(int|string $key, mixed $slot): ?string
+    {
+        $type = SecurityEventType::tryFrom((string) $key);
+
+        if ($type === null) {
+            return "keystone.notifications.{$key} isn't a type of security event.";
         }
 
-        return $failures;
+        if ($slot === null) {
+            return null;
+        }
+
+        if (! is_string($slot) || ! is_a($slot, Notification::class, true)) {
+            return "keystone.notifications.{$key} must be null or the class name of a notification.";
+        }
+
+        if (! is_a($slot, SecurityEventAlertContract::class, true)) {
+            return "keystone.notifications.{$key} must name a notification that implements ".SecurityEventAlertContract::class.'.';
+        }
+
+        if ($slot === SecurityAlert::class && ! SecurityAlert::handles($type)) {
+            return "keystone.notifications.{$key} can't use SecurityAlert, which has no mail for that type: name your own notification class or null.";
+        }
+
+        return null;
     }
 
     /**

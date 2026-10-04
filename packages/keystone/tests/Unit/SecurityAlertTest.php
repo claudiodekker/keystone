@@ -14,6 +14,7 @@ use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Support\Facades\Exceptions;
+use Illuminate\Support\Facades\Lang;
 
 function alertEvent(array $attributes = []): SecurityEvent
 {
@@ -81,6 +82,14 @@ it('is worded by its type\'s translation keys', function (SecurityEventType $typ
     'account unsuspended' => [SecurityEventType::ACCOUNT_UNSUSPENDED],
     'recovery code used' => [SecurityEventType::RECOVERY_CODE_USED],
 ]);
+
+it('has a mail for every type it handles', function (SecurityEventType $type) {
+    $rendered = renderedAlert(alertEvent(['type' => $type]));
+
+    expect(Lang::has("keystone::alerts.types.{$type->value}.subject"))->toBeTrue()
+        ->and(Lang::has("keystone::alerts.types.{$type->value}.what"))->toBeTrue()
+        ->and($rendered)->toContain(e(__("keystone::alerts.types.{$type->value}.what")));
+})->with(fn () => array_values(array_filter(SecurityEventType::cases(), SecurityAlert::handles(...))));
 
 it('tells the owner of a used recovery code how many they have left', function (int $left) {
     $user = User::factory()->create();

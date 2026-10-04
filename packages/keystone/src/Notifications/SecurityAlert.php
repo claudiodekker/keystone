@@ -4,6 +4,7 @@ namespace ClaudioDekker\Keystone\Notifications;
 
 use Carbon\CarbonImmutable;
 use ClaudioDekker\Keystone\IpLocation;
+use ClaudioDekker\Keystone\Notifications\Contracts\SecurityEventAlertContract;
 use ClaudioDekker\Keystone\RecoveryCodes;
 use ClaudioDekker\Keystone\SecurityEvent;
 use ClaudioDekker\Keystone\SecurityEventType;
@@ -18,7 +19,7 @@ use Throwable;
 /**
  * @api
  */
-class SecurityAlert extends Notification implements ShouldBeEncrypted, ShouldQueue
+class SecurityAlert extends Notification implements SecurityEventAlertContract, ShouldBeEncrypted, ShouldQueue
 {
     use Queueable;
 
@@ -26,6 +27,18 @@ class SecurityAlert extends Notification implements ShouldBeEncrypted, ShouldQue
      * How the time the event occurred is shown, always in UTC.
      */
     public const string TIME_FORMAT = 'Y-m-d H:i \U\T\C';
+
+    /**
+     * The types of security event the alert has a view and translation keys for.
+     */
+    protected const array TYPES = [
+        SecurityEventType::ACCOUNT_SUSPENDED,
+        SecurityEventType::ACCOUNT_UNSUSPENDED,
+        SecurityEventType::CREDENTIAL_ADDED,
+        SecurityEventType::RECOVERY_CODE_USED,
+        SecurityEventType::RECOVERY_CODES_GENERATED,
+        SecurityEventType::SESSIONS_TERMINATED,
+    ];
 
     /**
      * The type of the event the alert is about.
@@ -68,6 +81,14 @@ class SecurityAlert extends Notification implements ShouldBeEncrypted, ShouldQue
         $this->device = $this->describe($event->user_agent);
         $this->credentialType = $event->credential_type;
         $this->remainingRecoveryCodes = $this->countRemainingRecoveryCodes($event);
+    }
+
+    /**
+     * Determine if the alert can say what an event of the type is, so a slot may name it for that type.
+     */
+    public static function handles(SecurityEventType $type): bool
+    {
+        return in_array($type, self::TYPES, true);
     }
 
     /**

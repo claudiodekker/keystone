@@ -4,9 +4,12 @@ use ClaudioDekker\Keystone\BootChecks;
 use ClaudioDekker\Keystone\Exceptions\Misconfigured;
 use ClaudioDekker\Keystone\KeystoneServiceProvider;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
+use ClaudioDekker\Keystone\Notifications\Contracts\SecurityEventAlertContract;
+use ClaudioDekker\Keystone\Notifications\SecurityAlert;
 use ClaudioDekker\Keystone\Tests\Fixtures\FlakyAlert;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormType;
 use ClaudioDekker\Keystone\Tests\Fixtures\UserOnOtherConnection;
+use Illuminate\Notifications\Notification;
 
 function bootFailures(): array
 {
@@ -148,6 +151,30 @@ describe('the alert slots', function () {
 
         expect($failures)->toBe([]);
     })->with(['silenced' => [null], 'the app\'s own' => [FlakyAlert::class]]);
+
+    it('refuses the default alert for a type it has no mail for', function (string $type) {
+        config(['keystone.notifications' => [$type => SecurityAlert::class]]);
+
+        $failures = bootFailures();
+
+        expect($failures)->toBe(["keystone.notifications.{$type} can't use SecurityAlert, which has no mail for that type: name your own notification class or null."]);
+    })->with(['a rejected proof' => ['proof.rejected'], 'a sign-in' => ['signed_in']]);
+
+    it('refuses a notification that can\'t be built from the event', function () {
+        config(['keystone.notifications' => ['signed_out' => Notification::class]]);
+
+        $failures = bootFailures();
+
+        expect($failures)->toBe(['keystone.notifications.signed_out must name a notification that implements '.SecurityEventAlertContract::class.'.']);
+    });
+
+    it('accepts the app\'s own notification for a type SecurityAlert has no mail for', function () {
+        config(['keystone.notifications' => ['proof.rejected' => FlakyAlert::class]]);
+
+        $failures = bootFailures();
+
+        expect($failures)->toBe([]);
+    });
 });
 
 describe('the mandates', function () {
