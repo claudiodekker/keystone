@@ -6,7 +6,7 @@ Under bcrypt a new password is capped at 72 bytes, the most bcrypt reads, or at 
 
 ## Consequences
 
-- An imported bcrypt hash of a password longer than 72 bytes verifies against the password's first 72 bytes, as bcrypt always did (V6.2.8). Sign-in takes a password of any length for that reason; only setting one is capped.
+- An imported bcrypt hash of a password longer than 72 bytes verifies against the password's first 72 bytes, as bcrypt always did (V6.2.8). Sign-in takes a password longer than 72 bytes for that reason, up to the 1024 characters every driver caps it at before hashing, since nothing else bounds the hashing cost of an argon2 check; only setting one is capped lower.
 - An unknown account, or one without a password, is checked against a dummy hash made with the app's driver and cost, so it costs what a wrong password does. The dummy is made once and cached forever in the default cache store under a fingerprint of the whole hashing config, so changing the driver or cost makes a new one. With the `array` or `null` cache store it is made on every such request, which makes unknown accounts slower than known ones; production needs a persistent store.
 - A wrong password against a hash of an older driver or cost takes that hash's time, not the dummy's, until the account's next sign-in rehashes it.
 - Core never trims `password`, `current_password` or `password_confirmation`, even when the app's `TrimStrings` drops Laravel's defaults, so surrounding spaces are part of the password at set and at sign-in.

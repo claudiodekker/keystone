@@ -40,6 +40,30 @@ it('requires the password as a string', function (mixed $password) {
     'an array' => [['correct horse']],
 ]);
 
+it('signs in with a password of 1024 characters', function () {
+    $account = $this->createAccount();
+    storePassword($account, Hash::make($password = str_repeat('a', 1024)));
+
+    signInWithPassword($this, $password);
+
+    $this->assertAuthenticatedAs($account);
+});
+
+it('refuses a password of more than 1024 characters before hashing it, even the right one', function () {
+    $account = $this->createAccount();
+    storePassword($account, Hash::make($password = str_repeat('a', 1025)));
+    $hash = Mockery::mock(app('hash'));
+    Hash::swap($hash);
+    $hash->shouldNotReceive('check');
+    $hash->shouldNotReceive('driver');
+
+    $response = signInWithPassword($this, $password);
+
+    $response->assertSessionHasErrors('password');
+    $this->assertGuest();
+    $this->assertDatabaseMissing('user_security_events', ['type' => 'proof.rejected']);
+});
+
 it('signs in with a password that starts and ends with spaces', function () {
     $account = $this->createAccount();
     storePassword($account, Hash::make('  correct horse  '));
