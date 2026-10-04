@@ -130,6 +130,20 @@ describe('the log line', function () {
         expect(substr_count(logRecords()[0]->formatted, "\n"))->toBe(1);
     });
 
+    it('replaces line and paragraph separators in the user agent, the credential label and the operator with spaces', function () {
+        captureContext(userAgent: "Fire\u{2028}fox\u{2029}ESR");
+
+        recorder()->record(
+            SecurityEventType::SIGNED_IN,
+            account: User::factory()->create(),
+            credentialType: 'form',
+            credential: new StoredCredential(7, null, null, "Lap\u{2028}top\u{2029}one"),
+            operator: "jane\u{2028}ops\u{2029}team",
+        );
+
+        expect(loggedContext()[0])->toMatchArray(['user_agent' => 'Fire fox ESR', 'credential_label' => 'Lap top one', 'operator' => 'jane ops team']);
+    });
+
     it('carries no request context outside a request', function () {
         recorder()->record(SecurityEventType::SIGNED_OUT, account: User::factory()->create());
 
