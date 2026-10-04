@@ -156,7 +156,7 @@ A method's in-flight data for one step, such as a WebAuthn challenge or a TOTP s
 Core's one limiter, holding three limits. A spent limit always refuses the same way, and nothing ever resets a count; counts only expire.
 
 **Request limit**:
-How many requests one IP address and session may make to a kind of step in a short window.
+How many requests one IP address, and separately the account the session names, may make to a kind of step in a short window.
 
 **Failed-attempt limit**:
 How many wrong answers an account may get per credential type, in each flow, over a long window. TOTP shares one count across flows.

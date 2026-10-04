@@ -6,13 +6,13 @@ Recording inline, rather than from listeners on Laravel's auth events, means an 
 
 ## Consequences
 
-- An app can opt out of recording entirely with `keystone.events.enabled` set to `false` (and only `false`), in any environment. Recording stays on by default; this relaxes the spec's "no app can turn recording off" [SEC-04] at Claudio's review, since an app that doesn't want an audit trail shouldn't be forced to keep one.
+- An app can opt out of recording entirely with `keystone.events.enabled` set to `false` (and only `false`), in any environment. Recording stays on by default; this relaxes the spec's "no app can turn recording off" [SEC-04], since an app that doesn't want an audit trail shouldn't be forced to keep one.
 
 - The log line's message is always `keystone.security_event` and every field travels in its context array, so typed input that reaches a field (a user agent) is JSON-escaped and can't forge a second line.
 - Events about nobody are log lines only. Identical ones (same type, IP address and path) are logged once per 60 seconds, counted in the default cache; while the cache fails every one is logged.
 - IP address, location and user agent are encrypted at rest and hidden from the model's array form. The log line carries them in clear, since the log is the operator's and is the record of events about nobody.
 - A reason is a short code of `a-z`, `0-9`, `.` and `_`, at most 64 characters, prefixed by the event's credential type or by `keystone.`; anything else is stored as `<type>.invalid_reason`, so a method can't smuggle typed input through it.
 - Core's global middleware captures the request's IP address, user agent, path and a new ULID request id once per request, after the app's trusted-proxy middleware, into a scoped instance that resets between Octane requests.
-- A hard-deleted account's rows stay with its `user_id`, so its trail still reads as one account's until retention prunes it. `user_id` has no foreign key for that reason, and apps must not reuse user ids.
+- A hard-deleted account's rows stay with its `user_id`, so its trail still reads as one account's, and nothing prunes them. `user_id` has no foreign key for that reason, and apps must not reuse user ids.
 - A refused sign-in naming an account records inside the sign-in's 300 ms timing floor, and one naming nobody records nothing, so the floor hides the difference only while logging, the insert and the app's synchronous listeners finish inside it. Listeners doing slow work (mail, HTTP) should be queued; the docs say so.
 - Control characters in the user agent and credential label are replaced by spaces before they reach any field, because Laravel's default log formatter turns escaped newlines in a JSON context back into real ones.
