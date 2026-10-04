@@ -52,7 +52,7 @@ Set your app's guard to the `keystone` driver in `config/auth.php`. Its provider
 ],
 ```
 
-Only Keystone signs anyone in. `Auth::attempt()`, `Auth::once()`, `Auth::onceUsingId()`, `Auth::login()`, `Auth::loginUsingId()`, `Auth::logoutOtherDevices()` and the `auth.basic` middleware sign nobody in. Sessions and remember-me cookies from before Keystone end on their next request.
+Only Keystone signs anyone in. `Auth::attempt()`, `Auth::once()`, `Auth::onceUsingId()`, `Auth::loginUsingId()`, `Auth::logoutOtherDevices()` and the `auth.basic` middleware sign nobody in, and `Auth::login()` throws a `LogicException`, because it has no way to report a refusal and a caller would carry on as if a session had started. Sessions and remember-me cookies from before Keystone end on their next request.
 
 Keystone's migration adds its columns to `users` and makes `email`, `password` and `remember_token` nullable strings (255, 255 and 100 characters). It never reads or drops them.
 

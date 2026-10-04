@@ -30,7 +30,7 @@ class PasswordType implements CredentialType
     public const int BCRYPT_MAX_BYTES = 72;
 
     /**
-     * The most characters of a new password under any other driver.
+     * The most characters of a typed password at sign-in, and of a new one under any other driver than bcrypt.
      */
     public const int MAX_CHARACTERS = 1024;
 
@@ -79,12 +79,12 @@ class PasswordType implements CredentialType
     }
 
     /**
-     * Get the rules for the typed password, asking a new one to be confirmed, to meet the app's password defaults and to fit what the hashing driver takes.
+     * Get the rules for the typed password, asking a new one to be confirmed, to meet the app's password defaults and to fit what the hashing driver takes, and keeping any typed one short enough to refuse before it is hashed.
      */
     public function rules(Surface $surface): array
     {
         return match ($surface) {
-            Surface::SIGN_IN => [self::FIELD => ['required', 'string']],
+            Surface::SIGN_IN => [self::FIELD => ['required', 'string', 'max:'.self::MAX_CHARACTERS]],
             default => [self::FIELD => ['required', 'string', 'confirmed', Password::default(), $this->lengthCap()]],
         };
     }

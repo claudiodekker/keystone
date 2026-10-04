@@ -24,7 +24,7 @@ A new password must also meet your app's password defaults, Laravel's `Password:
 Password::defaults(fn () => Password::min(15));
 ```
 
-Sign-in takes a password of any length.
+Sign-in takes a password of up to 1024 characters under every driver, so a hash imported from a longer bcrypt password still matches its first 72 bytes. A longer one is refused with a validation error on `password` before anything is hashed, so it costs no hashing time and doesn't count as a wrong answer.
 
 ## Unknown accounts
 

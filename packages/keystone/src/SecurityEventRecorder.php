@@ -137,7 +137,7 @@ class SecurityEventRecorder
     }
 
     /**
-     * Cut a value taken from input to its length, with control characters replaced by spaces so it can't break a log line.
+     * Cut a value taken from input to its length, with control characters and line and paragraph separators replaced by spaces so it can't break a log line.
      */
     protected function clean(?string $value, int $length): ?string
     {
@@ -145,7 +145,7 @@ class SecurityEventRecorder
             return null;
         }
 
-        $printable = (string) preg_replace('/\p{Cc}/u', ' ', $value);
+        $printable = (string) preg_replace('/[\p{Cc}\p{Zl}\p{Zp}]/u', ' ', $value);
 
         return Str::substr($printable, 0, $length);
     }
