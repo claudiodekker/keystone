@@ -7,6 +7,7 @@ use Composer\InstalledVersions;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Str;
 use ParseError;
+use stdClass;
 use Symfony\Component\Finder\SplFileInfo;
 
 /**
@@ -354,11 +355,12 @@ class Installer
      */
     public function mapAutoloadDev(array $namespaces): void
     {
-        $manifest = $this->readJson('composer.json');
-        $mapped = $manifest['autoload-dev']['psr-4'] ?? [];
-        $manifest['autoload-dev']['psr-4'] = [...$mapped, ...array_diff_key($namespaces, $mapped)];
+        $this->editJson('composer.json', function (stdClass $manifest) use ($namespaces) {
+            $autoload = $manifest->{'autoload-dev'} ??= new stdClass;
+            $mapped = (array) ($autoload->{'psr-4'} ?? []);
 
-        $this->writeJson('composer.json', $manifest);
+            $autoload->{'psr-4'} = (object) [...$mapped, ...array_diff_key($namespaces, $mapped)];
+        });
     }
 
     /**
@@ -368,18 +370,20 @@ class Installer
      */
     public function addNpmPackages(array $packages): void
     {
-        $manifest = $this->readJson('package.json');
-        $devDependencies = [...$manifest['devDependencies'] ?? []];
-        $installed = [...$manifest['dependencies'] ?? [], ...$devDependencies, ...$manifest['peerDependencies'] ?? []];
+        $this->editJson('package.json', function (stdClass $manifest) use ($packages) {
+            $devDependencies = (array) ($manifest->devDependencies ?? []);
+            $installed = [...(array) ($manifest->dependencies ?? []), ...$devDependencies, ...(array) ($manifest->peerDependencies ?? [])];
+            $missing = array_diff_key($packages, $installed);
 
-        foreach (array_diff_key($packages, $installed) as $package => $version) {
-            $devDependencies[$package] = $version;
-        }
+            if ($missing === []) {
+                return;
+            }
 
-        ksort($devDependencies);
-        $manifest['devDependencies'] = $devDependencies;
+            $devDependencies = [...$devDependencies, ...$missing];
+            ksort($devDependencies);
 
-        $this->writeJson('package.json', $manifest);
+            $manifest->devDependencies = (object) $devDependencies;
+        });
     }
 
     /**
@@ -411,14 +415,27 @@ class Installer
     }
 
     /**
-     * Write a JSON file of the app the way composer and npm do.
+     * Edit a JSON file of the app, keeping its indentation and leaving the file alone when the edit changes nothing.
      *
-     * @param  array<string, mixed>  $data
+     * @param  Closure(stdClass): void  $edit
      */
-    protected function writeJson(string $path, array $data): void
+    protected function editJson(string $path, Closure $edit): void
     {
-        $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        $json = $this->files->exists($this->path($path)) ? $this->files->get($this->path($path)) : '{}';
+        $manifest = json_decode($json, flags: JSON_THROW_ON_ERROR);
+        $before = json_encode($manifest, JSON_THROW_ON_ERROR);
 
-        $this->files->put($this->path($path), $json."\n");
+        $edit($manifest);
+
+        if (json_encode($manifest, JSON_THROW_ON_ERROR) === $before) {
+            return;
+        }
+
+        $edited = json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        $indent = preg_match('/^([ \t]+)"/m', $json, $match) === 1 ? $match[1] : '    ';
+
+        $indented = preg_replace_callback('/^(?: {4})+/m', fn (array $spaces) => str_repeat($indent, intdiv(strlen($spaces[0]), 4)), $edited);
+
+        $this->files->put($this->path($path), $indented."\n");
     }
 }

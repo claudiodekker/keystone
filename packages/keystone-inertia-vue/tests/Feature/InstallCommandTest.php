@@ -30,6 +30,11 @@ function freshApp(array $composer = []): string
     return $path;
 }
 
+function twoSpaceIndented(string $json): string
+{
+    return preg_replace_callback('/^(?: {4})+/m', fn (array $spaces) => str_repeat('  ', intdiv(strlen($spaces[0]), 4)), $json);
+}
+
 it('refuses while laravel/fortify is installed, changing nothing', function () {
     $app = freshApp(['require' => ['laravel/fortify' => '^1.37']]);
     $before = file_get_contents("{$app}/routes/web.php");
@@ -239,6 +244,49 @@ it('maps the AppTests\' namespaces in the app\'s autoload-dev only', function ()
         'ClaudioDekker\\Keystone\\Totp\\AppTests\\' => 'vendor/claudiodekker/keystone-totp/app-tests/',
         'ClaudioDekker\\Keystone\\InertiaVue\\AppTests\\' => 'vendor/claudiodekker/keystone-inertia-vue/app-tests/',
     ])->and($manifest['autoload']['psr-4'])->not->toHaveKey('ClaudioDekker\\Keystone\\AppTests\\');
+});
+
+it('keeps an empty object an object in the manifests it edits', function () {
+    $app = freshApp();
+    $empty = ['composer.json' => 'scripts', 'package.json' => 'overrides'];
+
+    foreach ($empty as $manifest => $key) {
+        file_put_contents("{$app}/{$manifest}", preg_replace('/^\{\n/', "{\n    \"{$key}\": {},\n", file_get_contents("{$app}/{$manifest}"), limit: 1));
+    }
+
+    $this->artisan('keystone:install')->assertSuccessful()->run();
+
+    expect(file_get_contents("{$app}/composer.json"))->toContain('"scripts": {}')
+        ->and(file_get_contents("{$app}/package.json"))->toContain('"overrides": {}');
+});
+
+it('keeps the indentation of the manifests it edits', function () {
+    $app = freshApp();
+
+    foreach (['composer.json', 'package.json'] as $manifest) {
+        file_put_contents("{$app}/{$manifest}", twoSpaceIndented(file_get_contents("{$app}/{$manifest}")));
+    }
+
+    $this->artisan('keystone:install')->assertSuccessful()->run();
+
+    expect(file_get_contents("{$app}/composer.json"))->toContain("\n      \"ClaudioDekker\\\\Keystone\\\\AppTests\\\\\"")->not->toMatch('/^ {8}/m')
+        ->and(file_get_contents("{$app}/package.json"))->toContain("\n    \"vue\"")->not->toMatch('/^ {8}/m');
+});
+
+it('leaves the manifests it has nothing to add to byte for byte', function () {
+    $app = freshApp();
+    $this->artisan('keystone:install')->assertSuccessful()->run();
+    $before = [];
+
+    foreach (['composer.json', 'package.json'] as $manifest) {
+        $before[$manifest] = twoSpaceIndented(file_get_contents("{$app}/{$manifest}"));
+        file_put_contents("{$app}/{$manifest}", $before[$manifest]);
+    }
+
+    $this->artisan('keystone:install')->assertSuccessful()->run();
+
+    expect(file_get_contents("{$app}/composer.json"))->toBe($before['composer.json'])
+        ->and(file_get_contents("{$app}/package.json"))->toBe($before['package.json']);
 });
 
 it('sets up Inertia and Vue in a bare app, keeping its old Vite files as backups', function () {

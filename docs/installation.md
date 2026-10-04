@@ -16,7 +16,7 @@ The installer refuses while `laravel/fortify` is installed, since both would han
 - requires `routes/keystone.php` from `routes/web.php`, makes your user model a Keystone user and sets the `web` guard's driver to `keystone`, as described below.
 - sets `SESSION_COOKIE=__Host-<app name>-session`, `SESSION_SECURE_COOKIE=true`, `SESSION_DOMAIN=null` and `SESSION_PATH=/` in `.env` and `.env.example`. The `__Host-` prefix keeps the session cookie to your own host, and browsers only accept it over HTTPS, so serve your app over HTTPS locally too (for example `herd secure`); `localhost` is the one exception.
 - adds the `Keystone` testsuite to `phpunit.xml` and maps the AppTests' namespaces in your `autoload-dev`, so `php artisan test` proves your copies keep Keystone's guarantees. The AppTests declare no global functions, so they can't clash with your own Pest helpers.
-- adds the npm packages the pages need, keeping the versions you already pinned, then runs `npm install && npm run build`. A package your app already depends on keeps its version.
+- adds the npm packages the pages need, keeping the versions you already pinned, then runs `npm install && npm run build`. A package your app already depends on keeps its version. Both `composer.json` and `package.json` keep their indentation and empty objects, and one the installer has nothing to add to isn't rewritten.
 
 When it can't make an edit, such as a `phpunit.xml` without a `<testsuites>` element, it prints what to add yourself. It leaves `app.cipher` alone. Keystone's migrations run from the package, so there is nothing to publish; publish Keystone's config only to change a setting (see [Configuration](configuration.md)).
 
