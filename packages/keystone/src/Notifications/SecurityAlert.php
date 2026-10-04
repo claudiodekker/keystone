@@ -4,6 +4,7 @@ namespace ClaudioDekker\Keystone\Notifications;
 
 use Carbon\CarbonImmutable;
 use ClaudioDekker\Keystone\IpLocation;
+use ClaudioDekker\Keystone\Notifications\Contracts\SecurityEventAlertContract;
 use ClaudioDekker\Keystone\RecoveryCodes;
 use ClaudioDekker\Keystone\SecurityEvent;
 use ClaudioDekker\Keystone\SecurityEventType;
@@ -18,7 +19,7 @@ use Throwable;
 /**
  * @api
  */
-class SecurityAlert extends Notification implements SecurityEventAlert, ShouldBeEncrypted, ShouldQueue
+class SecurityAlert extends Notification implements SecurityEventAlertContract, ShouldBeEncrypted, ShouldQueue
 {
     use Queueable;
 

@@ -4,8 +4,8 @@ use ClaudioDekker\Keystone\BootChecks;
 use ClaudioDekker\Keystone\Exceptions\Misconfigured;
 use ClaudioDekker\Keystone\KeystoneServiceProvider;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
+use ClaudioDekker\Keystone\Notifications\Contracts\SecurityEventAlertContract;
 use ClaudioDekker\Keystone\Notifications\SecurityAlert;
-use ClaudioDekker\Keystone\Notifications\SecurityEventAlert;
 use ClaudioDekker\Keystone\Tests\Fixtures\FlakyAlert;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormType;
 use ClaudioDekker\Keystone\Tests\Fixtures\UserOnOtherConnection;
@@ -165,7 +165,7 @@ describe('the alert slots', function () {
 
         $failures = bootFailures();
 
-        expect($failures)->toBe(['keystone.notifications.signed_out must name a notification that implements '.SecurityEventAlert::class.'.']);
+        expect($failures)->toBe(['keystone.notifications.signed_out must name a notification that implements '.SecurityEventAlertContract::class.'.']);
     });
 
     it('accepts the app\'s own notification for a type SecurityAlert has no mail for', function () {

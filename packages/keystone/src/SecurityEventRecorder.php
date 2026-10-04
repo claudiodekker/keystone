@@ -3,7 +3,7 @@
 namespace ClaudioDekker\Keystone;
 
 use ClaudioDekker\Keystone\Methods\StoredCredential;
-use ClaudioDekker\Keystone\Notifications\SecurityEventAlert;
+use ClaudioDekker\Keystone\Notifications\Contracts\SecurityEventAlertContract;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\AnonymousNotifiable;
@@ -278,14 +278,14 @@ class SecurityEventRecorder
     /**
      * Get the notification class the type's slot names, or null when the type is silenced.
      *
-     * @return class-string<SecurityEventAlert>|null
+     * @return class-string<SecurityEventAlertContract>|null
      */
     protected function slot(SecurityEventType $type): ?string
     {
         $slots = config('keystone.notifications');
         $slot = is_array($slots) ? ($slots[$type->value] ?? null) : null;
 
-        return is_string($slot) && is_a($slot, Notification::class, true) && is_a($slot, SecurityEventAlert::class, true) ? $slot : null;
+        return is_string($slot) && is_a($slot, Notification::class, true) && is_a($slot, SecurityEventAlertContract::class, true) ? $slot : null;
     }
 
     /**

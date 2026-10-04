@@ -1,13 +1,13 @@
 <?php
 
-namespace ClaudioDekker\Keystone\Notifications;
+namespace ClaudioDekker\Keystone\Notifications\Contracts;
 
 use ClaudioDekker\Keystone\SecurityEvent;
 
 /**
  * @api
  */
-interface SecurityEventAlert
+interface SecurityEventAlertContract
 {
     /**
      * Create a new alert about the security event.

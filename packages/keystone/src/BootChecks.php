@@ -8,8 +8,8 @@ use ClaudioDekker\Keystone\Http\Middleware\ClearSiteDataOnSessionEnd;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
+use ClaudioDekker\Keystone\Notifications\Contracts\SecurityEventAlertContract;
 use ClaudioDekker\Keystone\Notifications\SecurityAlert;
-use ClaudioDekker\Keystone\Notifications\SecurityEventAlert;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notification;
 
@@ -208,8 +208,8 @@ class BootChecks
             return "keystone.notifications.{$key} must be null or the class name of a notification.";
         }
 
-        if (! is_a($slot, SecurityEventAlert::class, true)) {
-            return "keystone.notifications.{$key} must name a notification that implements ".SecurityEventAlert::class.'.';
+        if (! is_a($slot, SecurityEventAlertContract::class, true)) {
+            return "keystone.notifications.{$key} must name a notification that implements ".SecurityEventAlertContract::class.'.';
         }
 
         if ($slot === SecurityAlert::class && ! SecurityAlert::handles($type)) {

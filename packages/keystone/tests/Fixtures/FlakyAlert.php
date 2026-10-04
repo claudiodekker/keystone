@@ -2,13 +2,13 @@
 
 namespace ClaudioDekker\Keystone\Tests\Fixtures;
 
-use ClaudioDekker\Keystone\Notifications\SecurityEventAlert;
+use ClaudioDekker\Keystone\Notifications\Contracts\SecurityEventAlertContract;
 use ClaudioDekker\Keystone\SecurityEvent;
 use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Notifications\Notification;
 use RuntimeException;
 
-class FlakyAlert extends Notification implements SecurityEventAlert
+class FlakyAlert extends Notification implements SecurityEventAlertContract
 {
     public static array $delivered = [];
 
