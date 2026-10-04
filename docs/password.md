@@ -32,4 +32,4 @@ A sign-in naming no account, or an account without a password, is checked agains
 
 ## Spaces
 
-Keystone never trims the `password`, `current_password` and `password_confirmation` fields, even if your `TrimStrings` middleware no longer excepts them. A password that starts or ends with a space is kept as typed.
+Keystone's password package never trims the `password`, `current_password` and `password_confirmation` fields, even if your `TrimStrings` middleware no longer excepts them. A password that starts or ends with a space is kept as typed.
