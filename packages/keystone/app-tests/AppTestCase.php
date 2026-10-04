@@ -2,9 +2,11 @@
 
 namespace ClaudioDekker\Keystone\AppTests;
 
+use Carbon\CarbonInterval;
 use ClaudioDekker\Keystone\AccountChange;
 use ClaudioDekker\Keystone\AccountChanges;
 use ClaudioDekker\Keystone\AppTests\Support\CredentialTypeSupport;
+use ClaudioDekker\Keystone\CredentialAttempt;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\KeystoneUser;
 use ClaudioDekker\Keystone\Methods\CredentialType;
@@ -470,6 +472,37 @@ abstract class AppTestCase extends TestCase
         }
 
         return $directives;
+    }
+
+    /**
+     * Assert the request waited out the timing floor, returning its response.
+     *
+     * Core sleeps for what the floor leaves after the request's own work, so the time slept and the time the whole request took reach the floor together.
+     *
+     * @param  Closure(): TestResponse<Response>  $request
+     * @return TestResponse<Response>
+     */
+    protected function assertWaitsOutTimingFloor(Closure $request): TestResponse
+    {
+        $slept = [];
+
+        Sleep::fake();
+        Sleep::whenFakingSleep(function (CarbonInterval $duration) use (&$slept) {
+            $slept[] = $duration->totalMicroseconds;
+        });
+
+        $started = hrtime(true);
+        $response = $request();
+        $tookMicroseconds = (hrtime(true) - $started) / 1_000;
+
+        $this->assertNotEmpty($slept, 'The request returned without waiting out the timing floor.');
+        $this->assertGreaterThanOrEqual(
+            CredentialAttempt::TIMING_FLOOR_MICROSECONDS,
+            array_sum($slept) + $tookMicroseconds,
+            'The request waited less than the timing floor.',
+        );
+
+        return $response;
     }
 
     /**

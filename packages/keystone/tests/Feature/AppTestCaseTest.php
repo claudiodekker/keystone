@@ -3,6 +3,7 @@
 use ClaudioDekker\Keystone\AppTests\AppTestCase;
 use ClaudioDekker\Keystone\AppTests\Assertions\SignInAssertions;
 use ClaudioDekker\Keystone\AppTests\Support\CredentialTypeSupport;
+use ClaudioDekker\Keystone\CredentialAttempt;
 use ClaudioDekker\Keystone\Http\Middleware\AddHardeningHeaders;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Proof;
@@ -15,6 +16,7 @@ use ClaudioDekker\Keystone\Tests\Fixtures\UserWithoutFactory;
 use Illuminate\Cache\ArrayStore;
 use Illuminate\Cache\RateLimiter as CacheRateLimiter;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Timebox;
 use PHPUnit\Framework\AssertionFailedError;
 use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 
@@ -80,6 +82,38 @@ describe('assertIndistinguishable', function () {
         expect(fn () => $this->assertIndistinguishable(fn () => $this->get('alike'), fn () => $this->get($uri)))
             ->toThrow(AssertionFailedError::class, 'The responses differ.');
     })->with(['other-status', 'other-location', 'other-header', 'other-cookie', 'other-flash']);
+});
+
+describe('assertWaitsOutTimingFloor', function () {
+    beforeEach(function () {
+        Route::get('boxed', fn () => (new Timebox)->call(fn () => response('answer'), CredentialAttempt::TIMING_FLOOR_MICROSECONDS));
+        Route::get('boxed-short', fn () => (new Timebox)->call(fn () => response('answer'), 10_000));
+        Route::get('boxed-early', fn () => (new Timebox)->returnEarly()->call(fn () => response('answer'), CredentialAttempt::TIMING_FLOOR_MICROSECONDS));
+        Route::get('unboxed', fn () => response('answer'));
+    });
+
+    it('passes a request that waits out the floor, returning its response', function () {
+        $response = $this->assertWaitsOutTimingFloor(fn () => $this->get('boxed'));
+
+        $response->assertContent('answer');
+    });
+
+    it('fails a request that never sleeps', function (string $uri) {
+        expect(fn () => $this->assertWaitsOutTimingFloor(fn () => $this->get($uri)))
+            ->toThrow(AssertionFailedError::class, 'The request returned without waiting out the timing floor.');
+    })->with(['unboxed', 'boxed-early']);
+
+    it('fails a request that sleeps for less than the floor', function () {
+        expect(fn () => $this->assertWaitsOutTimingFloor(fn () => $this->get('boxed-short')))
+            ->toThrow(AssertionFailedError::class, 'The request waited less than the timing floor.');
+    });
+
+    it('counts only the sleeps of the request it is given', function () {
+        $this->get('boxed');
+
+        expect(fn () => $this->assertWaitsOutTimingFloor(fn () => $this->get('unboxed')))
+            ->toThrow(AssertionFailedError::class, 'The request returned without waiting out the timing floor.');
+    });
 });
 
 describe('assertions', function () {

@@ -141,17 +141,32 @@ describe('submit', function () {
         $this->assertGuest();
     });
 
-    it('refuses inside the timing floor, and returns early once signed in', function () {
+    it('refuses an unknown address inside the timing floor', function () {
         $account = $this->createAccount();
         $this->arrangeCredential($account, $this->support, Surface::SIGN_IN);
 
-        $this->assertSignInRefused($this->submitSignIn($this->support, 'nobody@example.com', $this->support->validProof(Surface::SIGN_IN)));
+        $response = $this->assertWaitsOutTimingFloor(fn () => $this->submitSignIn($this->support, 'nobody@example.com', $this->support->validProof(Surface::SIGN_IN)));
 
-        Sleep::assertSleptTimes(1);
+        $this->assertSignInRefused($response);
+    });
+
+    it('refuses a known account\'s wrong proof inside the timing floor', function () {
+        $account = $this->createAccount();
+        $this->arrangeCredential($account, $this->support, Surface::SIGN_IN);
+
+        $response = $this->assertWaitsOutTimingFloor(fn () => $this->submitSignIn($this->support, 'jane@example.com', $this->support->rejectedProof(Surface::SIGN_IN)));
+
+        $this->assertSignInRefused($response);
+    });
+
+    it('returns early once signed in', function () {
+        $account = $this->createAccount();
+        $this->arrangeCredential($account, $this->support, Surface::SIGN_IN);
+        Sleep::fake();
 
         $this->assertSignedIn($this->submitSignIn($this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN)), '/');
 
-        Sleep::assertSleptTimes(1);
+        Sleep::assertNeverSlept();
     });
 
     it('flashes back only the identifier when refusing', function () {
