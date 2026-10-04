@@ -2,6 +2,7 @@
 
 namespace ClaudioDekker\Keystone;
 
+use ClaudioDekker\Keystone\Exceptions\Barred;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\Proof;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
@@ -9,7 +10,6 @@ use ClaudioDekker\Keystone\Methods\Surface;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Timebox;
-use LogicException;
 use Throwable;
 
 /**
@@ -136,7 +136,7 @@ abstract class CredentialAttempt
     ): bool {
         try {
             $enter();
-        } catch (LogicException) {
+        } catch (Barred) {
             $this->recordRejected($account, $flow, $type, $credential, reason: 'keystone.barred');
 
             return false;

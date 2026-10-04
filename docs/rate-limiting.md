@@ -1,6 +1,6 @@
 # Rate limiting
 
-Keystone rate limits its own endpoints. Nothing in your routes, middleware or controllers needs to be wired up, and a spent limit always refuses the same way: a `429 Too Many Requests` response with a `Retry-After` header, reading "Too many attempts. Please try again in :seconds seconds."
+Keystone rate limits its own endpoints. Nothing in your routes, middleware or controllers needs to be wired up, and a spent limit always refuses the same way: a `429 Too Many Requests` response with a `Retry-After` header, reading "Too many attempts. Please try again in :seconds seconds." Laravel never reports the refusal, so spending a limit adds nothing to your logs or error tracker.
 
 ## Limits
 
