@@ -23,7 +23,6 @@ use Illuminate\Contracts\Foundation\CachesConfiguration;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Foundation\Exceptions\Handler;
 use Illuminate\Foundation\Http\Kernel as HttpKernel;
-use Illuminate\Foundation\Http\Middleware\TrimStrings;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Router;
 use Illuminate\Support\ServiceProvider;
@@ -36,11 +35,6 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class KeystoneServiceProvider extends ServiceProvider
 {
-    /**
-     * The password fields a proof or a new password arrives in, which are never trimmed.
-     */
-    protected const array PASSWORD_FIELDS = ['password', 'current_password', 'password_confirmation'];
-
     /**
      * Register the package services.
      */
@@ -63,8 +57,6 @@ class KeystoneServiceProvider extends ServiceProvider
     public function boot(AuthManager $auth, Kernel $kernel, Router $router): void
     {
         $auth->extend('keystone', $this->createGuard(...));
-
-        TrimStrings::except(self::PASSWORD_FIELDS);
 
         if ($kernel instanceof HttpKernel) {
             $kernel->pushMiddleware(CaptureRequestContext::class);
