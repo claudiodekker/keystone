@@ -13,4 +13,5 @@ The installer edits the application's own files (`routes/web.php`, the user mode
 - It leaves `app.cipher` alone: Keystone's encrypted columns use whatever cipher the application already has.
 - Keystone has no config file and runs its migrations from the package, so the installer publishes neither. Publishing the migrations as well would run them twice.
 - The Inertia-Vue installer sets up Inertia and Vue itself in a bare `laravel new` application, one without `resources/js/app.ts` whose `resources/js/app.js` is the skeleton's and which no other view loads. It keeps the old Vite entry files as `.bak`, so the application reaches a working sign-in page in one command. An application with its own setup, such as the Vue starter kit, Livewire or its own Blade layouts, keeps it, and the installer prints what to set up instead.
+- A run that stops part way is finished by running it again. The Inertia-Vue installer takes an `app.ts` identical to its stub as the one an earlier run copied, so it still wires the middleware and the welcome view.
 - It runs `composer dump-autoload`, `npm install` and `npm run build`, and when one fails it prints the commands to run instead.

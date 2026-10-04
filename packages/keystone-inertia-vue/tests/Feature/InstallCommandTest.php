@@ -2,6 +2,7 @@
 
 use ClaudioDekker\Keystone\InertiaVue\Tests\StubsTestCase;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
+use Illuminate\Contracts\Filesystem\FileNotFoundException;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Process\PendingProcess;
 use Illuminate\Support\Facades\Process;
@@ -28,6 +29,19 @@ function freshApp(array $composer = []): string
     Process::fake();
 
     return $path;
+}
+
+function treeOf(string $path): array
+{
+    $hashes = [];
+
+    foreach ((new Filesystem)->allFiles($path, hidden: true) as $file) {
+        $hashes[$file->getRelativePathname()] = md5_file($file->getPathname());
+    }
+
+    ksort($hashes);
+
+    return $hashes;
 }
 
 function twoSpaceIndented(string $json): string
@@ -389,6 +403,34 @@ it('leaves a Vite setup it doesn\'t recognise alone, and says how to set up Iner
     'its own code in app.js' => [['resources/js/app.js' => "import './bootstrap';\nimport Alpine from 'alpinejs';\n\nAlpine.start();\n"]],
     'a layout that loads app.js' => [['resources/views/layouts/app.blade.php' => "<html>@vite(['resources/css/app.css', 'resources/js/app.js'])</html>"]],
 ]);
+
+it('finishes wiring Inertia and Vue when an earlier run failed after copying the stubs', function () {
+    $app = freshApp();
+    $viteConfig = file_get_contents("{$app}/vite.config.js");
+    $web = file_get_contents("{$app}/routes/web.php");
+    unlink("{$app}/routes/web.php");
+
+    expect(fn () => $this->artisan('keystone:install')->run())->toThrow(FileNotFoundException::class);
+
+    file_put_contents("{$app}/routes/web.php", $web);
+    $this->artisan('keystone:install')->assertSuccessful()->run();
+
+    expect(file_get_contents("{$app}/bootstrap/app.php"))->toContain('\\App\\Http\\Middleware\\HandleInertiaRequests::class,')
+        ->and(file_get_contents("{$app}/resources/views/welcome.blade.php"))->toContain("'resources/js/app.ts'")
+        ->and(file_get_contents("{$app}/routes/web.php"))->toContain("require __DIR__.'/keystone.php';")
+        ->and(file_get_contents("{$app}/vite.config.js.bak"))->toBe($viteConfig)
+        ->and("{$app}/vite.config.js.bak.1")->not->toBeFile();
+});
+
+it('changes nothing when it runs again', function () {
+    $app = freshApp();
+    $this->artisan('keystone:install')->assertSuccessful()->run();
+    $before = treeOf($app);
+
+    $this->artisan('keystone:install')->assertSuccessful()->run();
+
+    expect(treeOf($app))->toBe($before);
+});
 
 it('leaves an app that already has Inertia and Vue set up as it is', function () {
     $app = freshApp();

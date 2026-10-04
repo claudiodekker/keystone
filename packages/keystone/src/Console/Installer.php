@@ -398,6 +398,14 @@ class Installer
     }
 
     /**
+     * Determine if the app's file is the stub's, byte for byte.
+     */
+    public function matchesStub(string $stubs, string $path): bool
+    {
+        return $this->has($path) && $this->files->get($this->path($path)) === $this->files->get("{$stubs}/{$path}");
+    }
+
+    /**
      * Determine if resources/js/app.js is Laravel's skeleton entry and no view but welcome.blade.php loads it, so replacing it breaks nothing else.
      */
     public function hasStockViteEntry(): bool

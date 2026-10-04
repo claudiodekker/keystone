@@ -8,14 +8,15 @@ namespace ClaudioDekker\Keystone\InertiaVue\Console;
 enum FrontendEntry: string
 {
     case STOCK = 'stock';
+    case KEYSTONE = 'keystone';
     case OWN = 'own';
     case UNKNOWN = 'unknown';
 
     /**
-     * Determine if the installer sets up Inertia and Vue itself in the app.
+     * Determine if the entry is the one Keystone sets up, so the installer wires its middleware and root view into the app.
      */
     public function isSetUpByKeystone(): bool
     {
-        return $this === self::STOCK;
+        return $this === self::STOCK || $this === self::KEYSTONE;
     }
 }

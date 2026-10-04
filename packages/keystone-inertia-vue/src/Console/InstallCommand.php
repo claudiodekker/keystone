@@ -84,9 +84,10 @@ class InstallCommand extends Command
             return self::FAILURE;
         }
 
-        $entry = $this->frontendEntry($installer);
+        $stubs = dirname(__DIR__, 2).'/stubs';
+        $entry = $this->frontendEntry($installer, $stubs);
 
-        if ($entry->isSetUpByKeystone()) {
+        if ($entry === FrontendEntry::STOCK) {
             $installer->backUp('vite.config.js');
             $installer->backUp('resources/js/app.js');
         }
@@ -95,8 +96,8 @@ class InstallCommand extends Command
         $names = [...array_map(fn (CredentialType $type) => $type->name(), $served), CredentialTypes::RECOVERY_CODE];
         $partials = array_unique(array_map(fn (string $name) => self::PARTIALS.Str::studly($name).'.vue', $names));
 
-        $copies = $installer->copyStubs(dirname(__DIR__, 2).'/stubs', (bool) $this->option('force'), fn (string $path) => match (true) {
-            in_array($path, self::BOOTSTRAP, true) => $entry->isSetUpByKeystone(),
+        $copies = $installer->copyStubs($stubs, (bool) $this->option('force'), fn (string $path) => match (true) {
+            in_array($path, self::BOOTSTRAP, true) => $entry === FrontendEntry::STOCK,
             dirname($path).'/' === self::PARTIALS => in_array($path, $partials, true),
             isset(self::PARTIAL_COMPONENTS[$path]) => in_array(self::PARTIAL_COMPONENTS[$path], $partials, true),
             default => true,
@@ -112,8 +113,12 @@ class InstallCommand extends Command
     /**
      * Get how the app sets up its frontend entry, which decides whether the installer sets up Inertia and Vue for it.
      */
-    protected function frontendEntry(Installer $installer): FrontendEntry
+    protected function frontendEntry(Installer $installer, string $stubs): FrontendEntry
     {
+        if ($installer->matchesStub($stubs, 'resources/js/app.ts')) {
+            return FrontendEntry::KEYSTONE;
+        }
+
         if ($installer->has('resources/js/app.ts')) {
             return FrontendEntry::OWN;
         }
