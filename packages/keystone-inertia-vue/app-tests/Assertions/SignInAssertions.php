@@ -15,18 +15,14 @@ trait SignInAssertions
     use KeystoneSignInAssertions;
 
     /**
-     * Assert the response is the sign-in page, showing the status message when one is given.
+     * Assert the response is the sign-in page, showing the status message when one is given and none otherwise.
      *
      * @param  TestResponse<Response>  $response
      */
     public function assertSignInPage(TestResponse $response, ?string $status = null): void
     {
         $response->assertInertia(function (AssertableInertia $page) use ($status) {
-            $page->component('auth/Login')->has('types');
-
-            if ($status !== null) {
-                $page->where('status', $status);
-            }
+            $page->component('auth/Login')->has('types')->where('status', $status);
         });
     }
 }

@@ -3,6 +3,7 @@
 namespace ClaudioDekker\Keystone\AppTests\Assertions;
 
 use ClaudioDekker\Keystone\Http\Controllers\SignInController;
+use ClaudioDekker\Keystone\Status;
 use Illuminate\Testing\TestResponse;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -12,7 +13,7 @@ use Symfony\Component\HttpFoundation\Response;
 trait SignInAssertions
 {
     /**
-     * Assert the response is the sign-in page, showing the status message when one is given.
+     * Assert the response is the sign-in page, showing the status message when one is given and none otherwise.
      *
      * @param  TestResponse<Response>  $response
      */
@@ -22,6 +23,12 @@ trait SignInAssertions
 
         if ($status !== null) {
             $response->assertSee($status);
+
+            return;
+        }
+
+        foreach (Status::cases() as $case) {
+            $response->assertDontSee($case->label());
         }
     }
 
