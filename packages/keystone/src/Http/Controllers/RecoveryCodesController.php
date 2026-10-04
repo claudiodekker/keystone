@@ -3,7 +3,6 @@
 namespace ClaudioDekker\Keystone\Http\Controllers;
 
 use ClaudioDekker\Keystone\Demand;
-use ClaudioDekker\Keystone\Http\Concerns\RefusesSignedInUsers;
 use ClaudioDekker\Keystone\Http\Concerns\ResolvesEnrollmentSignIn;
 use ClaudioDekker\Keystone\Http\PageValues\RecoveryCodesPage;
 use ClaudioDekker\Keystone\Keystone;
@@ -23,7 +22,6 @@ use Symfony\Component\HttpFoundation\Response;
  */
 abstract class RecoveryCodesController extends Controller
 {
-    use RefusesSignedInUsers;
     use ResolvesEnrollmentSignIn;
 
     /**
@@ -42,20 +40,10 @@ abstract class RecoveryCodesController extends Controller
      */
     public function show(Request $request): Response|Responsable
     {
-        if (Keystone::guard()->check()) {
-            return $this->refuseSignedIn();
-        }
+        $pending = $this->owing($request);
 
-        $pending = $this->pending();
-
-        if ($pending === null) {
-            return $this->refuseWithoutEnrollment();
-        }
-
-        $elsewhere = $this->elsewhere($request, $pending);
-
-        if ($elsewhere !== null) {
-            return $elsewhere;
+        if (! $pending instanceof PendingSignIn) {
+            return $pending;
         }
 
         $setup = new RecoveryCodeSetup(Keystone::guard());
@@ -68,20 +56,10 @@ abstract class RecoveryCodesController extends Controller
      */
     public function store(Request $request): Response|Responsable
     {
-        if (Keystone::guard()->check()) {
-            return $this->refuseSignedIn();
-        }
+        $pending = $this->owing($request);
 
-        $pending = $this->pending();
-
-        if ($pending === null) {
-            return $this->refuseWithoutEnrollment();
-        }
-
-        $elsewhere = $this->elsewhere($request, $pending);
-
-        if ($elsewhere !== null) {
-            return $elsewhere;
+        if (! $pending instanceof PendingSignIn) {
+            return $pending;
         }
 
         $validator = Validator::make($request->all(), (new RecoveryCodeType)->rules(Surface::ENROLLMENT));
@@ -120,6 +98,20 @@ abstract class RecoveryCodesController extends Controller
      * Respond to saved recovery codes, sending the signed-in user on to the intended URL.
      */
     abstract protected function sendRecoveryCodesSaved(Request $request, string $intendedUrl): Response|Responsable;
+
+    /**
+     * Get the held sign-in when it still owes recovery codes, or the response that sends the user where they belong instead.
+     */
+    protected function owing(Request $request): PendingSignIn|Response|Responsable
+    {
+        $pending = $this->held();
+
+        if (! $pending instanceof PendingSignIn) {
+            return $pending;
+        }
+
+        return $this->elsewhere($request, $pending) ?? $pending;
+    }
 
     /**
      * Send the held account on when it owes something other than recovery codes, or nothing at all.

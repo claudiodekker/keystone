@@ -9,14 +9,20 @@ use Illuminate\Http\RedirectResponse;
 
 trait ResolvesEnrollmentSignIn
 {
+    use RefusesSignedInUsers;
+
     /**
-     * Get the session's live sign-in held at enrollment.
+     * Get the session's live sign-in held at enrollment, or the redirect that refuses a request without one.
      */
-    protected function pending(): ?PendingSignIn
+    protected function held(): PendingSignIn|RedirectResponse
     {
+        if (Keystone::guard()->check()) {
+            return $this->refuseSignedIn();
+        }
+
         $pending = Keystone::guard()->pending();
 
-        return $pending?->stage === PendingStage::ENROLLMENT ? $pending : null;
+        return $pending?->stage === PendingStage::ENROLLMENT ? $pending : $this->refuseWithoutEnrollment();
     }
 
     /**

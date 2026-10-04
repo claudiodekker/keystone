@@ -4,7 +4,6 @@ namespace ClaudioDekker\Keystone\Http\Controllers;
 
 use ClaudioDekker\Keystone\Demand;
 use ClaudioDekker\Keystone\EnrollmentAttempt;
-use ClaudioDekker\Keystone\Http\Concerns\RefusesSignedInUsers;
 use ClaudioDekker\Keystone\Http\Concerns\ResolvesEnrollmentSignIn;
 use ClaudioDekker\Keystone\Http\Concerns\StartsEnrollmentCeremonies;
 use ClaudioDekker\Keystone\Http\PageValues\EnrollmentFormPage;
@@ -27,7 +26,6 @@ use Throwable;
  */
 abstract class EnrollmentController extends Controller
 {
-    use RefusesSignedInUsers;
     use ResolvesEnrollmentSignIn;
     use StartsEnrollmentCeremonies;
 
@@ -49,20 +47,10 @@ abstract class EnrollmentController extends Controller
      */
     public function show(Request $request): Response|Responsable
     {
-        if (Keystone::guard()->check()) {
-            return $this->refuseSignedIn();
-        }
+        $pending = $this->owing($request);
 
-        $pending = $this->pending();
-
-        if ($pending === null) {
-            return $this->refuseWithoutEnrollment();
-        }
-
-        $elsewhere = $this->elsewhere($request, $pending);
-
-        if ($elsewhere !== null) {
-            return $elsewhere;
+        if (! $pending instanceof PendingSignIn) {
+            return $pending;
         }
 
         $types = array_map(fn (CredentialType $type) => [
@@ -84,20 +72,10 @@ abstract class EnrollmentController extends Controller
      */
     public function create(Request $request, string $type): Response|Responsable
     {
-        if (Keystone::guard()->check()) {
-            return $this->refuseSignedIn();
-        }
+        $pending = $this->owing($request);
 
-        $pending = $this->pending();
-
-        if ($pending === null) {
-            return $this->refuseWithoutEnrollment();
-        }
-
-        $elsewhere = $this->elsewhere($request, $pending);
-
-        if ($elsewhere !== null) {
-            return $elsewhere;
+        if (! $pending instanceof PendingSignIn) {
+            return $pending;
         }
 
         $credentialType = $this->offered($type);
@@ -129,20 +107,10 @@ abstract class EnrollmentController extends Controller
      */
     public function store(Request $request, string $type): Response|Responsable
     {
-        if (Keystone::guard()->check()) {
-            return $this->refuseSignedIn();
-        }
+        $pending = $this->owing($request);
 
-        $pending = $this->pending();
-
-        if ($pending === null) {
-            return $this->refuseWithoutEnrollment();
-        }
-
-        $elsewhere = $this->elsewhere($request, $pending);
-
-        if ($elsewhere !== null) {
-            return $elsewhere;
+        if (! $pending instanceof PendingSignIn) {
+            return $pending;
         }
 
         $credentialType = $this->offered($type);
@@ -181,12 +149,10 @@ abstract class EnrollmentController extends Controller
      */
     public function destroy(Request $request): Response|Responsable
     {
-        if (Keystone::guard()->check()) {
-            return $this->refuseSignedIn();
-        }
+        $pending = $this->held();
 
-        if ($this->pending() === null) {
-            return $this->refuseWithoutEnrollment();
+        if (! $pending instanceof PendingSignIn) {
+            return $pending;
         }
 
         Keystone::guard()->forgetPending();
@@ -235,6 +201,20 @@ abstract class EnrollmentController extends Controller
      * Respond to a cancelled enrollment.
      */
     abstract protected function sendEnrollmentCancelled(Request $request): Response|Responsable;
+
+    /**
+     * Get the held sign-in when it still owes a second factor, or the response that sends the user where they belong instead.
+     */
+    protected function owing(Request $request): PendingSignIn|Response|Responsable
+    {
+        $pending = $this->held();
+
+        if (! $pending instanceof PendingSignIn) {
+            return $pending;
+        }
+
+        return $this->elsewhere($request, $pending) ?? $pending;
+    }
 
     /**
      * Send the held account on when it owes something other than a second factor, or nothing at all.
