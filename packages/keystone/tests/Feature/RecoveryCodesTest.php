@@ -100,7 +100,7 @@ describe('answers', function () {
     });
 
     it('keeps the last code while recovery codes are required, counting it and recording why', function () {
-        config(['keystone.rate_limits.failed_attempts_per_hour' => 1]);
+        config(['keystone.require_recovery_codes' => true, 'keystone.rate_limits.failed_attempts_per_hour' => 1]);
         $account = $this->createChallengedAccount(new FormTypeSupport('code'));
         [$last] = $this->arrangeRecoveryCodes($account, count: 1);
         $this->passFirstFactor();
@@ -116,6 +116,7 @@ describe('answers', function () {
     });
 
     it('spends a code while it is not the last, with recovery codes required', function () {
+        config(['keystone.require_recovery_codes' => true]);
         $account = $this->createChallengedAccount(new FormTypeSupport('code'));
         [$code] = $this->arrangeRecoveryCodes($account, count: 2);
         $this->passFirstFactor();

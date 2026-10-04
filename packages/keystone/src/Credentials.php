@@ -3,6 +3,7 @@
 namespace ClaudioDekker\Keystone;
 
 use ClaudioDekker\Keystone\Methods\CredentialType;
+use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
 use ClaudioDekker\Keystone\Methods\Surface;
 use Illuminate\Database\Eloquent\Model;
@@ -40,7 +41,6 @@ class Credentials
             'identifier_hash' => $identifier === null ? null : hash('sha256', $identifier),
             'label' => $label,
             'secret' => $secret === null ? null : Crypt::encryptString($secret),
-            'served_challenge' => isset($type->surfaces()[Surface::CHALLENGE->value]),
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -81,14 +81,16 @@ class Credentials
     }
 
     /**
-     * Determine if the account holds a challenge credential of another type than the first factor's.
+     * Determine if the account holds a usable credential of a listed type that serves the challenge, of another type than the first factor's when there is one.
      */
-    public function holdsSecondFactor(int|string $accountId, string $firstFactor): bool
+    public function holdsSecondFactor(int|string $accountId, ?string $firstFactor = null): bool
     {
+        $names = array_map(fn (CredentialType $type) => $type->name(), app(CredentialTypes::class)->serving(Surface::CHALLENGE));
+
         return $this->query()
             ->where('user_id', $accountId)
-            ->where('type', '!=', $firstFactor)
-            ->where('served_challenge', true)
+            ->when($firstFactor !== null, fn (Builder $query) => $query->where('type', '!=', $firstFactor))
+            ->whereIn('type', $names)
             ->whereNull('disabled_at')
             ->exists();
     }

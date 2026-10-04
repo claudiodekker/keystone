@@ -11,6 +11,7 @@ use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\RecoveryCodes;
+use ClaudioDekker\Keystone\SignInDecision;
 use Closure;
 use Illuminate\Cache\RateLimiter as CacheRateLimiter;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -173,12 +174,59 @@ abstract class AppTestCase extends TestCase
      */
     protected function arrangeRecoveryCodes(Model&KeystoneUser $account, int $count = RecoveryCodes::SET_SIZE): array
     {
-        $recoveryCodes = new RecoveryCodes($account);
-        $codes = array_slice($recoveryCodes->generate(), 0, $count);
+        $codes = array_slice((new RecoveryCodes($account))->generate(), 0, $count);
 
-        $recoveryCodes->replace($account->getKey(), $codes);
+        $changes = new AccountChanges(Keystone::guard());
+
+        $changes->change($account, function (AccountChange $change) use ($codes) {
+            (new RecoveryCodes($change->account))->replace($change->account->getKey(), $codes);
+        });
 
         return $codes;
+    }
+
+    /**
+     * Let an account with only a first factor sign in, as an app that requires neither a second factor nor recovery codes does.
+     */
+    protected function withoutMandates(): void
+    {
+        config([
+            'keystone.require_second_factor' => false,
+            'keystone.require_recovery_codes' => false,
+        ]);
+    }
+
+    /**
+     * Require every account to hold a second factor and recovery codes, as Keystone does by default.
+     */
+    protected function withMandates(): void
+    {
+        config([
+            'keystone.require_second_factor' => true,
+            'keystone.require_recovery_codes' => true,
+        ]);
+    }
+
+    /**
+     * Get what core keeps of the type's running enrollment ceremony in the session.
+     */
+    protected function enrollmentCeremony(string $type): mixed
+    {
+        $running = Keystone::guard()->slots()->get($type, Surface::ENROLLMENT->value);
+
+        return is_array($running) ? $running['ceremony'] ?? null : null;
+    }
+
+    /**
+     * Get the recovery codes staged in the session for the account to save.
+     *
+     * @return list<string>
+     */
+    protected function stagedRecoveryCodes(): array
+    {
+        $staged = Keystone::guard()->slots()->get(CredentialTypes::RECOVERY_CODE, Surface::ENROLLMENT->value);
+
+        return is_array($staged) ? array_values($staged) : [];
     }
 
     /**
@@ -186,7 +234,7 @@ abstract class AppTestCase extends TestCase
      *
      * @return Model&KeystoneUser
      */
-    protected function signInAccount(CredentialTypeSupport $support, string $address = 'jane@example.com'): Model
+    public function signInAccount(CredentialTypeSupport $support, string $address = 'jane@example.com'): Model
     {
         $account = $this->createAccount($address);
         $this->arrangeCredential($account, $support, Surface::SIGN_IN);
@@ -212,6 +260,32 @@ abstract class AppTestCase extends TestCase
         $this->arrangeCredential($account, $challenge, Surface::CHALLENGE);
 
         return $account;
+    }
+
+    /**
+     * Create an account holding only a first factor, which owes a second factor while the app requires one.
+     *
+     * @return Model&KeystoneUser
+     */
+    public function createFirstFactorAccount(string $address = 'jane@example.com'): Model
+    {
+        $account = $this->createAccount($address);
+
+        $this->arrangeCredential($account, $this->supportsFor(Surface::SIGN_IN)[0], Surface::SIGN_IN);
+
+        return $account;
+    }
+
+    /**
+     * Start the supported type's enrollment ceremony for the held sign-in, then answer it.
+     *
+     * @return TestResponse<Response>
+     */
+    public function enrollSecondFactor(CredentialTypeSupport $support): TestResponse
+    {
+        $this->get(route('login.enrollment.start', ['type' => $support->type()]));
+
+        return $this->post(route('login.enrollment.submit', ['type' => $support->type()]), $support->validEnrollment($this->enrollmentCeremony($support->type())));
     }
 
     /**
@@ -261,13 +335,51 @@ abstract class AppTestCase extends TestCase
     }
 
     /**
+     * Get the test support of every listed type an account can enroll as its second factor, skipping when there is none.
+     *
+     * @return non-empty-list<CredentialTypeSupport>
+     */
+    protected function enrollmentSupports(): array
+    {
+        $offer = (new SignInDecision)->enrollmentOffer($this->types());
+        $supports = array_map($this->supportFor(...), $offer);
+
+        if ($supports === []) {
+            $this->markTestSkipped('No installed credential type can be enrolled as a second factor.');
+        }
+
+        return $supports;
+    }
+
+    /**
      * Run the scenario once for every installed type serving the surface, each in a fresh session.
      *
      * @param  Closure(CredentialTypeSupport): void  $scenario
      */
     protected function eachSupportFor(Surface $surface, Closure $scenario): void
     {
-        foreach ($this->supportsFor($surface) as $support) {
+        $this->eachOf($this->supportsFor($surface), $scenario);
+    }
+
+    /**
+     * Run the scenario once for every listed type an account can enroll as its second factor, each in a fresh session.
+     *
+     * @param  Closure(CredentialTypeSupport): void  $scenario
+     */
+    protected function eachEnrollmentSupport(Closure $scenario): void
+    {
+        $this->eachOf($this->enrollmentSupports(), $scenario);
+    }
+
+    /**
+     * Run the scenario once for each of the supports, each in a fresh session.
+     *
+     * @param  list<CredentialTypeSupport>  $supports
+     * @param  Closure(CredentialTypeSupport): void  $scenario
+     */
+    protected function eachOf(array $supports, Closure $scenario): void
+    {
+        foreach ($supports as $support) {
             $this->app['session.store']->invalidate();
             Auth::forgetGuards();
 

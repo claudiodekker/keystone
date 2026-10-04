@@ -45,11 +45,3 @@ it('sends a cancelled sign-in to the sign-in page', function () {
 
     $this->assertChallengeCancelled($response);
 });
-
-it('sends a held account whose second factor no listed type answers to the sign-in page, saying why', function () {
-    config(['keystone.methods' => ['form']]);
-
-    $response = $this->get(route('login.challenge'));
-
-    $this->assertSecondFactorUnavailable($response);
-});

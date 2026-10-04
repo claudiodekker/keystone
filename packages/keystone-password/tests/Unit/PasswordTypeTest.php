@@ -7,6 +7,7 @@ use ClaudioDekker\Keystone\Password\PasswordType;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rules\Password;
 use Mockery\MockInterface;
 
 function passwordCredential(string $secret, int $id = 1): StoredCredential
@@ -50,17 +51,38 @@ describe('new password rules', function () {
         'missing' => [null, false],
         'empty' => ['', false],
         'an array' => [['secret'], false],
-        'a string' => ['secret', true],
+        'a string' => ['correct horse battery staple', true],
     ]);
 
     it('requires a new password to be confirmed', function (Surface $surface, mixed $confirmation, bool $passes) {
-        $passed = passwordRulesPass($surface, 'correct horse', $confirmation);
+        $passed = passwordRulesPass($surface, 'correct horse battery staple', $confirmation);
 
         expect($passed)->toBe($passes);
     })->with([Surface::REGISTRATION, Surface::ENROLLMENT])->with([
         'missing' => [null, false],
-        'different' => ['correct horse ', false],
-        'the same' => ['correct horse', true],
+        'different' => ['correct horse battery staple ', false],
+        'the same' => ['correct horse battery staple', true],
+    ]);
+
+    it('asks for at least 8 characters by default', function (Surface $surface, string $password, bool $passes) {
+        $passed = passwordRulesPass($surface, $password);
+
+        expect($passed)->toBe($passes);
+    })->with([Surface::REGISTRATION, Surface::ENROLLMENT])->with([
+        '7 characters' => [str_repeat('a', 7), false],
+        '8 characters' => [str_repeat('a', 8), true],
+    ]);
+
+    it('applies the app\'s own password defaults', function (Surface $surface, string $password, bool $passes) {
+        Password::defaults(fn () => Password::min(10));
+        $this->beforeApplicationDestroyed(fn () => Password::defaults(fn () => Password::min(8)));
+
+        $passed = passwordRulesPass($surface, $password);
+
+        expect($passed)->toBe($passes);
+    })->with([Surface::REGISTRATION, Surface::ENROLLMENT])->with([
+        '9 characters' => [str_repeat('é', 9), false],
+        '10 characters' => [str_repeat('é', 10), true],
     ]);
 
     it('caps a new password at 72 bytes under bcrypt', function (Surface $surface, string $password, bool $passes) {

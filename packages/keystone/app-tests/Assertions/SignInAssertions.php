@@ -72,6 +72,16 @@ trait SignInAssertions
     }
 
     /**
+     * Assert the response sends a user whose account owes an enrollment on to enroll.
+     *
+     * @param  TestResponse<Response>  $response
+     */
+    public function assertEnrollmentOwed(TestResponse $response): void
+    {
+        $response->assertRedirectToRoute('login.enrollment');
+    }
+
+    /**
      * Assert the response sends the signed-in user on to the intended URL.
      *
      * @param  TestResponse<Response>  $response

@@ -13,6 +13,7 @@ pest()->extend(AppTestCase::class)->use(
 );
 
 beforeEach(function () {
+    $this->withoutMandates();
     $this->support = $this->supportsFor(Surface::CHALLENGE)[0];
 });
 
@@ -126,16 +127,6 @@ describe('show', function () {
         $this->assertSentToSignIn($this->get(route('login.challenge')));
 
         $this->assertSentToSignIn($this->post(route('login.challenge.submit', ['type' => $this->support->type()]), $this->support->validProof(Surface::CHALLENGE)));
-    });
-
-    it('sends the user on to recover an account whose second factor no listed type answers, keeping the held sign-in', function () {
-        $this->createChallengedAccount($this->support);
-        $this->passFirstFactor();
-        config(['keystone.methods' => [$this->supportsFor(Surface::SIGN_IN)[0]->type()]]);
-
-        $this->assertSecondFactorUnavailable($this->get(route('login.challenge')));
-
-        $this->assertSecondFactorUnavailable($this->get(route('login.challenge')));
     });
 });
 

@@ -24,17 +24,6 @@ trait ChallengeAssertions
     }
 
     /**
-     * Assert the response sends a user whose second factor no listed type can answer on to recover the account, saying why.
-     *
-     * @param  TestResponse<Response>  $response
-     */
-    public function assertSecondFactorUnavailable(TestResponse $response): void
-    {
-        $response->assertRedirectToRoute('login')
-            ->assertSessionHas(Status::SESSION_KEY, Status::SECOND_FACTOR_UNAVAILABLE->value);
-    }
-
-    /**
      * Assert the response refuses the answer, with the message on the credential type.
      *
      * @param  TestResponse<Response>  $response
@@ -79,6 +68,16 @@ trait ChallengeAssertions
     public function assertChallengeInvalid(TestResponse $response, array $fields): void
     {
         $response->assertRedirectToRoute('login.challenge')->assertSessionHasErrors($fields);
+    }
+
+    /**
+     * Assert the response sends a user who passed the challenge, but whose account still owes an enrollment, on to enroll.
+     *
+     * @param  TestResponse<Response>  $response
+     */
+    public function assertEnrollmentOwedAfterChallenge(TestResponse $response): void
+    {
+        $response->assertRedirectToRoute('login.enrollment');
     }
 
     /**

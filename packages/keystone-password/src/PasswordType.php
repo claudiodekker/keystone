@@ -4,12 +4,14 @@ namespace ClaudioDekker\Keystone\Password;
 
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\InitiateShape;
+use ClaudioDekker\Keystone\Methods\Initiation;
 use ClaudioDekker\Keystone\Methods\Proof;
 use ClaudioDekker\Keystone\Methods\Surface;
 use Closure;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rules\Password;
 use LogicException;
 
 /**
@@ -77,20 +79,28 @@ class PasswordType implements CredentialType
     }
 
     /**
-     * Get the rules for the typed password, asking a new one to be confirmed and capping it at what the hashing driver takes.
+     * Get the rules for the typed password, asking a new one to be confirmed, to meet the app's password defaults and to fit what the hashing driver takes.
      */
     public function rules(Surface $surface): array
     {
         return match ($surface) {
             Surface::SIGN_IN => [self::FIELD => ['required', 'string']],
-            default => [self::FIELD => ['required', 'string', 'confirmed', $this->lengthCap()]],
+            default => [self::FIELD => ['required', 'string', 'confirmed', Password::default(), $this->lengthCap()]],
         };
+    }
+
+    /**
+     * Start no ceremony: a password form shows nothing but its fields.
+     */
+    public function initiate(Surface $surface, string $accountName): ?Initiation
+    {
+        return null;
     }
 
     /**
      * Check the typed password against the subject's password, or against the dummy hash when there is none.
      */
-    public function verify(Surface $surface, array $input, array $credentials): Proof
+    public function verify(Surface $surface, array $input, array $credentials, mixed $ceremony = null): Proof
     {
         if ($surface !== Surface::SIGN_IN) {
             throw new LogicException("Verifying a password on {$surface->value} isn't built yet.");

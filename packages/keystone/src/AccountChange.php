@@ -107,6 +107,25 @@ class AccountChange
     }
 
     /**
+     * Store the set as the account's recovery codes in place of any it holds, ending its other sessions when it replaces a set.
+     *
+     * @param  list<string>  $codes
+     */
+    public function commitRecoveryCodes(#[\SensitiveParameter] array $codes, Flow $flow): void
+    {
+        $accountId = $this->account->getKey();
+        $replaces = $this->recoveryCodes->hasRemaining($accountId);
+
+        $this->recoveryCodes->replace($accountId, $codes);
+
+        if ($replaces) {
+            $this->endSessions();
+        }
+
+        $this->record(SecurityEventType::RECOVERY_CODES_GENERATED, alert: $replaces, flow: $flow->value, credentialType: CredentialTypes::RECOVERY_CODE);
+    }
+
+    /**
      * End every session of the account but the mover's own.
      */
     public function endSessions(): void
@@ -154,6 +173,7 @@ class AccountChange
         bool $alert = true,
         ?string $flow = null,
         ?string $credentialType = null,
+        ?StoredCredential $credential = null,
     ): void {
         $this->events[] = fn (SecurityEventRecorder $recorder) => $recorder->record(
             $type,
@@ -161,10 +181,19 @@ class AccountChange
             actor: $actor,
             flow: $flow,
             credentialType: $credentialType,
+            credential: $credential,
             operator: $operator,
             recipients: $this->recipients,
             alert: $alert,
         );
+    }
+
+    /**
+     * Determine if the locked account is still on the credential epoch.
+     */
+    public function isOnEpoch(int $epoch): bool
+    {
+        return (int) $this->account->getRawOriginal('credential_epoch') === $epoch;
     }
 
     /**

@@ -25,6 +25,8 @@ readonly class PendingSignIn
         public PendingStage $stage,
         public string $intendedUrl,
         public CarbonImmutable $heldAt,
+        public int $epoch,
+        public bool $secondFactorPassed,
     ) {
         //
     }

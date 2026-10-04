@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Route;
 pest()->extend(AppTestCase::class)->use(AppTestCase::assertions(SignInAssertions::class), AppTestCase::assertions(SessionExpiryAssertions::class));
 
 beforeEach(function () {
+    $this->withoutMandates();
     $this->lifetime = config('keystone.session.absolute_lifetime_seconds');
 
     if ($this->lifetime === null) {

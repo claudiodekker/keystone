@@ -12,6 +12,8 @@ class FixturesServiceProvider extends ServiceProvider
         config([
             'auth.guards.web.driver' => 'keystone',
             'auth.providers.users.model' => User::class,
+            'keystone.require_second_factor' => false,
+            'keystone.require_recovery_codes' => false,
         ]);
 
         $this->app->bind('keystone.test-support.form', FormTypeSupport::class);
@@ -21,7 +23,7 @@ class FixturesServiceProvider extends ServiceProvider
     public function boot(CredentialTypes $types): void
     {
         $types->register(new FormType);
-        $types->register(new FormType(name: 'code', surfaces: ['challenge']));
+        $types->register(new FormType(name: 'code', surfaces: ['challenge', 'enrollment']));
 
         $this->loadRoutesFrom(__DIR__.'/routes.php');
     }

@@ -12,6 +12,7 @@ enum Flow: string
 {
     case SIGN_IN = 'sign-in';
     case CHALLENGE = 'challenge';
+    case ENROLLMENT = 'enrollment';
 
     /**
      * Derive the flow from the session's phase and the surface in use.

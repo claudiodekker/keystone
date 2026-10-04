@@ -29,6 +29,11 @@ class KeystoneGuard extends SessionGuard
     public const string EXPIRED_SESSION = 'keystone.expired_session';
 
     /**
+     * The request attribute set when Keystone ended the session during the request because its account newly owes enrollment.
+     */
+    public const string DEMOTED_SESSION = 'keystone.demoted_session';
+
+    /**
      * Get the currently authenticated user.
      *
      * @return Authenticatable|null
@@ -59,6 +64,12 @@ class KeystoneGuard extends SessionGuard
 
         if ($this->hasExpired()) {
             $this->expire($user);
+
+            return null;
+        }
+
+        if ((new SignInDecision)->owesEnrollment($user)) {
+            $this->demote($user);
 
             return null;
         }
@@ -110,6 +121,33 @@ class KeystoneGuard extends SessionGuard
             'intended_url' => $intendedUrl,
             'epoch' => $this->epochOf($account),
             'held_at' => Date::now()->getTimestamp(),
+            'second_factor_passed' => false,
+        ]);
+    }
+
+    /**
+     * Note that the pending sign-in of an active account passed its second factor, holding it on at enrollment for what it still owes and keeping the time it was held.
+     */
+    public function passSecondFactor(): void
+    {
+        $held = $this->session->get($this->pendingKey());
+
+        if (! is_array($held)) {
+            throw new LogicException('The session holds no pending sign-in to move on.');
+        }
+
+        $account = $this->retrieveAccount($held['account'] ?? null);
+
+        if (is_null($account) || ! $this->isActive($account)) {
+            throw new LogicException('The account being moved on no longer exists, or is disabled or suspended.');
+        }
+
+        $this->changeAuthLevel();
+
+        $this->session->put($this->pendingKey(), [
+            ...$held,
+            'stage' => PendingStage::ENROLLMENT->value,
+            'second_factor_passed' => true,
         ]);
     }
 
@@ -147,6 +185,8 @@ class KeystoneGuard extends SessionGuard
             stage: PendingStage::from($held['stage']),
             intendedUrl: $held['intended_url'],
             heldAt: $heldAt,
+            epoch: $held['epoch'],
+            secondFactorPassed: $held['second_factor_passed'],
         );
     }
 
@@ -391,6 +431,24 @@ class KeystoneGuard extends SessionGuard
             SecurityEventType::SESSION_ENDED,
             account: $account,
             reason: 'expired',
+        );
+    }
+
+    /**
+     * End the session because its account newly owes enrollment, tell the user to sign in again, and record why.
+     */
+    protected function demote(Model&KeystoneUser $account): void
+    {
+        $this->endSession();
+
+        $this->session->flash(Status::SESSION_KEY, Status::ENROLLMENT_OWED->value);
+
+        $this->getRequest()->attributes->set(self::DEMOTED_SESSION, true);
+
+        (new SecurityEventRecorder)->record(
+            SecurityEventType::SESSION_ENDED,
+            account: $account,
+            reason: 'demoted',
         );
     }
 

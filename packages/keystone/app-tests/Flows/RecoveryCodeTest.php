@@ -25,7 +25,7 @@ it('offers recovery codes after the account\'s second factor while it holds one'
     $this->assertChallengePage($response, [$this->support->type(), CredentialTypes::RECOVERY_CODE]);
 });
 
-it('offers recovery codes when no listed type answers the account\'s second factor', function () {
+it('sends a held sign-in to the sign-in page once no listed type answers the account\'s second factor, whatever codes it holds', function () {
     $account = $this->createChallengedAccount($this->support);
     $this->arrangeRecoveryCodes($account);
     $this->passFirstFactor();
@@ -33,7 +33,7 @@ it('offers recovery codes when no listed type answers the account\'s second fact
 
     $response = $this->get(route('login.challenge'));
 
-    $this->assertChallengePage($response, [CredentialTypes::RECOVERY_CODE]);
+    $this->assertSentToSignIn($response);
 });
 
 it('completes the sign-in with a recovery code, spending it', function () {
@@ -63,6 +63,7 @@ it('refuses a recovery code that was already spent', function () {
 });
 
 it('keeps the account\'s last recovery code for account recovery', function () {
+    config(['keystone.require_recovery_codes' => true]);
     $account = $this->createChallengedAccount($this->support);
     [$last] = $this->arrangeRecoveryCodes($account, count: 1);
     $this->passFirstFactor();

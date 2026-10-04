@@ -4,7 +4,9 @@ namespace ClaudioDekker\Keystone\Http\Controllers;
 
 use ClaudioDekker\Keystone\ChallengeAttempt;
 use ClaudioDekker\Keystone\CredentialAttempt;
+use ClaudioDekker\Keystone\Demand;
 use ClaudioDekker\Keystone\Exceptions\LastRecoveryCode;
+use ClaudioDekker\Keystone\Http\Concerns\RefusesSignedInUsers;
 use ClaudioDekker\Keystone\Http\PageValues\ChallengePage;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\CredentialType;
@@ -28,6 +30,8 @@ use Symfony\Component\HttpFoundation\Response;
  */
 abstract class ChallengeController extends Controller
 {
+    use RefusesSignedInUsers;
+
     /**
      * Get the middleware that runs before the controller's actions.
      */
@@ -78,16 +82,16 @@ abstract class ChallengeController extends Controller
         $attempt = new ChallengeAttempt(Keystone::guard(), new RateLimiter($request, Keystone::guard()));
 
         try {
-            $passed = $attempt->attempt($pending, $credentialType, $validator->validated());
+            $demand = $attempt->attempt($pending, $credentialType, $validator->validated());
         } catch (LastRecoveryCode) {
             return $this->sendChallengeRefused($request, $credentialType->name(), __('keystone::messages.last_recovery_code'));
         }
 
-        if (! $passed) {
-            return $this->sendChallengeRefused($request, $credentialType->name(), __('keystone::messages.invalid_credential'));
-        }
-
-        return $this->sendChallengePassed($request, $pending->intendedUrl);
+        return match ($demand) {
+            Demand::REFUSE => $this->sendChallengeRefused($request, $credentialType->name(), __('keystone::messages.invalid_credential')),
+            Demand::ENROLLMENT => $this->sendEnrollmentOwedAfterChallenge($request),
+            default => $this->sendChallengePassed($request, $pending->intendedUrl),
+        };
     }
 
     /**
@@ -116,14 +120,14 @@ abstract class ChallengeController extends Controller
     abstract protected function sendChallengePage(Request $request, ChallengePage $page): Response|Responsable;
 
     /**
-     * Respond to a held account that holds a second factor no listed type can answer, sending the user on to recover it.
-     */
-    abstract protected function sendSecondFactorUnavailable(Request $request): Response|Responsable;
-
-    /**
      * Respond to a refused answer, with the message for the credential type's field.
      */
     abstract protected function sendChallengeRefused(Request $request, string $type, string $message): Response|Responsable;
+
+    /**
+     * Respond to a passed challenge whose account still owes an enrollment, sending the user on to enroll it.
+     */
+    abstract protected function sendEnrollmentOwedAfterChallenge(Request $request): Response|Responsable;
 
     /**
      * Respond to a passed challenge, sending the signed-in user on to the intended URL.
@@ -159,12 +163,6 @@ abstract class ChallengeController extends Controller
             return $this->refuseWithoutChallenge();
         }
 
-        if ($offer === []) {
-            Status::SECOND_FACTOR_UNAVAILABLE->flash($request);
-
-            return $this->sendSecondFactorUnavailable($request);
-        }
-
         $types = array_map(fn (CredentialType $type) => [
             'type' => $type->name(),
             'shape' => $type->surfaces()[Surface::CHALLENGE->value]->value,
@@ -186,14 +184,6 @@ abstract class ChallengeController extends Controller
         $pending = Keystone::guard()->pending();
 
         return $pending?->stage === PendingStage::CHALLENGE ? $pending : null;
-    }
-
-    /**
-     * Send a signed-in user away from the challenge.
-     */
-    protected function refuseSignedIn(): RedirectResponse
-    {
-        return redirect('/');
     }
 
     /**

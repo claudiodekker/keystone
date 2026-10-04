@@ -1,8 +1,10 @@
 # TOTP
 
-`keystone-totp` lets users answer the [second-factor challenge](challenge.md) with a six-digit code from an authenticator app, such as 1Password, Google Authenticator or Authy. It serves only the challenge, always as a form, and never counts as a first factor.
+`keystone-totp` lets users answer the [second-factor challenge](challenge.md) with a six-digit code from an authenticator app, such as 1Password, Google Authenticator or Authy. It serves the challenge and [enrollment](enrollment.md), always as a form, and never counts as a first factor.
 
-Enrolling an authenticator isn't built yet.
+## Enrolling
+
+Enrolling makes a new 160-bit key and shows it in Base32, with an `otpauth://` link that adds it to an authenticator app, labelled with your `app.name` and the account's first alert address. The user types back a code the new key makes, and the key is stored with that code's step as the last one accepted, so the same code can't answer the next challenge. A code the key doesn't make records `proof.rejected` with the reason `totp.mismatch`. The page shows no QR code yet.
 
 ## Codes
 

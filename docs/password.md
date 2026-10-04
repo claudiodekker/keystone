@@ -18,6 +18,12 @@ At registration and enrollment a new password must be typed twice, in `password`
 
 Under bcrypt a new password may be at most 72 bytes (or your lower `hashing.bcrypt.limit`), because bcrypt ignores everything after that; non-ASCII characters take more than one byte each. Under argon2i or argon2id the limit is 1024 characters. See [ADR 0008](adr/0008-passwords-hash-with-the-apps-hasher-and-bcrypt-keeps-its-72-byte-cap.md) for why, and for how hashes imported from longer passwords behave.
 
+A new password must also meet your app's password defaults, Laravel's `Password::default()`: at least 8 characters unless you set your own with `Password::defaults()` in a service provider. If a password may be an account's only factor, because you turned `keystone.require_second_factor` off, NIST SP 800-63B asks for at least 15:
+
+```php
+Password::defaults(fn () => Password::min(15));
+```
+
 Sign-in takes a password of any length.
 
 ## Unknown accounts

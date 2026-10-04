@@ -44,12 +44,17 @@ interface CredentialType
     public function rules(Surface $surface): array;
 
     /**
-     * Verify the input against the subject's credentials of this type.
+     * Start the type's ceremony on the surface for the named account, returning what core keeps of it and what the form shows, or null when it has none.
+     */
+    public function initiate(Surface $surface, string $accountName): ?Initiation;
+
+    /**
+     * Verify the input against the subject's credentials of this type, and the ceremony initiate started, if any.
      *
      * With no subject the list is empty, and the type does the same work as for a real one.
      *
      * @param  array<string, mixed>  $input
      * @param  list<StoredCredential>  $credentials
      */
-    public function verify(Surface $surface, array $input, array $credentials): Proof;
+    public function verify(Surface $surface, array $input, array $credentials, mixed $ceremony = null): Proof;
 }

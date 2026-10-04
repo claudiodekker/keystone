@@ -63,7 +63,7 @@ class BootChecks
 
         $failures = [
             ...$this->rateLimitFailures(),
-            ...$this->recoveryCodeFailures(),
+            ...$this->mandateFailures(),
             ...$this->sessionFailures(),
             ...$this->eventFailures(),
             ...$this->alertFailures(),
@@ -107,17 +107,16 @@ class BootChecks
     }
 
     /**
-     * Check the switch that requires recovery codes.
+     * Check the switches that require a second factor and recovery codes.
      *
      * @return list<string>
      */
-    protected function recoveryCodeFailures(): array
+    protected function mandateFailures(): array
     {
-        if (is_bool(config('keystone.require_recovery_codes'))) {
-            return [];
-        }
+        $keys = ['keystone.require_second_factor', 'keystone.require_recovery_codes'];
+        $invalid = array_filter($keys, fn (string $key) => ! is_bool(config($key)));
 
-        return ['keystone.require_recovery_codes must be true or false.'];
+        return array_values(array_map(fn (string $key) => "{$key} must be true or false.", $invalid));
     }
 
     /**
@@ -415,7 +414,7 @@ class BootChecks
     }
 
     /**
-     * Check that Keystone's routes use the keystone guard, and that some listed type serves sign-in.
+     * Check that Keystone's routes use the keystone guard, that some listed type serves sign-in, and that some can satisfy the second-factor mandate.
      *
      * @return list<string>
      */
@@ -430,6 +429,10 @@ class BootChecks
 
         if ($this->types->serving(Surface::SIGN_IN) === []) {
             $failures[] = 'No credential type listed in keystone.methods serves sign-in.';
+        }
+
+        if (config('keystone.require_second_factor') === true && ! (new SignInDecision)->mandateSatisfiable($this->types)) {
+            $failures[] = 'No credential type listed in keystone.methods can satisfy keystone.require_second_factor: list one that serves enrollment and challenge.';
         }
 
         return $failures;

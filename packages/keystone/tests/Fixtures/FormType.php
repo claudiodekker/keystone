@@ -3,12 +3,15 @@
 namespace ClaudioDekker\Keystone\Tests\Fixtures;
 
 use ClaudioDekker\Keystone\Methods\CredentialType;
+use ClaudioDekker\Keystone\Methods\EnrolledCredential;
 use ClaudioDekker\Keystone\Methods\InitiateShape;
+use ClaudioDekker\Keystone\Methods\Initiation;
 use ClaudioDekker\Keystone\Methods\Proof;
 use ClaudioDekker\Keystone\Methods\Surface;
+use Illuminate\Support\Str;
 
 /**
- * A credential type of the form shape: the account holds a hashed secret and proves it by typing it.
+ * A credential type of the form shape: the account holds a hashed secret and proves it by typing it, and enrolls one by typing back the code its ceremony shows.
  */
 class FormType implements CredentialType
 {
@@ -63,8 +66,21 @@ class FormType implements CredentialType
         return ['secret' => ['required', 'string']];
     }
 
-    public function verify(Surface $surface, array $input, array $credentials): Proof
+    public function initiate(Surface $surface, string $accountName): ?Initiation
     {
+        $code = Str::random(16);
+
+        return new Initiation(ceremony: $code, page: ['code' => $code, 'account' => $accountName]);
+    }
+
+    public function verify(Surface $surface, array $input, array $credentials, mixed $ceremony = null): Proof
+    {
+        if ($surface === Surface::ENROLLMENT) {
+            return is_string($ceremony) && hash_equals($ceremony, (string) $input['secret'])
+                ? Proof::enrolled(new EnrolledCredential(identifier: null, secret: static::hash($ceremony)))
+                : Proof::rejected("{$this->name}.mismatch");
+        }
+
         $typed = static::hash($input['secret']);
 
         foreach ($credentials as $credential) {

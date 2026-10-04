@@ -16,22 +16,23 @@ use Illuminate\Database\Eloquent\Model;
 class ChallengeAttempt extends CredentialAttempt
 {
     /**
-     * Prove the answer to the pending sign-in's challenge and complete the sign-in, or refuse inside the timing floor.
+     * Prove the answer to the pending sign-in's challenge, then complete the sign-in or hold it for the enrollment the account still owes, or refuse inside the timing floor.
      *
      * @param  array<string, mixed>  $input
      *
      * @throws Throttled
      * @throws LastRecoveryCode
      */
-    public function attempt(PendingSignIn $pending, CredentialType $type, #[\SensitiveParameter] array $input): bool
+    public function attempt(PendingSignIn $pending, CredentialType $type, #[\SensitiveParameter] array $input): Demand
     {
         return $this->timebox->call(function () use ($pending, $type, $input) {
             $account = $pending->account;
             $flow = Flow::of($this->guard, Surface::CHALLENGE);
             $taken = $this->limiter->takeFailedAttempt($flow, $type, $account, identifier: '');
+            $demand = $this->owed($pending);
 
             if ($type instanceof RecoveryCodeType) {
-                return $this->spendRecoveryCode($account, $flow, $type, (string) $input[RecoveryCodeType::FIELD], $taken);
+                return $this->spendRecoveryCode($account, $flow, $type, (string) $input[RecoveryCodeType::FIELD], $taken, $demand);
             }
 
             [$proof, $credential] = $type->name() === $pending->firstFactor
@@ -41,21 +42,24 @@ class ChallengeAttempt extends CredentialAttempt
             if (! $this->owns($account, $type, $proof, $credential)) {
                 $this->recordRejected($account, $flow, $type, $credential, reason: $proof->reason ?? 'keystone.foreign_credential');
 
-                return false;
+                return Demand::REFUSE;
             }
 
-            return $this->finish(
+            $entered = $this->finish(
                 account: $account,
                 flow: $flow,
                 type: $type,
                 proof: $proof,
                 credential: $credential,
                 taken: $taken,
-                enter: function () use ($account) {
-                    $this->guard->signIn($account);
+                enter: function () use ($account, $demand) {
+                    $this->enter($account, $demand);
                 },
-                recorded: SecurityEventType::SIGNED_IN,
+                recorded: $this->recorded($demand),
+                reason: $this->reason($demand),
             );
+
+            return $entered ? $demand : Demand::REFUSE;
         }, self::TIMING_FLOOR_MICROSECONDS);
     }
 
@@ -64,7 +68,7 @@ class ChallengeAttempt extends CredentialAttempt
      *
      * @throws LastRecoveryCode
      */
-    protected function spendRecoveryCode(Model&KeystoneUser $account, Flow $flow, RecoveryCodeType $type, #[\SensitiveParameter] string $typed, TakenAttempt $taken): bool
+    protected function spendRecoveryCode(Model&KeystoneUser $account, Flow $flow, RecoveryCodeType $type, #[\SensitiveParameter] string $typed, TakenAttempt $taken, Demand $demand): Demand
     {
         $changes = new AccountChanges($this->guard);
 
@@ -85,25 +89,66 @@ class ChallengeAttempt extends CredentialAttempt
         if ($spent === null) {
             $this->recordRejected($account, $flow, $type, credential: null, reason: 'keystone.barred');
 
-            return false;
+            return Demand::REFUSE;
         }
 
         if (! $spent) {
             $this->recordRejected($account, $flow, $type, credential: null, reason: 'recovery-code.mismatch');
 
-            return false;
+            return Demand::REFUSE;
         }
 
-        return $this->complete(
+        $entered = $this->complete(
             account: $account,
             flow: $flow,
             type: $type,
             credential: null,
             taken: $taken,
-            enter: function () use ($account) {
-                $this->guard->signIn($account);
+            enter: function () use ($account, $demand) {
+                $this->enter($account, $demand);
             },
-            recorded: SecurityEventType::SIGNED_IN,
+            recorded: $this->recorded($demand),
+            reason: $this->reason($demand),
         );
+
+        return $entered ? $demand : Demand::REFUSE;
+    }
+
+    /**
+     * Decide what passing the challenge leads to: the enrollment the account still owes, or the sign-in.
+     */
+    protected function owed(PendingSignIn $pending): Demand
+    {
+        return (new SignInDecision)->owesEnrollment($pending->account) ? Demand::ENROLLMENT : Demand::SIGN_IN;
+    }
+
+    /**
+     * Sign the account in, or hold its pending sign-in on at the enrollment it still owes.
+     */
+    protected function enter(Model&KeystoneUser $account, Demand $demand): void
+    {
+        if ($demand === Demand::ENROLLMENT) {
+            $this->guard->passSecondFactor();
+
+            return;
+        }
+
+        $this->guard->signIn($account);
+    }
+
+    /**
+     * Get the event a passed challenge records.
+     */
+    protected function recorded(Demand $demand): SecurityEventType
+    {
+        return $demand === Demand::ENROLLMENT ? SecurityEventType::SIGN_IN_HELD : SecurityEventType::SIGNED_IN;
+    }
+
+    /**
+     * Get the reason a passed challenge records.
+     */
+    protected function reason(Demand $demand): ?string
+    {
+        return $demand === Demand::ENROLLMENT ? 'keystone.enrollment' : null;
     }
 }

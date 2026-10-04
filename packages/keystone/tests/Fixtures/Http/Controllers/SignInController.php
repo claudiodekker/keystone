@@ -25,6 +25,11 @@ class SignInController extends Controller
         return to_route('login.challenge');
     }
 
+    protected function sendEnrollmentOwed(Request $request): RedirectResponse
+    {
+        return to_route('login.enrollment');
+    }
+
     protected function sendSignedIn(Request $request, string $intendedUrl): RedirectResponse
     {
         return redirect($intendedUrl);

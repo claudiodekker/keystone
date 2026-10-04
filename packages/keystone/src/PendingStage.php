@@ -8,4 +8,5 @@ namespace ClaudioDekker\Keystone;
 enum PendingStage: string
 {
     case CHALLENGE = 'challenge';
+    case ENROLLMENT = 'enrollment';
 }

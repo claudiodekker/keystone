@@ -24,14 +24,16 @@ To keep the audit trail but drop the log line, set `keystone.log_channel` to Lar
 | Type | Recorded when |
 |---|---|
 | `signed_in` | a session signs in |
-| `sign_in.held` | a first factor is proven for an account that owes the [second-factor challenge](challenge.md); the reason is `keystone.challenge`, and the credential is the first factor |
-| `sign_in.voided` | a pending sign-in is dropped because its account was suspended or soft-deleted, or its sessions were ended, before the challenge was answered |
-| `proof.rejected` | a sign-in naming an account, or an answer to its challenge, is refused: a rejected proof, a proof naming a credential the account doesn't hold, an answer of the first factor's type (`keystone.first_factor`), a recovery code the account doesn't hold (`recovery-code.mismatch`) or its last one while codes are required (`keystone.last_recovery_code`), or an account that is suspended |
+| `sign_in.held` | a first factor is proven for an account that owes the [second-factor challenge](challenge.md) or [enrollment](enrollment.md); the reason is `keystone.challenge` or `keystone.enrollment`, and the credential is the first factor. A passed challenge whose account still owes enrollment records it too |
+| `sign_in.voided` | a pending sign-in is dropped because its account was suspended or soft-deleted, or its sessions were ended, before the challenge or the enrollment was finished |
+| `proof.rejected` | a sign-in naming an account, or an answer to its challenge or enrollment, is refused: a rejected proof, a proof naming a credential the account doesn't hold, an answer of the first factor's type (`keystone.first_factor`), a recovery code the account doesn't hold (`recovery-code.mismatch`) or its last one while codes are required (`keystone.last_recovery_code`), an enrollment answer that enrolls nothing (`keystone.not_enrolled`) or arrives once the account holds a second factor (`keystone.second_factor_held`) or recovery codes (`keystone.recovery_codes_held`), an answer whose account's sessions were ended meanwhile (`keystone.superseded`), or an account that is suspended (`keystone.barred`) |
 | `signed_out` | the user signs out |
-| `session.ended` | Keystone ended a session; the reason says why (`expired` once the [absolute lifetime](configuration.md#session-lifetime) passed) |
+| `session.ended` | Keystone ended a session; the reason says why: `expired` once the [absolute lifetime](configuration.md#session-lifetime) passed, or `demoted` once its account newly owed [enrollment](enrollment.md#signed-in-sessions-that-newly-owe) |
 | `sessions.terminated` | an operator ended every session of the account, or of every account with reason `keystone.every_account` (see [Operator commands](operator-commands.md#ending-sessions)); alerts the account's owner |
 | `account.suspended` | an operator suspended the account (see [Operator commands](operator-commands.md#suspending-accounts)); alerts the account's owner |
 | `account.unsuspended` | an operator lifted the account's suspension; alerts the account's owner |
+| `credential.added` | a credential was added to the account, such as a second factor at [enrollment](enrollment.md); alerts the account's owner |
+| `recovery_codes.generated` | a new set of recovery codes was saved; alerts the account's owner only when it replaced a set |
 | `recovery_code.used` | a [recovery code](challenge.md#recovery-codes) answered the challenge and was spent; alerts the account's owner with how many codes are left |
 | `limit.tripped` | a rate limit refuses its first attempt in a window; the reason names the limit (`keystone.request_limit` or `keystone.failed_attempt_limit`) |
 | `request.rejected` | a request to change something on a Keystone route is refused as cross-site; the reason is `keystone.cross_site` (see [Hardening](hardening.md)) |
@@ -49,7 +51,7 @@ Every event has the same fields, and never typed input, secrets, codes, tokens o
 | `user_id` | the account, or null |
 | `actor` | `user`, `operator` or `system` |
 | `operator` | who acted, as the operator command or job named them, cut to 64 characters with control characters replaced by spaces; null otherwise |
-| `flow` | where it happened, such as `sign-in` or `challenge` |
+| `flow` | where it happened, such as `sign-in`, `challenge` or `enrollment` |
 | `credential_type`, `credential_id`, `credential_label` | the credential involved and its label at the time; a refusal names only a credential the account holds |
 | `reason` | a short code such as `form.mismatch` or `keystone.barred`; a reason that isn't a lowercase code of at most 64 characters prefixed by its credential type or `keystone.` is stored as `<type>.invalid_reason` |
 | `ip_address`, `user_agent` | the request's, the user agent cut to 512 characters with control characters replaced by spaces |

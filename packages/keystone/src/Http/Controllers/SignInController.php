@@ -4,6 +4,7 @@ namespace ClaudioDekker\Keystone\Http\Controllers;
 
 use ClaudioDekker\Keystone\Actions\AccountLookup;
 use ClaudioDekker\Keystone\Demand;
+use ClaudioDekker\Keystone\Http\Concerns\RefusesSignedInUsers;
 use ClaudioDekker\Keystone\Http\PageValues\SignInPage;
 use ClaudioDekker\Keystone\IntendedUrl;
 use ClaudioDekker\Keystone\Keystone;
@@ -27,6 +28,8 @@ use Symfony\Component\HttpFoundation\Response;
  */
 abstract class SignInController extends Controller
 {
+    use RefusesSignedInUsers;
+
     /**
      * The input field that names the account; the only field ever flashed back.
      */
@@ -109,6 +112,10 @@ abstract class SignInController extends Controller
             return $this->sendChallengeOwed($request);
         }
 
+        if ($demand === Demand::ENROLLMENT) {
+            return $this->sendEnrollmentOwed($request);
+        }
+
         return $this->sendSignedIn($request, $intendedUrl);
     }
 
@@ -128,17 +135,14 @@ abstract class SignInController extends Controller
     abstract protected function sendChallengeOwed(Request $request): Response|Responsable;
 
     /**
+     * Respond to a sign-in held until the account enrolls what it owes, sending the user on to enroll it.
+     */
+    abstract protected function sendEnrollmentOwed(Request $request): Response|Responsable;
+
+    /**
      * Respond to a completed sign-in, sending the user on to the intended URL.
      */
     abstract protected function sendSignedIn(Request $request, string $intendedUrl): Response|Responsable;
-
-    /**
-     * Send a signed-in user away from a guest step.
-     */
-    protected function refuseSignedIn(): RedirectResponse
-    {
-        return redirect('/');
-    }
 
     /**
      * Send invalid input back to the sign-in page, flashing only the identifier.

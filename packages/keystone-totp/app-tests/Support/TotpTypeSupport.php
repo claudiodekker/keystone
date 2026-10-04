@@ -19,11 +19,17 @@ class TotpTypeSupport implements CredentialTypeSupport
      */
     protected const string KEY = '12345678901234567890';
 
+    /**
+     * Get the name of the TOTP type.
+     */
     public function type(): string
     {
         return 'totp';
     }
 
+    /**
+     * Arrange a TOTP credential holding the known key, at no step yet.
+     */
     public function arrange(Surface $surface): array
     {
         $secret = new TotpSecret(self::KEY, lastStep: null);
@@ -31,30 +37,74 @@ class TotpTypeSupport implements CredentialTypeSupport
         return ['identifier' => null, 'secret' => $secret->toStored(), 'label' => null];
     }
 
+    /**
+     * Get the code the known key makes now.
+     */
     public function validProof(Surface $surface): array
     {
         return [TotpType::FIELD => $this->codeAt($this->now())];
     }
 
+    /**
+     * Get a code the known key accepts from no step in the window.
+     */
     public function rejectedProof(Surface $surface): array
     {
+        return [TotpType::FIELD => $this->wrongCode(self::KEY)];
+    }
+
+    /**
+     * Get the code the ceremony's new key makes now.
+     */
+    public function validEnrollment(mixed $ceremony): array
+    {
+        $secret = TotpSecret::fromStored((string) $ceremony);
+
+        return [TotpType::FIELD => $this->codeAt($this->now(), $secret->key)];
+    }
+
+    /**
+     * Get a code the ceremony's new key accepts from no step in the window.
+     */
+    public function rejectedEnrollment(mixed $ceremony): array
+    {
+        $secret = TotpSecret::fromStored((string) $ceremony);
+
+        return [TotpType::FIELD => $this->wrongCode($secret->key)];
+    }
+
+    /**
+     * Get the code the ceremony's new key makes at the step after now, which the enrolling answer didn't spend.
+     */
+    public function validProofOfEnrolled(mixed $ceremony): array
+    {
+        $secret = TotpSecret::fromStored((string) $ceremony);
+
+        return [TotpType::FIELD => $this->codeAt($this->now() + 1, $secret->key)];
+    }
+
+    /**
+     * Get a code the key accepts from no step in the window.
+     */
+    protected function wrongCode(string $key): string
+    {
         $windowSteps = config()->integer('keystone-totp.window_steps');
-        $accepted = array_map(fn (int $offset) => $this->codeAt($this->now() + $offset), range(-$windowSteps, $windowSteps));
+        $accepted = array_map(fn (int $offset) => $this->codeAt($this->now() + $offset, $key), range(-$windowSteps, $windowSteps));
         $wrong = 0;
 
         while (in_array(str_pad((string) $wrong, Totp::DIGITS, '0', STR_PAD_LEFT), $accepted, true)) {
             $wrong++;
         }
 
-        return [TotpType::FIELD => str_pad((string) $wrong, Totp::DIGITS, '0', STR_PAD_LEFT)];
+        return str_pad((string) $wrong, Totp::DIGITS, '0', STR_PAD_LEFT);
     }
 
     /**
-     * Get the arranged key's code for the step.
+     * Get the key's code for the step, the arranged key's by default.
      */
-    protected function codeAt(int $step): string
+    protected function codeAt(int $step, string $key = self::KEY): string
     {
-        return (new Totp)->code(self::KEY, $step);
+        return (new Totp)->code($key, $step);
     }
 
     /**

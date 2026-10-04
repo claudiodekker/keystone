@@ -19,12 +19,25 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Second Factor
+    |--------------------------------------------------------------------------
+    |
+    | Whether every account must hold a second factor: a credential of a
+    | listed type that answers the challenge. An account without one
+    | enrolls it before it gets in.
+    |
+    */
+
+    'require_second_factor' => true,
+
+    /*
+    |--------------------------------------------------------------------------
     | Recovery Codes
     |--------------------------------------------------------------------------
     |
-    | Whether every account must hold recovery codes. While it does, the
-    | last code can't answer a challenge: it is kept for recovery, so
-    | an account that spent the rest can still be recovered later.
+    | Whether every account must hold recovery codes. An account without
+    | them saves a new set before it gets in, and its last code can't
+    | answer a challenge: it is kept to recover the account later.
     |
     */
 
@@ -95,10 +108,12 @@ return [
     */
 
     'notifications' => [
-        'sessions.terminated' => SecurityAlert::class,
         'account.suspended' => SecurityAlert::class,
         'account.unsuspended' => SecurityAlert::class,
+        'credential.added' => SecurityAlert::class,
         'recovery_code.used' => SecurityAlert::class,
+        'recovery_codes.generated' => SecurityAlert::class,
+        'sessions.terminated' => SecurityAlert::class,
     ],
 
     /*

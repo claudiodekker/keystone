@@ -12,7 +12,9 @@ enum Status: string
     case SIGNED_OUT = 'signed-out';
     case SESSION_EXPIRED = 'session-expired';
     case SIGN_IN_CANCELLED = 'sign-in-cancelled';
-    case SECOND_FACTOR_UNAVAILABLE = 'second-factor-unavailable';
+    case ENROLLMENT_CANCELLED = 'enrollment-cancelled';
+    case ENROLLMENT_EXPIRED = 'enrollment-expired';
+    case ENROLLMENT_OWED = 'enrollment-owed';
 
     /**
      * The session key the status is flashed under.

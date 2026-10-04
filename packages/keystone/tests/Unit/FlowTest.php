@@ -35,4 +35,5 @@ test('only the challenge flow shares a guessable type\'s failures', function (Fl
 })->with([
     'sign-in' => [Flow::SIGN_IN, false],
     'challenge' => [Flow::CHALLENGE, true],
+    'enrollment' => [Flow::ENROLLMENT, false],
 ]);

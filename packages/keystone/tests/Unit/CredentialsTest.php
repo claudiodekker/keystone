@@ -1,6 +1,7 @@
 <?php
 
 use ClaudioDekker\Keystone\Credentials;
+use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormType;
 use ClaudioDekker\Keystone\Tests\Fixtures\User;
@@ -23,15 +24,30 @@ it('stores a credential with its identifier and secret encrypted', function () {
         ->type->toBe('form')
         ->identifier_hash->toBe(hash('sha256', 'jane-form'))
         ->label->toBe('My form')
-        ->served_challenge->toEqual(0)
         ->and(Crypt::decryptString($row->identifier))->toBe('jane-form')
         ->and(Crypt::decryptString($row->secret))->toBe('hashed-secret');
 });
 
-it('stamps whether the type served challenge when stored', function () {
-    credentials()->store(User::factory()->create(), new FormType(surfaces: ['challenge']), identifier: null, secret: 'hashed-secret');
+it('holds a second factor once it has a credential of a listed type that serves the challenge', function (array $surfaces, bool $holds) {
+    app(CredentialTypes::class)->register(new FormType(name: 'extra', surfaces: $surfaces));
+    $user = User::factory()->create();
+    credentials()->store($user, new FormType(name: 'extra', surfaces: $surfaces), identifier: null, secret: 'hashed-secret');
 
-    expect(DB::table('user_credentials')->value('served_challenge'))->toEqual(1);
+    expect(credentials()->holdsSecondFactor($user->getKey()))->toBe($holds);
+})->with([
+    'a challenge credential' => [['challenge'], true],
+    'a credential that only signs in' => [['sign-in'], false],
+]);
+
+it('stops counting a second factor once its type is no longer listed', function () {
+    $user = User::factory()->create();
+    credentials()->store($user, new FormType(name: 'code', surfaces: ['challenge']), identifier: null, secret: 'hashed-secret');
+    $held = credentials()->holdsSecondFactor($user->getKey());
+
+    config(['keystone.methods' => ['form']]);
+
+    expect($held)->toBeTrue()
+        ->and(credentials()->holdsSecondFactor($user->getKey()))->toBeFalse();
 });
 
 it('stores a credential without an identifier', function () {
@@ -85,17 +101,17 @@ it('lists the types the account holds a usable credential of, once each', functi
     expect($credentials->typesOf($jane->getKey()))->toBe(['form']);
 });
 
-it('tells whether the account holds a usable credential of another type than the first factor\'s, stamped as serving the challenge', function () {
-    [$held, $firstFactorOnly, $disabled, $other] = User::factory()->count(4)->create();
+it('tells whether the account holds a usable credential of another type than the first factor\'s that serves the challenge', function () {
+    app(CredentialTypes::class)->register(new FormType(name: 'other', surfaces: ['challenge']));
+    [$held, $firstFactorOnly, $disabled] = User::factory()->count(3)->create();
     $credentials = credentials();
-    $credentials->store($held, new FormType(name: 'unlisted', surfaces: ['challenge']), identifier: null, secret: 'secret');
+    $credentials->store($held, new FormType(name: 'code', surfaces: ['challenge']), identifier: null, secret: 'secret');
     $credentials->store($firstFactorOnly, new FormType, identifier: null, secret: 'secret');
-    $id = $credentials->store($disabled, new FormType(surfaces: ['challenge']), identifier: null, secret: 'secret');
+    $id = $credentials->store($disabled, new FormType(name: 'code', surfaces: ['challenge']), identifier: null, secret: 'secret');
     DB::table('user_credentials')->where('id', $id)->update(['disabled_at' => now()]);
-    $credentials->store($other, new FormType(surfaces: ['challenge']), identifier: null, secret: 'secret');
 
     expect($credentials->holdsSecondFactor($held->getKey(), 'form'))->toBeTrue()
-        ->and($credentials->holdsSecondFactor($held->getKey(), 'unlisted'))->toBeFalse()
+        ->and($credentials->holdsSecondFactor($held->getKey(), 'code'))->toBeFalse()
         ->and($credentials->holdsSecondFactor($firstFactorOnly->getKey(), 'other'))->toBeFalse()
         ->and($credentials->holdsSecondFactor($disabled->getKey(), 'other'))->toBeFalse();
 });
