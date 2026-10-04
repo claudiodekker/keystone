@@ -11,7 +11,7 @@ Alerts are queued. Run a queue worker, or they are never sent: `queue.default` s
 | `account.suspended` | an operator suspended the account (see [Operator commands](operator-commands.md#suspending-accounts)) |
 | `account.unsuspended` | an operator lifted the account's suspension |
 | `credential.added` | a credential was added to the account, such as a second factor at [enrollment](enrollment.md) |
-| `limit.tripped` | wrong answers spent the account's [failed-attempt limit](rate-limiting.md#locking-an-accounts-owner-out), once each window; a spent request limit alerts nobody |
+| `limit.tripped` | wrong answers spent one of the account's [failed-attempt counts](rate-limiting.md#locking-an-accounts-owner-out), once per count and window; a spent request limit alerts nobody |
 | `recovery_code.used` | a [recovery code](challenge.md#recovery-codes) answered the challenge; the mail says how many codes the account has left |
 | `recovery_codes.generated` | a new set of recovery codes replaced the account's codes; a first set alerts nobody |
 | `sessions.terminated` | an operator ended every session of the account, unless they passed `--no-alert` (see [Operator commands](operator-commands.md#ending-sessions)); ending every account's sessions with `--all` alerts nobody |
@@ -25,15 +25,13 @@ There is no de-duplication: two events send two alerts, however alike.
 
 ## New devices
 
-Every sign-in hands the browser a `__Host-keystone_device` cookie: a random value, host-only, `Secure`, `HttpOnly` and `SameSite=Lax`. Keystone stores only its SHA-256 digest, in `user_known_devices`, with the browser's user agent and IP address encrypted as labels. A browser holding a value the account knows is one of its known devices, and signing in from it doesn't alert. A browser it doesn't know, or one unseen for longer than `retention.known_devices_seconds` (90 days), alerts with `signed_in`. The IP address and user agent never decide: a known device on a new network doesn't alert, and a new browser on the owner's usual network does.
+Every sign-in hands the browser a `__Host-keystone_device` cookie: a random value, host-only, `Secure`, `HttpOnly` and `SameSite=Lax`. Laravel doesn't encrypt it: Keystone adds it to the `EncryptCookies` middleware's exceptions itself. Keystone stores only its SHA-256 digest, in `user_known_devices`, with the browser's user agent and IP address encrypted as labels. A browser holding a value the account knows is one of its known devices, and signing in from it doesn't alert. A browser it doesn't know, or one unseen for longer than `retention.known_devices_seconds` (90 days), alerts with `signed_in`. The IP address and user agent never decide: a known device on a new network doesn't alert, and a new browser on the owner's usual network does.
 
 Each sign-in hands the browser a fresh value and moves every account that knew the old one on to it. A copied cookie, or one planted in someone's browser, stops being known at that browser's next sign-in, and a value Keystone never handed out is never known. Several accounts signing in from one browser each know the same value.
 
 A known device earns no trust beyond its own [failed-attempt count](rate-limiting.md#locking-an-accounts-owner-out): it is never spared a challenge, an enrollment or an alert of any other type.
 
-Ending an account's sessions with `keystone:end-sessions` forgets its known devices, and `--all` forgets every account's, so each browser's next sign-in alerts. A scheduled job prunes devices unseen for the retention every night, on one server. Run Laravel's scheduler so it runs.
-
-The cookie isn't encrypted by Laravel: Keystone adds it to the `EncryptCookies` middleware's exceptions itself.
+An operator ending an account's sessions with `keystone:end-sessions` forgets its known devices, and `--all` forgets every account's, so each browser's next sign-in alerts. Keystone's scheduled `keystone:prune-known-devices` task deletes devices unseen for the retention every night, on one server, so run Laravel's scheduler.
 
 ## What they say
 

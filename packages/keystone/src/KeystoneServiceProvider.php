@@ -12,7 +12,6 @@ use ClaudioDekker\Keystone\Http\Middleware\AddHardeningHeaders;
 use ClaudioDekker\Keystone\Http\Middleware\CaptureRequestContext;
 use ClaudioDekker\Keystone\Http\Middleware\ClearSiteDataOnSessionEnd;
 use ClaudioDekker\Keystone\Http\Middleware\RefuseCrossSiteRequests;
-use ClaudioDekker\Keystone\Jobs\PruneKnownDevices;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use DeviceDetector\DeviceDetector;
 use Illuminate\Auth\AuthenticationException;
@@ -72,7 +71,10 @@ class KeystoneServiceProvider extends ServiceProvider
         EncryptCookies::except(KnownDevices::COOKIE);
 
         $this->callAfterResolving(Schedule::class, function (Schedule $schedule) {
-            $schedule->job(new PruneKnownDevices)->daily()->onOneServer();
+            $schedule->call(fn () => (new KnownDevices(Keystone::guard()->userModel()))->prune())
+                ->name('keystone:prune-known-devices')
+                ->daily()
+                ->onOneServer();
         });
 
         $this->callAfterResolving(ExceptionHandler::class, function (ExceptionHandler $handler) {

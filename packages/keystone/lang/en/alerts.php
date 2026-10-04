@@ -35,7 +35,7 @@ return [
         'limit' => [
             'tripped' => [
                 'subject' => 'Sign-ins to your account were paused',
-                'what' => 'Too many wrong answers were given while signing in to your account, so further attempts with that kind of credential are refused for up to an hour. Browsers you signed in from recently can still sign in.',
+                'what' => 'Too many wrong answers were given while signing in to your account, so further attempts with that kind of credential are refused for a while. Wrong answers from browsers you signed in from recently are counted apart, so those browsers can still sign in unless the wrong answers came from them.',
             ],
         ],
         'recovery_code' => [
@@ -51,15 +51,15 @@ return [
                 'what' => 'A new set of recovery codes was saved for your account. Your old codes no longer work.',
             ],
         ],
-        'signed_in' => [
-            'subject' => 'New sign-in to your account',
-            'what' => 'Your account was signed in to from a browser it hasn\'t signed in from recently.',
-        ],
         'sessions' => [
             'terminated' => [
                 'subject' => 'Your account was signed out everywhere',
                 'what' => 'An administrator ended every session of your account, so it is now signed out on every device.',
             ],
+        ],
+        'signed_in' => [
+            'subject' => 'New sign-in to your account',
+            'what' => 'Your account was signed in to from a browser it hasn\'t signed in from recently.',
         ],
     ],
 ];

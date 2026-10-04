@@ -7,6 +7,7 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\Request;
 
 /**
  * @internal
@@ -37,7 +38,7 @@ class KnownDevices
      */
     public function isKnown(int|string $accountId, #[\SensitiveParameter] ?string $value): bool
     {
-        if ($value === null || $value === '') {
+        if ($value === null) {
             return false;
         }
 
@@ -58,7 +59,7 @@ class KnownDevices
         $now = Date::now();
 
         $this->model->getConnection()->transaction(function () use ($accountId, $previous, $userAgent, $ipAddress, $digest, $now) {
-            if ($previous !== null && $previous !== '') {
+            if ($previous !== null) {
                 $this->query()->where('cookie_hash', static::digest($previous))->update(['cookie_hash' => $digest]);
             }
 
@@ -97,6 +98,16 @@ class KnownDevices
     public function prune(): int
     {
         return $this->query()->where('last_seen_at', '<=', Date::now()->subSeconds(static::retentionSeconds()))->delete();
+    }
+
+    /**
+     * Get the value of the device cookie the request carries.
+     */
+    public static function cookieOf(Request $request): ?string
+    {
+        $value = $request->cookies->get(static::COOKIE);
+
+        return is_string($value) && $value !== '' ? $value : null;
     }
 
     /**

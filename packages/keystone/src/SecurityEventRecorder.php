@@ -258,7 +258,7 @@ class SecurityEventRecorder
     }
 
     /**
-     * Queue the type's alert to each of the account's recipients, one mail each, unless suppressed or its slot is null.
+     * Queue the type's alert to each of the account's recipients, one mail each, unless suppressed, about a known device, or its slot is null.
      *
      * @param  list<string>|null  $recipients
      */
@@ -266,7 +266,7 @@ class SecurityEventRecorder
     {
         $slot = $this->slot($event->type);
 
-        if (! $alert || $account === null || $slot === null) {
+        if (! $alert || $event->known_device === true || $account === null || $slot === null) {
             return;
         }
 

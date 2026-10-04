@@ -54,7 +54,6 @@ abstract class EnrollmentStep
             flow: Flow::ENROLLMENT->value,
             credentialType: $enrolledType,
             knownDevice: $knownDevice,
-            alert: ! $knownDevice,
         );
 
         return Demand::SIGN_IN;

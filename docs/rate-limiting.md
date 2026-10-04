@@ -18,7 +18,7 @@ The request limit is checked before anything else, so even invalid input or an u
 
 A successful sign-in doesn't count, but nothing ever resets a count: counts only expire at the end of their window.
 
-The first refusal in each window records a `limit.tripped` [security event](security-events.md), about the account when one is named, and dispatches Laravel's `Illuminate\Auth\Events\Lockout` with the request, as Fortify does. Listen for either to react to lockouts. Unlike Fortify, `Lockout` fires once per window, not on every throttled request. A failed-attempt trip also [alerts the account's owner](security-alerts.md), once per window; a request-limit trip never alerts.
+The first refusal in each window records a `limit.tripped` [security event](security-events.md), about the account when one is named, and dispatches Laravel's `Illuminate\Auth\Events\Lockout` with the request, as Fortify does. Listen for either to react to lockouts. Unlike Fortify, `Lockout` fires once per window, not on every throttled request. A failed-attempt trip also [alerts the account's owner](security-alerts.md), once per count and window; a request-limit trip never alerts.
 
 ## Locking an account's owner out
 

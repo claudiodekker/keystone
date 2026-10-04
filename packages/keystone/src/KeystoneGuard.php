@@ -393,8 +393,7 @@ class KeystoneGuard extends SessionGuard
     protected function recognizeDevice(Model&KeystoneUser $account): bool
     {
         $request = $this->getRequest();
-        $cookie = $request->cookies->get(KnownDevices::COOKIE);
-        $previous = is_string($cookie) ? $cookie : null;
+        $previous = KnownDevices::cookieOf($request);
         $devices = new KnownDevices($account);
 
         $known = $devices->isKnown($account->getKey(), $previous);

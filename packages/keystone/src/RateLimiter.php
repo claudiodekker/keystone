@@ -213,20 +213,16 @@ class RateLimiter
 
     /**
      * Get the source part of a failed attempt: the device cookie's digest when the browser is a known device of the account, else other.
-     *
-     * @param  (Model&KeystoneUser)|null  $account
      */
-    protected function source(?Model $account): string
+    protected function source((Model&KeystoneUser)|null $account): string
     {
-        $cookie = $this->request->cookie(KnownDevices::COOKIE);
+        $cookie = KnownDevices::cookieOf($this->request);
 
-        if ($account === null || ! is_string($cookie)) {
+        if ($account === null || $cookie === null || ! (new KnownDevices($account))->isKnown($account->getKey(), $cookie)) {
             return self::OTHER_SOURCE;
         }
 
-        $known = (new KnownDevices($account))->isKnown($account->getKey(), $cookie);
-
-        return $known ? 'device:'.KnownDevices::digest($cookie) : self::OTHER_SOURCE;
+        return 'device:'.KnownDevices::digest($cookie);
     }
 
     /**

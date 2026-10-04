@@ -122,8 +122,6 @@ abstract class CredentialAttempt
     /**
      * Enter the account of an attempt whose credential is proven and written, giving its attempt back, or refuse an account barred from entering.
      *
-     * A sign-in from a browser that isn't a known device of the account alerts its owner.
-     *
      * @param  Closure(): ?bool  $enter  signs the account in, returning whether the browser was a known device of it, or holds it, returning null
      */
     protected function complete(
@@ -154,7 +152,6 @@ abstract class CredentialAttempt
             credential: $credential,
             reason: $reason,
             knownDevice: $knownDevice,
-            alert: $knownDevice === false,
         );
 
         $this->timebox->returnEarly();

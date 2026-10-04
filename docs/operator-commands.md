@@ -61,7 +61,7 @@ Unsuspend it to let it sign in again:
 php artisan keystone:unsuspend 42 --operator="jane@ops"
 ```
 
-Unsuspending doesn't bring back the sessions that suspending ended, or the [known devices](security-alerts.md#new-devices) it forgot.
+Unsuspending doesn't bring back the sessions that suspending ended.
 
 Each command records `account.suspended` or `account.unsuspended` [security events](security-events.md) with actor `operator` and the `--operator` you give, and [alerts the owner](security-alerts.md). Suspending an account that is already suspended, or unsuspending one that isn't, is refused: the command fails and nothing is recorded.
 

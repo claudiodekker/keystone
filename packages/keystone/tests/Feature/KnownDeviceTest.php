@@ -48,15 +48,31 @@ function signInOnDevice(AppTestCase $test, ?string $device, string $ip = '203.0.
 }
 
 /**
- * Submit a wrong answer for the address from a browser holding the device cookie's value, or none.
+ * Submit the account's valid proof from a browser holding the device cookie's value, or none.
  *
  * @return TestResponse<Response>
  */
-function failOnDevice(AppTestCase $test, ?string $device, string $ip, string $address = 'jane@example.com'): TestResponse
+function proveOnDevice(AppTestCase $test, ?string $device, string $ip, string $address = 'jane@example.com'): TestResponse
 {
     openBrowser($test, $device, $ip);
 
-    return $test->submitSignIn(new FormTypeSupport, $address, (new FormTypeSupport)->rejectedProof(Surface::SIGN_IN));
+    return $test->submitSignIn(new FormTypeSupport, $address, (new FormTypeSupport)->validProof(Surface::SIGN_IN));
+}
+
+/**
+ * Submit wrong answers for the address from a browser holding the device cookie's value, or none, each from its own IP address, returning the last response.
+ *
+ * @return TestResponse<Response>
+ */
+function failOnDevice(AppTestCase $test, ?string $device, string $ip, string $address = 'jane@example.com', int $times = 1): TestResponse
+{
+    foreach (range(1, $times) as $i) {
+        openBrowser($test, $device, $i === 1 ? $ip : "{$ip}{$i}");
+
+        $response = $test->submitSignIn(new FormTypeSupport, $address, (new FormTypeSupport)->rejectedProof(Surface::SIGN_IN));
+    }
+
+    return $response;
 }
 
 /**
@@ -224,20 +240,20 @@ describe('a sign-in', function () {
     });
 
     it('tells a known device apart when the challenge completes the sign-in', function () {
-        $this->createChallengedAccount(new FormTypeSupport('code'));
-        $devices = [];
+        $code = new FormTypeSupport('code');
+        $this->createChallengedAccount($code);
+        openBrowser($this, null);
+        $this->passFirstFactor();
+        $device = $this->deviceCookieOf($this->post(route('login.challenge.submit', ['type' => 'code']), $code->validProof(Surface::CHALLENGE)));
+        $this->post(route('logout'));
+        openBrowser($this, $device);
+        $this->passFirstFactor();
 
-        foreach ([null, 'known'] as $from) {
-            openBrowser($this, $from === null ? null : $devices[0]);
-            $this->passFirstFactor();
-            $response = $this->post(route('login.challenge.submit', ['type' => 'code']), (new FormTypeSupport('code'))->validProof(Surface::CHALLENGE));
-            $response->assertRedirect('/');
-            $devices[] = $this->deviceCookieOf($response);
-            $this->post(route('logout'));
-        }
+        $response = $this->post(route('login.challenge.submit', ['type' => 'code']), $code->validProof(Surface::CHALLENGE));
 
-        expect(knownDeviceFlags())->toBe([false, true]);
-        expect(newDeviceAlerts())->toBe(1);
+        $response->assertRedirect('/');
+        expect(knownDeviceFlags())->toBe([false, true])
+            ->and(newDeviceAlerts())->toBe(1);
     });
 
     it('tells a known device apart when an enrollment completes the sign-in', function () {
@@ -264,26 +280,22 @@ describe('failed attempts', function () {
         $account = $this->createAccount();
         $this->arrangeCredential($account, new FormTypeSupport, Surface::SIGN_IN);
         $device = signInOnDevice($this, null);
+        failOnDevice($this, null, '198.51.100.1', times: 4)->assertTooManyRequests();
 
-        foreach (range(1, 4) as $i) {
-            $response = failOnDevice($this, null, "198.51.100.{$i}");
-        }
+        $response = proveOnDevice($this, $device, '198.51.100.9');
 
-        $response->assertTooManyRequests();
-        signInOnDevice($this, $device, '198.51.100.9');
+        $response->assertRedirect('/');
     });
 
     it('gives a known device an allowance of its own that other browsers keep after it is spent', function () {
         $account = $this->createAccount();
         $this->arrangeCredential($account, new FormTypeSupport, Surface::SIGN_IN);
         $device = signInOnDevice($this, null);
+        failOnDevice($this, $device, '198.51.100.1', times: 4)->assertTooManyRequests();
 
-        foreach (range(1, 4) as $i) {
-            $response = failOnDevice($this, $device, "198.51.100.{$i}");
-        }
+        $response = proveOnDevice($this, null, '198.51.100.9');
 
-        $response->assertTooManyRequests();
-        signInOnDevice($this, null, '198.51.100.9');
+        $response->assertRedirect('/');
     });
 
     it('counts a device only another account knows with every other browser', function () {
@@ -292,32 +304,33 @@ describe('failed attempts', function () {
         $this->arrangeCredential($jane, new FormTypeSupport, Surface::SIGN_IN);
         $this->arrangeCredential($john, new FormTypeSupport, Surface::SIGN_IN);
         $johnsDevice = signInOnDevice($this, null, address: 'john@example.com');
+        failOnDevice($this, null, '198.51.100.1', times: 3);
 
-        foreach (range(1, 3) as $i) {
-            failOnDevice($this, null, "198.51.100.{$i}");
-        }
+        $response = proveOnDevice($this, $johnsDevice, '198.51.100.9');
 
-        failOnDevice($this, $johnsDevice, '198.51.100.9')->assertTooManyRequests();
+        $response->assertTooManyRequests();
     });
 
     it('keeps the owner\'s known device answering the challenge once other browsers spent the account\'s allowance', function () {
-        $this->createChallengedAccount(new FormTypeSupport('code'));
+        $code = new FormTypeSupport('code');
+        $this->createChallengedAccount($code);
         openBrowser($this, null);
         $this->passFirstFactor();
-        $response = $this->post(route('login.challenge.submit', ['type' => 'code']), (new FormTypeSupport('code'))->validProof(Surface::CHALLENGE));
-        $device = $this->deviceCookieOf($response);
+        $device = $this->deviceCookieOf($this->post(route('login.challenge.submit', ['type' => 'code']), $code->validProof(Surface::CHALLENGE)));
         $this->post(route('logout'));
         openBrowser($this, null, '198.51.100.1');
         $this->passFirstFactor();
 
         foreach (range(1, 4) as $ignored) {
-            $refused = $this->post(route('login.challenge.submit', ['type' => 'code']), (new FormTypeSupport('code'))->rejectedProof(Surface::CHALLENGE));
+            $this->post(route('login.challenge.submit', ['type' => 'code']), $code->rejectedProof(Surface::CHALLENGE));
         }
 
-        $refused->assertTooManyRequests();
         openBrowser($this, $device, '198.51.100.9');
         $this->passFirstFactor();
-        $this->post(route('login.challenge.submit', ['type' => 'code']), (new FormTypeSupport('code'))->validProof(Surface::CHALLENGE))->assertRedirect('/');
+
+        $response = $this->post(route('login.challenge.submit', ['type' => 'code']), $code->validProof(Surface::CHALLENGE));
+
+        $response->assertRedirect('/');
     });
 });
 
@@ -335,7 +348,7 @@ describe('forgetting devices', function () {
 
         $this->artisan('schedule:run')->assertSuccessful();
 
-        $events = collect($this->app->make(Schedule::class)->events())->filter(fn (Event $event) => $event->description === 'ClaudioDekker\Keystone\Jobs\PruneKnownDevices');
+        $events = collect($this->app->make(Schedule::class)->events())->filter(fn (Event $event) => $event->description === 'keystone:prune-known-devices');
         expect($events)->toHaveCount(1)
             ->and($events->sole()->onOneServer)->toBeTrue()
             ->and(DB::table('user_known_devices')->pluck('user_id')->all())->toEqual([$john->getKey()]);

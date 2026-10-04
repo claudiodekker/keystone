@@ -127,13 +127,19 @@ class AccountChange
     }
 
     /**
-     * End every session of the account but the mover's own, and forget the devices it signed in from.
+     * End every session of the account but the mover's own.
      */
     public function endSessions(): void
     {
-        $this->knownDevices->forget($this->account->getKey());
-
         $this->movesEpoch = true;
+    }
+
+    /**
+     * Forget every device the account signed in from, so each one's next sign-in alerts.
+     */
+    public function forgetDevices(): void
+    {
+        $this->knownDevices->forget($this->account->getKey());
     }
 
     /**
