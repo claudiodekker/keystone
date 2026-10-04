@@ -74,6 +74,12 @@ test('app tests check responses only through their overridable assertion traits'
     expect($offenders)->toBe([]);
 });
 
+test('app tests declare no global functions, so they never clash with the app\'s own', function () {
+    $offenders = filesContaining(packageFiles('app-tests'), '/^\s*function\s+\w+\s*\(/m');
+
+    expect($offenders)->toBe([]);
+});
+
 test('package tests live in Unit or Feature', function () {
     $files = packageFiles('tests');
     $tests = preg_grep('/Test\.php$/', $files);

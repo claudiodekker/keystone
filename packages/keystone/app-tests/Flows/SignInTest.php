@@ -2,7 +2,6 @@
 
 use ClaudioDekker\Keystone\AppTests\AppTestCase;
 use ClaudioDekker\Keystone\AppTests\Assertions\SignInAssertions;
-use ClaudioDekker\Keystone\AppTests\Support\CredentialTypeSupport;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\SecurityEventRecorded;
@@ -11,7 +10,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Sleep;
-use Illuminate\Testing\TestResponse;
 
 pest()->extend(AppTestCase::class)->use(AppTestCase::assertions(SignInAssertions::class));
 
@@ -19,25 +17,6 @@ beforeEach(function () {
     $this->withoutMandates();
     $this->support = $this->supportsFor(Surface::SIGN_IN)[0];
 });
-
-function refused(AppTestCase $test, TestResponse $response): TestResponse
-{
-    $test->assertSignInRefused($response);
-
-    return $response;
-}
-
-function throttled(AppTestCase $test, TestResponse $response): TestResponse
-{
-    $test->assertSignInThrottled($response);
-
-    return $response;
-}
-
-function signIn(AppTestCase $test, CredentialTypeSupport $support, string $identifier, array $proof)
-{
-    return $test->post(route('login.submit', ['type' => $support->type()]), ['identifier' => $identifier, ...$proof]);
-}
 
 describe('show', function () {
     it('shows the sign-in page', function () {
@@ -47,7 +26,7 @@ describe('show', function () {
     it('shows that the user signed out', function () {
         $account = $this->createAccount();
         $this->arrangeCredential($account, $this->support, Surface::SIGN_IN);
-        signIn($this, $this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN));
+        $this->submitSignIn($this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN));
         $this->post(route('logout'));
 
         $this->assertSignInPage($this->get(route('login')), __('keystone::messages.status.signed-out'));
@@ -56,7 +35,7 @@ describe('show', function () {
     it('sends a signed-in user away without signing them out', function () {
         $account = $this->createAccount();
         $this->arrangeCredential($account, $this->support, Surface::SIGN_IN);
-        signIn($this, $this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN));
+        $this->submitSignIn($this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN));
 
         $this->assertSignedInSentAway($this->get(route('login')));
         $this->assertAuthenticatedAs($account);
@@ -70,7 +49,7 @@ describe('submit', function () {
         $this->arrangeCredential($account, $this->support, Surface::SIGN_IN);
         $sessionId = session()->getId();
 
-        $response = signIn($this, $this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN));
+        $response = $this->submitSignIn($this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN));
 
         $this->assertSignedIn($response, '/');
         $this->assertAuthenticatedAs($account);
@@ -82,7 +61,7 @@ describe('submit', function () {
         $account = $this->createAccount('jane@example.com');
         $this->arrangeCredential($account, $this->support, Surface::SIGN_IN);
 
-        $response = signIn($this, $this->support, ' Jane@EXAMPLE.com ', $this->support->validProof(Surface::SIGN_IN));
+        $response = $this->submitSignIn($this->support, ' Jane@EXAMPLE.com ', $this->support->validProof(Surface::SIGN_IN));
 
         $this->assertSignedIn($response, '/');
         $this->assertAuthenticatedAs($account);
@@ -93,7 +72,7 @@ describe('submit', function () {
         $this->arrangeCredential($account, $this->support, Surface::SIGN_IN);
         DB::table($account->getTable())->where($account->getKeyName(), $account->getKey())->update(['credential_epoch' => 3]);
 
-        signIn($this, $this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN));
+        $this->submitSignIn($this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN));
 
         $this->assertSignedInSentAway($this->get(route('login')));
         $this->assertAuthenticatedAs($account);
@@ -104,7 +83,7 @@ describe('submit', function () {
         $this->arrangeCredential($account, $this->support, Surface::SIGN_IN);
         session()->put('url.intended', str_replace('{app}', rtrim((string) config('app.url'), '/'), $intended));
 
-        $response = signIn($this, $this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN));
+        $response = $this->submitSignIn($this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN));
 
         $this->assertSignedIn($response, $expected);
     })->with([
@@ -117,7 +96,7 @@ describe('submit', function () {
         $account = $this->createAccount();
         $this->arrangeCredential($account, $this->support, Surface::SIGN_IN);
 
-        $response = signIn($this, $this->support, 'jane@example.com', $this->support->rejectedProof(Surface::SIGN_IN));
+        $response = $this->submitSignIn($this->support, 'jane@example.com', $this->support->rejectedProof(Surface::SIGN_IN));
 
         $this->assertSignInRefused($response);
         $this->assertGuest();
@@ -130,8 +109,8 @@ describe('submit', function () {
         $proof = $this->support->validProof(Surface::SIGN_IN);
 
         $this->assertIndistinguishable(
-            fn () => refused($this, signIn($this, $this->support, 'jane@example.com', $proof)),
-            fn () => refused($this, signIn($this, $this->support, 'nobody@example.com', $proof)),
+            fn () => tap($this->submitSignIn($this->support, 'jane@example.com', $proof), $this->assertSignInRefused(...)),
+            fn () => tap($this->submitSignIn($this->support, 'nobody@example.com', $proof), $this->assertSignInRefused(...)),
         );
         $this->assertGuest();
     })->with([
@@ -146,8 +125,8 @@ describe('submit', function () {
         $this->arrangeCredential($account, $this->support, Surface::SIGN_IN);
 
         $this->assertIndistinguishable(
-            fn () => refused($this, signIn($this, $this->support, 'jane@example.com', $this->support->rejectedProof(Surface::SIGN_IN))),
-            fn () => refused($this, signIn($this, $this->support, 'nobody@example.com', $this->support->rejectedProof(Surface::SIGN_IN))),
+            fn () => tap($this->submitSignIn($this->support, 'jane@example.com', $this->support->rejectedProof(Surface::SIGN_IN)), $this->assertSignInRefused(...)),
+            fn () => tap($this->submitSignIn($this->support, 'nobody@example.com', $this->support->rejectedProof(Surface::SIGN_IN)), $this->assertSignInRefused(...)),
         );
     });
 
@@ -156,7 +135,7 @@ describe('submit', function () {
         $this->holdAddress($account, 'jane@example.com', verified: false);
         $this->arrangeCredential($account, $this->support, Surface::SIGN_IN);
 
-        $response = signIn($this, $this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN));
+        $response = $this->submitSignIn($this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN));
 
         $this->assertSignInRefused($response);
         $this->assertGuest();
@@ -166,11 +145,11 @@ describe('submit', function () {
         $account = $this->createAccount();
         $this->arrangeCredential($account, $this->support, Surface::SIGN_IN);
 
-        $this->assertSignInRefused(signIn($this, $this->support, 'nobody@example.com', $this->support->validProof(Surface::SIGN_IN)));
+        $this->assertSignInRefused($this->submitSignIn($this->support, 'nobody@example.com', $this->support->validProof(Surface::SIGN_IN)));
 
         Sleep::assertSleptTimes(1);
 
-        $this->assertSignedIn(signIn($this, $this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN)), '/');
+        $this->assertSignedIn($this->submitSignIn($this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN)), '/');
 
         Sleep::assertSleptTimes(1);
     });
@@ -179,14 +158,14 @@ describe('submit', function () {
         $account = $this->createAccount();
         $this->arrangeCredential($account, $this->support, Surface::SIGN_IN);
 
-        $response = signIn($this, $this->support, 'jane@example.com', [...$this->support->rejectedProof(Surface::SIGN_IN), 'extra' => 'typed']);
+        $response = $this->submitSignIn($this->support, 'jane@example.com', [...$this->support->rejectedProof(Surface::SIGN_IN), 'extra' => 'typed']);
 
         $this->assertSignInRefused($response);
         expect(session()->getOldInput())->toBe(['identifier' => 'jane@example.com']);
     });
 
     it('flashes back only the identifier when the input is invalid', function () {
-        $response = signIn($this, $this->support, 'jane@example.com', ['extra' => 'typed']);
+        $response = $this->submitSignIn($this->support, 'jane@example.com', ['extra' => 'typed']);
 
         $this->assertSignInInvalid($response, array_keys($this->support->validProof(Surface::SIGN_IN)));
         expect(session()->getOldInput())->toBe(['identifier' => 'jane@example.com']);
@@ -203,8 +182,8 @@ describe('submit', function () {
         $this->arrangeCredential($account, $this->support, Surface::SIGN_IN);
 
         $this->assertIndistinguishable(
-            fn () => refused($this, signIn($this, $this->support, 'jane@example.com', $this->support->rejectedProof(Surface::SIGN_IN))),
-            fn () => refused($this, $this->post(route('login.submit', ['type' => 'no-such-type']), ['identifier' => 'jane@example.com'])),
+            fn () => tap($this->submitSignIn($this->support, 'jane@example.com', $this->support->rejectedProof(Surface::SIGN_IN)), $this->assertSignInRefused(...)),
+            fn () => tap($this->post(route('login.submit', ['type' => 'no-such-type']), ['identifier' => 'jane@example.com']), $this->assertSignInRefused(...)),
         );
         $this->assertGuest();
     });
@@ -212,10 +191,10 @@ describe('submit', function () {
     it('sends a signed-in user away without signing in again', function () {
         $account = $this->createAccount();
         $this->arrangeCredential($account, $this->support, Surface::SIGN_IN);
-        signIn($this, $this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN));
+        $this->submitSignIn($this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN));
         $sessionId = session()->getId();
 
-        $response = signIn($this, $this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN));
+        $response = $this->submitSignIn($this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN));
 
         $this->assertSignedInSentAway($response);
         expect(session()->getId())->toBe($sessionId);
@@ -254,14 +233,14 @@ describe('rate limits', function () {
 
         foreach (range(1, 20) as $i) {
             $this->withServerVariables(['REMOTE_ADDR' => "203.0.113.{$i}"]);
-            refused($this, signIn($this, $this->support, 'jane@example.com', $this->support->rejectedProof(Surface::SIGN_IN)));
-            refused($this, signIn($this, $this->support, 'nobody@example.com', $this->support->rejectedProof(Surface::SIGN_IN)));
+            $this->assertSignInRefused($this->submitSignIn($this->support, 'jane@example.com', $this->support->rejectedProof(Surface::SIGN_IN)));
+            $this->assertSignInRefused($this->submitSignIn($this->support, 'nobody@example.com', $this->support->rejectedProof(Surface::SIGN_IN)));
         }
 
         $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.1']);
         $this->assertIndistinguishable(
-            fn () => throttled($this, signIn($this, $this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN))),
-            fn () => throttled($this, signIn($this, $this->support, 'nobody@example.com', $this->support->validProof(Surface::SIGN_IN))),
+            fn () => tap($this->submitSignIn($this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN)), $this->assertSignInThrottled(...)),
+            fn () => tap($this->submitSignIn($this->support, 'nobody@example.com', $this->support->validProof(Surface::SIGN_IN)), $this->assertSignInThrottled(...)),
         );
         $this->assertGuest();
     });
@@ -272,15 +251,15 @@ describe('rate limits', function () {
 
         foreach (range(1, 19) as $i) {
             $this->withServerVariables(['REMOTE_ADDR' => "203.0.113.{$i}"]);
-            refused($this, signIn($this, $this->support, 'jane@example.com', $this->support->rejectedProof(Surface::SIGN_IN)));
+            $this->assertSignInRefused($this->submitSignIn($this->support, 'jane@example.com', $this->support->rejectedProof(Surface::SIGN_IN)));
         }
 
         $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.1']);
-        $this->assertSignedIn(signIn($this, $this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN)), '/');
+        $this->assertSignedIn($this->submitSignIn($this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN)), '/');
         $this->post(route('logout'));
-        refused($this, signIn($this, $this->support, 'jane@example.com', $this->support->rejectedProof(Surface::SIGN_IN)));
+        $this->assertSignInRefused($this->submitSignIn($this->support, 'jane@example.com', $this->support->rejectedProof(Surface::SIGN_IN)));
 
-        $this->assertSignInThrottled(signIn($this, $this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN)));
+        $this->assertSignInThrottled($this->submitSignIn($this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN)));
         $this->assertGuest();
     });
 });
@@ -290,7 +269,7 @@ describe('security events', function () {
         $account = $this->createAccount();
         $this->arrangeCredential($account, $this->support, Surface::SIGN_IN);
 
-        $this->assertSignedIn(signIn($this, $this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN)), '/');
+        $this->assertSignedIn($this->submitSignIn($this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN)), '/');
 
         $this->assertDatabaseHas('user_security_events', [
             'type' => 'signed_in',
@@ -307,7 +286,7 @@ describe('security events', function () {
         $account = $this->createAccount();
         $this->arrangeCredential($account, $this->support, Surface::SIGN_IN);
 
-        $this->assertSignInRefused(signIn($this, $this->support, 'jane@example.com', $this->support->rejectedProof(Surface::SIGN_IN)));
+        $this->assertSignInRefused($this->submitSignIn($this->support, 'jane@example.com', $this->support->rejectedProof(Surface::SIGN_IN)));
 
         $this->assertDatabaseHas('user_security_events', [
             'type' => 'proof.rejected',
@@ -325,7 +304,7 @@ describe('security events', function () {
             $logged[] = [$message->message, $message->context];
         });
 
-        $this->assertSignInRefused(signIn($this, $this->support, 'typed-nobody@example.com', $this->support->rejectedProof(Surface::SIGN_IN)));
+        $this->assertSignInRefused($this->submitSignIn($this->support, 'typed-nobody@example.com', $this->support->rejectedProof(Surface::SIGN_IN)));
 
         $this->assertDatabaseCount('user_security_events', 0);
         expect(json_encode($logged))->not->toContain('typed-nobody');
@@ -337,7 +316,7 @@ describe('security events', function () {
         $account = $this->createAccount();
         $this->arrangeCredential($account, $this->support, Surface::SIGN_IN);
 
-        $this->assertSignedIn(signIn($this, $this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN)), '/');
+        $this->assertSignedIn($this->submitSignIn($this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN)), '/');
 
         $this->assertAuthenticatedAs($account);
         Exceptions::assertReported(fn (RuntimeException $e) => $e->getMessage() === 'Listener broke.');
@@ -349,7 +328,7 @@ describe('security events', function () {
         $account = $this->createAccount();
         $this->arrangeCredential($account, $this->support, Surface::SIGN_IN);
 
-        $this->assertSignInRefused(signIn($this, $this->support, 'jane@example.com', $this->support->rejectedProof(Surface::SIGN_IN)));
+        $this->assertSignInRefused($this->submitSignIn($this->support, 'jane@example.com', $this->support->rejectedProof(Surface::SIGN_IN)));
 
         $this->assertGuest();
         Exceptions::assertReported(fn (RuntimeException $e) => $e->getMessage() === 'Listener broke.');
