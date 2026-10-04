@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { Form } from '@inertiajs/vue3';
+import { Form, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import { submit } from '@/routes/login';
 import { submit as submitChallenge } from '@/routes/login/challenge';
 import { submit as submitEnrollment } from '@/routes/login/enrollment';
-import type { CredentialTypeOption, Surface } from '@/types/auth';
+import type { CredentialTypeOption, SignInPage, Surface } from '@/types/auth';
 
 const props = defineProps<{ option: CredentialTypeOption; surface: Surface }>();
 
@@ -12,15 +12,19 @@ defineSlots<{
     default(props: { errors: Partial<Record<string, string>>; processing: boolean }): unknown;
 }>();
 
+const page = usePage<Partial<SignInPage>>();
+
 const routes = { 'sign-in': submit, challenge: submitChallenge, enrollment: submitEnrollment };
 
 const action = computed(() => routes[props.surface].form({ type: props.option.type }));
+
+const secretFields = ['password', 'code'];
 
 const labels = { 'sign-in': 'Sign in', challenge: 'Verify', enrollment: 'Set up' };
 </script>
 
 <template>
-    <Form v-bind="action" v-slot="{ errors, processing }" class="flex flex-col gap-4">
+    <Form v-bind="action" :reset-on-error="secretFields" v-slot="{ errors, processing }" class="flex flex-col gap-4">
         <div v-if="surface === 'sign-in'" class="flex flex-col gap-2">
             <label :for="`${option.type}-identifier`" class="text-sm font-medium text-gray-900">Email address</label>
             <input
@@ -28,6 +32,7 @@ const labels = { 'sign-in': 'Sign in', challenge: 'Verify', enrollment: 'Set up'
                 name="identifier"
                 type="email"
                 autocomplete="username"
+                :defaultValue="page.props.identifier ?? ''"
                 required
                 class="rounded-md border border-gray-300 px-3 py-2 text-sm"
             />

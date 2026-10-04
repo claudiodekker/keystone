@@ -11,6 +11,7 @@ export type CredentialTypeOption = {
 export type SignInPage = {
     types: CredentialTypeOption[];
     status: string | null;
+    identifier: string | null;
 };
 
 export type ChallengePage = {

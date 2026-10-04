@@ -75,6 +75,15 @@ it('signs in once a staged code is typed back', function () {
     $this->assertRecoveryCodesSaved($response, '/');
 });
 
+it('sends the signed-in user on to the intended URL once the enrollment completes', function () {
+    config(['keystone.require_recovery_codes' => false]);
+    holdAtEnrollment($this);
+
+    $response = $this->enrollSecondFactor(new TotpTypeSupport);
+
+    $this->assertEnrollmentCompleted($response, '/');
+});
+
 it('sends a cancelled enrollment to the sign-in page', function () {
     holdAtEnrollment($this);
 
