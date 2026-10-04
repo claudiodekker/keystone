@@ -1,9 +1,10 @@
 <?php
 
 use ClaudioDekker\Keystone\AppTests\AppTestCase;
+use ClaudioDekker\Keystone\AppTests\Assertions\SignInAssertions;
 use ClaudioDekker\Keystone\Methods\Surface;
 
-pest()->extend(AppTestCase::class);
+pest()->extend(AppTestCase::class)->use(AppTestCase::assertions(SignInAssertions::class));
 
 beforeEach(function () {
     $this->withoutMandates();
@@ -30,11 +31,11 @@ it('hardens every Keystone response, whatever answers the request', function (Cl
     },
     'a guest sent away from sign-out' => fn () => $this->post(route('logout')),
     'a throttled request' => function () {
-        foreach (range(1, 60) as $ignored) {
+        foreach (range(1, config()->integer('keystone.rate_limits.requests_per_minute.view')) as $ignored) {
             $this->get(route('login'));
         }
 
-        return $this->get(route('login'));
+        return tap($this->get(route('login')), $this->assertSignInThrottled(...));
     },
     'a cross-site refusal' => fn () => $this->withHeader('Sec-Fetch-Site', 'cross-site')->post(route('logout')),
 ]);

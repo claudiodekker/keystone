@@ -202,8 +202,8 @@ describe('submit', function () {
 });
 
 describe('rate limits', function () {
-    it('throttles the eleventh submission in a minute before validating it', function () {
-        foreach (range(1, 10) as $ignored) {
+    it('throttles the submission past the minute\'s allowance before validating it', function () {
+        foreach (range(1, config()->integer('keystone.rate_limits.requests_per_minute.submit')) as $ignored) {
             $this->post(route('login.submit', ['type' => $this->support->type()]));
         }
 
@@ -211,27 +211,27 @@ describe('rate limits', function () {
     });
 
     it('throttles a type that does not exist', function () {
-        foreach (range(1, 10) as $ignored) {
+        foreach (range(1, config()->integer('keystone.rate_limits.requests_per_minute.submit')) as $ignored) {
             $this->post(route('login.submit', ['type' => 'no-such-type']), ['identifier' => 'jane@example.com']);
         }
 
         $this->assertSignInThrottled($this->post(route('login.submit', ['type' => 'no-such-type']), ['identifier' => 'jane@example.com']));
     });
 
-    it('throttles the sixty-first view of the sign-in page in a minute', function () {
-        foreach (range(1, 60) as $ignored) {
+    it('throttles the view of the sign-in page past the minute\'s allowance', function () {
+        foreach (range(1, config()->integer('keystone.rate_limits.requests_per_minute.view')) as $ignored) {
             $this->get(route('login'));
         }
 
         $this->assertSignInThrottled($this->get(route('login')));
     });
 
-    it('throttles an account after 20 wrong answers in an hour from any address, exactly like an unknown one', function () {
+    it('throttles an account after the hour\'s allowance of wrong answers from any address, exactly like an unknown one', function () {
         $this->freezeSecond();
         $account = $this->createAccount();
         $this->arrangeCredential($account, $this->support, Surface::SIGN_IN);
 
-        foreach (range(1, 20) as $i) {
+        foreach (range(1, config()->integer('keystone.rate_limits.failed_attempts_per_hour')) as $i) {
             $this->withServerVariables(['REMOTE_ADDR' => "203.0.113.{$i}"]);
             $this->assertSignInRefused($this->submitSignIn($this->support, 'jane@example.com', $this->support->rejectedProof(Surface::SIGN_IN)));
             $this->assertSignInRefused($this->submitSignIn($this->support, 'nobody@example.com', $this->support->rejectedProof(Surface::SIGN_IN)));
@@ -249,7 +249,7 @@ describe('rate limits', function () {
         $account = $this->createAccount();
         $this->arrangeCredential($account, $this->support, Surface::SIGN_IN);
 
-        foreach (range(1, 19) as $i) {
+        for ($i = 1; $i < config()->integer('keystone.rate_limits.failed_attempts_per_hour'); $i++) {
             $this->withServerVariables(['REMOTE_ADDR' => "203.0.113.{$i}"]);
             $this->assertSignInRefused($this->submitSignIn($this->support, 'jane@example.com', $this->support->rejectedProof(Surface::SIGN_IN)));
         }

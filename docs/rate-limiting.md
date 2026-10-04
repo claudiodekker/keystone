@@ -10,7 +10,7 @@ Keystone rate limits its own endpoints. Nothing in your routes, middleware or co
 | Failed-attempt limit | account and credential type in each flow, from any IP address | 20 wrong answers an hour |
 | Shared TOTP limit | account, for TOTP codes in the challenge, recovery and sudo together | 20 wrong codes an hour, and at most 100 in 24 hours |
 
-Change the allowances in `keystone.rate_limits` (see [Configuration](configuration.md)). Each must be a whole number of at least 1: no value turns a limit off.
+Change the allowances in `keystone.rate_limits` (see [Configuration](configuration.md)). Each must be a whole number of at least 1: no value turns a limit off. Keystone's AppTests read the same allowances, so they check the limits you set.
 
 A six-digit code is easy enough to guess that wrong [TOTP](totp.md) codes share one count across every flow behind a first factor, so moving between the challenge and other flows gets an attacker no fresh guesses. The hourly allowance is `failed_attempts_per_hour`; the 100-a-day ceiling is fixed, and counts only the wrong codes the hourly limit let through, so hammering a spent hour can't lock the account out for the day. Wrong answers at the challenge never touch the first factor's count, and cancelling a challenge resets nothing.
 

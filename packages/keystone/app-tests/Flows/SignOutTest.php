@@ -52,8 +52,8 @@ it('sends a guest away', function () {
     $this->assertGuest();
 });
 
-it('throttles the eleventh sign-out in a minute', function () {
-    foreach (range(1, 10) as $ignored) {
+it('throttles the sign-out past the minute\'s allowance', function () {
+    foreach (range(1, config()->integer('keystone.rate_limits.requests_per_minute.change')) as $ignored) {
         $this->post(route('logout'));
     }
 
