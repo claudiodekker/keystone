@@ -4,7 +4,7 @@
 
 ## Enrolling
 
-Enrolling makes a new 160-bit key and shows it in Base32, with an `otpauth://` link that adds it to an authenticator app, labelled with your `app.name` and the account's first alert address. The user types back a code the new key makes, and the key is stored with that code's step as the last one accepted, so the same code can't answer the next challenge. A code the key doesn't make records `proof.rejected` with the reason `totp.mismatch`. The page shows no QR code yet.
+Enrolling makes a new 160-bit key and shows it in Base32, with an `otpauth://` link that adds it to an authenticator app, labelled with your `app.name` and the account's first alert address. The user types back a code the new key makes, and the key is stored with that code's step as the last one accepted, so the same code can't answer the next challenge. A code the key doesn't make records `proof.rejected` with the reason `totp.mismatch`. The page shows the key and the link, not a QR code.
 
 ## Codes
 

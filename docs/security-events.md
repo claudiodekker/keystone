@@ -55,8 +55,8 @@ Every event has the same fields, and never typed input, secrets, codes, tokens o
 | `credential_type`, `credential_id`, `credential_label` | the credential involved and its label at the time; a refusal names only a credential the account holds |
 | `reason` | a short code such as `form.mismatch` or `keystone.barred`; a reason that isn't a lowercase code of at most 64 characters prefixed by its credential type or `keystone.` is stored as `<type>.invalid_reason` |
 | `ip_address`, `user_agent` | the request's, the user agent cut to 512 characters with control characters and line and paragraph separators replaced by spaces |
-| `location` | reserved for a later release; always null (alerts look the location up when they are sent, see [IP location](security-alerts.md#ip-location)) |
-| `known_device` | reserved for a later release; always null |
+| `location` | always null (alerts look the location up when they are sent, see [IP location](security-alerts.md#ip-location)) |
+| `known_device` | always null |
 | `request_id` | an id Keystone gives each request, shared by every event it records |
 
 `ip_address`, `location` and `user_agent` are encrypted in the table and left out of the model's array and JSON form.

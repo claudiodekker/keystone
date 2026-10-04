@@ -15,11 +15,9 @@ Alerts are queued. Run a queue worker, or they are never sent: `queue.default` s
 | `recovery_codes.generated` | a new set of recovery codes replaced the account's codes; a first set alerts nobody |
 | `sessions.terminated` | an operator ended every session of the account, unless they passed `--no-alert` (see [Operator commands](operator-commands.md#ending-sessions)); ending every account's sessions with `--all` alerts nobody |
 
-Later releases add alerts to more types.
-
 ## Who gets them
 
-Every verified address of the account gets its own mail. While an account has no verified address, its unverified addresses get one each instead. The addresses are read before the change that caused the event, so an address a change removes still hears about it. Keystone never sends an alert to an address someone typed.
+Every verified address of the account gets its own mail. While an account has no verified address, its unverified addresses get one each instead. The addresses are read before the change that caused the event, so an address a change removes still hears about it.
 
 There is no de-duplication: two events send two alerts, however alike.
 
