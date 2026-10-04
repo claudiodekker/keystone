@@ -224,11 +224,11 @@ describe('rate limits', function () {
         $this->freezeSecond();
     });
 
-    it('throttles the account after 20 wrong answers in an hour', function () {
+    it('throttles the account after the hour\'s allowance of wrong answers', function () {
         $this->createChallengedAccount($this->support);
         $this->passFirstFactor();
 
-        foreach (range(1, 20) as $i) {
+        foreach (range(1, config()->integer('keystone.rate_limits.failed_attempts_per_hour')) as $i) {
             $this->travel(7)->seconds();
             $this->withServerVariables(['REMOTE_ADDR' => "203.0.113.{$i}"]);
             $this->assertChallengeRefused($this->post(route('login.challenge.submit', ['type' => $this->support->type()]), $this->support->rejectedProof(Surface::CHALLENGE)), $this->support->type());
@@ -243,7 +243,7 @@ describe('rate limits', function () {
     it('leaves the first factor\'s count alone when answers are wrong', function () {
         $this->createChallengedAccount($this->support);
 
-        foreach (range(1, 20) as $i) {
+        foreach (range(1, config()->integer('keystone.rate_limits.failed_attempts_per_hour')) as $i) {
             $this->travel(15)->seconds();
             $this->withServerVariables(['REMOTE_ADDR' => "203.0.113.{$i}"]);
             $this->passFirstFactor();
@@ -259,7 +259,7 @@ describe('rate limits', function () {
         $this->createChallengedAccount($this->support);
         $this->passFirstFactor();
 
-        foreach (range(1, 20) as $i) {
+        foreach (range(1, config()->integer('keystone.rate_limits.failed_attempts_per_hour')) as $i) {
             $this->travel(7)->seconds();
             $this->withServerVariables(['REMOTE_ADDR' => "203.0.113.{$i}"]);
             $this->post(route('login.challenge.submit', ['type' => $this->support->type()]), $this->support->rejectedProof(Surface::CHALLENGE));
@@ -273,8 +273,8 @@ describe('rate limits', function () {
         $this->assertChallengeThrottled($this->post(route('login.challenge.submit', ['type' => $this->support->type()]), $this->support->validProof(Surface::CHALLENGE)));
     });
 
-    it('throttles the eleventh cancel in a minute', function () {
-        foreach (range(1, 10) as $ignored) {
+    it('throttles the cancel past the minute\'s allowance', function () {
+        foreach (range(1, config()->integer('keystone.rate_limits.requests_per_minute.change')) as $ignored) {
             $this->delete(route('login.challenge.cancel'));
         }
 

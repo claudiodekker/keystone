@@ -230,6 +230,20 @@ abstract class AppTestCase extends TestCase
     }
 
     /**
+     * Submit the proof of the supported type for the identifier to the sign-in.
+     *
+     * @param  array<string, mixed>  $proof
+     * @return TestResponse<Response>
+     */
+    public function submitSignIn(CredentialTypeSupport $support, string $identifier, array $proof): TestResponse
+    {
+        return $this->post(route('login.submit', ['type' => $support->type()]), [
+            'identifier' => $identifier,
+            ...$proof,
+        ]);
+    }
+
+    /**
      * Create an account holding a credential of the supported type, and sign it in.
      *
      * @return Model&KeystoneUser
@@ -239,10 +253,7 @@ abstract class AppTestCase extends TestCase
         $account = $this->createAccount($address);
         $this->arrangeCredential($account, $support, Surface::SIGN_IN);
 
-        $this->post(route('login.submit', ['type' => $support->type()]), [
-            'identifier' => $address,
-            ...$support->validProof(Surface::SIGN_IN),
-        ]);
+        $this->submitSignIn($support, $address, $support->validProof(Surface::SIGN_IN));
 
         return $account;
     }
@@ -297,10 +308,7 @@ abstract class AppTestCase extends TestCase
     {
         $support = $this->supportsFor(Surface::SIGN_IN)[0];
 
-        return $this->post(route('login.submit', ['type' => $support->type()]), [
-            'identifier' => $address,
-            ...$support->validProof(Surface::SIGN_IN),
-        ]);
+        return $this->submitSignIn($support, $address, $support->validProof(Surface::SIGN_IN));
     }
 
     /**
