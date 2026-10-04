@@ -105,4 +105,8 @@ In production it also refuses what's fine on a laptop but unsafe on a server:
 | `mail.default` | a mailer using the `log` or `array` transport |
 | `queue.default` | a connection using the `null` driver |
 
-The installer sets the session cookie up this way. Because the checks run on every boot, a build step that boots your app with `APP_ENV=production` needs the production settings too. The commands that clear or rebuild a cached config (`config:clear`, `config:cache`, `optimize:clear` and `package:discover`) skip the checks, so you can always recover from a cached config Keystone refuses.
+The installer sets the session cookie up this way.
+
+The checks run in every artisan command, not only on requests. Wherever `APP_ENV` is `production`, `migrate`, `queue:work`, `route:cache` and every other command refuse to run until the settings in the table are right. A build environment that runs `migrate` with no `SESSION_SECURE_COOKIE=true`, or with an `APP_URL` that doesn't start with `https://`, fails with the `Misconfigured` exception.
+
+No setting turns the checks off. The only commands that skip them are the ones that clear or rebuild a cached config (`config:clear`, `config:cache`, `optimize:clear` and `package:discover`), so you can always recover from a cached config Keystone refuses. Give every other build step the production values of the settings above, such as `SESSION_SECURE_COOKIE=true` and `APP_URL=https://example.com`. The checks read only the form of each value, so a placeholder passes.

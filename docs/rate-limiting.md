@@ -20,6 +20,20 @@ A successful sign-in doesn't count, but nothing ever resets a count: counts only
 
 The first refusal in each window records a `limit.tripped` [security event](security-events.md), about the account when one is named, and dispatches Laravel's `Illuminate\Auth\Events\Lockout` with the request, as Fortify does. Listen for either to react to lockouts. Unlike Fortify, `Lockout` fires once per window, not on every throttled request.
 
+## Locking an account's owner out
+
+The failed-attempt limit counts per account and ignores the IP address, so someone other than the owner can spend it. Anyone who knows an account's address can send 20 wrong passwords for it, from one IP address or many. Keystone then refuses every password sign-in for that account, the owner's correct password included, until the count expires an hour after the first wrong answer. The attacker can repeat this when the window ends. Counting by account is what holds a guesser who rotates through IP addresses to 20 guesses an hour, and Keystone makes this trade rather than count per address.
+
+The lock is narrow. It refuses only sign-in and the challenge, so sessions that are already signed in carry on. Each credential type counts apart, so locking an account's passwords leaves its other first-factor types alone. The refusal's `Retry-After` header says when the count expires.
+
+Nothing ends a lock early. A count is only reset by expiring, and no [operator command](operator-commands.md) touches one: they end sessions and suspend accounts. Raising `rate_limits.failed_attempts_per_hour` makes a lock cost more wrong passwords, and gives every guesser the same number more.
+
+Keystone mails no alert when a lock trips. The `limit.tripped` event with the reason `keystone.failed_attempt_limit` and the `Lockout` event are your hooks for telling the owner.
+
+## Sharing an IP address
+
+The request limit counts per IP address, so everyone behind one address shares it, such as an office or a school behind one NAT address. Sign-ins, challenge answers, recovery-code saves and enrollment answers all count as submissions. With the default of 10 a minute and a second factor required, one address completes at most five sign-ins a minute. An IPv6 address counts as its /64 network. If your users sit behind shared addresses, raise `rate_limits.requests_per_minute.submit`. That also gives a scripted client more submissions from each address.
+
 ## The store
 
 Counts live in Laravel's rate-limiter cache store: the store named by `cache.limiter`, else your default cache store. It must increment atomically and must not evict entries early, so use `redis`, `database` or `memcached` in production. In production, Keystone refuses to boot when that store uses the `file`, `storage`, `array`, `null` or `session` driver. Keys are hashed with your app key, and no email address, username or IP address is stored in clear.

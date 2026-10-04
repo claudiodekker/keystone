@@ -65,4 +65,23 @@ Every event has the same fields, and never typed input, secrets, codes, tokens o
 
 Every event logs one `info` line with the message `keystone.security_event` and every field above in its context, `ip_address` and `user_agent` included. Events about nobody are only logged, and an identical one (same type, IP address and path) is logged at most once a minute. While your cache is down, every one is logged.
 
-When an account is deleted for good, its events stay in the table with their `user_id`, so an investigation can still follow that account until retention prunes them. Keystone assumes your app never reuses a deleted user's id.
+## Retention and erasure
+
+Keystone has no retention setting and no prune command, and nothing deletes a row from `user_security_events`. The table grows until your app deletes from it. `occurred_at` is indexed, so a scheduled delete by age is cheap. In `routes/console.php`, for example:
+
+```php
+use ClaudioDekker\Keystone\SecurityEvent;
+use Illuminate\Support\Facades\Schedule;
+
+Schedule::call(fn () => SecurityEvent::where('occurred_at', '<', now()->subDays(90)->utc())->delete())->daily();
+```
+
+The table has no foreign key to your users table, unlike the credentials, addresses and recovery codes, which the database deletes with their account. When an account is deleted for good, its events stay with their `user_id`, and so do their encrypted `ip_address` and `user_agent`. Keystone assumes your app never reuses a deleted user's id. If you must erase an account's events with it, delete them in the code that deletes the account:
+
+```php
+SecurityEvent::where('user_id', $user->getKey())->delete();
+```
+
+That delete doesn't reach two things. The log line of each event carries the IP address and user agent in clear, so it lives as long as your log channel keeps it. And when the person you erase also ran operator commands, the name they gave `--operator` is in the `operator` column of rows about other accounts, which `user_id` doesn't find.
+
+A wrong password for an existing account writes a `proof.rejected` row, so anyone who knows the account's address can add rows to its trail: up to 20 an hour from any IP address, plus the `limit.tripped` row when the limit trips. A wrong password for an address no account holds writes none. Only the [rate limits](rate-limiting.md) bound it.
