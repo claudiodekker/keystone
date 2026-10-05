@@ -13,7 +13,7 @@
         "format": "prettier --write ."
     },
     "devDependencies": {
-        "@inertiajs/vue3": "^3.7.1",
+        "@inertiajs/vue3": "^3.8.0",
         "@laravel/vite-plugin-wayfinder": "^0.1.10",
         "@tailwindcss/vite": "^4.3.3",
         "@types/node": "^22.12.0",
