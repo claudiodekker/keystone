@@ -194,7 +194,7 @@ Legend: **K** = KEEP as-is, **KR** = KEEP reworded (usually merge), **R** = RECO
 | 0088 | Partial also receives signed link | D | Same. |
 | 0089 | Sign-in link consumed before proof | KR | Sound magic-link rule. Belongs in a magic-link ADR. |
 | 0090 | Refused guest goes to sign-in | D | A bug fix, not a decision. Fold into 0082. |
-| 0100 | Docs restate nothing; generated reference | D | Conflicts with NEW `CLAUDE.md` ("No documentation beyond CONTEXT.md, ADRs and docs/agents/"). |
+| 0100 | Docs restate nothing; generated reference | D | Conflicts with NEW `CLAUDE.md` ("No documentation beyond GLOSSARY.md, ADRs and docs/agents/"). |
 | 0110 | Config key only when two honest apps differ | KR | Keep the principle, units in names and the bounds table. Drop the config arch test. |
 | 0111 | Boot check is prod-only iff the bad value has a dev use | KR | Merge 0020, 0111 and 0115 into one ADR. |
 | 0112 | Surfaces narrowed on the methods line; closes registration | K | One source of truth, fails toward less. |
@@ -260,7 +260,7 @@ Tally: K 19, KR 26, R 11, D 11 (= 67).
 
 ## 6. OLD docs worth salvaging (as input only, not copied)
 
-NEW allows docs only in `CONTEXT.md`, ADRs and `docs/agents/`, so these become ADR content, ticket bodies or test names.
+NEW allows docs only in `GLOSSARY.md`, ADRs and `docs/agents/`, so these become ADR content, ticket bodies or test names.
 
 | File | Salvage | Use as |
 |---|---|---|
@@ -299,4 +299,4 @@ NEW allows docs only in `CONTEXT.md`, ADRs and `docs/agents/`, so these become A
 17. **Remember-me.** Own cookie, first factor only, fixed lifetime, kill rules (0070-0072).
 18. **Config surface and boot checks.** Key list, seconds, bounds and ceilings, prod-only rule, cache persistence, config comments (0110, 0111, 0115, 0117).
 19. **ASVS traceability.** Test tags only vs checker plus exclusions file; which L3 items are claimed; the accepted deviations list (0010, 0018).
-20. **User-facing docs.** NEW bans docs outside `CONTEXT.md`, ADRs and `docs/agents/`, but a package needs install and security docs eventually. Decide where and when (OLD 0100 dropped).
+20. **User-facing docs.** NEW bans docs outside `GLOSSARY.md`, ADRs and `docs/agents/`, but a package needs install and security docs eventually. Decide where and when (OLD 0100 dropped).
