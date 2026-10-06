@@ -39,6 +39,7 @@ class AccountChange
         public readonly array $recipients,
         protected Credentials $credentials,
         protected RecoveryCodes $recoveryCodes,
+        protected KnownDevices $knownDevices,
     ) {
         //
     }
@@ -131,6 +132,14 @@ class AccountChange
     public function endSessions(): void
     {
         $this->movesEpoch = true;
+    }
+
+    /**
+     * Forget every device the account signed in from, so each one's next sign-in alerts.
+     */
+    public function forgetDevices(): void
+    {
+        $this->knownDevices->forget($this->account->getKey());
     }
 
     /**

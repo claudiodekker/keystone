@@ -158,7 +158,7 @@ describe('the alert slots', function () {
         $failures = bootFailures();
 
         expect($failures)->toBe(["keystone.notifications.{$type} can't use SecurityAlert, which has no mail for that type: name your own notification class or null."]);
-    })->with(['a rejected proof' => ['proof.rejected'], 'a sign-in' => ['signed_in']]);
+    })->with(['a rejected proof' => ['proof.rejected'], 'a sign-out' => ['signed_out']]);
 
     it('refuses a notification that can\'t be built from the event', function () {
         config(['keystone.notifications' => ['signed_out' => Notification::class]]);
@@ -213,6 +213,16 @@ describe('the absolute session lifetime', function () {
 
         expect($failures)->toBe([]);
     })->with(['one second' => [1], 'off' => [null]]);
+});
+
+describe('the retention', function () {
+    it('refuses a known-device retention that isn\'t a whole number of at least 1', function (mixed $seconds) {
+        config(['keystone.retention.known_devices_seconds' => $seconds]);
+
+        $failures = bootFailures();
+
+        expect($failures)->toBe(['keystone.retention.known_devices_seconds must be a whole number of at least 1.']);
+    })->with(['zero' => [0], 'null' => [null], 'a negative number' => [-1], 'a string' => ['7776000']]);
 });
 
 describe('the hardening opt-outs', function () {

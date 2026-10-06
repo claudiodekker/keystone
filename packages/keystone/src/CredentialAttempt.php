@@ -82,7 +82,7 @@ abstract class CredentialAttempt
     /**
      * Enter the account of a proven attempt, or refuse it.
      *
-     * @param  Closure(): void  $enter
+     * @param  Closure(): ?bool  $enter  signs the account in, returning whether the browser was a known device of it, or holds it, returning null
      */
     protected function finish(
         Model&KeystoneUser $account,
@@ -122,7 +122,7 @@ abstract class CredentialAttempt
     /**
      * Enter the account of an attempt whose credential is proven and written, giving its attempt back, or refuse an account barred from entering.
      *
-     * @param  Closure(): void  $enter
+     * @param  Closure(): ?bool  $enter  signs the account in, returning whether the browser was a known device of it, or holds it, returning null
      */
     protected function complete(
         Model&KeystoneUser $account,
@@ -135,7 +135,7 @@ abstract class CredentialAttempt
         ?string $reason = null,
     ): bool {
         try {
-            $enter();
+            $knownDevice = $enter();
         } catch (Barred) {
             $this->recordRejected($account, $flow, $type, $credential, reason: 'keystone.barred');
 
@@ -151,6 +151,7 @@ abstract class CredentialAttempt
             credentialType: $type->name(),
             credential: $credential,
             reason: $reason,
+            knownDevice: $knownDevice,
         );
 
         $this->timebox->returnEarly();

@@ -13,6 +13,7 @@ use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Notifications\SecurityAlert;
 use ClaudioDekker\Keystone\PendingSignIn;
 use ClaudioDekker\Keystone\PendingStage;
+use ClaudioDekker\Keystone\SecurityEventType;
 use ClaudioDekker\Keystone\Tests\Fixtures\FlakyAlert;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormType;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormTypeSupport;
@@ -20,6 +21,7 @@ use ClaudioDekker\Keystone\Tests\Fixtures\RogueType;
 use ClaudioDekker\Keystone\Tests\Fixtures\User;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Notification;
@@ -559,7 +561,7 @@ describe('recovery codes', function () {
         $this->assertDatabaseCount('user_recovery_codes', 0);
     });
 
-    it('saves the staged set once a code is typed back, recording it without an alert, and signs in', function () {
+    it('saves the staged set once a code is typed back, recording it without an alert of its own, and signs in', function () {
         Notification::fake();
         $account = passChallengeOwingCodes($this);
         $codes = $this->get(route('login.recovery-codes'))->json('codes');
@@ -572,7 +574,7 @@ describe('recovery codes', function () {
         $this->assertDatabaseHas('users', ['id' => $account->getKey(), 'credential_epoch' => 0]);
         $this->assertDatabaseHas('user_security_events', ['type' => 'recovery_codes.generated', 'user_id' => $account->getKey(), 'flow' => 'enrollment']);
         $this->assertDatabaseHas('user_security_events', ['type' => 'signed_in', 'user_id' => $account->getKey(), 'flow' => 'enrollment', 'credential_type' => 'recovery-code']);
-        Notification::assertNothingSent();
+        Notification::assertNotSentTo(new AnonymousNotifiable, SecurityAlert::class, fn (SecurityAlert $alert) => $alert->type === SecurityEventType::RECOVERY_CODES_GENERATED);
         expect(session()->has(CeremonySlots::SESSION_KEY))->toBeFalse();
     });
 

@@ -67,6 +67,7 @@ class BootChecks
             ...$this->rateLimitFailures(),
             ...$this->mandateFailures(),
             ...$this->sessionFailures(),
+            ...$this->floorFailures(['keystone.retention.known_devices_seconds']),
             ...$this->eventFailures(),
             ...$this->alertFailures(),
             ...$this->ipLocationFailures(),

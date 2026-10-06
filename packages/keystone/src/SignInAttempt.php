@@ -72,9 +72,7 @@ class SignInAttempt extends CredentialAttempt
                 proof: $proof,
                 credential: $credential,
                 taken: $taken,
-                enter: function () use ($account, $type, $demand, $intendedUrl) {
-                    $this->enter($account, $type, $demand, $intendedUrl);
-                },
+                enter: fn () => $this->enter($account, $type, $demand, $intendedUrl),
                 recorded: $demand === Demand::SIGN_IN ? SecurityEventType::SIGNED_IN : SecurityEventType::SIGN_IN_HELD,
                 reason: $demand === Demand::SIGN_IN ? null : "keystone.{$demand->value}",
             );
@@ -84,21 +82,21 @@ class SignInAttempt extends CredentialAttempt
     }
 
     /**
-     * Sign the account in, or hold its sign-in at the challenge or an enrollment, as the decision demands.
+     * Sign the account in, returning whether the browser was a known device of it, or hold its sign-in at the challenge or an enrollment, as the decision demands.
      *
      * @throws Barred
      */
-    protected function enter(Model&KeystoneUser $account, CredentialType $type, Demand $demand, string $intendedUrl): void
+    protected function enter(Model&KeystoneUser $account, CredentialType $type, Demand $demand, string $intendedUrl): ?bool
     {
         if ($demand === Demand::SIGN_IN) {
-            $this->guard->signIn($account);
-
-            return;
+            return $this->guard->signIn($account);
         }
 
         $stage = $demand === Demand::CHALLENGE ? PendingStage::CHALLENGE : PendingStage::ENROLLMENT;
 
         $this->guard->hold($account, firstFactor: $type->name(), stage: $stage, intendedUrl: $intendedUrl);
+
+        return null;
     }
 
     /**

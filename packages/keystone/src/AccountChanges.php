@@ -37,7 +37,7 @@ class AccountChanges
             $locked = $this->lock($account);
             $addresses = new Addresses($locked);
             $recipients = $addresses->recipientsOf($locked);
-            $change = new AccountChange($locked, $recipients, new Credentials($locked), new RecoveryCodes($locked));
+            $change = new AccountChange($locked, $recipients, new Credentials($locked), new RecoveryCodes($locked), new KnownDevices($locked));
             $result = $apply($change);
             $movedFrom = $change->movesEpoch() ? $this->moveEpoch($locked) : null;
 
@@ -52,14 +52,18 @@ class AccountChanges
     }
 
     /**
-     * End every session of every account, the mover's own included, and log it once.
+     * End every session of every account, the mover's own included, forget every known device, and log it once.
      */
     public function endEverySession(?string $operator = null): void
     {
         $users = $this->guard->userModel();
         $movedAt = $users->fromDateTime(Date::now());
 
-        $users->newQueryWithoutScopes()->toBase()->increment('credential_epoch', extra: ['credential_epoch_moved_at' => $movedAt]);
+        $users->getConnection()->transaction(function () use ($users, $movedAt) {
+            $users->newQueryWithoutScopes()->toBase()->increment('credential_epoch', extra: ['credential_epoch_moved_at' => $movedAt]);
+
+            (new KnownDevices($users))->forgetAll();
+        });
 
         $users->getConnection()->afterCommit(function () use ($operator) {
             $this->recorder->record(SecurityEventType::SESSIONS_TERMINATED, actor: Actor::OPERATOR, reason: 'keystone.every_account', operator: $operator);

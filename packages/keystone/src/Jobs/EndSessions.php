@@ -43,6 +43,7 @@ class EndSessions implements ShouldQueue
     {
         (new AccountChanges(Keystone::guard()))->change($this->account, function (AccountChange $change) {
             $change->endSessions();
+            $change->forgetDevices();
 
             $change->record(SecurityEventType::SESSIONS_TERMINATED, actor: Actor::OPERATOR, operator: $this->operator, alert: $this->alert);
         });

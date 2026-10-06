@@ -11,6 +11,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Date;
 use LogicException;
+use Symfony\Component\HttpFoundation\Cookie;
 
 /**
  * @internal
@@ -81,11 +82,11 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Start a signed-in session for the user, stamped with the credential epoch they were read with.
+     * Start a signed-in session for the user, stamped with the credential epoch they were read with, returning whether the browser was a known device of theirs.
      *
      * @throws Barred
      */
-    public function signIn(Model&KeystoneUser $user): void
+    public function signIn(Model&KeystoneUser $user): bool
     {
         $account = $this->retrieveAccount($user->getAuthIdentifier());
 
@@ -97,6 +98,8 @@ class KeystoneGuard extends SessionGuard
             throw Barred::inactive();
         }
 
+        $knownDevice = $this->recognizeDevice($user);
+
         $this->changeAuthLevel();
 
         $this->session->forget($this->pendingKey());
@@ -107,6 +110,8 @@ class KeystoneGuard extends SessionGuard
         $this->fireLoginEvent($user);
 
         $this->setUser($user);
+
+        return $knownDevice;
     }
 
     /**
@@ -381,6 +386,35 @@ class KeystoneGuard extends SessionGuard
 
         /** @var (Model&KeystoneUser)|null */
         return $model->newQueryWithoutScopes()->where($model->getAuthIdentifierName(), $id)->first();
+    }
+
+    /**
+     * Determine if the browser is a known device of the account, then hand it a fresh device cookie every account that knew it moves to.
+     *
+     * A browser holding a value that a later sign-in replaced shares its cookie with another browser, so the owner is told and the account knows only this browser from here on.
+     */
+    protected function recognizeDevice(Model&KeystoneUser $account): bool
+    {
+        $request = $this->getRequest();
+        $previous = KnownDevices::cookieOf($request);
+        $devices = new KnownDevices($account);
+
+        if ($previous !== null && $devices->isReused($account->getKey(), $previous)) {
+            (new SecurityEventRecorder)->record(SecurityEventType::DEVICE_COOKIE_REUSED, account: $account);
+        }
+
+        $known = $devices->isKnown($account->getKey(), $previous);
+        $value = $devices->remember($account->getKey(), previous: $previous, userAgent: $request->headers->get('User-Agent'), ipAddress: $request->getClientIp());
+
+        $this->getCookieJar()->queue(Cookie::create(
+            KnownDevices::COOKIE,
+            $value,
+            expire: Date::now()->addSeconds(KnownDevices::retentionSeconds()),
+            secure: true,
+            sameSite: Cookie::SAMESITE_LAX,
+        ));
+
+        return $known;
     }
 
     /**

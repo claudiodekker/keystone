@@ -120,7 +120,7 @@ class RateLimiter
      */
     public function takeFailedAttempt(Flow $flow, CredentialType $type, (Model&KeystoneUser)|null $account, string $identifier): TakenAttempt
     {
-        $limits = $this->failedAttemptLimits($flow, $type, $this->subject($account, $identifier));
+        $limits = $this->failedAttemptLimits($flow, $type, subject: $this->subject($account, $identifier), source: $this->source($account));
 
         try {
             $counts = [];
@@ -184,16 +184,16 @@ class RateLimiter
     }
 
     /**
-     * Get the failed-attempt limits a wrong answer counts against.
+     * Get the failed-attempt limits a wrong answer from the source counts against.
      *
      * @return non-empty-list<array{key: string, window_seconds: int, allowance: int}>
      */
-    protected function failedAttemptLimits(Flow $flow, CredentialType $type, string $subject): array
+    protected function failedAttemptLimits(Flow $flow, CredentialType $type, string $subject, string $source): array
     {
         $shared = $type->sharesFailedAttempts() && $flow->sharesFailedAttempts();
 
         $hourly = [
-            'key' => $this->key('failed-attempt', [$subject, $type->name(), $shared ? self::SHARED_FLOWS : $flow->value, self::OTHER_SOURCE]),
+            'key' => $this->key('failed-attempt', [$subject, $type->name(), $shared ? self::SHARED_FLOWS : $flow->value, $source]),
             'window_seconds' => self::FAILED_ATTEMPT_WINDOW_SECONDS,
             'allowance' => config()->integer('keystone.rate_limits.failed_attempts_per_hour'),
         ];
@@ -203,12 +203,26 @@ class RateLimiter
         }
 
         $daily = [
-            'key' => $this->key('failed-attempt-ceiling', [$subject, $type->name(), self::OTHER_SOURCE]),
+            'key' => $this->key('failed-attempt-ceiling', [$subject, $type->name(), $source]),
             'window_seconds' => self::SHARED_CEILING_WINDOW_SECONDS,
             'allowance' => self::SHARED_CEILING,
         ];
 
         return [$hourly, $daily];
+    }
+
+    /**
+     * Get the source part of a failed attempt: the id of the account's known device the browser is, else other.
+     */
+    protected function source((Model&KeystoneUser)|null $account): string
+    {
+        if ($account === null) {
+            return self::OTHER_SOURCE;
+        }
+
+        $device = (new KnownDevices($account))->idOf($account->getKey(), KnownDevices::cookieOf($this->request));
+
+        return $device === null ? self::OTHER_SOURCE : "device:{$device}";
     }
 
     /**
@@ -257,6 +271,7 @@ class RateLimiter
             SecurityEventType::LIMIT_TRIPPED,
             account: $account,
             reason: 'keystone.request_limit',
+            alert: false,
         );
 
         $this->dispatchLockout();

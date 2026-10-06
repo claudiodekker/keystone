@@ -257,6 +257,8 @@ it('works with a user model that has its own table and key name', function () {
     });
     config(['auth.providers.users.model' => Member::class]);
     $member = Member::create();
+    // Keystone's migrations reference users, so the member's devices need a row there.
+    User::factory()->create(['id' => $member->getKey()]);
     Auth::guard('web')->signIn($member);
 
     expect(nextRequest()->user()?->getKey())->toBe($member->getKey());

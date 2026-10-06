@@ -109,3 +109,27 @@ describe('the end-sessions job', function () {
         expect(DB::table('users')->value('credential_epoch'))->toEqual(1);
     });
 });
+
+describe('known devices', function () {
+    it('forgets the devices of the account whose sessions end', function () {
+        $jane = $this->signInAccount(new FormTypeSupport, 'jane@example.com');
+        $this->post(route('logout'));
+        $john = $this->signInAccount(new FormTypeSupport, 'john@example.com');
+        inConsole();
+
+        $this->artisan('keystone:end-sessions', ['user' => (string) $jane->getKey()])->assertSuccessful();
+
+        expect(DB::table('user_known_devices')->pluck('user_id')->all())->toEqual([$john->getKey()]);
+    });
+
+    it('forgets every account\'s devices with --all', function () {
+        $this->signInAccount(new FormTypeSupport, 'jane@example.com');
+        $this->post(route('logout'));
+        $this->signInAccount(new FormTypeSupport, 'john@example.com');
+        inConsole();
+
+        $this->artisan('keystone:end-sessions', ['--all' => true])->assertSuccessful();
+
+        $this->assertDatabaseCount('user_known_devices', 0);
+    });
+});

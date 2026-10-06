@@ -17,10 +17,12 @@ use DeviceDetector\DeviceDetector;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Auth\AuthManager;
 use Illuminate\Auth\EloquentUserProvider;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Foundation\CachesConfiguration;
 use Illuminate\Contracts\Http\Kernel;
+use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Exceptions\Handler;
 use Illuminate\Foundation\Http\Kernel as HttpKernel;
 use Illuminate\Http\Request;
@@ -65,6 +67,15 @@ class KeystoneServiceProvider extends ServiceProvider
         }
 
         $router->pushMiddlewareToGroup('web', RefuseCrossSiteRequests::class);
+
+        EncryptCookies::except(KnownDevices::COOKIE);
+
+        $this->callAfterResolving(Schedule::class, function (Schedule $schedule) {
+            $schedule->call(fn () => (new KnownDevices(Keystone::guard()->userModel()))->prune())
+                ->name('keystone:prune-known-devices')
+                ->daily()
+                ->onOneServer();
+        });
 
         $this->callAfterResolving(ExceptionHandler::class, function (ExceptionHandler $handler) {
             if ($handler instanceof Handler) {

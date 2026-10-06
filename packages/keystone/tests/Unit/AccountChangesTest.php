@@ -328,6 +328,17 @@ describe('ending every account\'s sessions', function () {
             ->and(DB::table('users')->pluck('credential_epoch_moved_at')->unique()->all())->toBe([now()->toDateTimeString()]);
     });
 
+    it('moves no epoch when forgetting the known devices fails', function () {
+        $user = User::factory()->create();
+        DB::connection()->beforeExecuting(function (string $query) {
+            throw_if(str_starts_with($query, 'delete') && str_contains($query, 'user_known_devices'), RuntimeException::class, 'The devices could not be forgotten.');
+        });
+
+        expect(fn () => changes()->endEverySession())->toThrow(RuntimeException::class, 'The devices could not be forgotten.');
+
+        expect(epochOf($user))->toBe(0);
+    });
+
     it('ends the mover\'s own session too', function () {
         $user = User::factory()->create();
         guard()->signIn($user);

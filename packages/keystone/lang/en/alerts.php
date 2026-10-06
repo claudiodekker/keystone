@@ -32,6 +32,18 @@ return [
                 'what' => 'A new way to sign in or confirm it\'s you was added to your account.',
             ],
         ],
+        'device_cookie' => [
+            'reused' => [
+                'subject' => 'A browser you sign in from may have been copied',
+                'what' => 'Your account was signed in to from a browser whose device cookie had already been replaced by a later sign-in. That happens when the cookie was copied to another browser, and rarely when a sign-in was cut off. Your account now knows only the browser that just signed in, and you will be told again if the other one signs in.',
+            ],
+        ],
+        'limit' => [
+            'tripped' => [
+                'subject' => 'Sign-ins to your account were paused',
+                'what' => 'Too many wrong answers were given while signing in to your account, so further attempts with that kind of credential are refused for a while. Wrong answers from browsers you signed in from recently are counted apart, so those browsers can still sign in unless the wrong answers came from them.',
+            ],
+        ],
         'recovery_code' => [
             'used' => [
                 'subject' => 'A recovery code was used on your account',
@@ -50,6 +62,10 @@ return [
                 'subject' => 'Your account was signed out everywhere',
                 'what' => 'An administrator ended every session of your account, so it is now signed out on every device.',
             ],
+        ],
+        'signed_in' => [
+            'subject' => 'New sign-in to your account',
+            'what' => 'Your account was signed in to from a browser it hasn\'t signed in from recently.',
         ],
     ],
 ];

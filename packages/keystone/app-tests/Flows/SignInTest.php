@@ -260,6 +260,24 @@ describe('rate limits', function () {
         $this->assertGuest();
     });
 
+    it('keeps the owner\'s known device signing in once other browsers spent the account\'s allowance', function () {
+        $account = $this->createAccount();
+        $this->arrangeCredential($account, $this->support, Surface::SIGN_IN);
+        $device = $this->deviceCookieOf($this->submitSignIn($this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN)));
+        $this->post(route('logout'));
+        $this->fromDevice(null);
+
+        foreach (range(1, config()->integer('keystone.rate_limits.failed_attempts_per_hour')) as $i) {
+            $this->withServerVariables(['REMOTE_ADDR' => "203.0.113.{$i}"]);
+            $this->assertSignInRefused($this->submitSignIn($this->support, 'jane@example.com', $this->support->rejectedProof(Surface::SIGN_IN)));
+        }
+
+        $this->assertSignInThrottled($this->submitSignIn($this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN)));
+        $this->fromDevice($device)->withServerVariables(['REMOTE_ADDR' => '198.51.100.1']);
+        $this->assertSignedIn($this->submitSignIn($this->support, 'jane@example.com', $this->support->validProof(Surface::SIGN_IN)), '/');
+        $this->assertAuthenticatedAs($account);
+    });
+
     it('neither counts a successful sign-in nor resets earlier failures', function () {
         $account = $this->createAccount();
         $this->arrangeCredential($account, $this->support, Surface::SIGN_IN);
