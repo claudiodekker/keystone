@@ -17,6 +17,8 @@ readonly class PendingSignIn
 
     /**
      * Create a new pending sign-in instance.
+     *
+     * @param  int|null  $pendingChallenge  the id of the pending challenge the hold opened, when its browser wasn't a known device
      */
     public function __construct(
         public Model&KeystoneUser $account,
@@ -27,6 +29,7 @@ readonly class PendingSignIn
         public CarbonImmutable $heldAt,
         public int $epoch,
         public bool $secondFactorPassed,
+        public ?int $pendingChallenge = null,
     ) {
         //
     }

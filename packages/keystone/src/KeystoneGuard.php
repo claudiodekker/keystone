@@ -116,6 +116,8 @@ class KeystoneGuard extends SessionGuard
 
     /**
      * Hold the account's sign-in until it passes the stage, replacing any pending one.
+     *
+     * A hold at the challenge from a browser that isn't a known device of the account opens a pending challenge, which only passing the challenge forgets.
      */
     public function hold(Model&KeystoneUser $account, string $firstFactor, PendingStage $stage, string $intendedUrl): void
     {
@@ -130,6 +132,7 @@ class KeystoneGuard extends SessionGuard
             'epoch' => $this->epochOf($account),
             'held_at' => Date::now()->getTimestamp(),
             'second_factor_passed' => false,
+            'pending_challenge' => $stage === PendingStage::CHALLENGE ? $this->openPendingChallenge($account) : null,
         ]);
     }
 
@@ -162,6 +165,7 @@ class KeystoneGuard extends SessionGuard
             ...$held,
             'stage' => PendingStage::ENROLLMENT->value,
             'second_factor_passed' => true,
+            'pending_challenge' => null,
         ]);
     }
 
@@ -201,6 +205,7 @@ class KeystoneGuard extends SessionGuard
             heldAt: $heldAt,
             epoch: $held['epoch'],
             secondFactorPassed: $held['second_factor_passed'],
+            pendingChallenge: $held['pending_challenge'] ?? null,
         );
     }
 
@@ -415,6 +420,20 @@ class KeystoneGuard extends SessionGuard
         ));
 
         return $known;
+    }
+
+    /**
+     * Open a pending challenge for the account, returning its id, unless the browser is a known device of it.
+     */
+    protected function openPendingChallenge(Model&KeystoneUser $account): ?int
+    {
+        $request = $this->getRequest();
+
+        if ((new KnownDevices($account))->isKnown($account->getKey(), KnownDevices::cookieOf($request))) {
+            return null;
+        }
+
+        return (new PendingChallenges($account))->open($account->getKey(), userAgent: $request->headers->get('User-Agent'), ipAddress: $request->getClientIp());
     }
 
     /**
