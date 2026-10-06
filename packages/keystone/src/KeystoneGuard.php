@@ -360,6 +360,7 @@ class KeystoneGuard extends SessionGuard
      * Refuse to end other sessions by password; Keystone moves the credential epoch instead.
      *
      * @param  string  $password
+     * @return null
      */
     public function logoutOtherDevices(#[\SensitiveParameter] $password)
     {
