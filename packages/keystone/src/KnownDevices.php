@@ -22,7 +22,7 @@ class KnownDevices
     /**
      * How many random bytes a device cookie's value holds.
      */
-    public const int VALUE_BYTES = 32;
+    protected const int VALUE_BYTES = 32;
 
     /**
      * Create a new known devices instance on the model's connection.
@@ -38,15 +38,27 @@ class KnownDevices
      */
     public function isKnown(int|string $accountId, #[\SensitiveParameter] ?string $value): bool
     {
+        return $this->idOf($accountId, $value) !== null;
+    }
+
+    /**
+     * Get the id of the device the cookie's value marks, when the account has signed in from it within the retention.
+     *
+     * The id outlives the value, which every sign-in from the browser replaces.
+     */
+    public function idOf(int|string $accountId, #[\SensitiveParameter] ?string $value): ?int
+    {
         if ($value === null) {
-            return false;
+            return null;
         }
 
-        return $this->query()
+        $id = $this->query()
             ->where('user_id', $accountId)
             ->where('cookie_hash', static::digest($value))
             ->where('last_seen_at', '>', Date::now()->subSeconds(static::retentionSeconds()))
-            ->exists();
+            ->value('id');
+
+        return $id === null ? null : (int) $id;
     }
 
     /**

@@ -120,7 +120,7 @@ class RateLimiter
      */
     public function takeFailedAttempt(Flow $flow, CredentialType $type, (Model&KeystoneUser)|null $account, string $identifier): TakenAttempt
     {
-        $limits = $this->failedAttemptLimits($flow, $type, $this->subject($account, $identifier), $this->source($account));
+        $limits = $this->failedAttemptLimits($flow, $type, subject: $this->subject($account, $identifier), source: $this->source($account));
 
         try {
             $counts = [];
@@ -212,17 +212,17 @@ class RateLimiter
     }
 
     /**
-     * Get the source part of a failed attempt: the device cookie's digest when the browser is a known device of the account, else other.
+     * Get the source part of a failed attempt: the id of the account's known device the browser is, else other.
      */
     protected function source((Model&KeystoneUser)|null $account): string
     {
-        $cookie = KnownDevices::cookieOf($this->request);
-
-        if ($account === null || $cookie === null || ! (new KnownDevices($account))->isKnown($account->getKey(), $cookie)) {
+        if ($account === null) {
             return self::OTHER_SOURCE;
         }
 
-        return 'device:'.KnownDevices::digest($cookie);
+        $device = (new KnownDevices($account))->idOf($account->getKey(), KnownDevices::cookieOf($this->request));
+
+        return $device === null ? self::OTHER_SOURCE : "device:{$device}";
     }
 
     /**

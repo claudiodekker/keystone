@@ -561,7 +561,7 @@ describe('recovery codes', function () {
         $this->assertDatabaseCount('user_recovery_codes', 0);
     });
 
-    it('saves the staged set once a code is typed back, recording it without an alert, and signs in', function () {
+    it('saves the staged set once a code is typed back, recording it without an alert of its own, and signs in', function () {
         Notification::fake();
         $account = passChallengeOwingCodes($this);
         $codes = $this->get(route('login.recovery-codes'))->json('codes');

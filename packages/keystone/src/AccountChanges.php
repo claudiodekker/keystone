@@ -59,9 +59,11 @@ class AccountChanges
         $users = $this->guard->userModel();
         $movedAt = $users->fromDateTime(Date::now());
 
-        $users->newQueryWithoutScopes()->toBase()->increment('credential_epoch', extra: ['credential_epoch_moved_at' => $movedAt]);
+        $users->getConnection()->transaction(function () use ($users, $movedAt) {
+            $users->newQueryWithoutScopes()->toBase()->increment('credential_epoch', extra: ['credential_epoch_moved_at' => $movedAt]);
 
-        (new KnownDevices($users))->forgetAll();
+            (new KnownDevices($users))->forgetAll();
+        });
 
         $users->getConnection()->afterCommit(function () use ($operator) {
             $this->recorder->record(SecurityEventType::SESSIONS_TERMINATED, actor: Actor::OPERATOR, reason: 'keystone.every_account', operator: $operator);

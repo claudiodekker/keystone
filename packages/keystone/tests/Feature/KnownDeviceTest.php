@@ -298,6 +298,21 @@ describe('failed attempts', function () {
         $response->assertRedirect('/');
     });
 
+    it('keeps a known device\'s spent allowance spent when another account\'s sign-in hands the browser a new value', function () {
+        $jane = $this->createAccount('jane@example.com');
+        $john = $this->createAccount('john@example.com');
+        $this->arrangeCredential($jane, new FormTypeSupport, Surface::SIGN_IN);
+        $this->arrangeCredential($john, new FormTypeSupport, Surface::SIGN_IN);
+        $johnsDevice = signInOnDevice($this, null, address: 'john@example.com');
+        $sharedDevice = signInOnDevice($this, $johnsDevice, address: 'jane@example.com');
+        failOnDevice($this, $sharedDevice, '198.51.100.1', times: 4)->assertTooManyRequests();
+        $rekeyedDevice = signInOnDevice($this, $sharedDevice, address: 'john@example.com');
+
+        $response = proveOnDevice($this, $rekeyedDevice, '198.51.100.9');
+
+        $response->assertTooManyRequests();
+    });
+
     it('counts a device only another account knows with every other browser', function () {
         $jane = $this->createAccount('jane@example.com');
         $john = $this->createAccount('john@example.com');
