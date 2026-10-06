@@ -13,6 +13,7 @@ use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -84,6 +85,14 @@ function newDeviceAlerts(): int
 }
 
 /**
+ * Count the alerts sent about a reused device cookie.
+ */
+function reusedCookieAlerts(): int
+{
+    return Notification::sent(new AnonymousNotifiable, SecurityAlert::class, fn (SecurityAlert $alert) => $alert->type === SecurityEventType::DEVICE_COOKIE_REUSED)->count();
+}
+
+/**
  * Get whether each recorded sign-in came from a known device, oldest first.
  *
  * @return list<bool|null>
@@ -102,7 +111,7 @@ describe('the device cookie', function () {
         $response = $this->submitSignIn(new FormTypeSupport, 'jane@example.com', (new FormTypeSupport)->validProof(Surface::SIGN_IN));
 
         $cookie = $response->getCookie(KnownDevices::COOKIE, decrypt: false);
-        expect($cookie->getValue())->toMatch('/^[0-9a-f]{64}$/')
+        expect($cookie->getValue())->toMatch('/^[0-9a-f]{32}\.[0-9a-f]{64}$/')
             ->and($cookie->getDomain())->toBeNull()
             ->and($cookie->getPath())->toBe('/')
             ->and($cookie->isSecure())->toBeTrue()
@@ -121,6 +130,7 @@ describe('the device cookie', function () {
         $row = DB::table('user_known_devices')->sole();
         expect($row->user_id)->toEqual($account->getKey())
             ->and($row->cookie_hash)->toBe(hash('sha256', $device))
+            ->and($row->device_hash)->toBe(hash('sha256', Str::before($device, '.')))
             ->and($row->user_agent)->not->toContain('Firefox')
             ->and(Crypt::decryptString($row->user_agent))->toBe('Firefox/130.0')
             ->and(Crypt::decryptString($row->ip_address))->toBe('198.51.100.7');
@@ -187,7 +197,7 @@ describe('a sign-in', function () {
         $this->arrangeCredential($account, new FormTypeSupport, Surface::SIGN_IN);
         signInOnDevice($this, null);
 
-        signInOnDevice($this, str_repeat('a', 64));
+        signInOnDevice($this, str_repeat('a', 32).'.'.str_repeat('a', 64));
 
         expect(knownDeviceFlags())->toBe([false, false]);
     });
@@ -269,6 +279,128 @@ describe('a sign-in', function () {
         expect(knownDeviceFlags())->toBe([false, true]);
         expect(newDeviceAlerts())->toBe(1);
     });
+});
+
+describe('a reused device cookie', function () {
+    it('alerts the owner when a browser signs in with a value a later sign-in replaced', function () {
+        $account = $this->createAccount();
+        $this->arrangeCredential($account, new FormTypeSupport, Surface::SIGN_IN);
+        $copied = signInOnDevice($this, null);
+        signInOnDevice($this, $copied);
+
+        signInOnDevice($this, $copied, '198.51.100.1');
+
+        expect(reusedCookieAlerts())->toBe(1);
+        $this->assertDatabaseHas('user_security_events', ['type' => 'device_cookie.reused', 'user_id' => $account->getKey()]);
+    });
+
+    it('alerts the owner at their next sign-in however often the copy signed in first', function () {
+        $account = $this->createAccount();
+        $this->arrangeCredential($account, new FormTypeSupport, Surface::SIGN_IN);
+        $owners = signInOnDevice($this, null);
+        $copy = signInOnDevice($this, $owners, '198.51.100.1');
+        signInOnDevice($this, $copy, '198.51.100.1');
+        expect(reusedCookieAlerts())->toBe(0);
+
+        signInOnDevice($this, $owners);
+
+        expect(reusedCookieAlerts())->toBe(1);
+    });
+
+    it('knows the browser that signed in last, and alerts again when the other one comes back', function () {
+        $account = $this->createAccount();
+        $this->arrangeCredential($account, new FormTypeSupport, Surface::SIGN_IN);
+        $owners = signInOnDevice($this, null);
+        $copy = signInOnDevice($this, $owners, '198.51.100.1');
+        $owners = signInOnDevice($this, $owners);
+        SecurityEvent::query()->delete();
+
+        signInOnDevice($this, $owners);
+        signInOnDevice($this, $copy, '198.51.100.1');
+
+        expect(knownDeviceFlags())->toBe([true, false])
+            ->and(reusedCookieAlerts())->toBe(2);
+        $this->assertDatabaseCount('user_known_devices', 1);
+    });
+
+    it('alerts each account that knew the device at its own next sign-in', function () {
+        $jane = $this->createAccount('jane@example.com');
+        $john = $this->createAccount('john@example.com');
+        $this->arrangeCredential($jane, new FormTypeSupport, Surface::SIGN_IN);
+        $this->arrangeCredential($john, new FormTypeSupport, Surface::SIGN_IN);
+        $first = signInOnDevice($this, null, address: 'john@example.com');
+        $owners = signInOnDevice($this, $first, address: 'jane@example.com');
+        signInOnDevice($this, $owners, '198.51.100.1', address: 'jane@example.com');
+
+        $owners = signInOnDevice($this, $owners, address: 'john@example.com');
+        signInOnDevice($this, $owners, address: 'jane@example.com');
+
+        expect(SecurityEvent::query()->where('type', SecurityEventType::DEVICE_COOKIE_REUSED)->orderBy('id')->pluck('user_id')->all())->toEqual([$john->getKey(), $jane->getKey()]);
+    });
+
+    it('leaves an account\'s device alone when another account signs in with its device part', function () {
+        $jane = $this->createAccount('jane@example.com');
+        $mallory = $this->createAccount('mallory@example.com');
+        $this->arrangeCredential($jane, new FormTypeSupport, Surface::SIGN_IN);
+        $this->arrangeCredential($mallory, new FormTypeSupport, Surface::SIGN_IN);
+        $janes = signInOnDevice($this, null, address: 'jane@example.com');
+        $forged = Str::before($janes, '.').'.'.str_repeat('0', 64);
+        signInOnDevice($this, $forged, '198.51.100.1', address: 'mallory@example.com');
+        signInOnDevice($this, $forged, '198.51.100.1', address: 'mallory@example.com');
+        SecurityEvent::query()->where('user_id', $mallory->getKey())->delete();
+
+        signInOnDevice($this, $janes, address: 'jane@example.com');
+
+        expect(knownDeviceFlags())->toBe([false, true]);
+        $this->assertDatabaseMissing('user_security_events', ['type' => 'device_cookie.reused', 'user_id' => $jane->getKey()]);
+    });
+
+    it('takes a replaced value of a device unseen for the retention for a new device', function () {
+        $account = $this->createAccount();
+        $this->arrangeCredential($account, new FormTypeSupport, Surface::SIGN_IN);
+        $replaced = signInOnDevice($this, null);
+        signInOnDevice($this, $replaced);
+        $this->travel(config()->integer('keystone.retention.known_devices_seconds'))->seconds();
+
+        signInOnDevice($this, $replaced);
+
+        expect(reusedCookieAlerts())->toBe(0);
+    });
+
+    it('hands a browser holding a malformed value a well-formed one', function () {
+        $account = $this->createAccount();
+        $this->arrangeCredential($account, new FormTypeSupport, Surface::SIGN_IN);
+
+        $device = signInOnDevice($this, 'not-a-device-cookie.'.str_repeat('a', 64));
+
+        expect($device)->toMatch('/^[0-9a-f]{32}\.[0-9a-f]{64}$/');
+    });
+
+    it('keeps the device part of the value from one sign-in to the next', function () {
+        $account = $this->createAccount();
+        $this->arrangeCredential($account, new FormTypeSupport, Surface::SIGN_IN);
+        $first = signInOnDevice($this, null);
+
+        $second = signInOnDevice($this, $first);
+
+        expect(Str::before($second, '.'))->toBe(Str::before($first, '.'))
+            ->and(Str::after($second, '.'))->not->toBe(Str::after($first, '.'));
+        $this->assertDatabaseCount('user_known_devices', 1);
+    });
+
+    it('does not take a value it never handed out, or a malformed one, for a reused one', function (string $value) {
+        $account = $this->createAccount();
+        $this->arrangeCredential($account, new FormTypeSupport, Surface::SIGN_IN);
+        signInOnDevice($this, null);
+
+        signInOnDevice($this, $value);
+
+        expect(reusedCookieAlerts())->toBe(0)
+            ->and(knownDeviceFlags())->toBe([false, false]);
+    })->with([
+        'never handed out' => [str_repeat('a', 32).'.'.str_repeat('a', 64)],
+        'malformed' => ['not-a-device-cookie'],
+    ]);
 });
 
 describe('failed attempts', function () {

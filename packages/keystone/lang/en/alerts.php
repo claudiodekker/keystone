@@ -32,6 +32,12 @@ return [
                 'what' => 'A new way to sign in or confirm it\'s you was added to your account.',
             ],
         ],
+        'device_cookie' => [
+            'reused' => [
+                'subject' => 'A browser you sign in from may have been copied',
+                'what' => 'Your account was signed in to from a browser whose device cookie had already been replaced by a later sign-in. That happens when the cookie was copied to another browser, and rarely when a sign-in was cut off. Your account now knows only the browser that just signed in, and you will be told again if the other one signs in.',
+            ],
+        ],
         'limit' => [
             'tripped' => [
                 'subject' => 'Sign-ins to your account were paused',

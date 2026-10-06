@@ -389,12 +389,18 @@ class KeystoneGuard extends SessionGuard
 
     /**
      * Determine if the browser is a known device of the account, then hand it a fresh device cookie every account that knew it moves to.
+     *
+     * A browser holding a value that a later sign-in replaced shares its cookie with another browser, so the owner is told and the account knows only this browser from here on.
      */
     protected function recognizeDevice(Model&KeystoneUser $account): bool
     {
         $request = $this->getRequest();
         $previous = KnownDevices::cookieOf($request);
         $devices = new KnownDevices($account);
+
+        if ($previous !== null && $devices->isReused($account->getKey(), $previous)) {
+            (new SecurityEventRecorder)->record(SecurityEventType::DEVICE_COOKIE_REUSED, account: $account);
+        }
 
         $known = $devices->isKnown($account->getKey(), $previous);
         $value = $devices->remember($account->getKey(), previous: $previous, userAgent: $request->headers->get('User-Agent'), ipAddress: $request->getClientIp());

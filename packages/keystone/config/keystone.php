@@ -126,6 +126,7 @@ return [
         'account.suspended' => SecurityAlert::class,
         'account.unsuspended' => SecurityAlert::class,
         'credential.added' => SecurityAlert::class,
+        'device_cookie.reused' => SecurityAlert::class,
         'limit.tripped' => SecurityAlert::class,
         'recovery_code.used' => SecurityAlert::class,
         'recovery_codes.generated' => SecurityAlert::class,

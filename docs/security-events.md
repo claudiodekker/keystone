@@ -35,6 +35,7 @@ To keep the audit trail but drop the log line, set `keystone.log_channel` to Lar
 | `credential.added` | a credential was added to the account, such as a second factor at [enrollment](enrollment.md); alerts the account's owner |
 | `recovery_codes.generated` | a new set of recovery codes was saved; alerts the account's owner only when it replaced a set |
 | `recovery_code.used` | a [recovery code](challenge.md#recovery-codes) answered the challenge and was spent; alerts the account's owner with how many codes are left |
+| `device_cookie.reused` | a sign-in carried a [device cookie](security-alerts.md#new-devices) that a later sign-in had replaced, so two browsers held the same cookie; alerts the account's owner |
 | `limit.tripped` | a rate limit refuses its first attempt in a window; the reason names the limit (`keystone.request_limit` or `keystone.failed_attempt_limit`), and a failed-attempt trip alerts the account's owner |
 | `request.rejected` | a request to change something on a Keystone route is refused as cross-site; the reason is `keystone.cross_site` (see [Hardening](hardening.md)) |
 
