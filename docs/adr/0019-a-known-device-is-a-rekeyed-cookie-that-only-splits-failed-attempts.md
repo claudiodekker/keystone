@@ -16,5 +16,5 @@ A sign-in from a browser the account hasn't used should alert its owner, and fai
 - An operator ending an account's sessions forgets its devices, and `--all` forgets every account's, so a cookie an attacker held stops counting apart and the owner's next sign-ins alert. Other changes that end sessions, such as replacing recovery codes or suspending, keep the devices: they don't say a browser was compromised.
 - The prune is a scheduled closure rather than a queued job, so it runs without a queue worker.
 - The known-device check reads outside the account's lock, so a sign-in racing an operator's end-sessions can write its device row after the forget. Its session still dies on the epoch.
-- A sign-in whose response never reached the browser leaves it holding a replaced value, so its next sign-in alerts as reused though nothing was copied.
+- A sign-in whose response never reached the browser leaves it holding a replaced value, so its next sign-in alerts as reused though nothing was copied. Two sign-ins sent at once from one browser, such as a form submitted twice, do the same for the one handled second.
 - The sign-in that ends registration or recovery will be exempt from the alert when those flows land; until then every new device alerts.
