@@ -6,6 +6,7 @@ use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Notifications\SecurityAlert;
 use ClaudioDekker\Keystone\SecurityEvent;
+use ClaudioDekker\Keystone\SecurityEventRecorded;
 use ClaudioDekker\Keystone\SecurityEventType;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormTypeSupport;
 use Illuminate\Console\Scheduling\Event;
@@ -13,8 +14,8 @@ use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event as EventFacade;
 use Illuminate\Support\Facades\Notification;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Testing\TestResponse;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -245,6 +246,65 @@ describe('the sweep', function () {
             ->and($events->sole()->onOneServer)->toBeTrue();
     });
 
+    it('never runs while an earlier run is still going, and takes over five minutes after one that died', function () {
+        $event = collect($this->app->make(Schedule::class)->events())->sole(fn (Event $event) => $event->description === 'keystone:sweep-abandoned-challenges');
+
+        expect($event->withoutOverlapping)->toBeTrue()
+            ->and($event->expiresAt)->toBe(5);
+    });
+
+    it('deletes an account\'s rows before it turns to the next account, so a run that dies repeats one account at most', function () {
+        $this->travelTo('2026-10-06 12:00:00');
+        $this->createChallengedAccount(new FormTypeSupport('code'));
+        $john = $this->createChallengedAccount(new FormTypeSupport('code'), 'john@example.com');
+        holdFrom($this);
+        holdFrom($this, address: 'john@example.com');
+        $this->travelTo('2026-10-06 12:10:00');
+        $left = null;
+        EventFacade::listen(function (SecurityEventRecorded $recorded) use ($john, &$left) {
+            if ($recorded->event->user_id === $john->getKey()) {
+                $left = DB::table('user_pending_challenges')->pluck('user_id')->all();
+            }
+        });
+
+        $this->artisan('schedule:run')->assertSuccessful();
+
+        expect($left)->toEqual([$john->getKey()]);
+    });
+
+    it('dispatches each abandoned challenge to the app\'s listeners', function () {
+        $this->travelTo('2026-10-06 12:00:00');
+        $this->createChallengedAccount(new FormTypeSupport('code'));
+        holdFrom($this, ip: '203.0.113.1');
+        holdFrom($this, ip: '203.0.113.2');
+        $this->travelTo('2026-10-06 12:10:00');
+        $heard = [];
+        EventFacade::listen(function (SecurityEventRecorded $recorded) use (&$heard) {
+            $heard[] = [$recorded->event->type, $recorded->event->ip_address];
+        });
+
+        $this->artisan('schedule:run')->assertSuccessful();
+
+        expect($heard)->toEqual([
+            [SecurityEventType::CHALLENGE_ABANDONED, '203.0.113.1'],
+            [SecurityEventType::CHALLENGE_ABANDONED, '203.0.113.2'],
+        ]);
+    });
+
+    it('alerts the owner of an account that was soft-deleted meanwhile', function () {
+        $this->travelTo('2026-10-06 12:00:00');
+        $account = $this->createChallengedAccount(new FormTypeSupport('code'));
+        holdFrom($this);
+        DB::table($account->getTable())->where($account->getKeyName(), $account->getKey())->update(['deleted_at' => now()]);
+        $this->travelTo('2026-10-06 12:10:00');
+
+        $this->artisan('schedule:run')->assertSuccessful();
+
+        expect(abandonedChallengeEvents())->toHaveCount(1)
+            ->and(abandonedChallengeAlerts())->toHaveCount(1);
+        $this->assertDatabaseCount('user_pending_challenges', 0);
+    });
+
     it('records a challenge left for seven minutes as abandoned, alerts the owner and deletes its row', function () {
         $this->travelTo('2026-10-06 12:03:00');
         $account = $this->createChallengedAccount(new FormTypeSupport('code'));
@@ -374,13 +434,13 @@ describe('the sweep', function () {
             ->and(Crypt::decryptString(DB::table('user_pending_challenges')->sole()->ip_address))->toBe('198.51.100.9');
     });
 
-    it('deletes the rows of an account that no longer exists without an event or a mail', function () {
+    it('loses the rows of a hard-deleted account with the account, so nobody is told', function () {
         $this->travelTo('2026-10-06 12:00:00');
         $account = $this->createChallengedAccount(new FormTypeSupport('code'));
         $this->createChallengedAccount(new FormTypeSupport('code'), 'john@example.com');
         holdFrom($this);
         holdFrom($this, address: 'john@example.com');
-        Schema::withoutForeignKeyConstraints(fn () => DB::table($account->getTable())->where($account->getKeyName(), $account->getKey())->delete());
+        DB::table($account->getTable())->where($account->getKeyName(), $account->getKey())->delete();
         $this->travelTo('2026-10-06 12:10:00');
 
         $this->artisan('schedule:run')->assertSuccessful();

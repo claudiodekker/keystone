@@ -79,6 +79,7 @@ class KeystoneServiceProvider extends ServiceProvider
             $schedule->call(fn () => (new PendingChallenges(Keystone::guard()->userModel()))->sweep())
                 ->name('keystone:sweep-abandoned-challenges')
                 ->everyFiveMinutes()
+                ->withoutOverlapping(5)
                 ->onOneServer();
         });
 

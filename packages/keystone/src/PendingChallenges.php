@@ -4,9 +4,11 @@ namespace ClaudioDekker\Keystone;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
+use stdClass;
 
 /**
  * @internal
@@ -56,7 +58,7 @@ class PendingChallenges
     /**
      * Record every challenge left unanswered for the threshold as abandoned, alert each account's owner once about all of theirs, then forget them.
      *
-     * The rows go last, so a sweep that fails halfway alerts again rather than never. A row whose account is gone is forgotten without a word.
+     * An account's rows go right after its events, so a sweep that dies halfway tells one owner again rather than never.
      */
     public function sweep(SecurityEventRecorder $recorder = new SecurityEventRecorder): void
     {
@@ -72,23 +74,28 @@ class PendingChallenges
         $accounts = $this->accounts($abandoned->pluck('user_id')->unique()->all());
 
         foreach ($abandoned->groupBy('user_id') as $accountId => $challenges) {
-            $account = $accounts[$accountId] ?? null;
-
-            if ($account === null) {
-                continue;
+            if (isset($accounts[$accountId])) {
+                $recorder->recordEach(SecurityEventType::CHALLENGE_ABANDONED, $accounts[$accountId], $this->contextsOf($challenges), actor: Actor::SYSTEM);
             }
 
-            $contexts = $challenges->map(fn (object $challenge) => new RequestContext(
-                ipAddress: $this->decrypt($challenge->ip_address),
-                userAgent: $this->decrypt($challenge->user_agent),
-            ));
-
-            $recorder->recordEach(SecurityEventType::CHALLENGE_ABANDONED, $account, array_values($contexts->all()), actor: Actor::SYSTEM);
+            foreach ($challenges->pluck('id')->chunk(self::DELETE_CHUNK) as $ids) {
+                $this->query()->whereIn('id', $ids->all())->delete();
+            }
         }
+    }
 
-        foreach ($abandoned->pluck('id')->chunk(self::DELETE_CHUNK) as $ids) {
-            $this->query()->whereIn('id', $ids->all())->delete();
-        }
+    /**
+     * Get the context of the request that held each challenge.
+     *
+     * @param  Collection<int, stdClass>  $challenges
+     * @return list<RequestContext>
+     */
+    protected function contextsOf(Collection $challenges): array
+    {
+        return array_values($challenges->map(fn (stdClass $challenge) => new RequestContext(
+            ipAddress: $this->decrypt($challenge->ip_address),
+            userAgent: $this->decrypt($challenge->user_agent),
+        ))->all());
     }
 
     /**
@@ -104,7 +111,7 @@ class PendingChallenges
     }
 
     /**
-     * Encrypt a display label, keeping a missing one missing.
+     * Encrypt a user agent or an IP address, keeping a missing one missing.
      */
     protected function encrypt(?string $value): ?string
     {
@@ -112,7 +119,7 @@ class PendingChallenges
     }
 
     /**
-     * Decrypt a display label, treating one that can't be read as missing.
+     * Decrypt a user agent or an IP address, treating one that can't be read as missing.
      */
     protected function decrypt(?string $value): ?string
     {

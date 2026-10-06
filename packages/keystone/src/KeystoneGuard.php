@@ -132,7 +132,7 @@ class KeystoneGuard extends SessionGuard
             'epoch' => $this->epochOf($account),
             'held_at' => Date::now()->getTimestamp(),
             'second_factor_passed' => false,
-            'pending_challenge' => $stage === PendingStage::CHALLENGE ? $this->openPendingChallenge($account) : null,
+            'pending_challenge_id' => $stage === PendingStage::CHALLENGE ? $this->openPendingChallenge($account) : null,
         ]);
     }
 
@@ -165,7 +165,6 @@ class KeystoneGuard extends SessionGuard
             ...$held,
             'stage' => PendingStage::ENROLLMENT->value,
             'second_factor_passed' => true,
-            'pending_challenge' => null,
         ]);
     }
 
@@ -205,7 +204,7 @@ class KeystoneGuard extends SessionGuard
             heldAt: $heldAt,
             epoch: $held['epoch'],
             secondFactorPassed: $held['second_factor_passed'],
-            pendingChallenge: $held['pending_challenge'] ?? null,
+            pendingChallengeId: $held['pending_challenge_id'],
         );
     }
 

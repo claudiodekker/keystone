@@ -29,7 +29,7 @@ return [
         'challenge' => [
             'abandoned' => [
                 'subject' => 'A sign-in to your account was started but not finished',
-                'what' => 'Someone passed the first step of signing in to your account from a browser it hasn\'t signed in from recently, and didn\'t finish the second step. Nobody was signed in. If this wasn\'t you, whoever it was has what the first step asks for, such as your password, so change it.',
+                'what' => 'Someone passed the first step of signing in to your account from a browser it hasn\'t signed in from recently, and didn\'t finish the second step. Nobody was signed in, but whoever it was has what the first step asks for, such as your password.',
                 'count' => '{1} This happened once.|[2,*] This happened :count times.',
             ],
         ],

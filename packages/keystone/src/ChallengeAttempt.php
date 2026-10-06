@@ -120,16 +120,14 @@ class ChallengeAttempt extends CredentialAttempt
     }
 
     /**
-     * Sign the account in, returning whether the browser was a known device of it, or hold its pending sign-in on at the enrollment it still owes.
-     *
-     * Either way the challenge is passed, so the pending challenge its hold opened is forgotten.
+     * Move the pending sign-in past its challenge, returning whether a signed-in browser was a known device, then forget the pending challenge its hold opened.
      */
     protected function enter(PendingSignIn $pending, Demand $demand): ?bool
     {
         $knownDevice = $this->pass($pending->account, $demand);
 
-        if ($pending->pendingChallenge !== null) {
-            (new PendingChallenges($pending->account))->forget($pending->pendingChallenge);
+        if ($pending->pendingChallengeId !== null) {
+            rescue(fn () => (new PendingChallenges($pending->account))->forget($pending->pendingChallengeId));
         }
 
         return $knownDevice;

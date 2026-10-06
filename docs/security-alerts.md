@@ -10,7 +10,7 @@ Alerts are queued. Run a queue worker, or they are never sent: `queue.default` s
 |---|---|
 | `account.suspended` | an operator suspended the account (see [Operator commands](operator-commands.md#suspending-accounts)) |
 | `account.unsuspended` | an operator lifted the account's suspension |
-| `challenge.abandoned` | a sign-in from a browser that isn't one of the account's [known devices](#new-devices) passed its first factor and didn't pass the [challenge](challenge.md) within 7 minutes (see [Abandoned challenges](#abandoned-challenges)) |
+| `challenge.abandoned` | a sign-in from a browser that isn't one of the account's [known devices](#new-devices) passed its first factor and hasn't passed the [challenge](challenge.md) 7 minutes later (see [Abandoned challenges](#abandoned-challenges)) |
 | `credential.added` | a credential was added to the account, such as a second factor at [enrollment](enrollment.md) |
 | `device_cookie.reused` | a browser signed in with a [device cookie](#new-devices) that a later sign-in had already replaced, so two browsers held the same cookie |
 | `limit.tripped` | wrong answers spent one of the account's [failed-attempt counts](rate-limiting.md#locking-an-accounts-owner-out), once per count and window; a spent request limit alerts nobody |
@@ -43,7 +43,7 @@ A sign-in that passes its first factor and never answers the [challenge](challen
 
 When a sign-in is held at the challenge from a browser that isn't one of the account's known devices, Keystone writes a row to `user_pending_challenges` with the browser's user agent and IP address, both encrypted. Only passing the challenge deletes the row. Cancelling the sign-in, letting it expire or starting another one keeps it, so nobody can silence the alert by walking away. A hold from a known device writes no row.
 
-Keystone's scheduled `keystone:sweep-abandoned-challenges` task runs every five minutes, on one server, so run Laravel's scheduler. It records a `challenge.abandoned` event for each row older than 7 minutes, with the IP address and user agent of the sign-in, then deletes the rows. An account with several such rows gets one alert about all of them, which says how many there were and lists their devices and IP addresses. The 7 minutes aren't configurable.
+Keystone's scheduled `keystone:sweep-abandoned-challenges` task runs every five minutes, on one server, so run Laravel's scheduler. It records a `challenge.abandoned` event for each row at least 7 minutes old, with the IP address and user agent of the sign-in, then deletes the rows. A run never starts while an earlier one is still going. An account with several such rows gets one alert about all of them, which says how many there were and lists their devices and IP addresses. The 7 minutes aren't configurable.
 
 ## What they say
 

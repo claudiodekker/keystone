@@ -36,7 +36,7 @@ While `require_recovery_codes` is on, as it is by default, the account's last co
 
 ## Cancelling
 
-The page's cancel button (`DELETE` to `login.challenge.cancel`) drops the pending sign-in and sends the user to sign in again, reading "Sign-in cancelled. You were not logged in." Cancelling resets no rate limit.
+The page's cancel button (`DELETE` to `login.challenge.cancel`) drops the pending sign-in and sends the user to sign in again, reading "Sign-in cancelled. You were not logged in." Cancelling resets no rate limit, and doesn't stop the [abandoned-challenge alert](security-alerts.md#abandoned-challenges) a sign-in from an unknown browser sends.
 
 ## Changing the responses
 

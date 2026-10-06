@@ -341,9 +341,9 @@ abstract class AppTestCase extends TestCase
      */
     public function sweepAbandonedChallenges(): void
     {
-        $events = collect($this->app->make(Schedule::class)->events());
-
-        $events->sole(fn (Event $event) => $event->description === 'keystone:sweep-abandoned-challenges')->run($this->app);
+        collect($this->app->make(Schedule::class)->events())
+            ->sole(fn (Event $event) => $event->description === 'keystone:sweep-abandoned-challenges')
+            ->run($this->app);
     }
 
     /**

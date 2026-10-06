@@ -93,7 +93,7 @@ class SecurityEventRecorder
      *
      * @param  list<RequestContext>  $contexts  the context of the request that caused each event
      */
-    public function recordEach(SecurityEventType $type, Model&KeystoneUser $account, array $contexts, Actor $actor = Actor::USER): void
+    public function recordEach(SecurityEventType $type, Model&KeystoneUser $account, array $contexts, Actor $actor): void
     {
         if (! $this->enabled()) {
             return;
