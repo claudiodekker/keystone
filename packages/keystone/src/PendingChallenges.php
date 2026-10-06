@@ -19,6 +19,11 @@ class PendingChallenges
     public const int ABANDONED_AFTER_SECONDS = 420;
 
     /**
+     * The most swept rows one query deletes.
+     */
+    protected const int DELETE_CHUNK = 1000;
+
+    /**
      * Create a new pending challenges instance on the model's connection.
      */
     public function __construct(
@@ -49,11 +54,69 @@ class PendingChallenges
     }
 
     /**
+     * Record every challenge left unanswered for the threshold as abandoned, alert each account's owner once about all of theirs, then forget them.
+     *
+     * The rows go last, so a sweep that fails halfway alerts again rather than never. A row whose account is gone is forgotten without a word.
+     */
+    public function sweep(SecurityEventRecorder $recorder = new SecurityEventRecorder): void
+    {
+        $abandoned = $this->query()
+            ->where('created_at', '<=', Date::now()->subSeconds(self::ABANDONED_AFTER_SECONDS))
+            ->orderBy('id')
+            ->get();
+
+        if ($abandoned->isEmpty()) {
+            return;
+        }
+
+        $accounts = $this->accounts($abandoned->pluck('user_id')->unique()->all());
+
+        foreach ($abandoned->groupBy('user_id') as $accountId => $challenges) {
+            $account = $accounts[$accountId] ?? null;
+
+            if ($account === null) {
+                continue;
+            }
+
+            $contexts = $challenges->map(fn (object $challenge) => new RequestContext(
+                ipAddress: $this->decrypt($challenge->ip_address),
+                userAgent: $this->decrypt($challenge->user_agent),
+            ));
+
+            $recorder->recordEach(SecurityEventType::CHALLENGE_ABANDONED, $account, array_values($contexts->all()), actor: Actor::SYSTEM);
+        }
+
+        foreach ($abandoned->pluck('id')->chunk(self::DELETE_CHUNK) as $ids) {
+            $this->query()->whereIn('id', $ids->all())->delete();
+        }
+    }
+
+    /**
+     * Read the accounts with the ids in one query, keyed by id, bypassing every global scope.
+     *
+     * @param  array<array-key, mixed>  $ids
+     * @return array<array-key, Model&KeystoneUser>
+     */
+    protected function accounts(array $ids): array
+    {
+        /** @var array<array-key, Model&KeystoneUser> */
+        return $this->model->newQueryWithoutScopes()->whereKey($ids)->get()->getDictionary();
+    }
+
+    /**
      * Encrypt a display label, keeping a missing one missing.
      */
     protected function encrypt(?string $value): ?string
     {
         return $value === null ? null : Crypt::encryptString($value);
+    }
+
+    /**
+     * Decrypt a display label, treating one that can't be read as missing.
+     */
+    protected function decrypt(?string $value): ?string
+    {
+        return $value === null ? null : rescue(fn () => Crypt::decryptString($value));
     }
 
     /**

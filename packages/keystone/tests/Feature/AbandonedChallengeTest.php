@@ -1,12 +1,20 @@
 <?php
 
+use ClaudioDekker\Keystone\Actor;
 use ClaudioDekker\Keystone\AppTests\AppTestCase;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
+use ClaudioDekker\Keystone\Notifications\SecurityAlert;
+use ClaudioDekker\Keystone\SecurityEvent;
+use ClaudioDekker\Keystone\SecurityEventType;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormTypeSupport;
+use Illuminate\Console\Scheduling\Event;
+use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Testing\TestResponse;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -41,6 +49,36 @@ function holdFrom(AppTestCase $test, ?string $device = null, string $ip = '203.0
 function answerChallenge(AppTestCase $test): TestResponse
 {
     return $test->post(route('login.challenge.submit', ['type' => 'code']), (new FormTypeSupport('code'))->validProof(Surface::CHALLENGE));
+}
+
+/**
+ * Get the abandoned-challenge alerts sent, as the address each went to with its alert, in the order sent.
+ *
+ * @return list<array{string, SecurityAlert}>
+ */
+function abandonedChallengeAlerts(): array
+{
+    $sent = [];
+
+    Notification::sent(new AnonymousNotifiable, SecurityAlert::class, function (SecurityAlert $alert, array $channels, AnonymousNotifiable $notifiable) use (&$sent) {
+        if ($alert->type === SecurityEventType::CHALLENGE_ABANDONED) {
+            $sent[] = [$notifiable->routes['mail'], $alert];
+        }
+
+        return true;
+    });
+
+    return $sent;
+}
+
+/**
+ * Get the recorded abandoned challenges, oldest first.
+ *
+ * @return list<SecurityEvent>
+ */
+function abandonedChallengeEvents(): array
+{
+    return SecurityEvent::query()->where('type', SecurityEventType::CHALLENGE_ABANDONED)->orderBy('id')->get()->all();
 }
 
 describe('a hold at the challenge', function () {
@@ -195,5 +233,188 @@ describe('the pending challenge', function () {
 
         $this->assertAuthenticatedAs($john);
         expect(DB::table('user_pending_challenges')->pluck('user_id')->all())->toEqual([$jane->getKey()]);
+    });
+});
+
+describe('the sweep', function () {
+    it('is scheduled once by core, every five minutes on one server', function () {
+        $events = collect($this->app->make(Schedule::class)->events())->filter(fn (Event $event) => $event->description === 'keystone:sweep-abandoned-challenges');
+
+        expect($events)->toHaveCount(1)
+            ->and($events->sole()->expression)->toBe('*/5 * * * *')
+            ->and($events->sole()->onOneServer)->toBeTrue();
+    });
+
+    it('records a challenge left for seven minutes as abandoned, alerts the owner and deletes its row', function () {
+        $this->travelTo('2026-10-06 12:03:00');
+        $account = $this->createChallengedAccount(new FormTypeSupport('code'));
+        holdFrom($this, ip: '203.0.113.7', userAgent: FIREFOX_ON_WINDOWS);
+        $this->travelTo('2026-10-06 12:10:00');
+
+        $this->artisan('schedule:run')->assertSuccessful();
+
+        $event = SecurityEvent::query()->where('type', SecurityEventType::CHALLENGE_ABANDONED)->sole();
+        expect($event->only(['user_id', 'actor', 'ip_address', 'user_agent', 'request_id', 'known_device']))->toEqual([
+            'user_id' => $account->getKey(),
+            'actor' => Actor::SYSTEM,
+            'ip_address' => '203.0.113.7',
+            'user_agent' => FIREFOX_ON_WINDOWS,
+            'request_id' => null,
+            'known_device' => null,
+        ])->and($event->occurred_at->toDateTimeString())->toBe('2026-10-06 12:10:00');
+        expect(abandonedChallengeAlerts())->toHaveCount(1)
+            ->and(abandonedChallengeAlerts()[0][0])->toBe('jane@example.com');
+        $this->assertDatabaseCount('user_pending_challenges', 0);
+    });
+
+    it('leaves a challenge left for a second under seven minutes alone', function () {
+        $this->travelTo('2026-10-06 12:03:01');
+        $this->createChallengedAccount(new FormTypeSupport('code'));
+        holdFrom($this);
+        $this->travelTo('2026-10-06 12:10:00');
+
+        $this->artisan('schedule:run')->assertSuccessful();
+
+        expect(abandonedChallengeEvents())->toBeEmpty()
+            ->and(abandonedChallengeAlerts())->toBeEmpty();
+        $this->assertDatabaseCount('user_pending_challenges', 1);
+    });
+
+    it('never alerts about a challenge passed before it ran', function () {
+        $this->travelTo('2026-10-06 12:00:00');
+        $this->createChallengedAccount(new FormTypeSupport('code'));
+        holdFrom($this);
+        $this->travelTo('2026-10-06 12:06:59');
+        answerChallenge($this)->assertRedirect('/');
+        $this->travelTo('2026-10-06 12:10:00');
+
+        $this->artisan('schedule:run')->assertSuccessful();
+
+        expect(abandonedChallengeEvents())->toBeEmpty()
+            ->and(abandonedChallengeAlerts())->toBeEmpty();
+    });
+
+    it('alerts about a challenge that was cancelled', function () {
+        $this->travelTo('2026-10-06 12:00:00');
+        $this->createChallengedAccount(new FormTypeSupport('code'));
+        holdFrom($this);
+        $this->delete(route('login.challenge.cancel'));
+        $this->travelTo('2026-10-06 12:10:00');
+
+        $this->artisan('schedule:run')->assertSuccessful();
+
+        expect(abandonedChallengeEvents())->toHaveCount(1)
+            ->and(abandonedChallengeAlerts())->toHaveCount(1);
+    });
+
+    it('alerts nobody about a challenge held from a known device', function () {
+        $this->travelTo('2026-10-06 12:00:00');
+        $this->createChallengedAccount(new FormTypeSupport('code'));
+        holdFrom($this);
+        $device = $this->deviceCookieOf(answerChallenge($this));
+        $this->post(route('logout'));
+        holdFrom($this, $device);
+        $this->travelTo('2026-10-06 12:10:00');
+
+        $this->artisan('schedule:run')->assertSuccessful();
+
+        expect(abandonedChallengeEvents())->toBeEmpty()
+            ->and(abandonedChallengeAlerts())->toBeEmpty();
+    });
+
+    it('records each of an account\'s abandoned challenges and sends each recipient one alert about them all', function () {
+        $this->travelTo('2026-10-06 12:00:00');
+        $account = $this->createChallengedAccount(new FormTypeSupport('code'));
+        $this->holdAddress($account, 'work@example.com');
+        holdFrom($this, ip: '203.0.113.7', userAgent: FIREFOX_ON_WINDOWS);
+        holdFrom($this, ip: '198.51.100.9', userAgent: CHROME_ON_MAC);
+        holdFrom($this, ip: '198.51.100.9', userAgent: CHROME_ON_MAC);
+        $this->travelTo('2026-10-06 12:10:00');
+
+        $this->artisan('schedule:run')->assertSuccessful();
+
+        $alerts = abandonedChallengeAlerts();
+        expect(array_map(fn (SecurityEvent $event) => $event->ip_address, abandonedChallengeEvents()))->toBe(['203.0.113.7', '198.51.100.9', '198.51.100.9'])
+            ->and(array_column($alerts, 0))->toBe(['jane@example.com', 'work@example.com'])
+            ->and($alerts[0][1]->count)->toBe(3)
+            ->and($alerts[0][1]->ipAddresses)->toBe(['203.0.113.7', '198.51.100.9'])
+            ->and($alerts[0][1]->devices)->toBe(['Firefox on Windows', 'Chrome on Mac']);
+        $this->assertDatabaseCount('user_pending_challenges', 0);
+    });
+
+    it('sends each account its own alert about its own challenges', function () {
+        $this->travelTo('2026-10-06 12:00:00');
+        $this->createChallengedAccount(new FormTypeSupport('code'));
+        $this->createChallengedAccount(new FormTypeSupport('code'), 'john@example.com');
+        holdFrom($this, ip: '203.0.113.7');
+        holdFrom($this, ip: '198.51.100.9', address: 'john@example.com');
+        $this->travelTo('2026-10-06 12:10:00');
+
+        $this->artisan('schedule:run')->assertSuccessful();
+
+        $alerts = abandonedChallengeAlerts();
+        expect(array_map(fn (array $sent) => [$sent[0], $sent[1]->count, $sent[1]->ipAddresses], $alerts))->toBe([
+            ['jane@example.com', 1, ['203.0.113.7']],
+            ['john@example.com', 1, ['198.51.100.9']],
+        ]);
+    });
+
+    it('sweeps only the challenges that are old enough, leaving an account\'s newer one for a later run', function () {
+        $this->travelTo('2026-10-06 12:00:00');
+        $this->createChallengedAccount(new FormTypeSupport('code'));
+        holdFrom($this, ip: '203.0.113.7');
+        $this->travelTo('2026-10-06 12:05:00');
+        holdFrom($this, ip: '198.51.100.9');
+        $this->travelTo('2026-10-06 12:10:00');
+
+        $this->artisan('schedule:run')->assertSuccessful();
+
+        expect(abandonedChallengeAlerts())->toHaveCount(1)
+            ->and(abandonedChallengeAlerts()[0][1]->ipAddresses)->toBe(['203.0.113.7'])
+            ->and(Crypt::decryptString(DB::table('user_pending_challenges')->sole()->ip_address))->toBe('198.51.100.9');
+    });
+
+    it('deletes the rows of an account that no longer exists without an event or a mail', function () {
+        $this->travelTo('2026-10-06 12:00:00');
+        $account = $this->createChallengedAccount(new FormTypeSupport('code'));
+        $this->createChallengedAccount(new FormTypeSupport('code'), 'john@example.com');
+        holdFrom($this);
+        holdFrom($this, address: 'john@example.com');
+        Schema::withoutForeignKeyConstraints(fn () => DB::table($account->getTable())->where($account->getKeyName(), $account->getKey())->delete());
+        $this->travelTo('2026-10-06 12:10:00');
+
+        $this->artisan('schedule:run')->assertSuccessful();
+
+        expect(abandonedChallengeEvents())->toHaveCount(1)
+            ->and(array_column(abandonedChallengeAlerts(), 0))->toBe(['john@example.com']);
+        $this->assertDatabaseCount('user_pending_challenges', 0);
+    });
+
+    it('still records the events and deletes the rows when the alert is silenced', function () {
+        config(['keystone.notifications' => [...config('keystone.notifications'), 'challenge.abandoned' => null]]);
+        $this->travelTo('2026-10-06 12:00:00');
+        $this->createChallengedAccount(new FormTypeSupport('code'));
+        holdFrom($this);
+        $this->travelTo('2026-10-06 12:10:00');
+
+        $this->artisan('schedule:run')->assertSuccessful();
+
+        expect(abandonedChallengeEvents())->toHaveCount(1)
+            ->and(abandonedChallengeAlerts())->toBeEmpty();
+        $this->assertDatabaseCount('user_pending_challenges', 0);
+    });
+
+    it('alerts once about a challenge, however often it runs', function () {
+        $this->travelTo('2026-10-06 12:00:00');
+        $this->createChallengedAccount(new FormTypeSupport('code'));
+        holdFrom($this);
+        $this->travelTo('2026-10-06 12:10:00');
+        $this->artisan('schedule:run')->assertSuccessful();
+        $this->travelTo('2026-10-06 12:15:00');
+
+        $this->artisan('schedule:run')->assertSuccessful();
+
+        expect(abandonedChallengeEvents())->toHaveCount(1)
+            ->and(abandonedChallengeAlerts())->toHaveCount(1);
     });
 });

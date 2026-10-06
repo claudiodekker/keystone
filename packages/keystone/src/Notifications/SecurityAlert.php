@@ -34,6 +34,7 @@ class SecurityAlert extends Notification implements SecurityEventAlertContract, 
     protected const array TYPES = [
         SecurityEventType::ACCOUNT_SUSPENDED,
         SecurityEventType::ACCOUNT_UNSUSPENDED,
+        SecurityEventType::CHALLENGE_ABANDONED,
         SecurityEventType::CREDENTIAL_ADDED,
         SecurityEventType::DEVICE_COOKIE_REUSED,
         SecurityEventType::LIMIT_TRIPPED,
@@ -44,24 +45,33 @@ class SecurityAlert extends Notification implements SecurityEventAlertContract, 
     ];
 
     /**
-     * The type of the event the alert is about.
+     * The type of the events the alert is about.
      */
     public SecurityEventType $type;
 
     /**
-     * When the event occurred.
+     * How many events the alert is about.
+     */
+    public int $count;
+
+    /**
+     * When the first event occurred.
      */
     public CarbonImmutable $occurredAt;
 
     /**
-     * The IP address of the request that caused the event.
+     * The distinct IP addresses of the requests that caused the events, with null for an unknown one.
+     *
+     * @var list<string|null>
      */
-    public ?string $ipAddress;
+    public array $ipAddresses;
 
     /**
-     * The label of the device that caused the event, never its raw user agent.
+     * The distinct labels of the devices that caused the events, never their raw user agents, with null for an unknown one.
+     *
+     * @var list<string|null>
      */
-    public ?string $device;
+    public array $devices;
 
     /**
      * The type of the credential involved; never its label, which its owner typed.
@@ -76,12 +86,15 @@ class SecurityAlert extends Notification implements SecurityEventAlertContract, 
     /**
      * Create a new notification instance.
      */
-    public function __construct(SecurityEvent $event)
+    public function __construct(SecurityEvent $event, SecurityEvent ...$others)
     {
+        $events = [$event, ...array_values($others)];
+
         $this->type = $event->type;
+        $this->count = count($events);
         $this->occurredAt = $event->occurred_at;
-        $this->ipAddress = $event->ip_address;
-        $this->device = $this->describe($event->user_agent);
+        $this->ipAddresses = $this->distinct(array_map(fn (SecurityEvent $event) => $event->ip_address, $events));
+        $this->devices = $this->distinct(array_map(fn (SecurityEvent $event) => $this->describe($event->user_agent), $events));
         $this->credentialType = $event->credential_type;
         $this->remainingRecoveryCodes = $this->countRemainingRecoveryCodes($event);
     }
@@ -117,25 +130,51 @@ class SecurityAlert extends Notification implements SecurityEventAlertContract, 
                 'subject' => $subject,
                 'what' => "keystone::alerts.{$this->type->value}",
                 'occurredAt' => $this->occurredAt->utc()->format(self::TIME_FORMAT),
-                'ipAddress' => $this->ipAddress ?? __('keystone::alerts.unknown'),
+                'count' => $this->count,
+                'ipAddress' => $this->listed($this->ipAddresses, unknown: __('keystone::alerts.unknown')),
                 'location' => $this->locate(),
-                'device' => $this->device ?? __('keystone::alerts.unknown_device'),
+                'device' => $this->listed($this->devices, unknown: __('keystone::alerts.unknown_device')),
                 'credential' => $this->credentialType,
                 'remainingRecoveryCodes' => $this->remainingRecoveryCodes,
             ]);
     }
 
     /**
+     * Get the values without repeats, in the order they first appear.
+     *
+     * @param  list<string|null>  $values
+     * @return list<string|null>
+     */
+    protected function distinct(array $values): array
+    {
+        return array_values(array_unique($values));
+    }
+
+    /**
+     * List the values in one line, naming an unknown one.
+     *
+     * @param  list<string|null>  $values
+     */
+    protected function listed(array $values, string $unknown): string
+    {
+        return implode(', ', array_map(fn (?string $value) => $value ?? $unknown, $values));
+    }
+
+    /**
      * Name where the IP address is through the IP-location port, on the worker, so no request waits on the lookup.
+     *
+     * An alert about several IP addresses names no place.
      */
     protected function locate(): ?string
     {
-        if ($this->ipAddress === null) {
+        $ipAddress = $this->ipAddresses[0] ?? null;
+
+        if ($ipAddress === null || count($this->ipAddresses) > 1) {
             return null;
         }
 
         try {
-            return app(IpLocation::class)->locate($this->ipAddress);
+            return app(IpLocation::class)->locate($ipAddress);
         } catch (Throwable $e) {
             report($e);
 

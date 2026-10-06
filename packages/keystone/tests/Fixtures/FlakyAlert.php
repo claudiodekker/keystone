@@ -12,7 +12,7 @@ class FlakyAlert extends Notification implements SecurityEventAlertContract
 {
     public static array $delivered = [];
 
-    public function __construct(public SecurityEvent $event)
+    public function __construct(public SecurityEvent $event, SecurityEvent ...$others)
     {
         static::$delivered = [];
     }

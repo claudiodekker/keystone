@@ -171,3 +171,53 @@ it('escapes every value, and carries no links', function () {
     expect($mail)->toContain('&lt;a href=&quot;https://evil.test&quot;&gt;Amsterdam&lt;/a&gt;', '&lt;b&gt;Windows&lt;/b&gt;')
         ->not->toContain('<a ', '<b>', 'href="');
 });
+
+function renderedDigest(SecurityEvent ...$events): string
+{
+    $notifiable = (new AnonymousNotifiable)->route('mail', 'jane@example.com');
+
+    return (string) (new SecurityAlert(...$events))->toMail($notifiable)->render();
+}
+
+it('says how many abandoned challenges it is about', function (int $count) {
+    $events = array_fill(0, $count, alertEvent(['type' => SecurityEventType::CHALLENGE_ABANDONED]));
+
+    $mail = renderedDigest(...$events);
+
+    expect($mail)->toContain(e(trans_choice('keystone::alerts.types.challenge.abandoned.count', $count)))
+        ->and(trans_choice('keystone::alerts.types.challenge.abandoned.count', $count))->toContain($count === 1 ? 'once' : "{$count} times");
+})->with(['one' => [1], 'several' => [3]]);
+
+it('lists each IP address and each device of the events it is about once, and names no place for several addresses', function () {
+    app()->instance(IpLocation::class, Mockery::mock(IpLocation::class)->shouldNotReceive('locate')->getMock());
+    app()->instance(SessionInfo::class, new class implements SessionInfo
+    {
+        public function describe(string $userAgent): ?Device
+        {
+            return str_starts_with($userAgent, 'Mozilla') ? new Device(platform: 'Windows', browser: 'Firefox') : null;
+        }
+    });
+
+    $mail = renderedDigest(
+        alertEvent(['type' => SecurityEventType::CHALLENGE_ABANDONED, 'ip_address' => '203.0.113.7']),
+        alertEvent(['type' => SecurityEventType::CHALLENGE_ABANDONED, 'ip_address' => '198.51.100.9', 'user_agent' => 'curl/8.0']),
+        alertEvent(['type' => SecurityEventType::CHALLENGE_ABANDONED, 'ip_address' => '203.0.113.7']),
+        alertEvent(['type' => SecurityEventType::CHALLENGE_ABANDONED, 'ip_address' => null]),
+    );
+
+    expect($mail)->toContain(
+        e('203.0.113.7, 198.51.100.9, '.__('keystone::alerts.unknown')),
+        e(__('keystone::alerts.device', ['browser' => 'Firefox', 'platform' => 'Windows']).', '.__('keystone::alerts.unknown_device')),
+    )->not->toContain('Mozilla/5.0', 'curl', e(__('keystone::alerts.fields.location')));
+});
+
+it('names the place of several events from one IP address', function () {
+    locatingAs('Amsterdam, Netherlands');
+
+    $mail = renderedDigest(
+        alertEvent(['type' => SecurityEventType::CHALLENGE_ABANDONED]),
+        alertEvent(['type' => SecurityEventType::CHALLENGE_ABANDONED]),
+    );
+
+    expect($mail)->toContain('Amsterdam, Netherlands');
+});

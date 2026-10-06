@@ -77,6 +77,7 @@ class SecurityEventRecorder
                 reason: $reason,
                 operator: $operator,
                 knownDevice: $knownDevice,
+                context: $this->context(),
             );
         } catch (Throwable $e) {
             report($e);
@@ -84,12 +85,64 @@ class SecurityEventRecorder
             return;
         }
 
-        $recorded = new SecurityEventRecorded($event);
+        $this->publish([$event], $account, $recipients, $alert);
+    }
 
-        $this->rescue(fn () => $this->log($event));
-        $this->rescue(fn () => $this->append($event, $account));
-        $this->rescue(fn () => $this->alert($event, $account, $recipients, $alert));
-        $this->rescue(fn () => event($recorded));
+    /**
+     * Record one event of the type about the account for each request context, alerting its owner once about all of them.
+     *
+     * @param  list<RequestContext>  $contexts  the context of the request that caused each event
+     */
+    public function recordEach(SecurityEventType $type, Model&KeystoneUser $account, array $contexts, Actor $actor = Actor::USER): void
+    {
+        if (! $this->enabled()) {
+            return;
+        }
+
+        $events = [];
+
+        foreach ($contexts as $context) {
+            $this->rescue(function () use (&$events, $type, $account, $actor, $context) {
+                $events[] = $this->entry(
+                    type: $type,
+                    account: $account,
+                    actor: $actor,
+                    flow: null,
+                    credentialType: null,
+                    credential: null,
+                    reason: null,
+                    operator: null,
+                    knownDevice: null,
+                    context: $context,
+                );
+            });
+        }
+
+        if ($events === []) {
+            return;
+        }
+
+        $this->publish($events, $account, recipients: null, alert: true);
+    }
+
+    /**
+     * Log each event and append it to the account's trail, alert the owner once about them all, then dispatch each, every step rescued on its own.
+     *
+     * @param  non-empty-list<SecurityEvent>  $events  events of one type about the one account
+     * @param  list<string>|null  $recipients
+     */
+    protected function publish(array $events, (Model&KeystoneUser)|null $account, ?array $recipients, bool $alert): void
+    {
+        foreach ($events as $event) {
+            $this->rescue(fn () => $this->log($event));
+            $this->rescue(fn () => $this->append($event, $account));
+        }
+
+        $this->rescue(fn () => $this->alert($events, $account, $recipients, $alert));
+
+        foreach ($events as $event) {
+            $this->rescue(fn () => event(new SecurityEventRecorded($event)));
+        }
     }
 
     /**
@@ -101,7 +154,7 @@ class SecurityEventRecorder
     }
 
     /**
-     * Build the entry from the facts and the request's context.
+     * Build the entry from the facts and the context of the request that caused it.
      */
     protected function entry(
         SecurityEventType $type,
@@ -113,8 +166,8 @@ class SecurityEventRecorder
         ?string $reason,
         ?string $operator,
         ?bool $knownDevice,
+        RequestContext $context,
     ): SecurityEvent {
-        $context = $this->context();
         $userAgent = $this->clean($context->userAgent, self::USER_AGENT_LENGTH);
         $label = $this->clean($credential?->label, self::FIELD_LENGTH);
         $keptReason = $this->reason($reason, $credentialType);
@@ -258,20 +311,21 @@ class SecurityEventRecorder
     }
 
     /**
-     * Queue the type's alert to each of the account's recipients, one mail each, unless suppressed, about a known device, or its slot is null.
+     * Queue the type's one alert about the events to each of the account's recipients, one mail each, unless suppressed, about a known device, or its slot is null.
      *
+     * @param  non-empty-list<SecurityEvent>  $events
      * @param  list<string>|null  $recipients
      */
-    protected function alert(SecurityEvent $event, (Model&KeystoneUser)|null $account, ?array $recipients, bool $alert): void
+    protected function alert(array $events, (Model&KeystoneUser)|null $account, ?array $recipients, bool $alert): void
     {
-        $slot = $this->slot($event->type);
+        $slot = $this->slot($events[0]->type);
 
-        if (! $alert || $event->known_device === true || $account === null || $slot === null) {
+        if (! $alert || $events[0]->known_device === true || $account === null || $slot === null) {
             return;
         }
 
         $recipients ??= (new Addresses($account))->recipientsOf($account);
-        $notification = new $slot($event);
+        $notification = new $slot(...$events);
 
         foreach ($recipients as $address) {
             $this->rescue(fn () => (new AnonymousNotifiable)->route('mail', $address)->notify($notification));

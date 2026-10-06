@@ -17,6 +17,8 @@ use ClaudioDekker\Keystone\RecoveryCodes;
 use ClaudioDekker\Keystone\SignInDecision;
 use Closure;
 use Illuminate\Cache\RateLimiter as CacheRateLimiter;
+use Illuminate\Console\Scheduling\Event;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
@@ -332,6 +334,16 @@ abstract class AppTestCase extends TestCase
         $support = $this->supportsFor(Surface::SIGN_IN)[0];
 
         return $this->submitSignIn($support, $address, $support->validProof(Surface::SIGN_IN));
+    }
+
+    /**
+     * Run the sweep of abandoned challenges that core schedules, and nothing else on the app's schedule.
+     */
+    public function sweepAbandonedChallenges(): void
+    {
+        $events = collect($this->app->make(Schedule::class)->events());
+
+        $events->sole(fn (Event $event) => $event->description === 'keystone:sweep-abandoned-challenges')->run($this->app);
     }
 
     /**
