@@ -12,6 +12,7 @@ export type SignInPage = {
     types: CredentialTypeOption[];
     status: string | null;
     identifier: string | null;
+    rememberOffered: boolean;
 };
 
 export type ChallengePage = {

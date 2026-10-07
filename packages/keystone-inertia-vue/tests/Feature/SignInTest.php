@@ -17,6 +17,14 @@ it('renders the sign-in page with the page value\'s fields', function () {
         ->where('status', null));
 });
 
+it('tells the sign-in page whether to offer remember-me', function (int $lifetimeSeconds, bool $offered) {
+    config(['keystone.remember.lifetime_seconds' => $lifetimeSeconds]);
+
+    $response = $this->get(route('login'));
+
+    $response->assertInertia(fn (AssertableInertia $page) => $page->component('auth/Login')->where('rememberOffered', $offered));
+})->with(['on' => [2592000, true], 'off' => [0, false]]);
+
 it('renders the sign-in page with no identifier when nothing was refused', function () {
     $response = $this->get(route('login'));
 
