@@ -3,7 +3,7 @@
 - Build test-first (`/mattpocock-skills:tdd`): write the failing feature test that drives the real entry point (a request, a command, a job), then the code. Add a unit test only to pin behaviour that must never change, or to cover complex internal code that many public paths share.
 - No documentation beyond `GLOSSARY.md`, ADRs, `docs/agents/` and the user docs in `docs/`. A PR that changes behaviour updates its user docs page. No docblocks that restate types, no README prose.
 - `.scratch/` holds research that fed past decisions. Don't read it unless a decision (spec, ticket, ADR) lacks the specifics you need.
-- Boost MCP tools and guardrails: @docs/agents/laravel.md
+- Guardrails: @docs/agents/laravel.md
 
 ## Opening PRs
 
