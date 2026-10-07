@@ -75,6 +75,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Sudo
+    |--------------------------------------------------------------------------
+    |
+    | How long a session keeps the sudo that its sign-in brought, a grant
+    | it needs to change how the account signs in. It counts from the
+    | sign-in and nothing extends it. It must be at least 1 second.
+    |
+    */
+
+    'sudo' => [
+        'lifetime_seconds' => 900,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Rate Limits
     |--------------------------------------------------------------------------
     |

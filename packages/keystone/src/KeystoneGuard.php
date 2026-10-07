@@ -107,6 +107,8 @@ class KeystoneGuard extends SessionGuard
 
         $this->startSignedInSession($user, $this->remember($user, $rememberMe));
 
+        $this->bringSudo($user);
+
         $this->fireLoginEvent($user);
 
         $this->setUser($user);
@@ -288,6 +290,45 @@ class KeystoneGuard extends SessionGuard
         $timestamp = $this->session->get($this->signedInAtKey());
 
         return is_int($timestamp) ? Date::createFromTimestamp($timestamp) : null;
+    }
+
+    /**
+     * Get the subnet the request comes from, or null when its IP address can't be parsed.
+     */
+    public function subnet(): ?Subnet
+    {
+        return Subnet::of($this->getRequest()->getClientIp());
+    }
+
+    /**
+     * Get the session's live sudo grant, forgetting one that outlived keystone.sudo.lifetime_seconds or has no believable time to count it from.
+     */
+    public function sudoGrant(): ?SudoGrant
+    {
+        $held = $this->session->get($this->sudoKey());
+
+        if (! is_array($held)) {
+            return null;
+        }
+
+        $grantedAt = CarbonImmutable::createFromTimestamp($held['granted_at']);
+        $endsAt = $grantedAt->addSeconds(config()->integer('keystone.sudo.lifetime_seconds'));
+
+        if ($grantedAt->isFuture() || $endsAt->lessThanOrEqualTo(Date::now())) {
+            $this->session->forget($this->sudoKey());
+
+            return null;
+        }
+
+        return new SudoGrant($endsAt, new Subnet($held['subnet']));
+    }
+
+    /**
+     * End sudo, dropping the session's grant on a new session id. Safe to call without one.
+     */
+    public function endSudo(): void
+    {
+        $this->changeAuthLevel();
     }
 
     /**
@@ -574,6 +615,37 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
+     * Grant the session that just signed in its sudo and record it, unless the address it signed in from can't be parsed.
+     */
+    protected function bringSudo(Model&KeystoneUser $account): void
+    {
+        $subnet = $this->subnet();
+
+        if (is_null($subnet)) {
+            return;
+        }
+
+        $this->stampSudo($subnet);
+
+        (new SecurityEventRecorder)->record(
+            SecurityEventType::SUDO_GRANTED,
+            account: $account,
+            reason: 'keystone.sign_in',
+        );
+    }
+
+    /**
+     * Write a sudo grant from now, bound to the subnet.
+     */
+    protected function stampSudo(Subnet $subnet): void
+    {
+        $this->session->put($this->sudoKey(), [
+            'granted_at' => Date::now()->getTimestamp(),
+            'subnet' => $subnet->cidr,
+        ]);
+    }
+
+    /**
      * Hand the session's remember token a new value on the epoch its account moved to, so a copy of the old value dies with every other session.
      */
     protected function reissueRememberCookie(Model&KeystoneUser $account, int $movedFrom): void
@@ -795,13 +867,15 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Rotate the session id and close every ceremony slot, as every change of auth level does.
+     * Rotate the session id, close every ceremony slot and drop sudo, as every change of auth level does.
      */
     protected function changeAuthLevel(): void
     {
         $this->rotate();
 
         $this->slots()->flush();
+
+        $this->session->forget($this->sudoKey());
     }
 
     /**
@@ -842,5 +916,13 @@ class KeystoneGuard extends SessionGuard
     protected function signedInAtKey(): string
     {
         return 'keystone_signed_in_at_'.$this->name;
+    }
+
+    /**
+     * Get the session key holding the sudo grant.
+     */
+    protected function sudoKey(): string
+    {
+        return 'keystone_sudo_'.$this->name;
     }
 }

@@ -17,6 +17,7 @@ Your `config/keystone.php` is merged over Keystone's, key by key. A setting that
 | `require_recovery_codes` | `true` | `false` lets an account go without recovery codes, and lets the last one answer the challenge, so an account can be left with none for account recovery. See [Enrollment](enrollment.md) and [Recovery codes](challenge.md#recovery-codes). |
 | `session.absolute_lifetime_seconds` | `43200` (12 hours) | A stolen session that is kept busy stays signed in longer. `null` lets it live forever. See [Session lifetime](#session-lifetime). |
 | `remember.lifetime_seconds` | `2592000` (30 days) | A stolen remember-me cookie signs its holder in for longer. `0` turns remember-me off. See [Remember me](remember-me.md#the-lifetime). |
+| `sudo.lifetime_seconds` | `900` (15 minutes) | A session keeps sudo longer after its sign-in, so whoever takes over an unlocked browser has longer to use it. See [Sudo](sudo.md#the-lifetime). |
 | `rate_limits.requests_per_minute.view` | `60` | Faster scripted probing of Keystone's pages per IP address and account. |
 | `rate_limits.requests_per_minute.start` / `.submit` / `.change` | `10` each | Faster scripted submissions per IP address and account. |
 | `rate_limits.failed_attempts_per_hour` | `20` | More online guesses at each account's credentials. See [Rate limiting](rate-limiting.md). |

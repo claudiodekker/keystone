@@ -5,6 +5,7 @@ use App\Http\Controllers\Auth\EnrollmentController;
 use App\Http\Controllers\Auth\RecoveryCodesController;
 use App\Http\Controllers\Auth\SignInController;
 use App\Http\Controllers\Auth\SignOutController;
+use App\Http\Controllers\Auth\SudoController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->group(function () {
@@ -32,4 +33,6 @@ Route::prefix('auth')->group(function () {
     });
 
     Route::post('logout', SignOutController::class)->name('logout');
+
+    Route::delete('sudo', [SudoController::class, 'destroy'])->name('sudo.end');
 });

@@ -68,7 +68,7 @@ class BootChecks
             ...$this->mandateFailures(),
             ...$this->sessionFailures(),
             ...$this->rememberFailures(),
-            ...$this->floorFailures(['keystone.retention.known_devices_seconds']),
+            ...$this->floorFailures(['keystone.sudo.lifetime_seconds', 'keystone.retention.known_devices_seconds']),
             ...$this->eventFailures(),
             ...$this->alertFailures(),
             ...$this->ipLocationFailures(),

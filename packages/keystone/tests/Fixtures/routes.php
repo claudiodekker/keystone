@@ -5,6 +5,7 @@ use ClaudioDekker\Keystone\Tests\Fixtures\Http\Controllers\EnrollmentController;
 use ClaudioDekker\Keystone\Tests\Fixtures\Http\Controllers\RecoveryCodesController;
 use ClaudioDekker\Keystone\Tests\Fixtures\Http\Controllers\SignInController;
 use ClaudioDekker\Keystone\Tests\Fixtures\Http\Controllers\SignOutController;
+use ClaudioDekker\Keystone\Tests\Fixtures\Http\Controllers\SudoController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('web')->group(function () {
@@ -20,4 +21,5 @@ Route::middleware('web')->group(function () {
     Route::get('login/recovery-codes', [RecoveryCodesController::class, 'show'])->name('login.recovery-codes');
     Route::post('login/recovery-codes/confirm', [RecoveryCodesController::class, 'store'])->name('login.recovery-codes.submit');
     Route::post('logout', SignOutController::class)->name('logout');
+    Route::delete('sudo', [SudoController::class, 'destroy'])->name('sudo.end');
 });

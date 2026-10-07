@@ -98,6 +98,8 @@ it('copies the stubs into the app', function () {
         ->and("{$app}/resources/js/pages/auth/RecoveryCodes.vue")->toBeFile()
         ->and("{$app}/tests/Keystone/Assertions/EnrollmentAssertions.php")->toBeFile()
         ->and("{$app}/tests/Keystone/Assertions/RecoveryCodesAssertions.php")->toBeFile()
+        ->and("{$app}/app/Http/Controllers/Auth/SudoController.php")->toBeFile()
+        ->and("{$app}/tests/Keystone/Assertions/SudoAssertions.php")->toBeFile()
         ->and(file_get_contents("{$app}/routes/keystone.php"))->toBe(file_get_contents(StubsTestCase::STUBS.'/routes/keystone.php'));
 });
 
