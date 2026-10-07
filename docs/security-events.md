@@ -34,6 +34,8 @@ To keep the audit trail but drop the log line, set `keystone.log_channel` to Lar
 | `account.suspended` | an operator suspended the account (see [Operator commands](operator-commands.md#suspending-accounts)); alerts the account's owner |
 | `account.unsuspended` | an operator lifted the account's suspension; alerts the account's owner |
 | `credential.added` | a credential was added to the account, such as a second factor at [enrollment](enrollment.md); alerts the account's owner |
+| `sudo.granted` | a sign-in completed and its session now has [sudo](sudo.md#when-a-session-has-it); the reason is `keystone.sign_in` and there is no credential. A sign-in restored by a remember-me cookie, or from an address that isn't an IP address, records none |
+| `sudo.revoked` | the user [ended sudo](sudo.md#ending-it) while their session held a live grant |
 | `recovery_codes.generated` | a new set of recovery codes was saved; alerts the account's owner only when it replaced a set |
 | `recovery_code.used` | a [recovery code](challenge.md#recovery-codes) answered the challenge and was spent; alerts the account's owner with how many codes are left |
 | `device_cookie.reused` | a sign-in carried a [device cookie](security-alerts.md#new-devices) that a later sign-in had replaced, so two browsers held the same cookie; alerts the account's owner |
