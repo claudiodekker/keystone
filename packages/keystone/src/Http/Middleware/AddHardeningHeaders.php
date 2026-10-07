@@ -3,6 +3,7 @@
 namespace ClaudioDekker\Keystone\Http\Middleware;
 
 use ClaudioDekker\Keystone\Http\Middleware\Concerns\RecognizesKeystoneRoutes;
+use ClaudioDekker\Keystone\SudoGate;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -40,7 +41,7 @@ class AddHardeningHeaders
     protected const string FRAME_ANCESTOR_PATTERN = '/^[^\s;,]+$/';
 
     /**
-     * Attach the hardening floor to a Keystone response, whatever answered the request.
+     * Attach the hardening floor to a Keystone response, and to a refusal of the sudo gate on any route, whatever answered the request.
      *
      * @param  Closure(Request): Response  $next
      */
@@ -48,7 +49,7 @@ class AddHardeningHeaders
     {
         $response = $next($request);
 
-        if (! $this->routesToKeystone($request)) {
+        if (! $this->routesToKeystone($request) && ! $request->attributes->getBoolean(SudoGate::REFUSED)) {
             return $response;
         }
 

@@ -75,5 +75,11 @@ return [
             'subject' => 'New sign-in to your account',
             'what' => 'Your account was signed in to from a browser it hasn\'t signed in from recently.',
         ],
+        'sudo' => [
+            'network_changed' => [
+                'subject' => 'Your session moved to another network',
+                'what' => 'A signed-in session of your account tried to make a sensitive change from another network than the one it proved itself on. It must prove it\'s you again before it can make that change. A session cookie copied to another computer looks like this.',
+            ],
+        ],
     ],
 ];

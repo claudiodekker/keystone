@@ -2,11 +2,25 @@
 
 namespace ClaudioDekker\Keystone;
 
+use Illuminate\Http\Request;
+
 /**
  * @internal
  */
 class IntendedUrl
 {
+    /**
+     * Get where a request the sudo gate refused goes once sudo is granted: the page it asked for, or the page it came from, since a mutation is never replayed.
+     */
+    public static function afterSudo(Request $request, string $appUrl): string
+    {
+        if ($request->isMethod('GET') && ! $request->expectsJson()) {
+            return static::sanitize($request->fullUrl(), $appUrl);
+        }
+
+        return static::sanitize($request->headers->get('Referer'), $appUrl);
+    }
+
     /**
      * Keep the intended URL only as a same-origin relative path, else the root.
      */

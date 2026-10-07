@@ -163,6 +163,7 @@ return [
         'recovery_codes.generated' => SecurityAlert::class,
         'sessions.terminated' => SecurityAlert::class,
         'signed_in' => SecurityAlert::class,
+        'sudo.network_changed' => SecurityAlert::class,
     ],
 
     /*

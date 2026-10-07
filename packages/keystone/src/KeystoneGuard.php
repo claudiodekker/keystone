@@ -302,12 +302,14 @@ class KeystoneGuard extends SessionGuard
 
     /**
      * Get the session's live sudo grant, forgetting one that outlived keystone.sudo.lifetime_seconds or has no believable time to count it from.
+     *
+     * The subnet it is bound to isn't checked here: the gate does that, because a mismatch revokes and records.
      */
     public function sudoGrant(): ?SudoGrant
     {
         $held = $this->session->get($this->sudoKey());
 
-        if (! is_array($held)) {
+        if (! is_array($held) || ! is_int($held['granted_at'] ?? null) || ! is_string($held['subnet'] ?? null)) {
             return null;
         }
 
@@ -324,7 +326,91 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * End sudo, dropping the session's grant on a new session id. Safe to call without one.
+     * Get the session's live sudo-in-progress, forgetting one that outlived its fixed lifetime or has no believable time to count it from.
+     */
+    public function sudoInProgress(): ?SudoInProgress
+    {
+        $held = $this->session->get($this->sudoKey());
+
+        if (! is_array($held) || ! is_int($held['started_at'] ?? null) || ! is_string($held['intended_url'] ?? null)) {
+            return null;
+        }
+
+        $startedAt = CarbonImmutable::createFromTimestamp($held['started_at']);
+
+        if ($startedAt->isFuture() || $startedAt->addSeconds(SudoInProgress::LIFETIME_SECONDS)->lessThanOrEqualTo(Date::now())) {
+            $this->session->forget($this->sudoKey());
+
+            return null;
+        }
+
+        $firstFactor = $held['first_factor'] ?? null;
+
+        return new SudoInProgress(
+            intendedUrl: $held['intended_url'],
+            startedAt: $startedAt,
+            firstFactor: is_string($firstFactor) ? $firstFactor : null,
+        );
+    }
+
+    /**
+     * Note that the signed-in session owes a sudo replay before it reaches the intended URL.
+     *
+     * A live sudo-in-progress keeps its start time and the first factor it passed, and only takes the new intended URL, so asking again never buys more time. Anything else in the slot is replaced.
+     */
+    public function beginSudo(string $intendedUrl): void
+    {
+        $progress = $this->sudoInProgress();
+
+        $this->session->put($this->sudoKey(), [
+            'started_at' => ($progress->startedAt ?? Date::now())->getTimestamp(),
+            'intended_url' => $intendedUrl,
+            'first_factor' => $progress?->firstFactor,
+        ]);
+    }
+
+    /**
+     * Note that the sudo-in-progress passed its first factor, on a new session id, keeping the time it started.
+     *
+     * @throws LogicException when the session holds no live sudo-in-progress still owing its first step
+     */
+    public function passSudoFirstFactor(string $firstFactor): void
+    {
+        $progress = $this->sudoInProgress();
+
+        if ($progress === null || $progress->firstFactor !== null) {
+            throw new LogicException('The session holds no sudo-in-progress owing its first step.');
+        }
+
+        $this->changeAuthLevel();
+
+        $this->session->put($this->sudoKey(), [
+            'started_at' => $progress->startedAt->getTimestamp(),
+            'intended_url' => $progress->intendedUrl,
+            'first_factor' => $firstFactor,
+        ]);
+    }
+
+    /**
+     * Grant the sudo-in-progress its sudo, on a new session id, bound to the subnet.
+     *
+     * The grant is the last write of the request that earns it, so nothing that fails before it leaves one behind.
+     *
+     * @throws LogicException when the session holds no live sudo-in-progress
+     */
+    public function grantSudo(Subnet $subnet): void
+    {
+        if ($this->sudoInProgress() === null) {
+            throw new LogicException('The session holds no sudo-in-progress to grant.');
+        }
+
+        $this->changeAuthLevel();
+
+        $this->stampSudo($subnet);
+    }
+
+    /**
+     * End sudo, dropping the session's grant and any sudo-in-progress on a new session id. Safe to call with neither.
      */
     public function endSudo(): void
     {
@@ -832,18 +918,35 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Get the time the session's current phase ends: a pending sign-in's end, a sign-in's absolute lifetime, or never.
+     * Get the time the session's current phase ends: a pending sign-in's end, a sudo-in-progress's end, a sign-in's absolute lifetime, or never.
      */
     protected function phaseEndsAt(): ?CarbonInterface
     {
         $heldAt = $this->session->get($this->pendingKey())['held_at'] ?? null;
-        $lifetimeSeconds = config('keystone.session.absolute_lifetime_seconds');
 
         return match (true) {
-            $this->session->has($this->getName()) => is_int($lifetimeSeconds) ? $this->signedInAt()?->addSeconds($lifetimeSeconds) : null,
+            $this->session->has($this->getName()) => $this->signedInPhaseEndsAt(),
             is_int($heldAt) => Date::createFromTimestamp($heldAt)->addSeconds(PendingSignIn::LIFETIME_SECONDS),
             default => null,
         };
+    }
+
+    /**
+     * Get the time a signed-in session's phase ends: its sudo-in-progress's end or its absolute lifetime, whichever comes first, or never.
+     */
+    protected function signedInPhaseEndsAt(): ?CarbonInterface
+    {
+        $lifetimeSeconds = config('keystone.session.absolute_lifetime_seconds');
+        $signedInEndsAt = is_int($lifetimeSeconds) ? $this->signedInAt()?->addSeconds($lifetimeSeconds) : null;
+        $startedAt = $this->session->get($this->sudoKey())['started_at'] ?? null;
+
+        if (! is_int($startedAt)) {
+            return $signedInEndsAt;
+        }
+
+        $progressEndsAt = Date::createFromTimestamp($startedAt)->addSeconds(SudoInProgress::LIFETIME_SECONDS);
+
+        return $signedInEndsAt?->lessThan($progressEndsAt) ? $signedInEndsAt : $progressEndsAt;
     }
 
     /**
@@ -919,7 +1022,7 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Get the session key holding the sudo grant.
+     * Get the session key holding the sudo grant or the sudo-in-progress, never both.
      */
     protected function sudoKey(): string
     {

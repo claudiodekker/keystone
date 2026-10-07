@@ -25,4 +25,5 @@ enum SecurityEventType: string
     case CREDENTIAL_ADDED = 'credential.added';
     case SUDO_GRANTED = 'sudo.granted';
     case SUDO_REVOKED = 'sudo.revoked';
+    case SUDO_NETWORK_CHANGED = 'sudo.network_changed';
 }
