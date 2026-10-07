@@ -225,6 +225,16 @@ describe('the retention', function () {
     })->with(['zero' => [0], 'null' => [null], 'a negative number' => [-1], 'a string' => ['7776000']]);
 });
 
+describe('the sudo lifetime', function () {
+    it('refuses a lifetime that isn\'t a whole number of at least 1', function (mixed $seconds) {
+        config(['keystone.sudo.lifetime_seconds' => $seconds]);
+
+        $failures = bootFailures();
+
+        expect($failures)->toBe(['keystone.sudo.lifetime_seconds must be a whole number of at least 1.']);
+    })->with(['zero' => [0], 'null' => [null], 'a negative number' => [-1], 'a string' => ['900']]);
+});
+
 describe('the remember-me lifetime', function () {
     it('refuses a lifetime that isn\'t a whole number of at least 0', function (mixed $seconds) {
         config(['keystone.remember.lifetime_seconds' => $seconds]);
