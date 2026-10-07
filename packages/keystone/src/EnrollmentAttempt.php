@@ -2,13 +2,13 @@
 
 namespace ClaudioDekker\Keystone;
 
+use ClaudioDekker\Keystone\Exceptions\Barred;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\EnrolledCredential;
 use ClaudioDekker\Keystone\Methods\Proof;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
 use ClaudioDekker\Keystone\Methods\Surface;
 use Illuminate\Database\Eloquent\Model;
-use LogicException;
 use Throwable;
 
 /**
@@ -43,7 +43,9 @@ class EnrollmentAttempt extends EnrollmentStep
 
         try {
             $this->guard->passSecondFactor();
-        } catch (LogicException) {
+        } catch (Barred) {
+            $this->recordRejected($pending, $type->name(), reason: 'keystone.barred');
+
             return Demand::REFUSE;
         }
 
