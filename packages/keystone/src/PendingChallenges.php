@@ -67,7 +67,7 @@ class PendingChallenges
     /**
      * Record every challenge left unanswered for the threshold as abandoned, alert each account's owner once about all of theirs, then forget them.
      */
-    public function sweep(SecurityEventRecorder $recorder = new SecurityEventRecorder): void
+    public function sweep(): void
     {
         $abandoned = $this->query()
             ->where('created_at', '<=', Date::now()->subSeconds(self::ABANDONED_AFTER_SECONDS))
@@ -82,7 +82,7 @@ class PendingChallenges
 
         foreach ($abandoned->groupBy('user_id') as $accountId => $challenges) {
             if (isset($accounts[$accountId])) {
-                $recorder->recordEach(SecurityEventType::CHALLENGE_ABANDONED, $accounts[$accountId], $this->contextsOf($challenges), actor: Actor::SYSTEM);
+                (new SecurityEventRecorder)->recordEach(SecurityEventType::CHALLENGE_ABANDONED, $accounts[$accountId], $this->contextsOf($challenges), actor: Actor::SYSTEM);
             }
 
             foreach ($challenges->pluck('id')->chunk(self::DELETE_CHUNK_ROWS) as $ids) {
