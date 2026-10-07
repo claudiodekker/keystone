@@ -12,14 +12,13 @@ use ClaudioDekker\Keystone\SecurityEventType;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormTypeSupport;
 use Illuminate\Console\Scheduling\Event;
 use Illuminate\Console\Scheduling\Schedule;
-use Illuminate\Database\QueryException;
+use Illuminate\Database\Connection;
 use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event as EventFacade;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Notification;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Testing\TestResponse;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -135,12 +134,16 @@ describe('a hold at the challenge', function () {
     it('still lands on the challenge when the pending challenge can\'t be written, reporting why', function () {
         Exceptions::fake();
         $account = $this->createChallengedAccount(new FormTypeSupport('code'));
-        Schema::drop('user_pending_challenges');
+        DB::beforeExecuting(function (string $query, array $bindings, Connection $connection) {
+            if (str_starts_with($query, 'insert into') && str_contains($query, 'user_pending_challenges')) {
+                $connection->getPdo()->exec('select * from keystone_missing_table');
+            }
+        });
 
         holdFrom($this)->assertRedirectToRoute('login.challenge');
 
         expect(Keystone::guard()->pending()?->account->is($account))->toBeTrue();
-        Exceptions::assertReported(QueryException::class);
+        Exceptions::assertReported(PDOException::class);
     });
 
     it('cuts a long user agent to the length kept everywhere else', function () {
