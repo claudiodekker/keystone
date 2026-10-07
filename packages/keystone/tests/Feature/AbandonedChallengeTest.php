@@ -274,11 +274,11 @@ describe('the sweep', function () {
             ->and($events->sole()->onOneServer)->toBeTrue();
     });
 
-    it('never runs while an earlier run is still going, and takes over five minutes after one that died', function () {
+    it('never runs while an earlier run is still going, and takes over fifteen minutes after one that died', function () {
         $event = collect($this->app->make(Schedule::class)->events())->sole(fn (Event $event) => $event->description === 'keystone:sweep-abandoned-challenges');
 
         expect($event->withoutOverlapping)->toBeTrue()
-            ->and($event->expiresAt)->toBe(5);
+            ->and($event->expiresAt)->toBe(15);
     });
 
     it('deletes an account\'s rows before it turns to the next account, so a run that dies repeats one account at most', function () {
