@@ -45,6 +45,11 @@ class SecurityAlert extends Notification implements SecurityEventAlertContract, 
     ];
 
     /**
+     * The most IP addresses, or devices, a mail lists before it only counts the rest.
+     */
+    protected const int LISTED_VALUES = 5;
+
+    /**
      * The type of the events the alert is about.
      */
     public SecurityEventType $type;
@@ -151,13 +156,19 @@ class SecurityAlert extends Notification implements SecurityEventAlertContract, 
     }
 
     /**
-     * List the values in one line, naming an unknown one.
+     * List the first of the values in one line, naming an unknown one and saying how many more there are.
      *
      * @param  list<string|null>  $values
      */
     protected function listed(array $values, string $unknown): string
     {
-        return implode(', ', array_map(fn (?string $value) => $value ?? $unknown, $values));
+        $listed = collect($values)->take(self::LISTED_VALUES)->map(fn (?string $value) => $value ?? $unknown)->implode(', ');
+
+        if (count($values) <= self::LISTED_VALUES) {
+            return $listed;
+        }
+
+        return __('keystone::alerts.more', ['values' => $listed, 'count' => count($values) - self::LISTED_VALUES]);
     }
 
     /**

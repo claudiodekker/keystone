@@ -459,6 +459,20 @@ describe('the sweep', function () {
             ->and($mail->subject)->toBe(__('keystone::alerts.types.challenge.abandoned.subject'));
     });
 
+    it('mails the first five IP addresses of an account\'s abandoned challenges and how many more there were', function () {
+        $this->travelTo('2026-10-06 12:00:00');
+        $this->createChallengedAccount(new FormTypeSupport('code'));
+        collect(range(1, 7))->each(fn (int $host) => holdFrom($this, ip: "203.0.113.{$host}"));
+        $this->travelTo('2026-10-06 12:10:00');
+        $this->artisan('schedule:run')->assertSuccessful();
+        [$address, $alert] = abandonedChallengeAlerts()[0];
+
+        $mail = (string) $alert->toMail((new AnonymousNotifiable)->route('mail', $address))->render();
+
+        expect($mail)->toContain(e(__('keystone::alerts.more', ['values' => '203.0.113.1, 203.0.113.2, 203.0.113.3, 203.0.113.4, 203.0.113.5', 'count' => 2])))
+            ->not->toContain('203.0.113.6', '203.0.113.7', 'keystone::alerts.more');
+    });
+
     it('sends each account its own alert about its own challenges', function () {
         $this->travelTo('2026-10-06 12:00:00');
         $this->createChallengedAccount(new FormTypeSupport('code'));

@@ -6,6 +6,7 @@ return [
     'unknown' => 'Unknown',
     'unknown_device' => 'Unknown device',
     'device' => ':browser on :platform',
+    'more' => ':values and :count more',
 
     'fields' => [
         'when' => 'When',
