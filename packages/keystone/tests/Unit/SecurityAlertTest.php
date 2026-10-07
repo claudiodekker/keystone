@@ -221,3 +221,14 @@ it('names the place of several events from one IP address', function () {
 
     expect($mail)->toContain('Amsterdam, Netherlands');
 });
+
+it('names the place of the one known IP address when another event has none', function () {
+    locatingAs('Amsterdam, Netherlands');
+
+    $mail = renderedDigest(
+        alertEvent(['type' => SecurityEventType::CHALLENGE_ABANDONED, 'ip_address' => null]),
+        alertEvent(['type' => SecurityEventType::CHALLENGE_ABANDONED]),
+    );
+
+    expect($mail)->toContain('Amsterdam, Netherlands');
+});

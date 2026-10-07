@@ -172,18 +172,18 @@ class SecurityAlert extends Notification implements SecurityEventAlertContract, 
     }
 
     /**
-     * Name where the IP address is through the IP-location port, on the worker, so no request waits on the lookup.
+     * Name where the alert's one known IP address is through the IP-location port, on the worker, so no request waits on the lookup.
      */
     protected function locate(): ?string
     {
-        $ipAddress = $this->ipAddresses[0] ?? null;
+        $known = collect($this->ipAddresses)->whereNotNull();
 
-        if ($ipAddress === null || count($this->ipAddresses) > 1) {
+        if ($known->count() !== 1) {
             return null;
         }
 
         try {
-            return app(IpLocation::class)->locate($ipAddress);
+            return app(IpLocation::class)->locate($known->sole());
         } catch (Throwable $e) {
             report($e);
 
