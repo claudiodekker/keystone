@@ -8,7 +8,6 @@ use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\Proof;
 use ClaudioDekker\Keystone\Methods\RecoveryCodeType;
 use ClaudioDekker\Keystone\Methods\Surface;
-use Illuminate\Database\Eloquent\Model;
 
 /**
  * @internal
@@ -124,7 +123,7 @@ class ChallengeAttempt extends CredentialAttempt
      */
     protected function enter(PendingSignIn $pending, Demand $demand): ?bool
     {
-        $knownDevice = $this->pass($pending->account, $demand);
+        $knownDevice = $this->pass($pending, $demand);
 
         if ($pending->pendingChallengeId !== null) {
             rescue(fn () => (new PendingChallenges($pending->account))->forget($pending->pendingChallengeId));
@@ -136,7 +135,7 @@ class ChallengeAttempt extends CredentialAttempt
     /**
      * Move the pending sign-in past its challenge: on to the enrollment the account still owes, or into a signed-in session.
      */
-    protected function pass(Model&KeystoneUser $account, Demand $demand): ?bool
+    protected function pass(PendingSignIn $pending, Demand $demand): ?bool
     {
         if ($demand === Demand::ENROLLMENT) {
             $this->guard->passSecondFactor();
@@ -144,7 +143,7 @@ class ChallengeAttempt extends CredentialAttempt
             return null;
         }
 
-        return $this->guard->signIn($account);
+        return $this->guard->signIn($pending->account, $pending->rememberMe);
     }
 
     /**

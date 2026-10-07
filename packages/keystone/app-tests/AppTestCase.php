@@ -14,6 +14,7 @@ use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\RecoveryCodes;
+use ClaudioDekker\Keystone\RememberTokens;
 use ClaudioDekker\Keystone\SignInDecision;
 use Closure;
 use Illuminate\Cache\RateLimiter as CacheRateLimiter;
@@ -128,6 +129,26 @@ abstract class AppTestCase extends TestCase
     public function deviceCookieOf(TestResponse $response): ?string
     {
         return $response->getCookie(KnownDevices::COOKIE, decrypt: false)?->getValue();
+    }
+
+    /**
+     * Send the remember-me cookie on every later request, as the browser holding it would, or none, as a browser that was never remembered.
+     */
+    public function fromRememberCookie(?string $value): static
+    {
+        unset($this->unencryptedCookies[RememberTokens::COOKIE]);
+
+        return $value === null ? $this : $this->withUnencryptedCookie(RememberTokens::COOKIE, $value);
+    }
+
+    /**
+     * Get the value of the remember-me cookie the response handed the browser.
+     *
+     * @param  TestResponse<Response>  $response
+     */
+    public function rememberCookieOf(TestResponse $response): ?string
+    {
+        return $response->getCookie(RememberTokens::COOKIE, decrypt: false)?->getValue();
     }
 
     /**

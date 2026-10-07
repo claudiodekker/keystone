@@ -15,6 +15,7 @@ readonly class SignInPage
     public function __construct(
         public array $types,
         public ?string $status,
+        public bool $rememberOffered = false,
     ) {
         //
     }

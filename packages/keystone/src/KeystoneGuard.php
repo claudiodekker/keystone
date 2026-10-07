@@ -82,11 +82,11 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Start a signed-in session for the user, stamped with the credential epoch they were read with, returning whether the browser was a known device of theirs.
+     * Start a signed-in session for the user, stamped with the credential epoch they were read with and remembered on this device when asked, returning whether the browser was a known device of theirs.
      *
      * @throws Barred
      */
-    public function signIn(Model&KeystoneUser $user): bool
+    public function signIn(Model&KeystoneUser $user, RememberMe $rememberMe = RememberMe::NOT_ASKED): bool
     {
         $account = $this->retrieveAccount($user->getAuthIdentifier());
 
@@ -99,13 +99,9 @@ class KeystoneGuard extends SessionGuard
         }
 
         $knownDevice = $this->recognizeDevice($user);
+        $rememberTokenId = $this->remember($user, $rememberMe);
 
-        $this->changeAuthLevel();
-
-        $this->session->forget($this->pendingKey());
-        $this->session->put($this->getName(), $user->getAuthIdentifier());
-        $this->session->put($this->epochKey(), $this->epochOf($user));
-        $this->session->put($this->signedInAtKey(), Date::now()->getTimestamp());
+        $this->enter($user, $rememberTokenId);
 
         $this->fireLoginEvent($user);
 
@@ -115,9 +111,9 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Hold the account's sign-in until it passes the stage, replacing any pending one.
+     * Hold the account's sign-in until it passes the stage, keeping whether it asked to be remembered and replacing any pending one.
      */
-    public function hold(Model&KeystoneUser $account, string $firstFactor, PendingStage $stage, string $intendedUrl): void
+    public function hold(Model&KeystoneUser $account, string $firstFactor, PendingStage $stage, string $intendedUrl, RememberMe $rememberMe = RememberMe::NOT_ASKED): void
     {
         $this->changeAuthLevel();
 
@@ -131,6 +127,7 @@ class KeystoneGuard extends SessionGuard
             'held_at' => Date::now()->getTimestamp(),
             'second_factor_passed' => false,
             'pending_challenge_id' => $stage === PendingStage::CHALLENGE ? $this->openPendingChallenge($account) : null,
+            'remember_me' => $rememberMe->value,
         ]);
     }
 
@@ -203,6 +200,7 @@ class KeystoneGuard extends SessionGuard
             epoch: $held['epoch'],
             secondFactorPassed: $held['second_factor_passed'],
             pendingChallengeId: $held['pending_challenge_id'],
+            rememberMe: RememberMe::from($held['remember_me']),
         );
     }
 
@@ -261,10 +259,13 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * End the signed-in session and regenerate its CSRF token.
+     * End the signed-in session, forget the token that remembers it on this device, and regenerate its CSRF token.
      */
     public function signOut(): void
     {
+        // The token is forgotten first, because ending the session drops its id.
+        $this->forgetRememberToken();
+
         $this->logout();
 
         $this->session->invalidate();
@@ -417,6 +418,66 @@ class KeystoneGuard extends SessionGuard
         ));
 
         return $known;
+    }
+
+    /**
+     * Issue the account a remember token for this browser when the sign-in asked for one and remember-me is on, returning the token's id.
+     */
+    protected function remember(Model&KeystoneUser $account, RememberMe $rememberMe): ?int
+    {
+        if ($rememberMe === RememberMe::NOT_ASKED || ! RememberTokens::isOffered()) {
+            return null;
+        }
+
+        [$id, $cookie] = (new RememberTokens($account))->issue($account->getKey(), $this->epochOf($account));
+
+        $this->getCookieJar()->queue($cookie);
+
+        return $id;
+    }
+
+    /**
+     * Make the session a signed-in one for the account on a new session id, stamped with its credential epoch, the time and the token that remembers it.
+     */
+    protected function enter(Model&KeystoneUser $account, ?int $rememberTokenId): void
+    {
+        $this->changeAuthLevel();
+
+        $this->session->forget($this->pendingKey());
+        $this->session->put($this->getName(), $account->getAuthIdentifier());
+        $this->session->put($this->epochKey(), $this->epochOf($account));
+        $this->session->put($this->signedInAtKey(), Date::now()->getTimestamp());
+        $this->session->put($this->rememberKey(), $rememberTokenId);
+    }
+
+    /**
+     * Forget the token that remembers the session on this device and drop its cookie.
+     */
+    protected function forgetRememberToken(): void
+    {
+        $id = $this->session->get($this->rememberKey());
+
+        if (is_int($id)) {
+            (new RememberTokens($this->userModel()))->forget($id);
+        }
+
+        $this->dropRememberCookie();
+    }
+
+    /**
+     * Make the browser drop its remember-me cookie, and drop it from this request.
+     */
+    protected function dropRememberCookie(): void
+    {
+        $request = $this->getRequest();
+
+        if (! $request->cookies->has(RememberTokens::COOKIE)) {
+            return;
+        }
+
+        $this->getCookieJar()->queue(RememberTokens::expiredCookie());
+
+        $request->cookies->remove(RememberTokens::COOKIE);
     }
 
     /**
@@ -622,6 +683,14 @@ class KeystoneGuard extends SessionGuard
     protected function pendingKey(): string
     {
         return 'keystone_pending_'.$this->name;
+    }
+
+    /**
+     * Get the session key holding the id of the remember token the session issued or restored.
+     */
+    protected function rememberKey(): string
+    {
+        return 'keystone_remember_'.$this->name;
     }
 
     /**

@@ -12,6 +12,8 @@ use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\RateLimiter;
+use ClaudioDekker\Keystone\RememberMe;
+use ClaudioDekker\Keystone\RememberTokens;
 use ClaudioDekker\Keystone\SignInAttempt;
 use ClaudioDekker\Keystone\Status;
 use ClaudioDekker\Keystone\StepKind;
@@ -63,6 +65,7 @@ abstract class SignInController extends Controller
         $page = new SignInPage(
             types: $types,
             status: Status::flashed($request)?->label(),
+            rememberOffered: RememberTokens::isOffered(),
         );
 
         return $this->sendSignInPage($request, $page);
@@ -98,7 +101,7 @@ abstract class SignInController extends Controller
         $intendedUrl = IntendedUrl::sanitize($intended, (string) config('app.url'));
 
         $attempt = new SignInAttempt(Keystone::guard(), app(AccountLookup::class), new RateLimiter($request, Keystone::guard()));
-        $demand = $attempt->attempt($credentialType, $identifier, $proofInput, $intendedUrl);
+        $demand = $attempt->attempt($credentialType, $identifier, $proofInput, $intendedUrl, RememberMe::fromRequest($request));
 
         if ($demand === Demand::REFUSE) {
             $this->flashIdentifier($request);

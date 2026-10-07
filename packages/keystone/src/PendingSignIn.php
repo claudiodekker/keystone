@@ -28,6 +28,7 @@ readonly class PendingSignIn
         public int $epoch,
         public bool $secondFactorPassed,
         public ?int $pendingChallengeId,
+        public RememberMe $rememberMe,
     ) {
         //
     }

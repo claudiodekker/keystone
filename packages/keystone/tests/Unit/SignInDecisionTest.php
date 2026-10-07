@@ -6,6 +6,7 @@ use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\PendingOrigin;
 use ClaudioDekker\Keystone\PendingSignIn;
 use ClaudioDekker\Keystone\PendingStage;
+use ClaudioDekker\Keystone\RememberMe;
 use ClaudioDekker\Keystone\SignInDecision;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormType;
 use ClaudioDekker\Keystone\Tests\Fixtures\User;
@@ -36,7 +37,7 @@ function accountHolding(bool $secondFactor = false, bool $recoveryCodes = false)
 
 function pendingFor(User $account, string $firstFactor = 'form', bool $secondFactorPassed = false): PendingSignIn
 {
-    return new PendingSignIn($account, $firstFactor, PendingOrigin::LOGIN, PendingStage::CHALLENGE, '/', CarbonImmutable::now(), epoch: 0, secondFactorPassed: $secondFactorPassed, pendingChallengeId: null);
+    return new PendingSignIn($account, $firstFactor, PendingOrigin::LOGIN, PendingStage::CHALLENGE, '/', CarbonImmutable::now(), epoch: 0, secondFactorPassed: $secondFactorPassed, pendingChallengeId: null, rememberMe: RememberMe::NOT_ASKED);
 }
 
 it('signs in an active account', function () {

@@ -29,15 +29,15 @@ class SignInAttempt extends CredentialAttempt
     }
 
     /**
-     * Prove the input for the named account, then sign it in or hold it for what it owes, or refuse inside the timing floor.
+     * Prove the input for the named account, then sign it in or hold it for what it owes, remembered on its device when it asked, or refuse inside the timing floor.
      *
      * @param  array<string, mixed>  $input
      *
      * @throws Throttled
      */
-    public function attempt(?CredentialType $type, string $identifier, #[\SensitiveParameter] array $input, string $intendedUrl): Demand
+    public function attempt(?CredentialType $type, string $identifier, #[\SensitiveParameter] array $input, string $intendedUrl, RememberMe $rememberMe): Demand
     {
-        return $this->timebox->call(function () use ($type, $identifier, $input, $intendedUrl) {
+        return $this->timebox->call(function () use ($type, $identifier, $input, $intendedUrl, $rememberMe) {
             if ($type === null) {
                 return Demand::REFUSE;
             }
@@ -72,7 +72,7 @@ class SignInAttempt extends CredentialAttempt
                 proof: $proof,
                 credential: $credential,
                 taken: $taken,
-                enter: fn () => $this->enter($account, $type, $demand, $intendedUrl),
+                enter: fn () => $this->enter($account, $type, $demand, $intendedUrl, $rememberMe),
                 recorded: $demand === Demand::SIGN_IN ? SecurityEventType::SIGNED_IN : SecurityEventType::SIGN_IN_HELD,
                 reason: $demand === Demand::SIGN_IN ? null : "keystone.{$demand->value}",
             );
@@ -86,15 +86,15 @@ class SignInAttempt extends CredentialAttempt
      *
      * @throws Barred
      */
-    protected function enter(Model&KeystoneUser $account, CredentialType $type, Demand $demand, string $intendedUrl): ?bool
+    protected function enter(Model&KeystoneUser $account, CredentialType $type, Demand $demand, string $intendedUrl, RememberMe $rememberMe): ?bool
     {
         if ($demand === Demand::SIGN_IN) {
-            return $this->guard->signIn($account);
+            return $this->guard->signIn($account, $rememberMe);
         }
 
         $stage = $demand === Demand::CHALLENGE ? PendingStage::CHALLENGE : PendingStage::ENROLLMENT;
 
-        $this->guard->hold($account, firstFactor: $type->name(), stage: $stage, intendedUrl: $intendedUrl);
+        $this->guard->hold($account, firstFactor: $type->name(), stage: $stage, intendedUrl: $intendedUrl, rememberMe: $rememberMe);
 
         return null;
     }
