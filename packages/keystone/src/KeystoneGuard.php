@@ -420,7 +420,7 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Open a pending challenge for the account, returning its id, unless the browser is a known device of it or the sign-in being replaced already opened one for it.
+     * Get the id of the pending challenge the hold of the account keeps: the one the sign-in it replaces opened, a new one, or none for a known device or when opening it fails.
      */
     protected function openPendingChallenge(Model&KeystoneUser $account): ?int
     {
@@ -430,14 +430,16 @@ class KeystoneGuard extends SessionGuard
             return null;
         }
 
-        $challenges = new PendingChallenges($account);
-        $replaced = $this->replacedPendingChallengeId($account);
+        return rescue(function () use ($account, $request) {
+            $challenges = new PendingChallenges($account);
+            $replaced = $this->replacedPendingChallengeId($account);
 
-        if ($replaced !== null && $challenges->has($replaced)) {
-            return $replaced;
-        }
+            if ($replaced !== null && $challenges->has($replaced)) {
+                return $replaced;
+            }
 
-        return $challenges->open($account->getKey(), userAgent: $request->headers->get('User-Agent'), ipAddress: $request->getClientIp());
+            return $challenges->open($account->getKey(), userAgent: $request->headers->get('User-Agent'), ipAddress: $request->getClientIp());
+        });
     }
 
     /**
