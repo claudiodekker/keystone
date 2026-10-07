@@ -115,7 +115,7 @@ test('app tests declare no global functions, so they never clash with the app\'s
 test('only the account change unit writes credentials and recovery codes', function () {
     $files = packageFiles('src');
     $callers = preg_grep('#/src/(AccountChange|Credentials|RecoveryCodes)\.php$#', $files, PREG_GREP_INVERT);
-    $credentialWriters = filesContaining($callers, '/(?:credentials|Credentials\([^()]*\)\))->(?:store|replaceSecret)\(/i');
+    $credentialWriters = filesContaining($callers, '/(?:credentials|Credentials\([^()]*\)\))->(?:store|replaceSecret|stampLastUse)\(/i');
     $recoveryCodeWriters = filesContaining($callers, '/(?:recoveryCodes|codes|RecoveryCodes\([^()]*\)\))->(?:replace|spend)\(/i');
 
     expect($files)->not->toBe([])

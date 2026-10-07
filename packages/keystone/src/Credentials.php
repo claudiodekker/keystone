@@ -116,6 +116,14 @@ class Credentials
     }
 
     /**
+     * Set when the usable credential of the type was last used to now.
+     */
+    public function stampLastUse(int $credentialId, string $type): void
+    {
+        $this->usable($type)->where('id', $credentialId)->update(['last_used_at' => now()]);
+    }
+
+    /**
      * Get the id of the account owning the usable credential of the type.
      */
     public function ownerOf(int $credentialId, string $type): int|string|null

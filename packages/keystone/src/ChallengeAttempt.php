@@ -68,16 +68,9 @@ class ChallengeAttempt extends CredentialAttempt
     protected function spendRecoveryCode(PendingSignIn $pending, Flow $flow, RecoveryCodeType $type, #[\SensitiveParameter] string $typed, TakenAttempt $taken, Demand $demand): Demand
     {
         $account = $pending->account;
-        $changes = new AccountChanges($this->guard);
 
         try {
-            $spent = $changes->change($account, function (AccountChange $change) use ($typed, $flow) {
-                if ((new SignInDecision)->isBarred($change->account)) {
-                    return null;
-                }
-
-                return $change->spendRecoveryCode($typed, flow: $flow, keepLast: config()->boolean('keystone.require_recovery_codes'));
-            });
+            $spent = $this->spendCode($account, $flow, $typed, keepLast: config()->boolean('keystone.require_recovery_codes'));
         } catch (LastRecoveryCode $e) {
             $this->recordRejected($account, $flow, $type, credential: null, reason: 'keystone.last_recovery_code');
 

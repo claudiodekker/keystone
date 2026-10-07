@@ -3,6 +3,7 @@
 namespace ClaudioDekker\Keystone;
 
 use ClaudioDekker\Keystone\Exceptions\Barred;
+use ClaudioDekker\Keystone\Exceptions\LastRecoveryCode;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\Proof;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
@@ -83,6 +84,7 @@ abstract class CredentialAttempt
      * Enter the account of a proven attempt, or refuse it.
      *
      * @param  Closure(): ?bool  $enter  signs the account in, returning whether the browser was a known device of it, or holds it, returning null
+     * @param  SecurityEventType|null  $recorded  the event a pass records, or null for a step that passes without entering anything worth a row
      */
     protected function finish(
         Model&KeystoneUser $account,
@@ -92,7 +94,7 @@ abstract class CredentialAttempt
         StoredCredential $credential,
         TakenAttempt $taken,
         Closure $enter,
-        SecurityEventType $recorded,
+        ?SecurityEventType $recorded,
         ?string $reason = null,
     ): bool {
         if (! $this->advance($account, $type, $proof, $credential)) {
@@ -123,6 +125,7 @@ abstract class CredentialAttempt
      * Enter the account of an attempt whose credential is proven and written, giving its attempt back, or refuse an account barred from entering.
      *
      * @param  Closure(): ?bool  $enter  signs the account in, returning whether the browser was a known device of it, or holds it, returning null
+     * @param  SecurityEventType|null  $recorded  the event a pass records, or null for a step that passes without entering anything worth a row
      */
     protected function complete(
         Model&KeystoneUser $account,
@@ -131,7 +134,7 @@ abstract class CredentialAttempt
         ?StoredCredential $credential,
         TakenAttempt $taken,
         Closure $enter,
-        SecurityEventType $recorded,
+        ?SecurityEventType $recorded,
         ?string $reason = null,
     ): bool {
         try {
@@ -144,19 +147,39 @@ abstract class CredentialAttempt
 
         $this->limiter->giveBack($taken);
 
-        $this->recorder->record(
-            $recorded,
-            account: $account,
-            flow: $flow->value,
-            credentialType: $type->name(),
-            credential: $credential,
-            reason: $reason,
-            knownDevice: $knownDevice,
-        );
+        if ($recorded !== null) {
+            $this->recorder->record(
+                $recorded,
+                account: $account,
+                flow: $flow->value,
+                credentialType: $type->name(),
+                credential: $credential,
+                reason: $reason,
+                knownDevice: $knownDevice,
+            );
+        }
 
         $this->timebox->returnEarly();
 
         return true;
+    }
+
+    /**
+     * Spend the account's recovery code the typed one matches under its row lock, or answer null for a barred account.
+     *
+     * @throws LastRecoveryCode
+     */
+    protected function spendCode(Model&KeystoneUser $account, Flow $flow, #[\SensitiveParameter] string $typed, bool $keepLast): ?bool
+    {
+        $changes = new AccountChanges($this->guard);
+
+        return $changes->change($account, function (AccountChange $change) use ($typed, $flow, $keepLast) {
+            if ((new SignInDecision)->isBarred($change->account)) {
+                return null;
+            }
+
+            return $change->spendRecoveryCode($typed, flow: $flow, keepLast: $keepLast);
+        });
     }
 
     /**
@@ -196,7 +219,7 @@ abstract class CredentialAttempt
     }
 
     /**
-     * Record a refused proof for the account in the flow, naming only a credential the account owns.
+     * Record a refused answer for the account in the flow, naming only a credential the account owns.
      */
     protected function recordRejected(
         Model&KeystoneUser $account,
@@ -206,12 +229,20 @@ abstract class CredentialAttempt
         string $reason,
     ): void {
         $this->recorder->record(
-            SecurityEventType::PROOF_REJECTED,
+            $this->rejectionType(),
             account: $account,
             flow: $flow->value,
             credentialType: $type->name(),
             credential: $credential,
             reason: $reason,
         );
+    }
+
+    /**
+     * Get the event a refused answer records.
+     */
+    protected function rejectionType(): SecurityEventType
+    {
+        return SecurityEventType::PROOF_REJECTED;
     }
 }
