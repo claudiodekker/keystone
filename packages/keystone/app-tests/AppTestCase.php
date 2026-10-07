@@ -24,6 +24,7 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
@@ -81,7 +82,7 @@ abstract class AppTestCase extends TestCase
     }
 
     /**
-     * Call the given URI as a fresh request, forgetting what the guard resolved.
+     * Call the given URI as a fresh request, forgetting what the guard resolved and the cookies the last request queued.
      *
      * @param  string  $method
      * @param  string  $uri
@@ -95,6 +96,7 @@ abstract class AppTestCase extends TestCase
     public function call($method, $uri, $parameters = [], $cookies = [], $files = [], $server = [], $content = null)
     {
         Auth::forgetGuards();
+        Cookie::flushQueuedCookies();
 
         return parent::call($method, $uri, $parameters, $cookies, $files, $server, $content);
     }

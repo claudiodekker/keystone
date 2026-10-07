@@ -2,11 +2,13 @@
 
 namespace ClaudioDekker\Keystone;
 
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\Date;
 use Symfony\Component\HttpFoundation\Cookie;
+use Symfony\Component\HttpFoundation\Request;
 
 /**
  * @internal
@@ -55,11 +57,41 @@ class RememberTokens
     }
 
     /**
+     * Get the token the cookie's value names, live or not.
+     */
+    public function find(#[\SensitiveParameter] string $value): ?RememberToken
+    {
+        $row = $this->query()->where('token_hash', static::digest($value))->first();
+
+        if ($row === null) {
+            return null;
+        }
+
+        return new RememberToken(
+            id: (int) $row->id,
+            accountId: $row->user_id,
+            epoch: (int) $row->credential_epoch,
+            expiresAt: CarbonImmutable::parse($row->expires_at),
+        );
+    }
+
+    /**
      * Forget the token.
      */
     public function forget(int $id): void
     {
         $this->query()->where('id', $id)->delete();
+    }
+
+    /**
+     * Get the value of the remember-me cookie the request carries, when it has the shape of one Keystone hands out.
+     */
+    public static function cookieOf(Request $request): ?string
+    {
+        $value = $request->cookies->get(static::COOKIE);
+        $pattern = sprintf('/\A[0-9a-f]{%d}\z/', self::VALUE_BYTES * 2);
+
+        return is_string($value) && preg_match($pattern, $value) === 1 ? $value : null;
     }
 
     /**

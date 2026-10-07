@@ -31,7 +31,7 @@ class KeystoneGuard extends SessionGuard
     public const string EXPIRED_SESSION = 'keystone.expired_session';
 
     /**
-     * The request attribute set when Keystone ended the session during the request because its account newly owes enrollment.
+     * The request attribute set when Keystone ended the session, or refused to restore one, during the request because its account newly owes enrollment.
      */
     public const string DEMOTED_SESSION = 'keystone.demoted_session';
 
@@ -53,7 +53,7 @@ class KeystoneGuard extends SessionGuard
         $id = $this->session->get($this->getName());
 
         if (is_null($id)) {
-            return null;
+            return $this->restore();
         }
 
         $user = $this->retrieveAccount($id);
@@ -65,9 +65,14 @@ class KeystoneGuard extends SessionGuard
         }
 
         if ($this->hasExpired()) {
-            $this->expire($user);
+            $restored = $this->restore();
 
-            return null;
+            // A failure reported while refusing the cookie asks who is signed in, which expires the session there and then.
+            if (is_null($restored) && $this->session->has($this->getName())) {
+                $this->expire($user);
+            }
+
+            return $restored;
         }
 
         if ((new SignInDecision)->owesEnrollment($user)) {
@@ -418,6 +423,106 @@ class KeystoneGuard extends SessionGuard
         ));
 
         return $known;
+    }
+
+    /**
+     * Restore the sign-in the request's remember-me cookie remembers, or refuse a dead cookie.
+     *
+     * A restore changes no token, device or cookie value, so any number of requests from one browser may restore at once.
+     *
+     * @return (Model&KeystoneUser)|null
+     */
+    protected function restore(): ?Model
+    {
+        if (! RememberTokens::isOffered()) {
+            return null;
+        }
+
+        // A session that has yet to start takes the id the browser sent once it does, so a restore now would not rotate it.
+        if (! $this->session->isStarted()) {
+            return null;
+        }
+
+        $request = $this->getRequest();
+        $value = RememberTokens::cookieOf($request);
+
+        if ($value === null) {
+            return null;
+        }
+
+        $token = (new RememberTokens($this->userModel()))->find($value);
+        $account = is_null($token) ? null : $this->retrieveAccount($token->accountId);
+
+        if (is_null($token) || is_null($account) || ! $this->remembers($token, $account)) {
+            $this->refuseRestore($token, $account, reason: 'keystone.dead_remember_cookie');
+
+            return null;
+        }
+
+        if ((new SignInDecision)->owesEnrollment($account)) {
+            $this->refuseOwingRestore($token, $account);
+
+            return null;
+        }
+
+        $knownDevice = (new KnownDevices($account))->isKnown($account->getKey(), KnownDevices::cookieOf($request));
+
+        $this->enter($account, $token->id);
+
+        $this->viaRemember = true;
+
+        $this->fireLoginEvent($account, true);
+
+        $this->setUser($account);
+
+        (new SecurityEventRecorder)->record(
+            SecurityEventType::SIGNED_IN,
+            account: $account,
+            reason: 'remembered',
+            knownDevice: $knownDevice,
+        );
+
+        return $account;
+    }
+
+    /**
+     * Determine if the token still remembers the account: it is live on the account's credential epoch, and the account is active.
+     */
+    protected function remembers(RememberToken $token, Model&KeystoneUser $account): bool
+    {
+        return $token->isLiveOn($this->epochOf($account)) && $this->isActive($account);
+    }
+
+    /**
+     * Refuse the remember-me cookie: drop it from the browser and the request, forget its token, and record why.
+     *
+     * The cookie goes first, so a failure reported while recording finds none to refuse again.
+     */
+    protected function refuseRestore(?RememberToken $token, (Model&KeystoneUser)|null $account, string $reason): void
+    {
+        $this->dropRememberCookie();
+
+        if (! is_null($token)) {
+            (new RememberTokens($this->userModel()))->forget($token->id);
+        }
+
+        (new SecurityEventRecorder)->record(
+            SecurityEventType::REQUEST_REJECTED,
+            account: $account,
+            reason: $reason,
+        );
+    }
+
+    /**
+     * Refuse the remember-me cookie of an account that newly owes enrollment, telling the user to sign in again.
+     */
+    protected function refuseOwingRestore(RememberToken $token, Model&KeystoneUser $account): void
+    {
+        $this->session->flash(Status::SESSION_KEY, Status::ENROLLMENT_OWED->value);
+
+        $this->getRequest()->attributes->set(self::DEMOTED_SESSION, true);
+
+        $this->refuseRestore($token, $account, reason: 'keystone.enrollment_owed');
     }
 
     /**
