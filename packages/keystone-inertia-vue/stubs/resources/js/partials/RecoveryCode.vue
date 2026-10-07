@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import FormShape from '@/partials/shapes/Form.vue';
-import type { CredentialTypeOption, Surface } from '@/types/auth';
+import type { CredentialTypeOption, Purpose, Surface } from '@/types/auth';
 
-defineProps<{ option: CredentialTypeOption; surface: Surface }>();
+defineProps<{ option: CredentialTypeOption; surface: Surface; purpose?: Purpose }>();
 </script>
 
 <template>
-    <FormShape :option="option" :surface="surface" v-slot="{ errors }">
+    <FormShape :option="option" :surface="surface" :purpose="purpose" v-slot="{ errors }">
         <div class="flex flex-col gap-2">
             <label :for="`${option.type}-code`" class="text-sm font-medium text-gray-900">Recovery code</label>
             <input

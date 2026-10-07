@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import FormShape from '@/partials/shapes/Form.vue';
-import type { CredentialTypeOption, Surface } from '@/types/auth';
+import type { CredentialTypeOption, Purpose, Surface } from '@/types/auth';
 
-defineProps<{ option: CredentialTypeOption; surface: Surface }>();
+defineProps<{ option: CredentialTypeOption; surface: Surface; purpose?: Purpose }>();
 </script>
 
 <template>
-    <FormShape :option="option" :surface="surface" v-slot="{ errors }">
+    <FormShape :option="option" :surface="surface" :purpose="purpose" v-slot="{ errors }">
         <div v-if="surface === 'enrollment' && option.ceremony" class="flex flex-col gap-2">
             <p class="text-sm text-gray-600">Add this key to your authenticator app, or open the link on the device it runs on:</p>
             <code class="rounded-md bg-gray-100 px-3 py-2 font-mono text-sm break-all text-gray-900">{{ option.ceremony.key }}</code>

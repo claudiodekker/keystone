@@ -2,6 +2,8 @@ export type InitiateShape = 'form' | 'clientCeremony' | 'redirect' | 'delivered'
 
 export type Surface = 'sign-in' | 'challenge' | 'enrollment';
 
+export type Purpose = 'sudo';
+
 export type CredentialTypeOption = {
     type: string;
     shape: InitiateShape;
@@ -35,4 +37,10 @@ export type EnrollmentFormPage = {
 
 export type RecoveryCodesPage = {
     codes: string[];
+};
+
+export type SudoPage = {
+    types: CredentialTypeOption[];
+    preselect: string | null;
+    surface: 'sign-in' | 'challenge';
 };
