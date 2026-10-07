@@ -6,7 +6,7 @@ A route is one of Keystone's when its controller extends one of Keystone's contr
 
 ## Headers
 
-Every response from a Keystone route carries these headers, whatever produced it: the page itself, a redirect, a validation or throttle refusal, a middleware that answered early, or an exception your handler rendered. So does every refusal of the `sudo` middleware on your own routes, the redirect to the sudo page and the 403, because that answer is Keystone's even though the route isn't.
+Every response from a Keystone route carries these headers, whatever produced it: the page itself, a redirect, a validation or throttle refusal, a middleware that answered early, or an exception your handler rendered. A refusal by the `sudo` middleware carries them too, on any route of yours. That refusal is the redirect to the sudo page or the 403, and Keystone answers it even though the route isn't Keystone's.
 
 | Header | Value |
 |---|---|

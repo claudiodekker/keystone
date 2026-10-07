@@ -7,7 +7,7 @@ import { submit as submitEnrollment } from '@/routes/login/enrollment';
 import { submit as submitSudo } from '@/routes/sudo';
 import type { CredentialTypeOption, Purpose, SignInPage, Surface } from '@/types/auth';
 
-const props = defineProps<{ option: CredentialTypeOption; surface: Surface; purpose?: Purpose }>();
+const props = defineProps<{ option: CredentialTypeOption; surface: Surface; purpose?: Purpose; fields?: string[] }>();
 
 defineSlots<{
     default(props: { errors: Partial<Record<string, string>>; processing: boolean }): unknown;
@@ -23,7 +23,7 @@ const namesAccount = computed(() => props.surface === 'sign-in' && props.purpose
 
 const secretFields = ['password', 'code'];
 
-const shownByField = computed(() => secretFields.includes(props.option.type));
+const shownByField = computed(() => (props.fields ?? []).includes(props.option.type));
 
 const labels = { 'sign-in': 'Sign in', challenge: 'Verify', enrollment: 'Set up' };
 

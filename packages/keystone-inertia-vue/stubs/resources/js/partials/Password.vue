@@ -7,7 +7,7 @@ defineProps<{ option: CredentialTypeOption; surface: Surface; purpose?: Purpose 
 </script>
 
 <template>
-    <FormShape :option="option" :surface="surface" :purpose="purpose" v-slot="{ errors }">
+    <FormShape :option="option" :surface="surface" :purpose="purpose" :fields="['password']" v-slot="{ errors }">
         <PasswordField :id="`${option.type}-password`" :error="errors.password" />
     </FormShape>
 </template>

@@ -5,7 +5,7 @@ A signed-in user opens the workbench's gated security page. Inside 15 minutes of
 ## Sub-features
 
 - `sudo-pass` a fresh sign-in reaches `/settings/security` without being asked anything.
-- `sudo-end` the `End sudo` button on home drops the grant and lands on home with "Sudo has ended..." shown.
+- `sudo-end` the `End sudo` button on home drops the grant and lands on home with "Sudo has ended." shown.
 - `sudo-gate` a session without sudo asking for `/settings/security` is redirected to `/auth/sudo`.
 - `sudo-first-step` the sudo page offers the password with a `Confirm` button and no email field.
 - `sudo-second-step` after the password, the same page offers the TOTP code when Jane holds an authenticator.
@@ -36,7 +36,6 @@ The whole path is `scripts/scenarios/sudo-replay.mjs`: `node .claude/skills/veri
 ## Gotchas
 
 - The code that answered the sign-in's challenge is refused at sudo inside the same 30-second step, as `sudo.failed` with `totp.replayed`. Answer with the next step's code, `totp(account.totp_key, Date.now() + 30_000)`, which the window accepts.
-
 - The sudo page has no email field and no remember-me box. `getByLabel('Email address')` finds nothing there.
 - Both steps render on `/auth/sudo`. Wait for the next step's label or the `Security settings` heading, never for a URL change after the first `Confirm`.
 - `End sudo` sits on home, not on the gated page: the stub's `back()` would return to the gated page, meet the gate and land on the sudo page.

@@ -24,13 +24,13 @@ Keystone registers the `sudo` alias. On every request to the route it checks the
 |---|---|
 | comes from a signed-in session with a live grant, from the grant's subnet | it reaches your controller |
 | comes from a signed-in session with a live grant, from another subnet | the grant is revoked, `sudo.network_changed` is recorded and the owner alerted, then as below |
-| comes from a signed-in session without a live grant, from a browser | the session becomes [sudo-in-progress](#the-replay) and the browser is redirected to the sudo page, `GET /auth/sudo` |
-| comes from a signed-in session without a live grant, from a JSON client | the session becomes sudo-in-progress and the client gets `403` with `{"message": "...", "reason": "sudo"}` |
+| comes from a signed-in session without a live grant, from a browser | the session gets a [sudo-in-progress](#the-replay) and the browser is redirected to the sudo page, `GET /auth/sudo` |
+| comes from a signed-in session without a live grant, from a JSON client | the session gets a sudo-in-progress and the client gets `403` with `{"message": "...", "reason": "sudo"}` |
 | comes from a guest | the `auth` middleware answers as it always does |
 
 The redirect and the 403 carry the [hardening headers](hardening.md#headers), even though your route isn't a Keystone route. The gate itself records nothing: a session being asked for sudo is not an event. Once sudo is granted, the user lands on the page they asked for. A request that would have changed something is never replayed; the user lands on the page it came from instead, or on `/` when that page isn't one of yours.
 
-Core's own controllers that need sudo check it twice: in their middleware list and on the first line of the action, so replacing either in your published copy still leaves the action refused without sudo.
+A core controller that needs sudo checks it twice: in its middleware list and on the first line of the action. Replacing either in your published copy still leaves the action refused without sudo. The first such controllers arrive with the security settings.
 
 To answer a refused request differently, such as with a modal rather than a redirect, bind your own `RespondToSudoRequired` in a service provider. The decision stays Keystone's; only the response changes:
 
@@ -52,51 +52,23 @@ A session holds at most one grant. Whenever a session is held, signed in, restor
 
 ## The replay
 
-A session the gate refused is sudo-in-progress: it owes the same steps a sign-in of its account would take, and remembers where to go afterwards. The sudo page at `GET /auth/sudo` shows the step the session is at.
+A session the gate refused holds a sudo-in-progress. It owes the same steps a sign-in of its account would take, and it remembers where to go afterwards. The sudo page at `GET /auth/sudo` shows the step the session is at.
 
 The first step offers the sign-in credential types the account holds, such as its password. The page preselects the first and lets the user switch to another. When the account holds a second factor, passing the first step moves the session to the second: the same page now offers the account's challenge types, leaving out the type that passed the first step, and then [recovery codes](challenge.md#recovery-codes) while the account holds any. An account whose first factor proves two factors on its own, such as a passkey, is done after one step, as it is at sign-in. An account without a second factor is done after one step too. The offer comes from the same decision that drives sign-in, so an account holding a second factor never clears sudo on its first factor alone.
 
-A correct answer to the last step grants sudo: the session id is rotated, the grant is bound to the subnet the answer came from, the credential's `last_used_at` is stamped, and `sudo.granted` is recorded with flow `sudo` and the credential that earned it. The user is then sent to the page the gate refused. A recovery code is answerable, spends the code and records `recovery_code.used` with flow `sudo`, but the last code is always kept, whatever `require_recovery_codes` says.
+A correct answer to the last step grants sudo: the session id is rotated, the grant is bound to the subnet the answer came from, the credential's `last_used_at` is stamped, and `sudo.granted` is recorded with flow `sudo` and the credential that earned it. The user is then sent to the page the gate refused. A recovery code can answer the second step. It is spent, and `recovery_code.used` is recorded with flow `sudo`. The last code is always kept, whatever `require_recovery_codes` says.
 
 A wrong answer is refused with "The provided credential is invalid." on the type's field, records `sudo.failed` with flow `sudo`, and mails the owner a `sudo.failed` [alert](security-alerts.md), even when the browser is one of the account's known devices: someone with the session, or a copy of it, is guessing. It counts one failed attempt in the `sudo` flow for that type, apart from the counts sign-in and the challenge keep, except that wrong [TOTP](totp.md) codes share the challenge's count (see [Rate limiting](rate-limiting.md)). Once the sudo flow's count is spent, every answer gets a `429` until the count expires.
 
 Nothing is verified unless the gate asked for it. An answer from a session without a sudo-in-progress, or for a type the step doesn't offer, is refused without checking the credential or counting anything. An answer from an address that isn't an IP address is counted and refused like a wrong answer, with the reason `keystone.unbindable_subnet`, because a grant is never made without a subnet.
 
-A sudo-in-progress lasts 15 minutes from the refusal that started it. Being refused again inside those minutes only updates where the user goes afterwards; it buys no more time. When it runs out, the sudo page sends the user to `/`, and their next request to a gated route starts a fresh one. Whatever a method was in the middle of on the sudo page, such as a challenge a security key must sign, ends with it.
+A sudo-in-progress lasts 15 minutes from the refusal that started it. Being refused again inside those minutes buys no more time. A browser refused on another page goes to that page afterwards; a refused mutation or JSON request changes nothing. When it runs out, the sudo page sends the user to `/`, and their next request to a gated route starts a fresh one. Whatever a method was in the middle of on the sudo page, such as a challenge a security key must sign, ends with it.
 
 Each step of the replay is rate limited as the matching sign-in step is: the page counts as a view and an answer as a submission (see [Rate limiting](rate-limiting.md)).
 
 ## The page
 
-The published `SudoController` renders `resources/js/pages/auth/Sudo.vue` with the step's types, the preselected type and the surface the step verifies on, `sign-in` or `challenge`. The page reuses the credential type forms of the sign-in and challenge pages, with the identifier and remember-me fields left out and the button reading "Confirm". The response hooks in `app/Http/Controllers/Auth/SudoController.php` are yours to change:
-
-```php
-protected function sendSudoPage(Request $request, SudoPage $page): Response
-{
-    Inertia::encryptHistory();
-
-    return Inertia::render('auth/Sudo', [
-        'types' => $page->types,
-        'preselect' => $page->preselect,
-        'surface' => $page->surface,
-    ]);
-}
-
-protected function sendSudoRefused(Request $request, string $type, string $message): RedirectResponse
-{
-    return to_route('sudo')->withErrors([$type => $message]);
-}
-
-protected function sendSudoChallengeOwed(Request $request): RedirectResponse
-{
-    return to_route('sudo');
-}
-
-protected function sendSudoGranted(Request $request, string $intendedUrl): RedirectResponse
-{
-    return redirect($intendedUrl);
-}
-```
+The published `SudoController` renders `resources/js/pages/auth/Sudo.vue` with the step's types, the preselected type and the surface the step verifies on, `sign-in` or `challenge`. The page reuses the credential type forms of the sign-in and challenge pages, with the identifier and remember-me fields left out and the button reading "Confirm". Each outcome has its response hook in `app/Http/Controllers/Auth/SudoController.php`: `sendSudoPage()` renders the page, `sendSudoRefused()` sends a wrong answer back to it with the message on the type's field, `sendSudoChallengeOwed()` sends a passed first step on to the second, and `sendSudoGranted()` sends the user to the intended URL. Change any of them there.
 
 A guest is redirected to sign in. A signed-in session nothing was demanded of is sent to `/`, because without a refusal there is no page to go back to.
 
@@ -132,7 +104,7 @@ Only the grant is bound. The session itself follows the user from one network to
 
 ## Ending it
 
-A user who is done with their changes can end sudo before it runs out, for example on a computer they share. The published `SudoController` does it on the `sudo.end` route, `DELETE /auth/sudo`. A button on a page of your own:
+A user who is done with their changes can end sudo before it runs out, for example on a computer they share. The published `SudoController` does it on the `sudo.end` route, `DELETE /auth/sudo`. The response sends the user back to the page they came from, so the button belongs on a page that needs no sudo, such as your security overview. A button on such a page:
 
 ```vue
 <script setup lang="ts">
@@ -147,7 +119,7 @@ import { end } from '@/routes/sudo';
 </template>
 ```
 
-Keystone then drops the grant, or the sudo-in-progress, rotates the session id, records `sudo.revoked` when a live grant was ended, and flashes the status `sudo-revoked`. The user stays signed in. `sendSudoEnded()` in your `app/Http/Controllers/Auth/SudoController.php` sends them back to the page they came from, or to `/` when the request names none. Put the button on a page that doesn't need sudo, such as your security overview: from a gated page, going back meets the gate again and lands on the sudo page.
+Keystone then drops the grant, or the sudo-in-progress, rotates the session id, records `sudo.revoked` when a live grant was ended, and flashes the status `sudo-revoked`. The user stays signed in. `sendSudoEnded()` in your `app/Http/Controllers/Auth/SudoController.php` sends them back to the page they came from, or to `/` when the request names none. From a gated page, going back meets the gate again and lands on the sudo page.
 
 ```php
 protected function sendSudoEnded(Request $request): RedirectResponse

@@ -6,7 +6,7 @@ defineProps<{ option: CredentialTypeOption; surface: Surface; purpose?: Purpose 
 </script>
 
 <template>
-    <FormShape :option="option" :surface="surface" :purpose="purpose" v-slot="{ errors }">
+    <FormShape :option="option" :surface="surface" :purpose="purpose" :fields="['code']" v-slot="{ errors }">
         <div class="flex flex-col gap-2">
             <label :for="`${option.type}-code`" class="text-sm font-medium text-gray-900">Recovery code</label>
             <input

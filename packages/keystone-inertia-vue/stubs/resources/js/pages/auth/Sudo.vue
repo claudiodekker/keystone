@@ -25,7 +25,7 @@ const others = computed(() => props.types.filter((type) => type.type !== option.
 
     <CredentialTypeForm v-if="option" :key="option.type" :option="option" :surface="surface" purpose="sudo" />
 
-    <p v-else class="text-sm text-gray-600">Your account holds nothing you can confirm it's you with. Sign out and sign in again to continue.</p>
+    <p v-else class="text-sm text-gray-600">Your account has no way to confirm it's you. Sign out and sign in again to continue.</p>
 
     <div v-if="others.length" class="flex flex-col gap-2">
         <p class="text-sm text-gray-600">Use something else:</p>

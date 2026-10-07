@@ -49,7 +49,7 @@ return [
         'limit' => [
             'tripped' => [
                 'subject' => 'Attempts to prove it\'s you were paused',
-                'what' => 'Too many wrong answers were given to prove it\'s you on your account, while signing in or before a sensitive change, so further attempts with that kind of credential are refused for a while. Wrong answers from browsers you signed in from recently are counted apart, so those browsers can still get through unless the wrong answers came from them.',
+                'what' => 'Your account got too many wrong answers to a sign-in step or to a check before a sensitive change. Further attempts with that kind of credential are refused for a while. Browsers you signed in from recently count their own wrong answers, so they are only paused when the wrong answers came from them.',
             ],
         ],
         'recovery_code' => [
@@ -82,7 +82,7 @@ return [
             ],
             'network_changed' => [
                 'subject' => 'Your session moved to another network',
-                'what' => 'A signed-in session of your account tried to make a sensitive change from another network than the one it proved itself on. It must prove it\'s you again before it can make that change. A session cookie copied to another computer looks like this.',
+                'what' => 'A session signed in to your account tried to make a sensitive change from a different network. It had proved it\'s you on another network a short while before. It must prove it\'s you again before it can make the change. A session cookie copied to another computer looks like this.',
             ],
         ],
     ],
