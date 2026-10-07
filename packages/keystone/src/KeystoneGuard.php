@@ -420,7 +420,7 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Open a pending challenge for the account, returning its id, unless the browser is a known device of it.
+     * Open a pending challenge for the account, returning its id, unless the browser is a known device of it or the sign-in being replaced already opened one for it.
      */
     protected function openPendingChallenge(Model&KeystoneUser $account): ?int
     {
@@ -430,7 +430,28 @@ class KeystoneGuard extends SessionGuard
             return null;
         }
 
-        return (new PendingChallenges($account))->open($account->getKey(), userAgent: $request->headers->get('User-Agent'), ipAddress: $request->getClientIp());
+        $challenges = new PendingChallenges($account);
+        $replaced = $this->replacedPendingChallengeId($account);
+
+        if ($replaced !== null && $challenges->has($replaced)) {
+            return $replaced;
+        }
+
+        return $challenges->open($account->getKey(), userAgent: $request->headers->get('User-Agent'), ipAddress: $request->getClientIp());
+    }
+
+    /**
+     * Get the id of the pending challenge that the pending sign-in about to be replaced opened, when that sign-in is the account's.
+     */
+    protected function replacedPendingChallengeId(Model&KeystoneUser $account): ?int
+    {
+        $replaced = $this->session->get($this->pendingKey());
+
+        if (! is_array($replaced) || (string) $replaced['account'] !== (string) $account->getAuthIdentifier()) {
+            return null;
+        }
+
+        return $replaced['pending_challenge_id'];
     }
 
     /**

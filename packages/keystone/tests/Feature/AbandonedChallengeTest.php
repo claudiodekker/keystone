@@ -206,6 +206,27 @@ describe('the pending challenge', function () {
         $this->assertDatabaseCount('user_pending_challenges', 1);
     });
 
+    it('is deleted when the challenge is passed after the same account passed its first factor again in the same session', function () {
+        $this->createChallengedAccount(new FormTypeSupport('code'));
+        $this->passFirstFactor();
+        $this->passFirstFactor()->assertRedirectToRoute('login.challenge');
+
+        answerChallenge($this)->assertRedirect('/');
+
+        $this->assertDatabaseCount('user_pending_challenges', 0);
+    });
+
+    it('stays the first hold\'s when the same account passes its first factor again in the same session', function () {
+        $this->travelTo('2026-10-06 12:00:00');
+        $this->createChallengedAccount(new FormTypeSupport('code'));
+        $this->passFirstFactor();
+        $this->travelTo('2026-10-06 12:03:00');
+
+        $this->passFirstFactor()->assertRedirectToRoute('login.challenge');
+
+        expect(DB::table('user_pending_challenges')->sole()->created_at)->toBe('2026-10-06 12:00:00');
+    });
+
     it('is kept when a newer hold in the same session replaces its sign-in, and only the newer one is deleted on a pass', function () {
         $jane = $this->createChallengedAccount(new FormTypeSupport('code'));
         $this->createChallengedAccount(new FormTypeSupport('code'), 'john@example.com');

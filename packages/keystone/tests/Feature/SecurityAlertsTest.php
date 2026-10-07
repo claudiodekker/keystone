@@ -136,6 +136,7 @@ describe('the queued alert', function () {
         $this->travelTo('2026-10-06 12:00:00');
         $this->createChallengedAccount(new FormTypeSupport('code'));
         $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.7'])->withHeader('User-Agent', FIREFOX)->passFirstFactor();
+        session()->invalidate();
         $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.9'])->withHeader('User-Agent', 'curl/8.0')->passFirstFactor();
         $this->travelTo('2026-10-06 12:10:00');
 

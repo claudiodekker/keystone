@@ -48,6 +48,14 @@ class PendingChallenges
     }
 
     /**
+     * Determine if the challenge is still pending: neither passed nor swept.
+     */
+    public function has(int $id): bool
+    {
+        return $this->query()->where('id', $id)->exists();
+    }
+
+    /**
      * Forget the challenge, which its sign-in passed.
      */
     public function forget(int $id): void
