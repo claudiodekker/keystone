@@ -91,9 +91,9 @@ class SecurityEventRecorder
     /**
      * Record one event of the type about the account for each request context, alerting its owner once about all of them.
      *
-     * @param  list<RequestContext>  $contexts
+     * @param  iterable<RequestContext>  $contexts
      */
-    public function recordEach(SecurityEventType $type, Model&KeystoneUser $account, array $contexts, Actor $actor): void
+    public function recordEach(SecurityEventType $type, Model&KeystoneUser $account, iterable $contexts, Actor $actor): void
     {
         if (! $this->enabled()) {
             return;

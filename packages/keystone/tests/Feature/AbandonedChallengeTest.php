@@ -428,8 +428,8 @@ describe('the sweep', function () {
         expect(array_map(fn (SecurityEvent $event) => $event->ip_address, abandonedChallengeEvents()))->toBe(['203.0.113.7', '198.51.100.9', '198.51.100.9'])
             ->and(array_column($alerts, 0))->toBe(['jane@example.com', 'work@example.com'])
             ->and($alerts[0][1]->count)->toBe(3)
-            ->and($alerts[0][1]->ipAddresses)->toBe(['203.0.113.7', '198.51.100.9'])
-            ->and($alerts[0][1]->devices)->toBe(['Firefox on Windows', 'Chrome on Mac']);
+            ->and($alerts[0][1]->ipAddresses->all())->toBe(['203.0.113.7', '198.51.100.9'])
+            ->and($alerts[0][1]->devices->all())->toBe(['Firefox on Windows', 'Chrome on Mac']);
         $this->assertDatabaseCount('user_pending_challenges', 0);
     });
 
@@ -487,7 +487,7 @@ describe('the sweep', function () {
         $this->artisan('schedule:run')->assertSuccessful();
 
         $alerts = abandonedChallengeAlerts();
-        expect(array_map(fn (array $sent) => [$sent[0], $sent[1]->count, $sent[1]->ipAddresses], $alerts))->toBe([
+        expect(array_map(fn (array $sent) => [$sent[0], $sent[1]->count, $sent[1]->ipAddresses->all()], $alerts))->toBe([
             ['jane@example.com', 1, ['203.0.113.7']],
             ['john@example.com', 1, ['198.51.100.9']],
         ]);
@@ -504,7 +504,7 @@ describe('the sweep', function () {
         $this->artisan('schedule:run')->assertSuccessful();
 
         expect(abandonedChallengeAlerts())->toHaveCount(1)
-            ->and(abandonedChallengeAlerts()[0][1]->ipAddresses)->toBe(['203.0.113.7'])
+            ->and(abandonedChallengeAlerts()[0][1]->ipAddresses->all())->toBe(['203.0.113.7'])
             ->and(Crypt::decryptString(DB::table('user_pending_challenges')->sole()->ip_address))->toBe('198.51.100.9');
     });
 

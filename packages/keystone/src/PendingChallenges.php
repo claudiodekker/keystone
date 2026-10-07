@@ -95,15 +95,15 @@ class PendingChallenges
      * Get the context of the request that held each challenge, dated by the hold.
      *
      * @param  Collection<int, stdClass>  $challenges
-     * @return list<RequestContext>
+     * @return Collection<int, RequestContext>
      */
-    protected function contextsOf(Collection $challenges): array
+    protected function contextsOf(Collection $challenges): Collection
     {
-        return array_values($challenges->map(fn (stdClass $challenge) => new RequestContext(
+        return $challenges->map(fn (stdClass $challenge) => new RequestContext(
             ipAddress: $this->decrypt($challenge->ip_address),
             userAgent: $this->decrypt($challenge->user_agent),
             occurredAt: CarbonImmutable::parse($challenge->created_at),
-        ))->all());
+        ));
     }
 
     /**

@@ -14,6 +14,7 @@ use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\Collection;
 use Throwable;
 
 /**
@@ -67,16 +68,16 @@ class SecurityAlert extends Notification implements SecurityEventAlertContract, 
     /**
      * The distinct IP addresses of the requests that caused the events, with null for an unknown one.
      *
-     * @var list<string|null>
+     * @var Collection<int, string|null>
      */
-    public array $ipAddresses;
+    public Collection $ipAddresses;
 
     /**
      * The distinct labels of the devices that caused the events, never their raw user agents, with null for an unknown one.
      *
-     * @var list<string|null>
+     * @var Collection<int, string|null>
      */
-    public array $devices;
+    public Collection $devices;
 
     /**
      * The type of the credential involved; never its label, which its owner typed.
@@ -98,15 +99,13 @@ class SecurityAlert extends Notification implements SecurityEventAlertContract, 
         $this->type = $event->type;
         $this->count = count($events);
         $this->occurredAt = min(array_map(fn (SecurityEvent $event) => $event->occurred_at, $events));
-        $this->ipAddresses = array_values(collect($events)->map(fn (SecurityEvent $event) => $event->ip_address)->unique(strict: true)->all());
-        $this->devices = array_values(
-            collect($events)
-                ->map(fn (SecurityEvent $event) => $event->user_agent)
-                ->unique(strict: true)
-                ->map(fn (?string $userAgent) => $this->describe($userAgent))
-                ->unique(strict: true)
-                ->all()
-        );
+        $this->ipAddresses = collect($events)->map(fn (SecurityEvent $event) => $event->ip_address)->unique(strict: true)->values();
+        $this->devices = collect($events)
+            ->map(fn (SecurityEvent $event) => $event->user_agent)
+            ->unique(strict: true)
+            ->map(fn (?string $userAgent) => $this->describe($userAgent))
+            ->unique(strict: true)
+            ->values();
         $this->credentialType = $event->credential_type;
         $this->remainingRecoveryCodes = $this->countRemainingRecoveryCodes($event);
     }
@@ -154,17 +153,17 @@ class SecurityAlert extends Notification implements SecurityEventAlertContract, 
     /**
      * List the first of the values in one line, naming an unknown one and saying how many more there are.
      *
-     * @param  list<string|null>  $values
+     * @param  Collection<int, string|null>  $values
      */
-    protected function listed(array $values, string $unknown): string
+    protected function listed(Collection $values, string $unknown): string
     {
-        $listed = collect($values)->take(self::LISTED_VALUES)->map(fn (?string $value) => $value ?? $unknown)->implode(', ');
+        $listed = $values->take(self::LISTED_VALUES)->map(fn (?string $value) => $value ?? $unknown)->implode(', ');
 
-        if (count($values) <= self::LISTED_VALUES) {
+        if ($values->count() <= self::LISTED_VALUES) {
             return $listed;
         }
 
-        return __('keystone::alerts.more', ['values' => $listed, 'count' => count($values) - self::LISTED_VALUES]);
+        return __('keystone::alerts.more', ['values' => $listed, 'count' => $values->count() - self::LISTED_VALUES]);
     }
 
     /**
@@ -172,7 +171,7 @@ class SecurityAlert extends Notification implements SecurityEventAlertContract, 
      */
     protected function locate(): ?string
     {
-        $known = collect($this->ipAddresses)->whereNotNull();
+        $known = $this->ipAddresses->whereNotNull();
 
         if ($known->count() !== 1) {
             return null;
