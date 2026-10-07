@@ -41,7 +41,7 @@ class RememberTokens
      */
     public function issue(int|string $accountId, int $epoch): array
     {
-        $value = bin2hex(random_bytes(self::VALUE_BYTES));
+        $value = static::mint();
         $now = Date::now();
         $expiresAt = $now->copy()->addSeconds(static::lifetimeSeconds());
 
@@ -98,7 +98,7 @@ class RememberTokens
             return null;
         }
 
-        $value = bin2hex(random_bytes(self::VALUE_BYTES));
+        $value = static::mint();
 
         $moved = $this->query()->where('id', $id)->where('credential_epoch', $movedFrom)->update([
             'token_hash' => static::digest($value),
@@ -133,6 +133,14 @@ class RememberTokens
     public static function isOffered(): bool
     {
         return static::lifetimeSeconds() > 0;
+    }
+
+    /**
+     * Mint the value a remember-me cookie carries.
+     */
+    protected static function mint(): string
+    {
+        return bin2hex(random_bytes(self::VALUE_BYTES));
     }
 
     /**

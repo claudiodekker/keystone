@@ -65,9 +65,9 @@ The same happens when a signed-in session outlives its absolute lifetime while i
 
 A return changes neither the token nor the cookie, so a browser that reopens with several tabs restores in each of them. It also leaves the [device cookie](security-alerts.md#new-devices) as it was. A return from a browser that isn't one of the account's known devices, such as one that a copied cookie was pasted into, alerts the account's owner like any sign-in from a new device.
 
-A remembered return is a full sign-in. The second factor is not asked again, which is why the lifetime is fixed and why `0` exists. To ask for a fresh proof before a sensitive change in your own app, check `Auth::viaRemember()`.
+A remembered return is a full sign-in. The second factor is not asked again, which is why the lifetime is fixed and why `0` exists.
 
-Keystone restores only after Laravel's `StartSession` middleware has run. A global middleware of yours that asks who is signed in before it sees a guest.
+Keystone restores only after Laravel's `StartSession` middleware has run. If one of your global middleware asks who is signed in before `StartSession` runs, it sees a guest.
 
 ## What ends it
 
@@ -75,15 +75,15 @@ Keystone restores only after Laravel's `StartSession` middleware has run. A glob
 |---|---|
 | The user signs out on that browser | That browser's token and cookie are deleted. The account's other browsers stay remembered. |
 | The token reaches its end time | It no longer restores. |
-| The account's other sessions are ended, such as by a password change or `keystone:end-sessions` | Every token of the account stops restoring, because it was issued on an older credential epoch. |
+| The account's other sessions are ended, such as by `keystone:end-sessions` | Every token of the account stops restoring, because it was issued on an older credential epoch. |
 | The account is suspended, invalidated or deleted | Its tokens stop restoring. |
 | The account newly owes [enrollment](enrollment.md#signed-in-sessions-that-newly-owe) | A return is refused and the user signs in again, as below. |
 
-One browser survives the third row. When a signed-in user makes the change that ends their other sessions, their own session stays signed in, and their browser is handed a new cookie value for the same token. The token keeps its end time, and the old value stops working with the other sessions.
+One browser survives its account's other sessions being ended. When a signed-in user makes the change that ends them, their own session stays signed in, and their browser is handed a new cookie value for the same token. The token keeps its end time, and the old value stops working with the other sessions.
 
-A cookie that no longer restores is dropped from the browser the first time it is presented, and its token is deleted. Keystone records `request.rejected` with the reason `keystone.dead_remember_cookie`, on the account's audit trail when the cookie named a token and in the log alone when it didn't. The user is a guest and sees no message.
+A cookie that no longer restores is dropped from the browser the first time it is presented, and its token is deleted. Keystone records `request.rejected` with the reason `keystone.dead_remember_cookie`, on the account's audit trail when the cookie named a token and in the log alone when it didn't. The user is a guest and sees no message. A cookie whose value isn't 64 hexadecimal characters is not one Keystone handed out, so it is ignored: nothing is dropped or recorded.
 
-When the account newly owes enrollment, for example because you turned a mandate on, the return is refused the same way with the reason `keystone.enrollment_owed`, and the user is told why: a browser is redirected to sign in with the status "Please sign in again to finish setting up two-factor authentication.", and a request expecting JSON gets a `401` with the reason `demoted`. Signing in again proves the account afresh before it enrolls. A cookie never enrolls anything, so a stolen one can't add its own second factor. A signed-in session that is ended for the same reason forgets its token too.
+When the account newly owes enrollment, for example because you turned a mandate on, the return is refused the same way with the reason `keystone.enrollment_owed`, and the user is told why: a browser is redirected to sign in with the status "Please sign in again to finish setting up two-factor authentication.", and a request expecting JSON gets a `401` with the reason `demoted`. When the browser's session had also outlived its absolute lifetime, the user gets the expiry answer instead. Signing in again proves the account afresh before it enrolls. A cookie never enrolls anything, so a stolen one can't add its own second factor. A signed-in session that is ended for the same reason forgets its token too.
 
 If you list `cookies` in [`keystone.clear_site_data`](hardening.md#clearing-site-data), the browser also drops the remember-me cookie whenever Keystone ends a session.
 

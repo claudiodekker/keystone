@@ -104,9 +104,8 @@ class KeystoneGuard extends SessionGuard
         }
 
         $knownDevice = $this->recognizeDevice($user);
-        $rememberTokenId = $this->remember($user, $rememberMe);
 
-        $this->enter($user, $rememberTokenId);
+        $this->startSignedInSession($user, $this->remember($user, $rememberMe));
 
         $this->fireLoginEvent($user);
 
@@ -271,7 +270,7 @@ class KeystoneGuard extends SessionGuard
     public function signOut(): void
     {
         // The token is forgotten first, because ending the session drops its id.
-        $this->forgetRememberToken();
+        $this->stopRemembering();
 
         $this->logout();
 
@@ -430,23 +429,11 @@ class KeystoneGuard extends SessionGuard
     /**
      * Restore the sign-in the request's remember-me cookie remembers, or refuse a dead cookie.
      *
-     * A restore changes no token, device or cookie value, so any number of requests from one browser may restore at once.
-     *
      * @return (Model&KeystoneUser)|null
      */
     protected function restore(): ?Model
     {
-        if (! RememberTokens::isOffered()) {
-            return null;
-        }
-
-        // A session that has yet to start takes the id the browser sent once it does, so a restore now would not rotate it.
-        if (! $this->session->isStarted()) {
-            return null;
-        }
-
-        $request = $this->getRequest();
-        $value = RememberTokens::cookieOf($request);
+        $value = $this->presentedRememberCookie();
 
         if ($value === null) {
             return null;
@@ -467,9 +454,38 @@ class KeystoneGuard extends SessionGuard
             return null;
         }
 
-        $knownDevice = (new KnownDevices($account))->isKnown($account->getKey(), KnownDevices::cookieOf($request));
+        return $this->signInRemembered($account, $token);
+    }
 
-        $this->enter($account, $token->id);
+    /**
+     * Get the value of the remember-me cookie the request carries, when remember-me is on and the session can take a restored sign-in.
+     */
+    protected function presentedRememberCookie(): ?string
+    {
+        if (! RememberTokens::isOffered()) {
+            return null;
+        }
+
+        // A session that has yet to start takes the id the browser sent
+        // once it does, so restoring now would leave the sign-in on
+        // an id the browser chose, not a rotated one.
+        if (! $this->session->isStarted()) {
+            return null;
+        }
+
+        return RememberTokens::cookieOf($this->getRequest());
+    }
+
+    /**
+     * Sign the account in on the token that remembers it, changing neither the token nor a cookie, and record the remembered return.
+     *
+     * @return Model&KeystoneUser
+     */
+    protected function signInRemembered(Model&KeystoneUser $account, RememberToken $token): Model
+    {
+        $knownDevice = (new KnownDevices($account))->isKnown($account->getKey(), KnownDevices::cookieOf($this->getRequest()));
+
+        $this->startSignedInSession($account, $token->id);
 
         $this->viaRemember = true;
 
@@ -544,9 +560,9 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Make the session a signed-in one for the account on a new session id, stamped with its credential epoch, the time and the token that remembers it.
+     * Start the account's signed-in session on a new session id, in place of any pending sign-in, stamped with its credential epoch, the time and the token that remembers it.
      */
-    protected function enter(Model&KeystoneUser $account, ?int $rememberTokenId): void
+    protected function startSignedInSession(Model&KeystoneUser $account, ?int $rememberTokenId): void
     {
         $this->changeAuthLevel();
 
@@ -578,7 +594,7 @@ class KeystoneGuard extends SessionGuard
     /**
      * Forget the token that remembers the session on this device and drop its cookie.
      */
-    protected function forgetRememberToken(): void
+    protected function stopRemembering(): void
     {
         $id = $this->session->get($this->rememberKey());
 
@@ -711,7 +727,7 @@ class KeystoneGuard extends SessionGuard
      */
     protected function demote(Model&KeystoneUser $account): void
     {
-        $this->forgetRememberToken();
+        $this->stopRemembering();
 
         $this->endSession();
 

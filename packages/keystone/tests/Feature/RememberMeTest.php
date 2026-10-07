@@ -511,6 +511,7 @@ describe('a dead cookie', function () {
     })->with([
         'an older credential epoch' => [fn (AppTestCase $test, $account) => $test->artisan('keystone:end-sessions', ['user' => (string) $account->getKey()])->assertSuccessful()],
         'a suspended account' => [fn (AppTestCase $test, $account) => $test->artisan('keystone:suspend', ['user' => (string) $account->getKey()])->assertSuccessful()],
+        'an account suspended on the same credential epoch' => [fn () => DB::table('users')->update(['suspended_at' => now()])],
         'an invalidated account' => [fn () => DB::table('users')->update(['invalidated_at' => now()])],
         'a deleted account' => [fn () => DB::table('users')->update(['deleted_at' => now()])],
         'an expired token' => [fn (AppTestCase $test) => $test->travel(config()->integer('keystone.remember.lifetime_seconds'))->seconds()],
@@ -651,6 +652,25 @@ describe('a session that outlives its absolute lifetime', function () {
             ->and(session('keystone.status'))->toBeNull()
             ->and(session('keystone_signed_in_at_web'))->toBe(now()->getTimestamp())
             ->and(recordedEvents(SecurityEventType::SIGNED_IN)->last()->reason)->toBe('remembered');
+    });
+
+    it('expires as ever when its account newly owes enrollment, and the cookie is dropped with its token', function () {
+        $this->createFirstFactorAccount();
+        [$remember, $device] = tickedBrowser($this);
+        $this->fromRememberCookie($remember)->fromDevice($device);
+        config(['keystone.require_second_factor' => true]);
+        $this->travel(3600)->seconds();
+
+        $response = $this->withCredentials()->getJson('dashboard');
+
+        $response->assertUnauthorized()
+            ->assertJsonPath('reason', 'expired')
+            ->assertCookieExpired(RememberTokens::COOKIE);
+        $this->assertGuest();
+        $this->assertDatabaseCount('user_remember_tokens', 0);
+        expect(session('keystone.status'))->toBe('session-expired')
+            ->and(recordedEvents(SecurityEventType::SESSION_ENDED)->sole()->reason)->toBe('expired')
+            ->and(recordedEvents(SecurityEventType::REQUEST_REJECTED)->sole()->reason)->toBe('keystone.enrollment_owed');
     });
 
     it('gets an absolute lifetime of its own once restored', function () {
