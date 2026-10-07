@@ -98,8 +98,15 @@ class SecurityAlert extends Notification implements SecurityEventAlertContract, 
         $this->type = $event->type;
         $this->count = count($events);
         $this->occurredAt = min(array_map(fn (SecurityEvent $event) => $event->occurred_at, $events));
-        $this->ipAddresses = $this->distinct(array_map(fn (SecurityEvent $event) => $event->ip_address, $events));
-        $this->devices = $this->distinct(array_map(fn (SecurityEvent $event) => $this->describe($event->user_agent), $events));
+        $this->ipAddresses = array_values(collect($events)->map(fn (SecurityEvent $event) => $event->ip_address)->unique(strict: true)->all());
+        $this->devices = array_values(
+            collect($events)
+                ->map(fn (SecurityEvent $event) => $event->user_agent)
+                ->unique(strict: true)
+                ->map(fn (?string $userAgent) => $this->describe($userAgent))
+                ->unique(strict: true)
+                ->all()
+        );
         $this->credentialType = $event->credential_type;
         $this->remainingRecoveryCodes = $this->countRemainingRecoveryCodes($event);
     }
@@ -142,17 +149,6 @@ class SecurityAlert extends Notification implements SecurityEventAlertContract, 
                 'credential' => $this->credentialType,
                 'remainingRecoveryCodes' => $this->remainingRecoveryCodes,
             ]);
-    }
-
-    /**
-     * Get the values without repeats, in the order they first appear.
-     *
-     * @param  list<string|null>  $values
-     * @return list<string|null>
-     */
-    protected function distinct(array $values): array
-    {
-        return array_values(array_unique($values));
     }
 
     /**
