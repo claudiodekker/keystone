@@ -19,12 +19,12 @@ class PendingChallenges
     /**
      * How long a challenge may stay unanswered before it counts as abandoned.
      */
-    public const int ABANDONED_AFTER_SECONDS = 420;
+    protected const int ABANDONED_AFTER_SECONDS = 420;
 
     /**
      * The most swept rows one query deletes.
      */
-    protected const int DELETE_CHUNK = 1000;
+    protected const int DELETE_CHUNK_ROWS = 1000;
 
     /**
      * Create a new pending challenges instance on the model's connection.
@@ -85,7 +85,7 @@ class PendingChallenges
                 $recorder->recordEach(SecurityEventType::CHALLENGE_ABANDONED, $accounts[$accountId], $this->contextsOf($challenges), actor: Actor::SYSTEM);
             }
 
-            foreach ($challenges->pluck('id')->chunk(self::DELETE_CHUNK) as $ids) {
+            foreach ($challenges->pluck('id')->chunk(self::DELETE_CHUNK_ROWS) as $ids) {
                 $this->query()->whereIn('id', $ids->all())->delete();
             }
         }
