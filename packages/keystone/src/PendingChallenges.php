@@ -30,7 +30,7 @@ class PendingChallenges
      * Create a new pending challenges instance on the model's connection.
      */
     public function __construct(
-        protected Model $model,
+        protected Model&KeystoneUser $model,
     ) {
         //
     }
@@ -114,7 +114,6 @@ class PendingChallenges
      */
     protected function accounts(array $ids): array
     {
-        /** @var array<array-key, Model&KeystoneUser> */
         return $this->model->newQueryWithoutScopes()->whereKey($ids)->get()->getDictionary();
     }
 
