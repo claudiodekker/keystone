@@ -69,3 +69,5 @@ Clearing storage also drops what your app keeps there on purpose, such as prefer
 ```
 
 A list naming anything else stops your app from booting.
+
+Listing `cookies` makes the browser drop every cookie of your site whenever Keystone ends a session, the [remember-me cookie](remember-me.md) included, so a remembered user whose session is ended signs in again. A session that a live remember-me cookie restores after its absolute lifetime is not ended, so that response carries no `Clear-Site-Data` and the cookie stays.

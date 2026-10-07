@@ -52,6 +52,8 @@ When an account that is signed in comes to owe enrollment, for example because y
 
 Signing in again proves the account afresh: the first factor, then the challenge when the account holds a second factor, then the enrollment it owes. Signing out of such a session ends it the same way.
 
+A session ended this way forgets the [remember-me](remember-me.md#what-ends-it) token of its browser, and a remember-me cookie of an account that owes enrollment restores nothing: the user gets the same redirect or `401` and signs in again.
+
 To answer your own way, bind your own `ClaudioDekker\Keystone\Actions\RespondToDemotedSession` and override its `handle()`, exactly as for an [expired session](configuration.md#session-lifetime), then redefine `assertDemotedToSignIn()` or `assertDemotedJsonRefused()` in `tests/Keystone/Assertions/EnrollmentAssertions.php`.
 
 ## Changing the responses
