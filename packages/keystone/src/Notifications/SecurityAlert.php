@@ -43,6 +43,8 @@ class SecurityAlert extends Notification implements SecurityEventAlertContract, 
         SecurityEventType::RECOVERY_CODES_GENERATED,
         SecurityEventType::SESSIONS_TERMINATED,
         SecurityEventType::SIGNED_IN,
+        SecurityEventType::SUDO_FAILED,
+        SecurityEventType::SUDO_NETWORK_CHANGED,
     ];
 
     /**

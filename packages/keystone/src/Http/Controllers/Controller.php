@@ -2,6 +2,7 @@
 
 namespace ClaudioDekker\Keystone\Http\Controllers;
 
+use ClaudioDekker\Keystone\Http\Middleware\RequireSudo;
 use ClaudioDekker\Keystone\Http\Middleware\ThrottleKeystoneRequests;
 use ClaudioDekker\Keystone\StepKind;
 use Illuminate\Routing\Controllers\HasMiddleware;
@@ -18,5 +19,13 @@ abstract class Controller implements HasMiddleware
     protected static function throttle(StepKind $kind, string ...$actions): Middleware
     {
         return new Middleware(ThrottleKeystoneRequests::class.':'.$kind->value, only: $actions);
+    }
+
+    /**
+     * Require sudo before the given actions run, whatever an app's override of them does.
+     */
+    protected static function sudo(string ...$actions): Middleware
+    {
+        return new Middleware(RequireSudo::class, only: $actions);
     }
 }

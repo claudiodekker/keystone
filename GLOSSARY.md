@@ -84,8 +84,12 @@ _Avoid_: password reset, forgot password
 ### Security
 
 **Sudo**:
-A short grant on a signed-in session, bound to its network, that allows changes affecting authentication. Every real sign-in brings it (never a remembered return or a recovery), and proving again what a sign-in would demand earns it back.
+A short grant on a signed-in session, bound to the subnet it was earned from, that allows changes affecting authentication. Every real sign-in brings it (never a remembered return or a recovery), and proving again what a sign-in would demand earns it back.
 _Avoid_: password confirmation, step-up
+
+**Sudo-in-progress**:
+A signed-in session the sudo gate refused, which owes the steps a sign-in of its account would take before it gets sudo, and remembers where to go afterwards. It lasts a fixed 15 minutes from the refusal that started it, and a session holds either it or a grant, never both.
+_Avoid_: sudo challenge, pending sudo
 
 **Remember-me cookie**:
 Keystone's own long-lived cookie that restores a user's sign-in on return. A dead one never restores. A cookie is dead once its fixed lifetime, counted from its sign-in, has passed, or once the credential epoch has moved. It is also dead while its account is suspended, invalidated or deleted, or newly owes enrollment.

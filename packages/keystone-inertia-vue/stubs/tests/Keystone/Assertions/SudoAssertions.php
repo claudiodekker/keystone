@@ -2,9 +2,9 @@
 
 namespace Tests\Keystone\Assertions;
 
-use ClaudioDekker\Keystone\AppTests\Assertions\SudoAssertions as KeystoneSudoAssertions;
+use ClaudioDekker\Keystone\InertiaVue\AppTests\Assertions\SudoAssertions as InertiaVueSudoAssertions;
 
 trait SudoAssertions
 {
-    use KeystoneSudoAssertions;
+    use InertiaVueSudoAssertions;
 }

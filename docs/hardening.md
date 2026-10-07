@@ -2,11 +2,11 @@
 
 Keystone hardens its own responses and refuses cross-site requests to its own routes itself. Nothing in your routes, middleware or controllers needs to be wired up, and none of it can be turned off from a controller you published.
 
-A route is one of Keystone's when its controller extends one of Keystone's controllers, as the published `SignInController` and `SignOutController` do. Your own routes and controllers are left alone.
+A route is one of Keystone's when its controller extends one of Keystone's controllers, as the published `SignInController` and `SignOutController` do. Your own routes and controllers are left alone, with one exception: a response that the [sudo gate](sudo.md#gating-a-route) refused on a route of yours.
 
 ## Headers
 
-Every response from a Keystone route carries these headers, whatever produced it: the page itself, a redirect, a validation or throttle refusal, a middleware that answered early, or an exception your handler rendered.
+Every response from a Keystone route carries these headers, whatever produced it: the page itself, a redirect, a validation or throttle refusal, a middleware that answered early, or an exception your handler rendered. A refusal by the `sudo` middleware carries them too, on any route of yours. That refusal is the redirect to the sudo page or the 403, and Keystone answers it even though the route isn't Keystone's.
 
 | Header | Value |
 |---|---|

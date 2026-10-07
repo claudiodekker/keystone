@@ -5,6 +5,7 @@ namespace ClaudioDekker\Keystone;
 use ClaudioDekker\Keystone\Actions\AccountLookup;
 use ClaudioDekker\Keystone\Actions\RespondToDemotedSession;
 use ClaudioDekker\Keystone\Actions\RespondToExpiredSession;
+use ClaudioDekker\Keystone\Actions\RespondToSudoRequired;
 use ClaudioDekker\Keystone\Console\EndSessionsCommand;
 use ClaudioDekker\Keystone\Console\SuspendCommand;
 use ClaudioDekker\Keystone\Console\UnsuspendCommand;
@@ -12,6 +13,7 @@ use ClaudioDekker\Keystone\Http\Middleware\AddHardeningHeaders;
 use ClaudioDekker\Keystone\Http\Middleware\CaptureRequestContext;
 use ClaudioDekker\Keystone\Http\Middleware\ClearSiteDataOnSessionEnd;
 use ClaudioDekker\Keystone\Http\Middleware\RefuseCrossSiteRequests;
+use ClaudioDekker\Keystone\Http\Middleware\RequireSudo;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use DeviceDetector\DeviceDetector;
 use Illuminate\Auth\AuthenticationException;
@@ -48,6 +50,7 @@ class KeystoneServiceProvider extends ServiceProvider
         $this->app->bindIf(AccountLookup::class);
         $this->app->bindIf(RespondToExpiredSession::class);
         $this->app->bindIf(RespondToDemotedSession::class);
+        $this->app->bindIf(RespondToSudoRequired::class);
         $this->app->scoped(RequestContext::class, fn () => new RequestContext);
         $this->app->bindIf(IpLocation::class, fn () => class_exists(LocationManager::class) ? new StevebaumanIpLocation : new NullIpLocation);
         $this->app->bindIf(SessionInfo::class, fn () => class_exists(DeviceDetector::class) ? new DeviceDetectorSessionInfo : new NullSessionInfo);
@@ -67,6 +70,7 @@ class KeystoneServiceProvider extends ServiceProvider
         }
 
         $router->pushMiddlewareToGroup('web', RefuseCrossSiteRequests::class);
+        $router->aliasMiddleware('sudo', RequireSudo::class);
 
         EncryptCookies::except([KnownDevices::COOKIE, RememberTokens::COOKIE]);
 

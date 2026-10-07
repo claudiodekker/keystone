@@ -2,11 +2,33 @@
 
 namespace ClaudioDekker\Keystone;
 
+use Illuminate\Http\Request;
+
 /**
  * @internal
  */
 class IntendedUrl
 {
+    /**
+     * Get the page a browser asked for, as a relative path, or null when the request is not a browser's GET.
+     */
+    public static function requested(Request $request, string $appUrl): ?string
+    {
+        if (! $request->isMethod('GET') || $request->expectsJson()) {
+            return null;
+        }
+
+        return static::sanitize($request->getRequestUri(), $appUrl);
+    }
+
+    /**
+     * Get the same-origin page the request came from, as a relative path, else the root.
+     */
+    public static function previous(Request $request, string $appUrl): string
+    {
+        return static::sanitize($request->headers->get('Referer'), $appUrl);
+    }
+
     /**
      * Keep the intended URL only as a same-origin relative path, else the root.
      */

@@ -21,5 +21,7 @@ Route::middleware('web')->group(function () {
     Route::get('login/recovery-codes', [RecoveryCodesController::class, 'show'])->name('login.recovery-codes');
     Route::post('login/recovery-codes/confirm', [RecoveryCodesController::class, 'store'])->name('login.recovery-codes.submit');
     Route::post('logout', SignOutController::class)->name('logout');
+    Route::get('sudo', [SudoController::class, 'show'])->name('sudo');
+    Route::post('sudo/{type}', [SudoController::class, 'store'])->name('sudo.submit');
     Route::delete('sudo', [SudoController::class, 'destroy'])->name('sudo.end');
 });

@@ -65,6 +65,37 @@ class SignInDecision
     }
 
     /**
+     * Get the types the account can answer its next sudo step with: the listed sign-in types it holds before a first factor, its challenge offer after one.
+     *
+     * @return list<CredentialType>
+     */
+    public function replayOffer(Model&KeystoneUser $account, ?string $firstFactor): array
+    {
+        if ($firstFactor !== null) {
+            return $this->challengeOffer($account, $firstFactor);
+        }
+
+        $held = (new Credentials($account))->typesOf($account->getKey());
+        $types = app(CredentialTypes::class)->serving(Surface::SIGN_IN);
+
+        return array_values(array_filter($types, fn (CredentialType $type) => in_array($type->name(), $held, true)));
+    }
+
+    /**
+     * Get the named type among those the account's next sudo step offers, or null when the step doesn't offer it.
+     */
+    public function replayOffered(Model&KeystoneUser $account, ?string $firstFactor, string $name): ?CredentialType
+    {
+        foreach ($this->replayOffer($account, $firstFactor) as $type) {
+            if ($type->name() === $name) {
+                return $type;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Get the listed types an account can enroll as its second factor: those serving enrollment that answer a challenge.
      *
      * @return list<CredentialType>

@@ -34,10 +34,12 @@ To keep the audit trail but drop the log line, set `keystone.log_channel` to Lar
 | `account.suspended` | an operator suspended the account (see [Operator commands](operator-commands.md#suspending-accounts)); alerts the account's owner |
 | `account.unsuspended` | an operator lifted the account's suspension; alerts the account's owner |
 | `credential.added` | a credential was added to the account, such as a second factor at [enrollment](enrollment.md); alerts the account's owner |
-| `sudo.granted` | a sign-in completed and its session now has [sudo](sudo.md#when-a-session-has-it); the reason is `keystone.sign_in` and there is no credential. A sign-in restored by a remember-me cookie, or from an address that isn't an IP address, records none |
+| `sudo.granted` | a session got [sudo](sudo.md#when-a-session-has-it): at a sign-in, with the reason `keystone.sign_in` and no credential, or at the end of a [replay](sudo.md#the-replay), with flow `sudo` and the credential that earned it. A sign-in restored by a remember-me cookie, or from an address that isn't an IP address, records none |
+| `sudo.failed` | an answer at a [replay](sudo.md#the-replay) is refused, with flow `sudo` and the reasons `proof.rejected` uses, plus `keystone.unbindable_subnet` for an answer from an address that isn't an IP address; alerts the account's owner, from a known device too |
+| `sudo.network_changed` | a live sudo grant was used from another [subnet](sudo.md#the-subnet) than the one it was earned from and was revoked; alerts the account's owner, from a known device too |
 | `sudo.revoked` | the user [ended sudo](sudo.md#ending-it) while their session held a live grant |
 | `recovery_codes.generated` | a new set of recovery codes was saved; alerts the account's owner only when it replaced a set |
-| `recovery_code.used` | a [recovery code](challenge.md#recovery-codes) answered the challenge and was spent; alerts the account's owner with how many codes are left |
+| `recovery_code.used` | a [recovery code](challenge.md#recovery-codes) answered the challenge or a [sudo replay](sudo.md#the-replay) and was spent; the flow says which, and it alerts the account's owner with how many codes are left |
 | `device_cookie.reused` | a sign-in carried a [device cookie](security-alerts.md#new-devices) that a later sign-in had replaced, so two browsers held the same cookie; alerts the account's owner |
 | `limit.tripped` | a rate limit refuses its first attempt in a window; the reason names the limit (`keystone.request_limit` or `keystone.failed_attempt_limit`), and a failed-attempt trip alerts the account's owner |
 | `request.rejected` | a request to change something on a Keystone route is refused as cross-site, with the reason `keystone.cross_site` (see [Hardening](hardening.md)); or a [remember-me cookie](remember-me.md#what-ends-it) that no longer restores is refused, with the reason `keystone.dead_remember_cookie`, or `keystone.enrollment_owed` when its account newly owes enrollment |
@@ -55,7 +57,7 @@ Every event has the same fields, and never typed input, secrets, codes, tokens o
 | `user_id` | the account, or null |
 | `actor` | `user`, `operator` or `system` |
 | `operator` | who acted, as the operator command or job named them, cut to 64 characters with control characters and line and paragraph separators replaced by spaces; null otherwise |
-| `flow` | where it happened, such as `sign-in`, `challenge` or `enrollment` |
+| `flow` | where it happened, such as `sign-in`, `challenge`, `enrollment` or `sudo` |
 | `credential_type`, `credential_id`, `credential_label` | the credential involved and its label at the time; a refusal names only a credential the account holds |
 | `reason` | a short code such as `form.mismatch`, `keystone.barred` or `remembered`; a reason that isn't a lowercase code of at most 64 characters prefixed by its credential type or `keystone.` is stored as `<type>.invalid_reason` |
 | `ip_address`, `user_agent` | the request's, the user agent cut to 512 characters with control characters and line and paragraph separators replaced by spaces |

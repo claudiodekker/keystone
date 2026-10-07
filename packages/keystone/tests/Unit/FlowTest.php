@@ -30,10 +30,52 @@ it('derives no flow for a surface no flow uses yet', function (Surface $surface)
     Flow::of(Keystone::guard(), $surface);
 })->throws(LogicException::class)->with([Surface::REGISTRATION, Surface::ENROLLMENT]);
 
-test('only the challenge flow shares a guessable type\'s failures', function (Flow $flow, bool $shares) {
+it('derives the sudo flow for a signed-in session owing its first step on the sign-in surface', function () {
+    Keystone::guard()->setUser(User::factory()->create());
+    Keystone::guard()->beginSudo('/settings');
+
+    expect(Flow::of(Keystone::guard(), Surface::SIGN_IN))->toBe(Flow::SUDO);
+});
+
+it('derives the sudo flow for a signed-in session owing its challenge on the challenge surface', function () {
+    Keystone::guard()->setUser(User::factory()->create());
+    Keystone::guard()->beginSudo('/settings');
+    Keystone::guard()->passSudoFirstFactor(Keystone::guard()->sudoInProgress(), 'form');
+
+    expect(Flow::of(Keystone::guard(), Surface::CHALLENGE))->toBe(Flow::SUDO);
+});
+
+it('derives no flow for the surface the sudo-in-progress is not at', function (Surface $surface, ?string $firstFactor) {
+    Keystone::guard()->setUser(User::factory()->create());
+    Keystone::guard()->beginSudo('/settings');
+
+    if ($firstFactor !== null) {
+        Keystone::guard()->passSudoFirstFactor(Keystone::guard()->sudoInProgress(), $firstFactor);
+    }
+
+    Flow::of(Keystone::guard(), $surface);
+})->throws(LogicException::class)->with([
+    'the challenge surface while the first step is owed' => [Surface::CHALLENGE, null],
+    'the sign-in surface once the first factor passed' => [Surface::SIGN_IN, 'form'],
+]);
+
+it('derives no flow for a signed-in session nothing was demanded of', function (Surface $surface) {
+    Keystone::guard()->setUser(User::factory()->create());
+
+    Flow::of(Keystone::guard(), $surface);
+})->throws(LogicException::class)->with([Surface::SIGN_IN, Surface::CHALLENGE]);
+
+it('derives no sudo flow for a guest holding a sudo-in-progress', function () {
+    Keystone::guard()->beginSudo('/settings');
+
+    Flow::of(Keystone::guard(), Surface::CHALLENGE);
+})->throws(LogicException::class);
+
+test('only the flows behind a first factor share a guessable type\'s failures', function (Flow $flow, bool $shares) {
     expect($flow->sharesFailedAttempts())->toBe($shares);
 })->with([
     'sign-in' => [Flow::SIGN_IN, false],
     'challenge' => [Flow::CHALLENGE, true],
     'enrollment' => [Flow::ENROLLMENT, false],
+    'sudo' => [Flow::SUDO, true],
 ]);

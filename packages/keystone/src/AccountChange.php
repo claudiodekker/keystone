@@ -79,6 +79,14 @@ class AccountChange
     }
 
     /**
+     * Stamp the usable credential of the type as used now.
+     */
+    public function stampLastUse(StoredCredential $credential, string $type): void
+    {
+        $this->credentials->stampLastUse($credential->id, type: $type);
+    }
+
+    /**
      * Spend the account's recovery code the typed one matches, recording its use in the flow, unless it is the last one and must be kept.
      *
      * @throws LastRecoveryCode

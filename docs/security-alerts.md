@@ -18,6 +18,8 @@ Alerts are queued. Run a queue worker, or they are never sent: `queue.default` s
 | `recovery_codes.generated` | a new set of recovery codes replaced the account's codes; a first set alerts nobody |
 | `sessions.terminated` | an operator ended every session of the account, unless they passed `--no-alert` (see [Operator commands](operator-commands.md#ending-sessions)); ending every account's sessions with `--all` alerts nobody |
 | `signed_in` | the account signed in from a browser that isn't one of its [known devices](#new-devices) |
+| `sudo.failed` | a signed-in session gave a wrong answer when asked to prove it's the owner before a sensitive change (see [Sudo](sudo.md#the-replay)); a known device alerts too, because whoever answered holds the session |
+| `sudo.network_changed` | a signed-in session used its live sudo grant from another network than the one it was earned from, and lost it (see [Sudo](sudo.md#the-subnet)); a known device alerts too |
 
 ## Who gets them
 
@@ -35,7 +37,7 @@ The first part of the value names the device and stays the same, so Keystone can
 
 A sign-in restored by a [remember-me cookie](remember-me.md#coming-back) is also checked for a known device, and alerts with `signed_in` when the browser isn't one, as it does when someone pastes a copied remember-me cookie into another browser. It is the one sign-in that hands out no fresh device value and doesn't count as seeing the device, so a browser whose last real sign-in is older than the retention alerts when it returns.
 
-A known device earns no trust beyond its own [failed-attempt count](rate-limiting.md#locking-an-accounts-owner-out): it is never spared a challenge, an enrollment or an alert of any other type.
+A known device earns no trust beyond its own [failed-attempt count](rate-limiting.md#locking-an-accounts-owner-out): it is never spared a challenge, an enrollment, the [sudo replay](sudo.md#the-replay) or an alert of any other type.
 
 An operator ending an account's sessions with `keystone:end-sessions` forgets its known devices, and `--all` forgets every account's, so each browser's next sign-in alerts. Keystone's scheduled `keystone:prune-known-devices` task deletes devices unseen for the retention every night, on one server, so run Laravel's scheduler.
 

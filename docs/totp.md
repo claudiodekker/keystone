@@ -28,7 +28,7 @@ php artisan vendor:publish --tag=keystone-totp-config
 
 ## Guessing
 
-A code has a million values, so wrong TOTP codes count harder than other wrong answers. They share one count per account across the challenge and, once they exist, account recovery and re-entering your password for sensitive actions: 20 an hour (your `keystone.rate_limits.failed_attempts_per_hour`), and never more than 100 in 24 hours, a ceiling no setting changes. See [Rate limiting](rate-limiting.md).
+A code has a million values, so wrong TOTP codes count harder than other wrong answers. They share one count per account across the challenge and the [sudo replay](sudo.md#the-replay): 20 an hour (your `keystone.rate_limits.failed_attempts_per_hour`), and never more than 100 in 24 hours, a ceiling no setting changes. See [Rate limiting](rate-limiting.md).
 
 With the default window three codes are valid at once, so a guesser who holds the first factor and spends all 100 guesses a day has about a 0.03% chance a day of hitting one. That is 100 guesses at 3 in a million each.
 

@@ -34,5 +34,9 @@ Route::prefix('auth')->group(function () {
 
     Route::post('logout', SignOutController::class)->name('logout');
 
-    Route::delete('sudo', [SudoController::class, 'destroy'])->name('sudo.end');
+    Route::prefix('sudo')->group(function () {
+        Route::get('/', [SudoController::class, 'show'])->name('sudo');
+        Route::post('{type}', [SudoController::class, 'store'])->name('sudo.submit');
+        Route::delete('/', [SudoController::class, 'destroy'])->name('sudo.end');
+    });
 });

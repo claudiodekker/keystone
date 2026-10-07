@@ -48,8 +48,8 @@ return [
         ],
         'limit' => [
             'tripped' => [
-                'subject' => 'Sign-ins to your account were paused',
-                'what' => 'Too many wrong answers were given while signing in to your account, so further attempts with that kind of credential are refused for a while. Wrong answers from browsers you signed in from recently are counted apart, so those browsers can still sign in unless the wrong answers came from them.',
+                'subject' => 'Attempts to prove it\'s you were paused',
+                'what' => 'Your account got too many wrong answers to a sign-in step or to a check before a sensitive change. Further attempts with that kind of credential are refused for a while. Browsers you signed in from recently count their own wrong answers, so they are only paused when the wrong answers came from them.',
             ],
         ],
         'recovery_code' => [
@@ -74,6 +74,16 @@ return [
         'signed_in' => [
             'subject' => 'New sign-in to your account',
             'what' => 'Your account was signed in to from a browser it hasn\'t signed in from recently.',
+        ],
+        'sudo' => [
+            'failed' => [
+                'subject' => 'A wrong answer was given before a change to your account',
+                'what' => 'A signed-in session of your account was asked to prove it\'s you before a sensitive change, and gave a wrong answer. Whoever it was is signed in to your account, or holds a copy of its session, and got no further.',
+            ],
+            'network_changed' => [
+                'subject' => 'Your session moved to another network',
+                'what' => 'A session signed in to your account tried to make a sensitive change from a different network. It had proved it\'s you on another network a short while before. It must prove it\'s you again before it can make the change. A session cookie copied to another computer looks like this.',
+            ],
         ],
     ],
 ];

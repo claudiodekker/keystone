@@ -24,5 +24,7 @@ enum SecurityEventType: string
     case RECOVERY_CODES_GENERATED = 'recovery_codes.generated';
     case CREDENTIAL_ADDED = 'credential.added';
     case SUDO_GRANTED = 'sudo.granted';
+    case SUDO_FAILED = 'sudo.failed';
     case SUDO_REVOKED = 'sudo.revoked';
+    case SUDO_NETWORK_CHANGED = 'sudo.network_changed';
 }

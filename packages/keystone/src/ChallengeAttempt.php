@@ -31,7 +31,7 @@ class ChallengeAttempt extends CredentialAttempt
             $demand = $this->owed($pending);
 
             if ($type instanceof RecoveryCodeType) {
-                return $this->spendRecoveryCode($pending, $flow, $type, (string) $input[RecoveryCodeType::FIELD], $taken, $demand);
+                return $this->answerWithRecoveryCode($pending, $flow, $type, (string) $input[RecoveryCodeType::FIELD], $taken, $demand);
             }
 
             [$proof, $credential] = $type->name() === $pending->firstFactor
@@ -61,49 +61,21 @@ class ChallengeAttempt extends CredentialAttempt
     }
 
     /**
-     * Spend the recovery code of the pending sign-in's account the typed one matches and complete the sign-in, refusing a barred account and the last code while the gate keeps it.
+     * Spend the recovery code of the pending sign-in's account the typed one matches and complete the sign-in, keeping the last code while codes are required.
      *
      * @throws LastRecoveryCode
      */
-    protected function spendRecoveryCode(PendingSignIn $pending, Flow $flow, RecoveryCodeType $type, #[\SensitiveParameter] string $typed, TakenAttempt $taken, Demand $demand): Demand
+    protected function answerWithRecoveryCode(PendingSignIn $pending, Flow $flow, RecoveryCodeType $type, #[\SensitiveParameter] string $typed, TakenAttempt $taken, Demand $demand): Demand
     {
-        $account = $pending->account;
-        $changes = new AccountChanges($this->guard);
-
-        try {
-            $spent = $changes->change($account, function (AccountChange $change) use ($typed, $flow) {
-                if ((new SignInDecision)->isBarred($change->account)) {
-                    return null;
-                }
-
-                return $change->spendRecoveryCode($typed, flow: $flow, keepLast: config()->boolean('keystone.require_recovery_codes'));
-            });
-        } catch (LastRecoveryCode $e) {
-            $this->recordRejected($account, $flow, $type, credential: null, reason: 'keystone.last_recovery_code');
-
-            throw $e;
-        }
-
-        if ($spent === null) {
-            $this->recordRejected($account, $flow, $type, credential: null, reason: 'keystone.barred');
-
-            return Demand::REFUSE;
-        }
-
-        if (! $spent) {
-            $this->recordRejected($account, $flow, $type, credential: null, reason: 'recovery-code.mismatch');
-
-            return Demand::REFUSE;
-        }
-
-        $entered = $this->complete(
-            account: $account,
+        $entered = $this->spendRecoveryCode(
+            account: $pending->account,
             flow: $flow,
             type: $type,
-            credential: null,
+            typed: $typed,
             taken: $taken,
             enter: fn () => $this->enter($pending, $demand),
             recorded: $this->recorded($demand),
+            keepLast: config()->boolean('keystone.require_recovery_codes'),
             reason: $this->reason($demand),
         );
 
