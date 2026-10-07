@@ -29,6 +29,14 @@ readonly class SudoInProgress
     }
 
     /**
+     * Get the time it ends.
+     */
+    public function endsAt(): CarbonImmutable
+    {
+        return $this->startedAt->addSeconds(self::LIFETIME_SECONDS);
+    }
+
+    /**
      * Get the surface the step it is at verifies on: sign-in until a first factor passed, the challenge after.
      */
     public function surface(): Surface

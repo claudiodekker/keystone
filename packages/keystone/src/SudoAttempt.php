@@ -9,6 +9,7 @@ use ClaudioDekker\Keystone\Methods\Proof;
 use ClaudioDekker\Keystone\Methods\RecoveryCodeType;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
 use Illuminate\Database\Eloquent\Model;
+use LogicException;
 
 /**
  * @internal
@@ -16,9 +17,12 @@ use Illuminate\Database\Eloquent\Model;
 class SudoAttempt extends CredentialAttempt
 {
     /**
+     * Whether the step being finished grants sudo, so its credential's last use is stamped.
+     */
+    protected bool $granting = false;
+
+    /**
      * Prove the answer to the step the sudo-in-progress is at, then grant sudo or move on to the challenge a sign-in would demand, or refuse inside the timing floor.
-     *
-     * It takes the sudo-in-progress, so it can't run for a session nothing was demanded of.
      *
      * @param  array<string, mixed>  $input
      *
@@ -31,11 +35,16 @@ class SudoAttempt extends CredentialAttempt
             /** @var (Model&KeystoneUser)|null $account */
             $account = $this->guard->user();
 
-            if ($account === null || ! $this->offers($account, $progress, $type)) {
+            if ($account === null || (new SignInDecision)->replayOffered($account, $progress->firstFactor, $type->name()) === null) {
                 return SudoResult::REFUSED;
             }
 
-            $flow = Flow::of($this->guard, $progress->surface());
+            try {
+                $flow = Flow::of($this->guard, $progress->surface());
+            } catch (LogicException) {
+                return SudoResult::REFUSED;
+            }
+
             $taken = $this->limiter->takeFailedAttempt($flow, $type, $account, identifier: '');
             $subnet = $this->guard->subnet();
 
@@ -46,7 +55,7 @@ class SudoAttempt extends CredentialAttempt
             }
 
             if ($type instanceof RecoveryCodeType) {
-                return $this->spendRecoveryCode($account, $flow, $type, (string) $input[RecoveryCodeType::FIELD], $taken, $subnet);
+                return $this->spendCodeForSudo($account, $flow, $type, (string) $input[RecoveryCodeType::FIELD], $taken, $subnet);
             }
 
             [$proof, $credential] = $this->prove($progress->surface(), $type, $account, $input, $taken);
@@ -65,7 +74,12 @@ class SudoAttempt extends CredentialAttempt
                 return SudoResult::REFUSED;
             }
 
+            if ($this->ranOut($taken)) {
+                return SudoResult::REFUSED;
+            }
+
             $owed = $demand === Demand::CHALLENGE;
+            $this->granting = ! $owed;
 
             $entered = $this->finish(
                 account: $account,
@@ -74,7 +88,7 @@ class SudoAttempt extends CredentialAttempt
                 proof: $proof,
                 credential: $credential,
                 taken: $taken,
-                enter: fn () => $this->enter($owed, $type, $subnet),
+                enter: $owed ? fn () => $this->passFirstStep($progress, $type) : fn () => $this->grant($subnet),
                 recorded: $owed ? null : SecurityEventType::SUDO_GRANTED,
             );
 
@@ -84,16 +98,6 @@ class SudoAttempt extends CredentialAttempt
                 default => SudoResult::GRANTED,
             };
         }, self::TIMING_FLOOR_MICROSECONDS);
-    }
-
-    /**
-     * Determine if the step the sudo-in-progress is at offers the type to the account.
-     */
-    protected function offers(Model&KeystoneUser $account, SudoInProgress $progress, CredentialType $type): bool
-    {
-        $offer = (new SignInDecision)->replayOffer($account, $progress->firstFactor);
-
-        return in_array($type->name(), array_map(fn (CredentialType $offered) => $offered->name(), $offer), true);
     }
 
     /**
@@ -111,65 +115,66 @@ class SudoAttempt extends CredentialAttempt
     }
 
     /**
-     * Spend the recovery code the typed one matches and grant sudo, refusing a barred account and always keeping the last code.
+     * Determine if the sudo-in-progress ran out while the answer was checked, giving the attempt back when it did.
+     */
+    protected function ranOut(TakenAttempt $taken): bool
+    {
+        if ($this->guard->sudoInProgress() !== null) {
+            return false;
+        }
+
+        $this->limiter->giveBack($taken);
+
+        return true;
+    }
+
+    /**
+     * Spend the recovery code the typed one matches and grant sudo, always keeping the last code.
      *
      * @throws LastRecoveryCode
      */
-    protected function spendRecoveryCode(Model&KeystoneUser $account, Flow $flow, RecoveryCodeType $type, #[\SensitiveParameter] string $typed, TakenAttempt $taken, Subnet $subnet): SudoResult
+    protected function spendCodeForSudo(Model&KeystoneUser $account, Flow $flow, RecoveryCodeType $type, #[\SensitiveParameter] string $typed, TakenAttempt $taken, Subnet $subnet): SudoResult
     {
-        try {
-            $spent = $this->spendCode($account, $flow, $typed, keepLast: true);
-        } catch (LastRecoveryCode $e) {
-            $this->recordRejected($account, $flow, $type, credential: null, reason: 'keystone.last_recovery_code');
-
-            throw $e;
-        }
-
-        if ($spent === null) {
-            $this->recordRejected($account, $flow, $type, credential: null, reason: 'keystone.barred');
-
+        if ($this->ranOut($taken)) {
             return SudoResult::REFUSED;
         }
 
-        if (! $spent) {
-            $this->recordRejected($account, $flow, $type, credential: null, reason: 'recovery-code.mismatch');
-
-            return SudoResult::REFUSED;
-        }
-
-        $entered = $this->complete(
+        $entered = $this->spendRecoveryCode(
             account: $account,
             flow: $flow,
             type: $type,
-            credential: null,
+            typed: $typed,
             taken: $taken,
-            enter: fn () => $this->enter(false, $type, $subnet),
+            enter: fn () => $this->grant($subnet),
             recorded: SecurityEventType::SUDO_GRANTED,
+            keepLast: true,
         );
 
         return $entered ? SudoResult::GRANTED : SudoResult::REFUSED;
     }
 
     /**
-     * Move the sudo-in-progress past the step: on to the challenge it still owes, or into a grant bound to the subnet. No device is judged, so it returns null.
+     * Move the sudo-in-progress past its first step, on to the challenge it still owes.
      */
-    protected function enter(bool $owed, CredentialType $type, Subnet $subnet): ?bool
+    protected function passFirstStep(SudoInProgress $progress, CredentialType $type): ?bool
     {
-        if ($owed) {
-            $this->guard->passSudoFirstFactor($type->name());
+        $this->guard->passSudoFirstFactor($progress, $type->name());
 
-            return null;
-        }
+        return null;
+    }
 
+    /**
+     * Grant the sudo-in-progress its sudo, bound to the subnet.
+     */
+    protected function grant(Subnet $subnet): ?bool
+    {
         $this->guard->grantSudo($subnet);
 
         return null;
     }
 
     /**
-     * Write what the proof changed and stamp the credential's last use in one locked change, refusing a proof another one overtook.
-     *
-     * It runs before the grant, so a lock failure or a lost race ends with no grant.
+     * Write what the proof changed and, on the step that grants, stamp the credential's last use in the same locked change, refusing a proof another one overtook.
      */
     protected function advance(Model&KeystoneUser $account, CredentialType $type, Proof $proof, StoredCredential $credential): bool
     {
@@ -180,7 +185,9 @@ class SudoAttempt extends CredentialAttempt
                 return false;
             }
 
-            $change->stampLastUse($credential, type: $type->name());
+            if ($this->granting) {
+                $change->stampLastUse($credential, type: $type->name());
+            }
 
             return true;
         });

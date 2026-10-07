@@ -49,7 +49,7 @@ class AddHardeningHeaders
     {
         $response = $next($request);
 
-        if (! $this->routesToKeystone($request) && ! $request->attributes->getBoolean(SudoGate::REFUSED)) {
+        if (! $this->routesToKeystone($request) && ! SudoGate::refused($request)) {
             return $response;
         }
 

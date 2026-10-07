@@ -301,62 +301,27 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Get the session's live sudo grant, forgetting one that outlived keystone.sudo.lifetime_seconds or has no believable time to count it from.
-     *
-     * The subnet it is bound to isn't checked here: the gate does that, because a mismatch revokes and records.
+     * Get the session's live sudo grant, whatever subnet the request comes from.
      */
     public function sudoGrant(): ?SudoGrant
     {
-        $held = $this->session->get($this->sudoKey());
+        $held = $this->heldSudo();
 
-        if (! is_array($held) || ! is_int($held['granted_at'] ?? null) || ! is_string($held['subnet'] ?? null)) {
-            return null;
-        }
-
-        $grantedAt = CarbonImmutable::createFromTimestamp($held['granted_at']);
-        $endsAt = $grantedAt->addSeconds(config()->integer('keystone.sudo.lifetime_seconds'));
-
-        if ($grantedAt->isFuture() || $endsAt->lessThanOrEqualTo(Date::now())) {
-            $this->session->forget($this->sudoKey());
-
-            return null;
-        }
-
-        return new SudoGrant($endsAt, new Subnet($held['subnet']));
+        return $held instanceof SudoGrant ? $held : null;
     }
 
     /**
-     * Get the session's live sudo-in-progress, forgetting one that outlived its fixed lifetime or has no believable time to count it from.
+     * Get the session's live sudo-in-progress.
      */
     public function sudoInProgress(): ?SudoInProgress
     {
-        $held = $this->session->get($this->sudoKey());
+        $held = $this->heldSudo();
 
-        if (! is_array($held) || ! is_int($held['started_at'] ?? null) || ! is_string($held['intended_url'] ?? null)) {
-            return null;
-        }
-
-        $startedAt = CarbonImmutable::createFromTimestamp($held['started_at']);
-
-        if ($startedAt->isFuture() || $startedAt->addSeconds(SudoInProgress::LIFETIME_SECONDS)->lessThanOrEqualTo(Date::now())) {
-            $this->session->forget($this->sudoKey());
-
-            return null;
-        }
-
-        $firstFactor = $held['first_factor'] ?? null;
-
-        return new SudoInProgress(
-            intendedUrl: $held['intended_url'],
-            startedAt: $startedAt,
-            firstFactor: is_string($firstFactor) ? $firstFactor : null,
-        );
+        return $held instanceof SudoInProgress ? $held : null;
     }
 
     /**
-     * Note that the signed-in session owes a sudo replay before it reaches the intended URL.
-     *
-     * A live sudo-in-progress keeps its start time and the first factor it passed, and only takes the new intended URL, so asking again never buys more time. Anything else in the slot is replaced.
+     * Note that the signed-in session owes a sudo replay before it reaches the intended URL, keeping the start time and first factor of a live sudo-in-progress.
      */
     public function beginSudo(string $intendedUrl): void
     {
@@ -372,13 +337,11 @@ class KeystoneGuard extends SessionGuard
     /**
      * Note that the sudo-in-progress passed its first factor, on a new session id, keeping the time it started.
      *
-     * @throws LogicException when the session holds no live sudo-in-progress still owing its first step
+     * @throws LogicException when the session holds no sudo-in-progress, or the given one already passed its first step
      */
-    public function passSudoFirstFactor(string $firstFactor): void
+    public function passSudoFirstFactor(SudoInProgress $progress, string $firstFactor): void
     {
-        $progress = $this->sudoInProgress();
-
-        if ($progress === null || $progress->firstFactor !== null) {
+        if (! $this->holdsSudoInProgress() || $progress->firstFactor !== null) {
             throw new LogicException('The session holds no sudo-in-progress owing its first step.');
         }
 
@@ -394,13 +357,11 @@ class KeystoneGuard extends SessionGuard
     /**
      * Grant the sudo-in-progress its sudo, on a new session id, bound to the subnet.
      *
-     * The grant is the last write of the request that earns it, so nothing that fails before it leaves one behind.
-     *
-     * @throws LogicException when the session holds no live sudo-in-progress
+     * @throws LogicException when the session holds no sudo-in-progress
      */
     public function grantSudo(Subnet $subnet): void
     {
-        if ($this->sudoInProgress() === null) {
+        if (! $this->holdsSudoInProgress()) {
             throw new LogicException('The session holds no sudo-in-progress to grant.');
         }
 
@@ -410,7 +371,7 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * End sudo, dropping the session's grant and any sudo-in-progress on a new session id. Safe to call with neither.
+     * End sudo, dropping the session's grant and any sudo-in-progress on a new session id.
      */
     public function endSudo(): void
     {
@@ -732,6 +693,64 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
+     * Get the live sudo grant or sudo-in-progress the session holds, forgetting one that ran out or has no believable time to count from.
+     */
+    protected function heldSudo(): SudoGrant|SudoInProgress|null
+    {
+        $held = $this->parseSudo($this->session->get($this->sudoKey()));
+
+        if ($held === null) {
+            return null;
+        }
+
+        [$from, $until] = $held instanceof SudoGrant ? [$held->grantedAt, $held->endsAt] : [$held->startedAt, $held->endsAt()];
+
+        if ($from->isFuture() || $until->lessThanOrEqualTo(Date::now())) {
+            $this->session->forget($this->sudoKey());
+
+            return null;
+        }
+
+        return $held;
+    }
+
+    /**
+     * Determine if the session holds a sudo-in-progress, run out or not.
+     */
+    protected function holdsSudoInProgress(): bool
+    {
+        return $this->parseSudo($this->session->get($this->sudoKey())) instanceof SudoInProgress;
+    }
+
+    /**
+     * Parse the sudo session value into the grant or the sudo-in-progress it holds, or null for anything else.
+     */
+    protected function parseSudo(mixed $held): SudoGrant|SudoInProgress|null
+    {
+        if (! is_array($held)) {
+            return null;
+        }
+
+        if (is_int($held['granted_at'] ?? null) && is_string($held['subnet'] ?? null)) {
+            $grantedAt = CarbonImmutable::createFromTimestamp($held['granted_at']);
+
+            return new SudoGrant($grantedAt, $grantedAt->addSeconds(config()->integer('keystone.sudo.lifetime_seconds')), new Subnet($held['subnet']));
+        }
+
+        if (is_int($held['started_at'] ?? null) && is_string($held['intended_url'] ?? null)) {
+            $firstFactor = $held['first_factor'] ?? null;
+
+            return new SudoInProgress(
+                intendedUrl: $held['intended_url'],
+                startedAt: CarbonImmutable::createFromTimestamp($held['started_at']),
+                firstFactor: is_string($firstFactor) ? $firstFactor : null,
+            );
+        }
+
+        return null;
+    }
+
+    /**
      * Hand the session's remember token a new value on the epoch its account moved to, so a copy of the old value dies with every other session.
      */
     protected function reissueRememberCookie(Model&KeystoneUser $account, int $movedFrom): void
@@ -938,13 +957,11 @@ class KeystoneGuard extends SessionGuard
     {
         $lifetimeSeconds = config('keystone.session.absolute_lifetime_seconds');
         $signedInEndsAt = is_int($lifetimeSeconds) ? $this->signedInAt()?->addSeconds($lifetimeSeconds) : null;
-        $startedAt = $this->session->get($this->sudoKey())['started_at'] ?? null;
+        $progressEndsAt = $this->sudoInProgress()?->endsAt();
 
-        if (! is_int($startedAt)) {
+        if ($progressEndsAt === null) {
             return $signedInEndsAt;
         }
-
-        $progressEndsAt = Date::createFromTimestamp($startedAt)->addSeconds(SudoInProgress::LIFETIME_SECONDS);
 
         return $signedInEndsAt?->lessThan($progressEndsAt) ? $signedInEndsAt : $progressEndsAt;
     }

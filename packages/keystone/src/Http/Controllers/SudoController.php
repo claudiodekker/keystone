@@ -15,7 +15,6 @@ use ClaudioDekker\Keystone\SignInDecision;
 use ClaudioDekker\Keystone\Status;
 use ClaudioDekker\Keystone\StepKind;
 use ClaudioDekker\Keystone\SudoAttempt;
-use ClaudioDekker\Keystone\SudoInProgress;
 use ClaudioDekker\Keystone\SudoResult;
 use Illuminate\Contracts\Support\Responsable;
 use Illuminate\Database\Eloquent\Model;
@@ -69,7 +68,7 @@ abstract class SudoController extends Controller
             return $this->refuseWithoutSudoInProgress();
         }
 
-        $credentialType = $this->offered($account, $progress, $type);
+        $credentialType = (new SignInDecision)->replayOffered($account, $progress->firstFactor, $type);
 
         if ($credentialType === null) {
             return $this->sendSudoRefused($request, $type, __('keystone::messages.invalid_credential'));
@@ -168,9 +167,9 @@ abstract class SudoController extends Controller
             return $this->refuseWithoutSudoInProgress();
         }
 
-        $offer = (new SignInDecision)->replayOffer($account, $progress->firstFactor);
+        $decision = new SignInDecision;
 
-        if ($progress->firstFactor !== null && $offer === []) {
+        if ($progress->firstFactor !== null && ! $decision->holdsSecondFactor($account, $progress->firstFactor)) {
             $guard->endSudo();
 
             return redirect($progress->intendedUrl);
@@ -179,7 +178,7 @@ abstract class SudoController extends Controller
         $types = array_map(fn (CredentialType $type) => [
             'type' => $type->name(),
             'shape' => $type->surfaces()[$progress->surface()->value]->value,
-        ], $offer);
+        ], $decision->replayOffer($account, $progress->firstFactor));
 
         $page = new SudoPage(
             types: $types,
@@ -188,20 +187,6 @@ abstract class SudoController extends Controller
         );
 
         return $this->sendSudoPage($request, $page);
-    }
-
-    /**
-     * Get the type named among those the step offers the account.
-     */
-    protected function offered(Model&KeystoneUser $account, SudoInProgress $progress, string $name): ?CredentialType
-    {
-        foreach ((new SignInDecision)->replayOffer($account, $progress->firstFactor) as $type) {
-            if ($type->name() === $name) {
-                return $type;
-            }
-        }
-
-        return null;
     }
 
     /**

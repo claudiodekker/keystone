@@ -10,14 +10,22 @@ use Illuminate\Http\Request;
 class IntendedUrl
 {
     /**
-     * Get where a request the sudo gate refused goes once sudo is granted: the page it asked for, or the page it came from, since a mutation is never replayed.
+     * Get the page a browser asked for, as a relative path, or null when the request is not a browser's GET.
      */
-    public static function afterSudo(Request $request, string $appUrl): string
+    public static function requested(Request $request, string $appUrl): ?string
     {
-        if ($request->isMethod('GET') && ! $request->expectsJson()) {
-            return static::sanitize($request->fullUrl(), $appUrl);
+        if (! $request->isMethod('GET') || $request->expectsJson()) {
+            return null;
         }
 
+        return static::sanitize($request->getRequestUri(), $appUrl);
+    }
+
+    /**
+     * Get the same-origin page the request came from, as a relative path, else the root.
+     */
+    public static function previous(Request $request, string $appUrl): string
+    {
         return static::sanitize($request->headers->get('Referer'), $appUrl);
     }
 

@@ -6,6 +6,7 @@ use ClaudioDekker\Keystone\Exceptions\Barred;
 use ClaudioDekker\Keystone\Exceptions\LastRecoveryCode;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\Proof;
+use ClaudioDekker\Keystone\Methods\RecoveryCodeType;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
 use ClaudioDekker\Keystone\Methods\Surface;
 use Closure;
@@ -162,6 +163,57 @@ abstract class CredentialAttempt
         $this->timebox->returnEarly();
 
         return true;
+    }
+
+    /**
+     * Spend the account's recovery code the typed one matches and enter, or refuse a barred account, a code it doesn't hold or the last one while it is kept.
+     *
+     * @param  Closure(): ?bool  $enter  signs the account in, returning whether the browser was a known device of it, or holds it, returning null
+     * @param  SecurityEventType|null  $recorded  the event a pass records, or null for a step that passes without entering anything worth a row
+     *
+     * @throws LastRecoveryCode
+     */
+    protected function spendRecoveryCode(
+        Model&KeystoneUser $account,
+        Flow $flow,
+        RecoveryCodeType $type,
+        #[\SensitiveParameter] string $typed,
+        TakenAttempt $taken,
+        Closure $enter,
+        ?SecurityEventType $recorded,
+        bool $keepLast,
+        ?string $reason = null,
+    ): bool {
+        try {
+            $spent = $this->spendCode($account, $flow, $typed, $keepLast);
+        } catch (LastRecoveryCode $e) {
+            $this->recordRejected($account, $flow, $type, credential: null, reason: 'keystone.last_recovery_code');
+
+            throw $e;
+        }
+
+        if ($spent === null) {
+            $this->recordRejected($account, $flow, $type, credential: null, reason: 'keystone.barred');
+
+            return false;
+        }
+
+        if (! $spent) {
+            $this->recordRejected($account, $flow, $type, credential: null, reason: 'recovery-code.mismatch');
+
+            return false;
+        }
+
+        return $this->complete(
+            account: $account,
+            flow: $flow,
+            type: $type,
+            credential: null,
+            taken: $taken,
+            enter: $enter,
+            recorded: $recorded,
+            reason: $reason,
+        );
     }
 
     /**

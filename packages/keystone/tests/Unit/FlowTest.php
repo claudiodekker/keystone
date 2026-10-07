@@ -40,7 +40,7 @@ it('derives the sudo flow for a signed-in session owing its first step on the si
 it('derives the sudo flow for a signed-in session owing its challenge on the challenge surface', function () {
     Keystone::guard()->setUser(User::factory()->create());
     Keystone::guard()->beginSudo('/settings');
-    Keystone::guard()->passSudoFirstFactor('form');
+    Keystone::guard()->passSudoFirstFactor(Keystone::guard()->sudoInProgress(), 'form');
 
     expect(Flow::of(Keystone::guard(), Surface::CHALLENGE))->toBe(Flow::SUDO);
 });
@@ -50,7 +50,7 @@ it('derives no flow for the surface the sudo-in-progress is not at', function (S
     Keystone::guard()->beginSudo('/settings');
 
     if ($firstFactor !== null) {
-        Keystone::guard()->passSudoFirstFactor($firstFactor);
+        Keystone::guard()->passSudoFirstFactor(Keystone::guard()->sudoInProgress(), $firstFactor);
     }
 
     Flow::of(Keystone::guard(), $surface);

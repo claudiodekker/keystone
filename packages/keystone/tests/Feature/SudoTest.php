@@ -106,8 +106,9 @@ describe('the sudo page', function () {
         $response->assertOk()->assertExactJson(['types' => [], 'preselect' => null, 'surface' => 'sign-in']);
     });
 
-    it('sends the user on without sudo when the second factor they owed went away', function () {
+    it('sends the user on without sudo when the second factor they owed went away', function (int $codes) {
         $account = $this->createChallengedAccount(new FormTypeSupport('code'));
+        $this->arrangeRecoveryCodes($account, count: $codes);
         $this->passFirstFactor();
         $this->post(route('login.challenge.submit', ['type' => 'code']), (new FormTypeSupport('code'))->validProof(Surface::CHALLENGE));
         demandSudo($this);
@@ -119,7 +120,8 @@ describe('the sudo page', function () {
         $response->assertRedirect('/probe');
         $this->get('probe')->assertRedirectToRoute('sudo');
         $this->get(route('sudo'))->assertJsonPath('surface', 'sign-in');
-    });
+        $this->assertDatabaseCount('user_recovery_codes', $codes);
+    })->with(['holding no recovery codes' => 0, 'holding recovery codes a sign-in would not ask for' => 8]);
 
     it('sends a session nothing was demanded of away', function (Closure $arrange) {
         $arrange($this);
@@ -250,18 +252,58 @@ describe('the replay', function () {
         'a cross-origin referrer falls back to the root' => [fn (AppTestCase $test) => $test->from('https://evil.example/settings')->post('probe'), '/'],
     ]);
 
-    it('takes the latest intended URL while keeping the time the sudo-in-progress started', function () {
+    it('sends the user back to the page a refused GET asked for on a host that differs from app.url', function () {
+        config(['app.url' => 'https://app.example']);
+        $this->signInAccount(new FormTypeSupport);
+        $this->delete(route('sudo.end'));
+        $this->get('http://alias.example/probe?tab=keys')->assertRedirectToRoute('sudo');
+
+        $response = $this->post(route('sudo.submit', ['type' => 'form']), (new FormTypeSupport)->validProof(Surface::SIGN_IN));
+
+        $response->assertRedirect('/probe?tab=keys');
+    });
+
+    it('takes the page of the latest refused GET while keeping the time the sudo-in-progress started', function () {
         $this->freezeSecond();
         $this->signInAccount(new FormTypeSupport);
         demandSudo($this, 'probe?first=1');
         $this->travel(899)->seconds();
         $this->get('probe?second=1')->assertRedirectToRoute('sudo');
-        $this->travel(1)->seconds();
+
+        $this->post(route('sudo.submit', ['type' => 'form']), (new FormTypeSupport)->validProof(Surface::SIGN_IN))->assertRedirect('/probe?second=1');
+
+        demandSudo($this, 'probe?third=1');
+        $this->travel(900)->seconds();
+        $this->get('probe?fourth=1')->assertRedirectToRoute('sudo');
+        $this->travel(899)->seconds();
+
+        $this->post(route('sudo.submit', ['type' => 'form']), (new FormTypeSupport)->validProof(Surface::SIGN_IN))->assertRedirect('/probe?fourth=1');
+    });
+
+    it('keeps the page a refused GET asked for when a mutation or a JSON request is refused meanwhile', function (Closure $refused) {
+        $this->signInAccount(new FormTypeSupport);
+        demandSudo($this, 'probe?tab=keys');
+        $refused($this);
 
         $response = $this->post(route('sudo.submit', ['type' => 'form']), (new FormTypeSupport)->validProof(Surface::SIGN_IN));
 
-        $response->assertRedirect('/');
-        $this->get('probe')->assertRedirectToRoute('sudo');
+        $response->assertRedirect('/probe?tab=keys');
+    })->with([
+        'a POST from the sudo page' => [fn (AppTestCase $test) => $test->from(route('sudo'))->post('probe')],
+        'a JSON GET from the sudo page' => [fn (AppTestCase $test) => $test->from(route('sudo'))->getJson('probe')],
+    ]);
+
+    it('keeps the first factor that passed when the gate refuses again', function () {
+        $this->createChallengedAccount(new FormTypeSupport('code'));
+        $this->passFirstFactor();
+        $this->post(route('login.challenge.submit', ['type' => 'code']), (new FormTypeSupport('code'))->validProof(Surface::CHALLENGE));
+        demandSudo($this);
+        $this->post(route('sudo.submit', ['type' => 'form']), (new FormTypeSupport)->validProof(Surface::SIGN_IN));
+
+        $this->get('probe?again=1')->assertRedirectToRoute('sudo');
+
+        $this->get(route('sudo'))->assertJsonPath('surface', 'challenge');
+        $this->post(route('sudo.submit', ['type' => 'code']), (new FormTypeSupport('code'))->validProof(Surface::CHALLENGE))->assertRedirect('/probe?again=1');
     });
 
     it('rotates the session, binds the grant to the subnet it was earned from and clears the sudo-in-progress', function () {
@@ -676,6 +718,76 @@ describe('the replay', function () {
         $this->travel(1)->seconds();
 
         expect(Keystone::guard()->slots()->get('rogue', 'sign-in'))->toBeNull();
+    });
+
+    it('keeps a ceremony slot opened after an abandoned sudo-in-progress ran out', function () {
+        $this->freezeSecond();
+        $this->signInAccount(new FormTypeSupport);
+        demandSudo($this);
+        $this->travel(900)->seconds();
+        $this->get('whoami');
+
+        Keystone::guard()->slots()->put('rogue', 'sign-in', 'challenge-bytes', capSeconds: 300);
+
+        expect(Keystone::guard()->slots()->get('rogue', 'sign-in'))->toBe('challenge-bytes');
+    });
+
+    it('closes a ceremony slot when the sudo-in-progress or the sign-in ends, whichever comes first', function (int $absoluteLifetime, int $slotEndsAfter) {
+        $this->freezeSecond();
+        config(['keystone.session.absolute_lifetime_seconds' => $absoluteLifetime]);
+        $this->signInAccount(new FormTypeSupport);
+        $this->travel(500)->seconds();
+        demandSudo($this);
+        Keystone::guard()->slots()->put('rogue', 'sign-in', 'challenge-bytes', capSeconds: 3600);
+        $this->travel($slotEndsAfter - 1)->seconds();
+        expect(Keystone::guard()->slots()->get('rogue', 'sign-in'))->toBe('challenge-bytes');
+        $this->travel(1)->seconds();
+
+        expect(Keystone::guard()->slots()->get('rogue', 'sign-in'))->toBeNull();
+    })->with([
+        'the sign-in ends first' => [600, 100],
+        'the sudo-in-progress ends first' => [2000, 900],
+    ]);
+
+    it('refuses an answer whose sudo-in-progress ran out while it was checked, and grants nothing', function () {
+        $this->freezeSecond();
+        Exceptions::fake();
+        $account = $this->signInAccount(new FormTypeSupport);
+        $id = DB::table('user_credentials')->insertGetId(['user_id' => $account->getKey(), 'type' => 'rogue', 'secret' => Crypt::encryptString('hash')]);
+        $this->app->make(CredentialTypes::class)->register(new RogueType(function () use ($id) {
+            $this->travel(900)->seconds();
+
+            return Proof::proven(new StoredCredential($id, identifier: null, secret: 'hash', label: null));
+        }, surfaces: ['sign-in']));
+        demandSudo($this);
+
+        $response = $this->post(route('sudo.submit', ['type' => 'rogue']));
+
+        $response->assertRedirectToRoute('sudo')->assertSessionHasErrors(['rogue' => __('keystone::messages.invalid_credential')]);
+        $this->get('probe')->assertRedirectToRoute('sudo');
+        $this->assertDatabaseMissing('user_security_events', ['type' => 'sudo.granted', 'flow' => 'sudo']);
+        $this->assertDatabaseMissing('user_security_events', ['type' => 'sudo.failed']);
+        expect(DB::table('user_credentials')->where('id', $id)->value('last_used_at'))->toBeNull();
+        Exceptions::assertNothingReported();
+    });
+
+    it('stamps the last use of the credential that grants, not of a first factor that still owes the challenge', function () {
+        $this->freezeSecond();
+        $account = $this->createChallengedAccount(new FormTypeSupport('code'));
+        $this->passFirstFactor();
+        $this->post(route('login.challenge.submit', ['type' => 'code']), (new FormTypeSupport('code'))->validProof(Surface::CHALLENGE));
+        demandSudo($this);
+        $lastUse = fn (string $type) => DB::table('user_credentials')->where('user_id', $account->getKey())->where('type', $type)->value('last_used_at');
+
+        $this->post(route('sudo.submit', ['type' => 'form']), (new FormTypeSupport)->validProof(Surface::SIGN_IN))->assertRedirectToRoute('sudo');
+
+        expect($lastUse('form'))->toBeNull()
+            ->and($lastUse('code'))->toBeNull();
+
+        $this->post(route('sudo.submit', ['type' => 'code']), (new FormTypeSupport('code'))->validProof(Surface::CHALLENGE))->assertRedirect('/probe');
+
+        expect($lastUse('form'))->toBeNull()
+            ->and($lastUse('code'))->toBe(now()->toDateTimeString());
     });
 
     it('closes every ceremony slot when it grants', function () {
