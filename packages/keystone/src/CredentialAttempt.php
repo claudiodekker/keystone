@@ -2,14 +2,12 @@
 
 namespace ClaudioDekker\Keystone;
 
-use ClaudioDekker\Keystone\Exceptions\Barred;
 use ClaudioDekker\Keystone\Exceptions\LastRecoveryCode;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\Proof;
 use ClaudioDekker\Keystone\Methods\RecoveryCodeType;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
 use ClaudioDekker\Keystone\Methods\Surface;
-use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Timebox;
 use Throwable;
@@ -25,6 +23,11 @@ abstract class CredentialAttempt
     public const int TIMING_FLOOR_MICROSECONDS = 300_000;
 
     /**
+     * What concludes a step once its proof is accepted.
+     */
+    protected AcceptedProof $accepted;
+
+    /**
      * Create a new credential attempt instance.
      */
     public function __construct(
@@ -33,11 +36,11 @@ abstract class CredentialAttempt
         protected Timebox $timebox = new Timebox,
         protected SecurityEventRecorder $recorder = new SecurityEventRecorder,
     ) {
-        //
+        $this->accepted = new AcceptedProof($recorder, $limiter);
     }
 
     /**
-     * Let the type verify the input on the surface against the subject's usable credentials, turning any failure into a rejection.
+     * Let the type verify the input on the surface against the subject's usable credentials and its ceremony, if any, turning any failure into a rejection.
      *
      * The proof comes back with the subject's credential it names, if any. A failure gives the taken attempt back.
      *
@@ -45,16 +48,25 @@ abstract class CredentialAttempt
      * @param  array<string, mixed>  $input
      * @return array{Proof, ?StoredCredential}
      */
-    protected function prove(Surface $surface, CredentialType $type, ?Model $account, #[\SensitiveParameter] array $input, TakenAttempt $taken): array
-    {
+    protected function prove(
+        Surface $surface,
+        CredentialType $type,
+        ?Model $account,
+        #[\SensitiveParameter] array $input,
+        ?TakenAttempt $taken = null,
+        #[\SensitiveParameter] mixed $ceremony = null,
+    ): array {
         $credentials = new Credentials($this->guard->userModel());
 
         try {
             $usable = $account === null ? [] : $credentials->ofType($account->getKey(), $type->name());
-            $proof = $type->verify($surface, $input, $usable);
+            $proof = $type->verify($surface, $input, $usable, $ceremony);
         } catch (Throwable $e) {
             report($e);
-            $this->limiter->giveBack($taken);
+
+            if ($taken !== null) {
+                $this->limiter->giveBack($taken);
+            }
 
             return [Proof::rejected('keystone.verify_failed'), null];
         }
@@ -82,108 +94,37 @@ abstract class CredentialAttempt
     }
 
     /**
-     * Enter the account of a proven attempt, or refuse it.
+     * Conclude the step with what its pass earned, ending the timing floor early once it stands.
      *
-     * @param  Closure(): ?bool  $enter  signs the account in, returning whether the browser was a known device of it, or holds it, returning null
-     * @param  SecurityEventType|null  $recorded  the event a pass records, or null for a step that passes without entering anything worth a row
-     */
-    protected function finish(
-        Model&KeystoneUser $account,
-        Flow $flow,
-        CredentialType $type,
-        Proof $proof,
-        StoredCredential $credential,
-        TakenAttempt $taken,
-        Closure $enter,
-        ?SecurityEventType $recorded,
-        ?string $reason = null,
-    ): bool {
-        if (! $this->advance($account, $type, $proof, $credential)) {
-            $this->recordRejected($account, $flow, $type, $credential, reason: 'keystone.superseded');
-
-            return false;
-        }
-
-        $entered = $this->complete(
-            account: $account,
-            flow: $flow,
-            type: $type,
-            credential: $credential,
-            taken: $taken,
-            enter: $enter,
-            recorded: $recorded,
-            reason: $reason,
-        );
-
-        if ($entered) {
-            $this->storeUpdatedSecret($account, $type, $proof, $credential);
-        }
-
-        return $entered;
-    }
-
-    /**
-     * Enter the account of an attempt whose credential is proven and written, giving its attempt back, or refuse an account barred from entering.
+     * @template TOutcome of Demand|SudoResult
      *
-     * @param  Closure(): ?bool  $enter  signs the account in, returning whether the browser was a known device of it, or holds it, returning null
-     * @param  SecurityEventType|null  $recorded  the event a pass records, or null for a step that passes without entering anything worth a row
+     * @param  Passed<TOutcome>|null  $passed  what the pass earned, or null for an account barred from it
+     * @return TOutcome|null
      */
-    protected function complete(
+    protected function conclude(
+        ?Passed $passed,
         Model&KeystoneUser $account,
         Flow $flow,
         CredentialType $type,
         ?StoredCredential $credential,
         TakenAttempt $taken,
-        Closure $enter,
-        ?SecurityEventType $recorded,
-        ?string $reason = null,
-    ): bool {
-        try {
-            $knownDevice = $enter();
-        } catch (Barred) {
-            $this->recordRejected($account, $flow, $type, $credential, reason: 'keystone.barred');
+    ): Demand|SudoResult|null {
+        $outcome = $this->accepted->conclude($passed, $account, $flow, $type->name(), $credential, $taken);
 
-            return false;
+        if ($outcome !== null) {
+            $this->timebox->returnEarly();
         }
 
-        $this->limiter->giveBack($taken);
-
-        if ($recorded !== null) {
-            $this->recorder->record(
-                $recorded,
-                account: $account,
-                flow: $flow->value,
-                credentialType: $type->name(),
-                credential: $credential,
-                reason: $reason,
-                knownDevice: $knownDevice,
-            );
-        }
-
-        $this->timebox->returnEarly();
-
-        return true;
+        return $outcome;
     }
 
     /**
-     * Spend the account's recovery code the typed one matches and enter, or refuse a barred account, a code it doesn't hold or the last one while it is kept.
-     *
-     * @param  Closure(): ?bool  $enter  signs the account in, returning whether the browser was a known device of it, or holds it, returning null
-     * @param  SecurityEventType|null  $recorded  the event a pass records, or null for a step that passes without entering anything worth a row
+     * Spend the account's recovery code the typed one matches, or refuse a barred account, a code it doesn't hold or the last one while it is kept.
      *
      * @throws LastRecoveryCode
      */
-    protected function spendRecoveryCode(
-        Model&KeystoneUser $account,
-        Flow $flow,
-        RecoveryCodeType $type,
-        #[\SensitiveParameter] string $typed,
-        TakenAttempt $taken,
-        Closure $enter,
-        ?SecurityEventType $recorded,
-        bool $keepLast,
-        ?string $reason = null,
-    ): bool {
+    protected function spendRecoveryCode(Model&KeystoneUser $account, Flow $flow, RecoveryCodeType $type, #[\SensitiveParameter] string $typed, bool $keepLast): bool
+    {
         try {
             $spent = $this->spendCode($account, $flow, $typed, $keepLast);
         } catch (LastRecoveryCode $e) {
@@ -200,20 +141,9 @@ abstract class CredentialAttempt
 
         if (! $spent) {
             $this->recordRejected($account, $flow, $type, credential: null, reason: 'recovery-code.mismatch');
-
-            return false;
         }
 
-        return $this->complete(
-            account: $account,
-            flow: $flow,
-            type: $type,
-            credential: null,
-            taken: $taken,
-            enter: $enter,
-            recorded: $recorded,
-            reason: $reason,
-        );
+        return $spent;
     }
 
     /**
@@ -281,20 +211,12 @@ abstract class CredentialAttempt
         string $reason,
     ): void {
         $this->recorder->record(
-            $this->rejectionType(),
+            $flow->rejectionType(),
             account: $account,
             flow: $flow->value,
             credentialType: $type->name(),
             credential: $credential,
             reason: $reason,
         );
-    }
-
-    /**
-     * Get the event a refused answer records.
-     */
-    protected function rejectionType(): SecurityEventType
-    {
-        return SecurityEventType::PROOF_REJECTED;
     }
 }

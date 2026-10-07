@@ -55,9 +55,9 @@ class AcceptedProof
             $this->limiter?->giveBack($taken);
         }
 
-        if ($passed->recorded !== null) {
+        if ($passed->event !== null) {
             $this->recorder->record(
-                $passed->recorded,
+                $passed->event,
                 account: $account,
                 flow: $flow->value,
                 credentialType: $credentialType,

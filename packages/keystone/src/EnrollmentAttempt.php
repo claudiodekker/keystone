@@ -2,19 +2,15 @@
 
 namespace ClaudioDekker\Keystone;
 
-use ClaudioDekker\Keystone\Exceptions\Barred;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\EnrolledCredential;
-use ClaudioDekker\Keystone\Methods\Proof;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
 use ClaudioDekker\Keystone\Methods\Surface;
-use Illuminate\Database\Eloquent\Model;
-use Throwable;
 
 /**
  * @internal
  */
-class EnrollmentAttempt extends EnrollmentStep
+class EnrollmentAttempt extends CredentialAttempt
 {
     /**
      * Verify the answer to the type's enrollment ceremony and store the new credential, then sign in or keep the sign-in held for what the account still owes.
@@ -23,10 +19,11 @@ class EnrollmentAttempt extends EnrollmentStep
      */
     public function attempt(PendingSignIn $pending, CredentialType $type, #[\SensitiveParameter] array $input, #[\SensitiveParameter] mixed $ceremony): Demand
     {
-        $proof = $this->prove($pending->account, $type, $input, $ceremony);
+        $account = $pending->account;
+        [$proof] = $this->prove(Surface::ENROLLMENT, $type, $account, $input, ceremony: $ceremony);
 
         if ($proof->enrolled === null) {
-            $this->recordRejected($pending, $type->name(), reason: $proof->reason ?? 'keystone.not_enrolled');
+            $this->recordRejected($account, Flow::ENROLLMENT, $type, credential: null, reason: $proof->reason ?? 'keystone.not_enrolled');
 
             return Demand::REFUSE;
         }
@@ -34,42 +31,16 @@ class EnrollmentAttempt extends EnrollmentStep
         $refusal = $this->store($pending, $type, $proof->enrolled);
 
         if ($refusal !== null) {
-            $this->recordRejected($pending, $type->name(), reason: $refusal);
+            $this->recordRejected($account, Flow::ENROLLMENT, $type, credential: null, reason: $refusal);
 
             return Demand::REFUSE;
         }
 
         $this->guard->slots()->forget($type->name(), Surface::ENROLLMENT->value);
 
-        try {
-            $this->guard->passSecondFactor();
-        } catch (Barred) {
-            $this->recordRejected($pending, $type->name(), reason: 'keystone.barred');
+        $passed = (new Entry($this->guard))->afterSecondFactorEnrollment();
 
-            return Demand::REFUSE;
-        }
-
-        return $this->proceed($type->name());
-    }
-
-    /**
-     * Let the type verify the input against its ceremony, turning any failure into a rejection.
-     *
-     * @param  array<string, mixed>  $input
-     */
-    protected function prove(Model&KeystoneUser $account, CredentialType $type, #[\SensitiveParameter] array $input, #[\SensitiveParameter] mixed $ceremony): Proof
-    {
-        $credentials = new Credentials($account);
-
-        try {
-            $usable = $credentials->ofType($account->getKey(), $type->name());
-
-            return $type->verify(Surface::ENROLLMENT, $input, $usable, $ceremony);
-        } catch (Throwable $e) {
-            report($e);
-
-            return Proof::rejected('keystone.verify_failed');
-        }
+        return $this->accepted->conclude($passed, $account, Flow::ENROLLMENT, $type->name()) ?? Demand::REFUSE;
     }
 
     /**

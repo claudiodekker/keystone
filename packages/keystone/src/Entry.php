@@ -69,13 +69,7 @@ class Entry
      */
     public function afterSecondFactorEnrollment(): ?Passed
     {
-        try {
-            $this->guard->passSecondFactor();
-        } catch (Barred) {
-            return null;
-        }
-
-        return $this->afterEnrollment();
+        return $this->passSecondFactor() ? $this->afterEnrollment() : null;
     }
 
     /**
@@ -137,12 +131,24 @@ class Entry
      */
     protected function holdAtEnrollment(): ?Passed
     {
-        try {
-            $this->guard->passSecondFactor();
-        } catch (Barred) {
+        if (! $this->passSecondFactor()) {
             return null;
         }
 
         return new Passed(Demand::ENROLLMENT, SecurityEventType::SIGN_IN_HELD, reason: 'keystone.enrollment');
+    }
+
+    /**
+     * Note that the pending sign-in passed its second factor, unless its account is barred.
+     */
+    protected function passSecondFactor(): bool
+    {
+        try {
+            $this->guard->passSecondFactor();
+        } catch (Barred) {
+            return false;
+        }
+
+        return true;
     }
 }

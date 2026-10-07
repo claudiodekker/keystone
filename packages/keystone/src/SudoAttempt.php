@@ -17,11 +17,6 @@ use LogicException;
 class SudoAttempt extends CredentialAttempt
 {
     /**
-     * Whether the step being finished grants sudo, so its credential's last use is stamped.
-     */
-    protected bool $granting = false;
-
-    /**
      * Prove the answer to the step the sudo-in-progress is at, then grant sudo or move on to the challenge a sign-in would demand, or refuse inside the timing floor.
      *
      * @param  array<string, mixed>  $input
@@ -78,25 +73,25 @@ class SudoAttempt extends CredentialAttempt
                 return SudoResult::REFUSED;
             }
 
-            $owed = $demand === Demand::CHALLENGE;
-            $this->granting = ! $owed;
+            $leadsTo = $demand === Demand::CHALLENGE ? SudoResult::CHALLENGE_OWED : SudoResult::GRANTED;
 
-            $entered = $this->finish(
-                account: $account,
-                flow: $flow,
-                type: $type,
-                proof: $proof,
-                credential: $credential,
-                taken: $taken,
-                enter: $owed ? fn () => $this->passFirstStep($progress, $type) : fn () => $this->grant($subnet),
-                recorded: $owed ? null : SecurityEventType::SUDO_GRANTED,
-            );
+            if (! $this->write($account, $type, $proof, $credential, $leadsTo)) {
+                $this->recordRejected($account, $flow, $type, $credential, reason: 'keystone.superseded');
 
-            return match (true) {
-                ! $entered => SudoResult::REFUSED,
-                $owed => SudoResult::CHALLENGE_OWED,
-                default => SudoResult::GRANTED,
-            };
+                return SudoResult::REFUSED;
+            }
+
+            $pass = new SudoPass($this->guard);
+            $passed = $leadsTo === SudoResult::GRANTED ? $pass->grant($subnet) : $pass->passFirstStep($progress, $type->name());
+            $result = $this->conclude($passed, $account, $flow, $type, $credential, $taken);
+
+            if ($result === null) {
+                return SudoResult::REFUSED;
+            }
+
+            $this->storeUpdatedSecret($account, $type, $proof, $credential);
+
+            return $result;
         }, self::TIMING_FLOOR_MICROSECONDS);
     }
 
@@ -139,65 +134,32 @@ class SudoAttempt extends CredentialAttempt
             return SudoResult::REFUSED;
         }
 
-        $entered = $this->spendRecoveryCode(
-            account: $account,
-            flow: $flow,
-            type: $type,
-            typed: $typed,
-            taken: $taken,
-            enter: fn () => $this->grant($subnet),
-            recorded: SecurityEventType::SUDO_GRANTED,
-            keepLast: true,
-        );
+        if (! $this->spendRecoveryCode($account, $flow, $type, $typed, keepLast: true)) {
+            return SudoResult::REFUSED;
+        }
 
-        return $entered ? SudoResult::GRANTED : SudoResult::REFUSED;
+        $passed = (new SudoPass($this->guard))->grant($subnet);
+
+        return $this->conclude($passed, $account, $flow, $type, credential: null, taken: $taken) ?? SudoResult::REFUSED;
     }
 
     /**
-     * Move the sudo-in-progress past its first step, on to the challenge it still owes.
+     * Write what the proof changed and, on a step that leads to the grant, stamp the credential's last use in the same locked change, refusing a proof another one overtook.
      */
-    protected function passFirstStep(SudoInProgress $progress, CredentialType $type): ?bool
-    {
-        $this->guard->passSudoFirstFactor($progress, $type->name());
-
-        return null;
-    }
-
-    /**
-     * Grant the sudo-in-progress its sudo, bound to the subnet.
-     */
-    protected function grant(Subnet $subnet): ?bool
-    {
-        $this->guard->grantSudo($subnet);
-
-        return null;
-    }
-
-    /**
-     * Write what the proof changed and, on the step that grants, stamp the credential's last use in the same locked change, refusing a proof another one overtook.
-     */
-    protected function advance(Model&KeystoneUser $account, CredentialType $type, Proof $proof, StoredCredential $credential): bool
+    protected function write(Model&KeystoneUser $account, CredentialType $type, Proof $proof, StoredCredential $credential, SudoResult $leadsTo): bool
     {
         $changes = new AccountChanges($this->guard);
 
-        return $changes->change($account, function (AccountChange $change) use ($credential, $type, $proof) {
+        return $changes->change($account, function (AccountChange $change) use ($credential, $type, $proof, $leadsTo) {
             if ($proof->advancedSecret !== null && ! $change->advance($credential, type: $type->name(), secret: (string) $proof->advancedSecret)) {
                 return false;
             }
 
-            if ($this->granting) {
+            if ($leadsTo === SudoResult::GRANTED) {
                 $change->stampLastUse($credential, type: $type->name());
             }
 
             return true;
         });
-    }
-
-    /**
-     * Get the event a refused answer records.
-     */
-    protected function rejectionType(): SecurityEventType
-    {
-        return SecurityEventType::SUDO_FAILED;
     }
 }
