@@ -66,8 +66,8 @@ Use these handles. Each one comes from the stub pages and is stable:
 | Home | `/` | link `Sign in` (guest), text `You're signed in.` and button `Sign out` (signed in) |
 | Sign in | `/auth/login` | heading `Sign in`, label `Email address`, label `Password`, button `Sign in` |
 | Challenge | `/auth/login/challenge` | heading `Confirm it's you`, label `Code from your authenticator app` (TOTP), label `Recovery code`, button `Verify`, a button per other type named by type (`recovery-code`), button `Cancel sign-in` |
-| Home (signed in) | `/` | link `Security settings`, text `Sudo has ended.` after ending sudo |
-| Security settings | `/settings/security` | heading `Security settings`, button `End sudo`, link `Home`; behind `['auth', 'sudo']` |
+| Home (signed in) | `/` | link `Security settings`, button `End sudo`, text `Sudo has ended.` after ending sudo |
+| Security settings | `/settings/security` | heading `Security settings`, link `Home`; behind `['auth', 'sudo']` |
 | Sudo | `/auth/sudo` | heading `Confirm it's you`, label `Password` then label `Code from your authenticator app`, button `Confirm`, a button per other type named by type |
 
 Errors render as red text under the field they belong to. Assert them with `page.getByText('…')`. The message strings are in `packages/keystone/lang/en/messages.php`.

@@ -147,7 +147,7 @@ import { end } from '@/routes/sudo';
 </template>
 ```
 
-Keystone then drops the grant, or the sudo-in-progress, rotates the session id, records `sudo.revoked` when a live grant was ended, and flashes the status `sudo-revoked`. The user stays signed in. `sendSudoEnded()` in your `app/Http/Controllers/Auth/SudoController.php` sends them back to the page they came from, or to `/` when the request names none:
+Keystone then drops the grant, or the sudo-in-progress, rotates the session id, records `sudo.revoked` when a live grant was ended, and flashes the status `sudo-revoked`. The user stays signed in. `sendSudoEnded()` in your `app/Http/Controllers/Auth/SudoController.php` sends them back to the page they came from, or to `/` when the request names none. Put the button on a page that doesn't need sudo, such as your security overview: from a gated page, going back meets the gate again and lands on the sudo page.
 
 ```php
 protected function sendSudoEnded(Request $request): RedirectResponse

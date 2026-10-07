@@ -23,6 +23,8 @@ const namesAccount = computed(() => props.surface === 'sign-in' && props.purpose
 
 const secretFields = ['password', 'code'];
 
+const shownByField = computed(() => secretFields.includes(props.option.type));
+
 const labels = { 'sign-in': 'Sign in', challenge: 'Verify', enrollment: 'Set up' };
 
 const label = computed(() => (props.purpose === 'sudo' ? 'Confirm' : labels[props.surface]));
@@ -51,7 +53,7 @@ const label = computed(() => (props.purpose === 'sudo' ? 'Confirm' : labels[prop
             Remember me
         </label>
 
-        <p v-if="errors[option.type]" class="text-sm text-red-600">{{ errors[option.type] }}</p>
+        <p v-if="errors[option.type] && !shownByField" class="text-sm text-red-600">{{ errors[option.type] }}</p>
 
         <button type="submit" :disabled="processing" class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
             {{ label }}
