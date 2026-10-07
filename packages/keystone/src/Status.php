@@ -15,6 +15,7 @@ enum Status: string
     case ENROLLMENT_CANCELLED = 'enrollment-cancelled';
     case ENROLLMENT_EXPIRED = 'enrollment-expired';
     case ENROLLMENT_OWED = 'enrollment-owed';
+    case SUDO_REVOKED = 'sudo-revoked';
 
     /**
      * The session key the status is flashed under.

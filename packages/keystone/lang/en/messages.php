@@ -20,5 +20,6 @@ return [
         'enrollment-cancelled' => 'Two-factor setup cancelled. You were not logged in.',
         'enrollment-expired' => 'Your enrollment session expired. Please start again.',
         'enrollment-owed' => 'Please sign in again to finish setting up two-factor authentication.',
+        'sudo-revoked' => 'Sudo has ended. You will be asked to prove your identity again before your next sensitive change.',
     ],
 ];

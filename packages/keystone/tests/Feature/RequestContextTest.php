@@ -17,7 +17,7 @@ it('captures each request\'s IP address, user agent and a request id of its own'
         ->post(route('login.submit', ['type' => 'form']), ['identifier' => 'jane@example.com', ...(new FormTypeSupport)->validProof(Surface::SIGN_IN)]);
     $this->post(route('logout'));
 
-    [$signedIn, $signedOut] = SecurityEvent::query()->orderBy('id')->get()->all();
+    [$signedIn, $signedOut] = SecurityEvent::query()->whereIn('type', ['signed_in', 'signed_out'])->orderBy('id')->get()->all();
     expect($signedIn->ip_address)->toBe('127.0.0.1')
         ->and($signedIn->user_agent)->toBe('KeystoneTest/1.0')
         ->and(Str::isUlid($signedIn->request_id))->toBeTrue()
