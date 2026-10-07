@@ -430,7 +430,8 @@ class KeystoneGuard extends SessionGuard
             return null;
         }
 
-        return rescue(function () use ($account, $request) {
+        // Postgres aborts the whole transaction a failed query ran in, so the queries get a savepoint of their own to fail in.
+        return rescue(fn () => $account->getConnection()->transaction(function () use ($account, $request) {
             $challenges = new PendingChallenges($account);
             $replaced = $this->replacedPendingChallengeId($account);
 
@@ -439,7 +440,7 @@ class KeystoneGuard extends SessionGuard
             }
 
             return $challenges->open($account->getKey(), userAgent: $request->headers->get('User-Agent'), ipAddress: $request->getClientIp());
-        });
+        }));
     }
 
     /**
