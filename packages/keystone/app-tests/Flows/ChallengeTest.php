@@ -281,3 +281,38 @@ describe('rate limits', function () {
         $this->assertChallengeThrottled($this->delete(route('login.challenge.cancel')));
     });
 });
+
+describe('abandoned challenges', function () {
+    it('records a challenge left for seven minutes as abandoned, with nothing for the app to schedule', function () {
+        $account = $this->createChallengedAccount($this->support);
+        $this->assertChallengeOwed($this->passFirstFactor());
+        $this->travel(7)->minutes();
+
+        $this->sweepAbandonedChallenges();
+
+        $this->assertDatabaseHas('user_security_events', ['type' => 'challenge.abandoned', 'user_id' => $account->getKey(), 'actor' => 'system']);
+    });
+
+    it('records one that was cancelled all the same', function () {
+        $account = $this->createChallengedAccount($this->support);
+        $this->passFirstFactor();
+        $this->assertChallengeCancelled($this->delete(route('login.challenge.cancel')));
+        $this->travel(7)->minutes();
+
+        $this->sweepAbandonedChallenges();
+
+        $this->assertDatabaseHas('user_security_events', ['type' => 'challenge.abandoned', 'user_id' => $account->getKey()]);
+    });
+
+    it('records nothing for a challenge passed sooner', function () {
+        $this->createChallengedAccount($this->support);
+        $this->passFirstFactor();
+        $this->travel(6)->minutes();
+        $this->assertChallengePassed($this->post(route('login.challenge.submit', ['type' => $this->support->type()]), $this->support->validProof(Surface::CHALLENGE)), '/');
+        $this->travel(7)->minutes();
+
+        $this->sweepAbandonedChallenges();
+
+        $this->assertDatabaseMissing('user_security_events', ['type' => 'challenge.abandoned']);
+    });
+});

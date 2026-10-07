@@ -36,7 +36,7 @@ function accountHolding(bool $secondFactor = false, bool $recoveryCodes = false)
 
 function pendingFor(User $account, string $firstFactor = 'form', bool $secondFactorPassed = false): PendingSignIn
 {
-    return new PendingSignIn($account, $firstFactor, PendingOrigin::LOGIN, PendingStage::CHALLENGE, '/', CarbonImmutable::now(), epoch: 0, secondFactorPassed: $secondFactorPassed);
+    return new PendingSignIn($account, $firstFactor, PendingOrigin::LOGIN, PendingStage::CHALLENGE, '/', CarbonImmutable::now(), epoch: 0, secondFactorPassed: $secondFactorPassed, pendingChallengeId: null);
 }
 
 it('signs in an active account', function () {

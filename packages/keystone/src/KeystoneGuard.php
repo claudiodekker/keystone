@@ -130,6 +130,7 @@ class KeystoneGuard extends SessionGuard
             'epoch' => $this->epochOf($account),
             'held_at' => Date::now()->getTimestamp(),
             'second_factor_passed' => false,
+            'pending_challenge_id' => $stage === PendingStage::CHALLENGE ? $this->openPendingChallenge($account) : null,
         ]);
     }
 
@@ -201,6 +202,7 @@ class KeystoneGuard extends SessionGuard
             heldAt: $heldAt,
             epoch: $held['epoch'],
             secondFactorPassed: $held['second_factor_passed'],
+            pendingChallengeId: $held['pending_challenge_id'],
         );
     }
 
@@ -415,6 +417,44 @@ class KeystoneGuard extends SessionGuard
         ));
 
         return $known;
+    }
+
+    /**
+     * Get the id of the pending challenge the hold of the account keeps: the one the sign-in it replaces opened, a new one, or none for a known device or when opening it fails.
+     */
+    protected function openPendingChallenge(Model&KeystoneUser $account): ?int
+    {
+        $request = $this->getRequest();
+
+        if ((new KnownDevices($account))->isKnown($account->getKey(), KnownDevices::cookieOf($request))) {
+            return null;
+        }
+
+        // Postgres aborts the whole transaction a failed query ran in, so the queries get a savepoint of their own to fail in.
+        return rescue(fn () => $account->getConnection()->transaction(function () use ($account, $request) {
+            $challenges = new PendingChallenges($account);
+            $replaced = $this->replacedPendingChallengeId($account);
+
+            if ($replaced !== null && $challenges->has($replaced)) {
+                return $replaced;
+            }
+
+            return $challenges->open($account->getKey(), userAgent: $request->headers->get('User-Agent'), ipAddress: $request->getClientIp());
+        }));
+    }
+
+    /**
+     * Get the id of the pending challenge that the pending sign-in about to be replaced opened, when that sign-in is the account's.
+     */
+    protected function replacedPendingChallengeId(Model&KeystoneUser $account): ?int
+    {
+        $replaced = $this->session->get($this->pendingKey());
+
+        if (! is_array($replaced) || (string) $replaced['account'] !== (string) $account->getAuthIdentifier()) {
+            return null;
+        }
+
+        return $replaced['pending_challenge_id'];
     }
 
     /**

@@ -75,6 +75,12 @@ class KeystoneServiceProvider extends ServiceProvider
                 ->name('keystone:prune-known-devices')
                 ->daily()
                 ->onOneServer();
+
+            $schedule->call(fn () => (new PendingChallenges(Keystone::guard()->userModel()))->sweep())
+                ->name('keystone:sweep-abandoned-challenges')
+                ->everyFiveMinutes()
+                ->withoutOverlapping(15)
+                ->onOneServer();
         });
 
         $this->callAfterResolving(ExceptionHandler::class, function (ExceptionHandler $handler) {

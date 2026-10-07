@@ -14,6 +14,7 @@ use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\Collection;
 use Throwable;
 
 /**
@@ -34,6 +35,7 @@ class SecurityAlert extends Notification implements SecurityEventAlertContract, 
     protected const array TYPES = [
         SecurityEventType::ACCOUNT_SUSPENDED,
         SecurityEventType::ACCOUNT_UNSUSPENDED,
+        SecurityEventType::CHALLENGE_ABANDONED,
         SecurityEventType::CREDENTIAL_ADDED,
         SecurityEventType::DEVICE_COOKIE_REUSED,
         SecurityEventType::LIMIT_TRIPPED,
@@ -44,24 +46,38 @@ class SecurityAlert extends Notification implements SecurityEventAlertContract, 
     ];
 
     /**
-     * The type of the event the alert is about.
+     * The most IP addresses, or devices, a mail lists before it only counts the rest.
+     */
+    protected const int LISTED_VALUES = 5;
+
+    /**
+     * The type of the events the alert is about.
      */
     public SecurityEventType $type;
 
     /**
-     * When the event occurred.
+     * How many events the alert is about.
+     */
+    public int $count;
+
+    /**
+     * When the earliest event occurred.
      */
     public CarbonImmutable $occurredAt;
 
     /**
-     * The IP address of the request that caused the event.
+     * The distinct IP addresses of the requests that caused the events, with null for an unknown one.
+     *
+     * @var Collection<int, string|null>
      */
-    public ?string $ipAddress;
+    public Collection $ipAddresses;
 
     /**
-     * The label of the device that caused the event, never its raw user agent.
+     * The distinct labels of the devices that caused the events, never their raw user agents, with null for an unknown one.
+     *
+     * @var Collection<int, string|null>
      */
-    public ?string $device;
+    public Collection $devices;
 
     /**
      * The type of the credential involved; never its label, which its owner typed.
@@ -76,12 +92,20 @@ class SecurityAlert extends Notification implements SecurityEventAlertContract, 
     /**
      * Create a new notification instance.
      */
-    public function __construct(SecurityEvent $event)
+    public function __construct(SecurityEvent $event, SecurityEvent ...$others)
     {
+        $events = [$event, ...array_values($others)];
+
         $this->type = $event->type;
-        $this->occurredAt = $event->occurred_at;
-        $this->ipAddress = $event->ip_address;
-        $this->device = $this->describe($event->user_agent);
+        $this->count = count($events);
+        $this->occurredAt = min(array_map(fn (SecurityEvent $event) => $event->occurred_at, $events));
+        $this->ipAddresses = collect($events)->map(fn (SecurityEvent $event) => $event->ip_address)->unique(strict: true)->values();
+        $this->devices = collect($events)
+            ->map(fn (SecurityEvent $event) => $event->user_agent)
+            ->unique(strict: true)
+            ->map(fn (?string $userAgent) => $this->describe($userAgent))
+            ->unique(strict: true)
+            ->values();
         $this->credentialType = $event->credential_type;
         $this->remainingRecoveryCodes = $this->countRemainingRecoveryCodes($event);
     }
@@ -117,25 +141,44 @@ class SecurityAlert extends Notification implements SecurityEventAlertContract, 
                 'subject' => $subject,
                 'what' => "keystone::alerts.{$this->type->value}",
                 'occurredAt' => $this->occurredAt->utc()->format(self::TIME_FORMAT),
-                'ipAddress' => $this->ipAddress ?? __('keystone::alerts.unknown'),
+                'count' => $this->count,
+                'ipAddress' => $this->listed($this->ipAddresses, unknown: __('keystone::alerts.unknown')),
                 'location' => $this->locate(),
-                'device' => $this->device ?? __('keystone::alerts.unknown_device'),
+                'device' => $this->listed($this->devices, unknown: __('keystone::alerts.unknown_device')),
                 'credential' => $this->credentialType,
                 'remainingRecoveryCodes' => $this->remainingRecoveryCodes,
             ]);
     }
 
     /**
-     * Name where the IP address is through the IP-location port, on the worker, so no request waits on the lookup.
+     * List the first of the values in one line, naming an unknown one and saying how many more there are.
+     *
+     * @param  Collection<int, string|null>  $values
+     */
+    protected function listed(Collection $values, string $unknown): string
+    {
+        $listed = $values->take(self::LISTED_VALUES)->map(fn (?string $value) => $value ?? $unknown)->implode(', ');
+
+        if ($values->count() <= self::LISTED_VALUES) {
+            return $listed;
+        }
+
+        return __('keystone::alerts.more', ['values' => $listed, 'count' => $values->count() - self::LISTED_VALUES]);
+    }
+
+    /**
+     * Name where the alert's one known IP address is through the IP-location port, on the worker, so no request waits on the lookup.
      */
     protected function locate(): ?string
     {
-        if ($this->ipAddress === null) {
+        $known = $this->ipAddresses->whereNotNull();
+
+        if ($known->count() !== 1) {
             return null;
         }
 
         try {
-            return app(IpLocation::class)->locate($this->ipAddress);
+            return app(IpLocation::class)->locate($known->sole());
         } catch (Throwable $e) {
             report($e);
 

@@ -6,6 +6,7 @@ return [
     'unknown' => 'Unknown',
     'unknown_device' => 'Unknown device',
     'device' => ':browser on :platform',
+    'more' => ':values and :count more',
 
     'fields' => [
         'when' => 'When',
@@ -24,6 +25,13 @@ return [
             'unsuspended' => [
                 'subject' => 'Your account was unsuspended',
                 'what' => 'An administrator lifted the suspension of your account, so it can sign in again.',
+            ],
+        ],
+        'challenge' => [
+            'abandoned' => [
+                'subject' => 'A sign-in to your account was started but not finished',
+                'what' => 'Someone passed the first step of signing in to your account from a browser it hasn\'t signed in from recently, and had not finished the second step 7 minutes later. Whoever it was has what the first step asks for, such as your password.',
+                'count' => '{1} This happened once.|[2,*] This happened :count times.',
             ],
         ],
         'credential' => [

@@ -27,6 +27,7 @@ readonly class PendingSignIn
         public CarbonImmutable $heldAt,
         public int $epoch,
         public bool $secondFactorPassed,
+        public ?int $pendingChallengeId,
     ) {
         //
     }

@@ -94,6 +94,9 @@ _Avoid_: recaller
 **Known device**:
 A browser that carries the device cookie an account's earlier sign-in left behind.
 
+**Pending challenge**:
+Keystone's note that a pending sign-in from a browser that isn't a known device of its account is held at the challenge. Only passing the challenge forgets it.
+
 **Abandoned challenge**:
 A sign-in that passed the first factor and never finished the second.
 

@@ -131,4 +131,19 @@ describe('the queued alert', function () {
         expect($queued)->toContain('SecurityAlert')->not->toContain('203.0.113.7', 'Firefox', 'Windows', 'jane@example.com')
             ->and($failed)->toContain('SecurityAlert')->not->toContain('203.0.113.7', 'Firefox', 'Windows', 'jane@example.com');
     });
+
+    it('holds none of the IP addresses or user agents of an alert about several events in clear on the queue', function () {
+        $this->travelTo('2026-10-06 12:00:00');
+        $this->createChallengedAccount(new FormTypeSupport('code'));
+        $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.7'])->withHeader('User-Agent', FIREFOX)->passFirstFactor();
+        session()->invalidate();
+        $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.9'])->withHeader('User-Agent', 'curl/8.0')->passFirstFactor();
+        $this->travelTo('2026-10-06 12:10:00');
+
+        $this->artisan('schedule:run')->assertSuccessful();
+
+        $queued = DB::table('jobs')->pluck('payload')->implode("\n");
+        expect(DB::table('jobs')->count())->toBe(1)
+            ->and($queued)->toContain('SecurityAlert')->not->toContain('203.0.113.7', '198.51.100.9', 'Firefox', 'Windows', 'curl', 'jane@example.com');
+    });
 });

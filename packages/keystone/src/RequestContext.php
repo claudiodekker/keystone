@@ -2,6 +2,7 @@
 
 namespace ClaudioDekker\Keystone;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -20,6 +21,7 @@ readonly class RequestContext
         public ?string $userAgent = null,
         public ?string $path = null,
         public ?string $requestId = null,
+        public ?CarbonImmutable $occurredAt = null,
     ) {
         //
     }

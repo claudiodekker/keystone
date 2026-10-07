@@ -32,7 +32,7 @@ class ChallengeAttempt extends CredentialAttempt
             $demand = $this->owed($pending);
 
             if ($type instanceof RecoveryCodeType) {
-                return $this->spendRecoveryCode($account, $flow, $type, (string) $input[RecoveryCodeType::FIELD], $taken, $demand);
+                return $this->spendRecoveryCode($pending, $flow, $type, (string) $input[RecoveryCodeType::FIELD], $taken, $demand);
             }
 
             [$proof, $credential] = $type->name() === $pending->firstFactor
@@ -52,7 +52,7 @@ class ChallengeAttempt extends CredentialAttempt
                 proof: $proof,
                 credential: $credential,
                 taken: $taken,
-                enter: fn () => $this->enter($account, $demand),
+                enter: fn () => $this->enter($pending, $demand),
                 recorded: $this->recorded($demand),
                 reason: $this->reason($demand),
             );
@@ -62,12 +62,13 @@ class ChallengeAttempt extends CredentialAttempt
     }
 
     /**
-     * Spend the account's recovery code the typed one matches and complete the sign-in, refusing a barred account and the last code while the gate keeps it.
+     * Spend the recovery code of the pending sign-in's account the typed one matches and complete the sign-in, refusing a barred account and the last code while the gate keeps it.
      *
      * @throws LastRecoveryCode
      */
-    protected function spendRecoveryCode(Model&KeystoneUser $account, Flow $flow, RecoveryCodeType $type, #[\SensitiveParameter] string $typed, TakenAttempt $taken, Demand $demand): Demand
+    protected function spendRecoveryCode(PendingSignIn $pending, Flow $flow, RecoveryCodeType $type, #[\SensitiveParameter] string $typed, TakenAttempt $taken, Demand $demand): Demand
     {
+        $account = $pending->account;
         $changes = new AccountChanges($this->guard);
 
         try {
@@ -102,7 +103,7 @@ class ChallengeAttempt extends CredentialAttempt
             type: $type,
             credential: null,
             taken: $taken,
-            enter: fn () => $this->enter($account, $demand),
+            enter: fn () => $this->enter($pending, $demand),
             recorded: $this->recorded($demand),
             reason: $this->reason($demand),
         );
@@ -119,9 +120,23 @@ class ChallengeAttempt extends CredentialAttempt
     }
 
     /**
-     * Sign the account in, returning whether the browser was a known device of it, or hold its pending sign-in on at the enrollment it still owes.
+     * Move the pending sign-in past its challenge, returning whether a signed-in browser was a known device, then forget the pending challenge its hold opened.
      */
-    protected function enter(Model&KeystoneUser $account, Demand $demand): ?bool
+    protected function enter(PendingSignIn $pending, Demand $demand): ?bool
+    {
+        $knownDevice = $this->pass($pending->account, $demand);
+
+        if ($pending->pendingChallengeId !== null) {
+            rescue(fn () => (new PendingChallenges($pending->account))->forget($pending->pendingChallengeId));
+        }
+
+        return $knownDevice;
+    }
+
+    /**
+     * Move the pending sign-in past its challenge: on to the enrollment the account still owes, or into a signed-in session.
+     */
+    protected function pass(Model&KeystoneUser $account, Demand $demand): ?bool
     {
         if ($demand === Demand::ENROLLMENT) {
             $this->guard->passSecondFactor();

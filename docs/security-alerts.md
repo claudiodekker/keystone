@@ -1,6 +1,6 @@
 # Security alerts
 
-Keystone mails an account's owner when something happens to their account that they should know about, such as an operator ending every session of it. Each alert is about one [security event](security-events.md), sent by the recorder that records it, so nothing in your app needs to be wired up.
+Keystone mails an account's owner when something happens to their account that they should know about, such as an operator ending every session of it. Each alert is about one [security event](security-events.md), or about an account's [abandoned challenges](#abandoned-challenges) together, sent by the recorder that records it, so nothing in your app needs to be wired up.
 
 Alerts are queued. Run a queue worker, or they are never sent: `queue.default` set to `sync` sends them inside the request, and production refuses to boot on the `null` queue (see [Configuration](configuration.md#boot-checks)).
 
@@ -10,6 +10,7 @@ Alerts are queued. Run a queue worker, or they are never sent: `queue.default` s
 |---|---|
 | `account.suspended` | an operator suspended the account (see [Operator commands](operator-commands.md#suspending-accounts)) |
 | `account.unsuspended` | an operator lifted the account's suspension |
+| `challenge.abandoned` | a sign-in from a browser that isn't one of the account's [known devices](#new-devices) passed its first factor and hasn't passed the [challenge](challenge.md) 7 minutes later (see [Abandoned challenges](#abandoned-challenges)) |
 | `credential.added` | a credential was added to the account, such as a second factor at [enrollment](enrollment.md) |
 | `device_cookie.reused` | a browser signed in with a [device cookie](#new-devices) that a later sign-in had already replaced, so two browsers held the same cookie |
 | `limit.tripped` | wrong answers spent one of the account's [failed-attempt counts](rate-limiting.md#locking-an-accounts-owner-out), once per count and window; a spent request limit alerts nobody |
@@ -22,7 +23,7 @@ Alerts are queued. Run a queue worker, or they are never sent: `queue.default` s
 
 Every verified address of the account gets its own mail. While an account has no verified address, its unverified addresses get one each instead. The addresses are read before the change that caused the event, so an address a change removes still hears about it.
 
-There is no de-duplication: two events send two alerts, however alike.
+There is no de-duplication: two events send two alerts, however alike. Only abandoned challenges share one.
 
 ## New devices
 
@@ -36,12 +37,20 @@ A known device earns no trust beyond its own [failed-attempt count](rate-limitin
 
 An operator ending an account's sessions with `keystone:end-sessions` forgets its known devices, and `--all` forgets every account's, so each browser's next sign-in alerts. Keystone's scheduled `keystone:prune-known-devices` task deletes devices unseen for the retention every night, on one server, so run Laravel's scheduler.
 
+## Abandoned challenges
+
+A sign-in that passes its first factor and hasn't passed the [challenge](challenge.md) 7 minutes later suggests someone has the account's first factor, such as its password, and not its second. Keystone tells the owner. A pending sign-in lasts 15 minutes, so the challenge can still be passed after the alert is sent, and the mail doesn't say that nobody signed in.
+
+When a sign-in is held at the challenge from a browser that isn't one of the account's known devices, Keystone writes a row to `user_pending_challenges` with the browser's user agent and IP address, both encrypted. Only passing the challenge deletes the row. Cancelling the sign-in, letting it expire or starting another one keeps it, so nobody can silence the alert by walking away. Passing the first factor again for the same account in the same session keeps the row it already has, so a retry adds no second row and doesn't postpone the alert. A hold from a known device writes no row.
+
+Keystone's scheduled `keystone:sweep-abandoned-challenges` task runs every five minutes, on one server, so run Laravel's scheduler. It records a `challenge.abandoned` event for each row at least 7 minutes old, with the time, IP address and user agent of the sign-in, then deletes the rows. A run never starts while an earlier one is still going, and one that died blocks the next for at most 15 minutes. An account with several such rows gets one alert about all of them, which says how many there were and lists their devices and IP addresses. A mail lists the first five of each, then says how many more there were. The 7 minutes aren't configurable.
+
 ## What they say
 
 The default alert is one notification class, `ClaudioDekker\Keystone\Notifications\SecurityAlert`, with a view and translation keys per type. Each mail says what happened and:
 
-- when, in UTC;
-- the IP address of the request that caused it, and where that address is when the [IP-location port](#ip-location) knows;
+- when, in UTC. For abandoned challenges that is when the sign-in passed its first factor. An alert about several gives the time of the earliest;
+- the IP address of the request that caused it, and where that address is when the [IP-location port](#ip-location) knows. An alert about several IP addresses lists them and names no place;
 - the device, as the platform and browser the [session-info port](#session-info) parses from the user agent, or "Unknown device". The raw user agent never appears in a mail;
 - the type of the credential involved, when there is one, such as `passkey`. Never its label: its owner typed that, and a mail client could turn a label that looks like a web address into a link;
 - "If this wasn't you, sign in and review your security settings."
@@ -60,7 +69,7 @@ To change the wording, override the keys under `keystone::alerts` in `lang/vendo
 ],
 ```
 
-Keystone builds your notification with the event and sends it on demand to each recipient's address. Implement `SecurityEventAlertContract`, which makes PHP require a constructor that takes the `SecurityEvent`:
+Keystone builds your notification with the event and sends it on demand to each recipient's address. Implement `SecurityEventAlertContract`, which makes PHP require a constructor that takes the `SecurityEvent`, followed by the other events the same alert is about. Only `challenge.abandoned` ever passes others:
 
 ```php
 use Carbon\CarbonImmutable;
@@ -79,7 +88,7 @@ class SessionsEnded extends Notification implements SecurityEventAlertContract, 
 
     public ?string $ipAddress;
 
-    public function __construct(SecurityEvent $event)
+    public function __construct(SecurityEvent $event, SecurityEvent ...$others)
     {
         $this->occurredAt = $event->occurred_at;
         $this->ipAddress = $event->ip_address;
@@ -89,7 +98,7 @@ class SessionsEnded extends Notification implements SecurityEventAlertContract, 
 }
 ```
 
-Copy what you need from the event in the constructor rather than keeping the event itself: it isn't stored when writing the audit trail failed, and a queued notification reloads a model it keeps from the database. Implement `ShouldQueue` so the mail doesn't slow the request down, and `ShouldBeEncrypted` so the IP address it carries isn't readable in your `jobs` and `failed_jobs` tables.
+Copy what you need from the events in the constructor rather than keeping the events themselves: an event isn't stored when writing the audit trail failed, and a queued notification reloads a model it keeps from the database. Implement `ShouldQueue` so the mail doesn't slow the request down, and `ShouldBeEncrypted` so the IP address it carries isn't readable in your `jobs` and `failed_jobs` tables.
 
 A slot may name any type of security event, including one that doesn't alert by default, such as `proof.rejected`. `SecurityAlert` only has a mail for the types in the [table above](#types-that-alert), so a slot for any other type names your own notification.
 
