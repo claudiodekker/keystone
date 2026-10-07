@@ -136,6 +136,9 @@ A session that has proven who it is and owes nothing more. A session that comes 
 A session that has named an account but still owes a challenge, an enrollment or a recovery before it is signed in. At most one per session.
 _Avoid_: park, half-authenticated, held user
 
+**Entry**:
+What core does once a proof is accepted for an account: signs it in, or holds its pending sign-in for what it still owes. A remembered return is not an entry.
+
 **Mandate**:
 A setting that requires every account to hold something: a second factor (`require_second_factor`) or recovery codes (`require_recovery_codes`). An account that doesn't owes enrollment.
 _Avoid_: requirement, policy
