@@ -225,6 +225,24 @@ describe('the retention', function () {
     })->with(['zero' => [0], 'null' => [null], 'a negative number' => [-1], 'a string' => ['7776000']]);
 });
 
+describe('the remember-me lifetime', function () {
+    it('refuses a lifetime that isn\'t a whole number of at least 0', function (mixed $seconds) {
+        config(['keystone.remember.lifetime_seconds' => $seconds]);
+
+        $failures = bootFailures();
+
+        expect($failures)->toBe(['keystone.remember.lifetime_seconds must be a whole number of at least 0.']);
+    })->with(['null' => [null], 'a negative number' => [-1], 'a string' => ['2592000'], 'false' => [false]]);
+
+    it('accepts a lifetime of zero, which turns remember-me off, and one longer than a device stays known', function (int $seconds) {
+        config(['keystone.retention.known_devices_seconds' => 3600, 'keystone.remember.lifetime_seconds' => $seconds]);
+
+        $failures = bootFailures();
+
+        expect($failures)->toBe([]);
+    })->with(['off' => [0], 'one second' => [1], 'longer than the retention' => [3601]]);
+});
+
 describe('the hardening opt-outs', function () {
     it('refuses frame ancestors that aren\'t a list of CSP sources', function (mixed $sources) {
         config(['keystone.hardening.frame_ancestors' => $sources]);

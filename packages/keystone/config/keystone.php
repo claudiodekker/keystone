@@ -60,6 +60,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Remember Me
+    |--------------------------------------------------------------------------
+    |
+    | How long a ticked "remember me" keeps a browser signed in, counted
+    | from the sign-in that issued its token and never extended by a
+    | return. A 0 turns this off, so no cookie is issued or read.
+    |
+    */
+
+    'remember' => [
+        'lifetime_seconds' => 2592000,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Rate Limits
     |--------------------------------------------------------------------------
     |
