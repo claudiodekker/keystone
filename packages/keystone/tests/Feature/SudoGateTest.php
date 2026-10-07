@@ -18,7 +18,6 @@ pest()->extend(AppTestCase::class);
 
 beforeEach(function () {
     $this->withoutMandates();
-    Route::middleware('web')->get('sudo', fn () => 'the sudo step')->name('sudo');
     Route::middleware(['web', 'sudo'])->match(['get', 'post'], 'probe', fn () => 'the gated page');
     Route::middleware('web')->delete('gated', [GatedProbeController::class, 'destroy']);
     Route::middleware('web')->delete('gated/overridden', [OverridingGatedProbeController::class, 'destroy']);
