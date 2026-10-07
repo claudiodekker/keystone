@@ -12,14 +12,21 @@ beforeEach(function () {
     $this->gated = $this->gatedRoute();
 });
 
+it('records the sudo a sign-in brings on the account\'s trail', function () {
+    $account = $this->signInAccount($this->supportsFor(Surface::SIGN_IN)[0]);
+
+    $this->assertAuthenticatedAs($account);
+    $this->assertDatabaseHas('user_security_events', ['type' => 'sudo.granted', 'user_id' => $account->getKey(), 'reason' => 'keystone.sign_in']);
+});
+
 describe('the gate', function () {
     it('lets a fresh sign-in through', function () {
         $account = $this->signInAccount($this->supportsFor(Surface::SIGN_IN)[0]);
 
-        $this->get($this->gated);
+        $response = $this->get($this->gated);
 
+        $this->assertSudoPassed($response);
         $this->assertAuthenticatedAs($account);
-        $this->assertDatabaseHas('user_security_events', ['type' => 'sudo.granted', 'user_id' => $account->getKey(), 'reason' => 'keystone.sign_in']);
         expect(SecurityEvent::query()->where('type', 'sudo.failed')->count())->toBe(0);
     });
 
@@ -107,7 +114,7 @@ describe('the replay', function () {
         $this->assertSudoGranted($response, '/'.$this->gated);
         $this->assertAuthenticatedAs($account);
         $this->assertDatabaseHas('user_security_events', ['type' => 'sudo.granted', 'user_id' => $account->getKey(), 'flow' => 'sudo', 'credential_type' => $support->type()]);
-        expect($this->get($this->gated)->getStatusCode())->toBe(200);
+        $this->assertSudoPassed($this->get($this->gated));
     });
 
     it('never grants sudo for a first factor alone to an account holding a second factor', function () {
@@ -140,7 +147,7 @@ describe('the replay', function () {
         $response = $this->post(route('sudo.submit', ['type' => $second->type()]), $second->validProof(Surface::CHALLENGE));
 
         $this->assertSudoGranted($response, '/'.$this->gated);
-        expect($this->get($this->gated)->getStatusCode())->toBe(200);
+        $this->assertSudoPassed($this->get($this->gated));
     });
 
     it('verifies nothing without a sudo-in-progress', function () {

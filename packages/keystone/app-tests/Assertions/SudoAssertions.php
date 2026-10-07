@@ -2,6 +2,7 @@
 
 namespace ClaudioDekker\Keystone\AppTests\Assertions;
 
+use ClaudioDekker\Keystone\AppTests\AppTestCase;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use Illuminate\Testing\TestResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -72,6 +73,16 @@ trait SudoAssertions
     public function assertSudoEnded(TestResponse $response): void
     {
         $response->assertRedirect('/');
+    }
+
+    /**
+     * Assert the response is the page gatedRoute() registered, so the sudo gate let the request through.
+     *
+     * @param  TestResponse<Response>  $response
+     */
+    public function assertSudoPassed(TestResponse $response): void
+    {
+        $response->assertOk()->assertSee(AppTestCase::GATED_PAGE);
     }
 
     /**

@@ -198,7 +198,7 @@ describe('the replay', function () {
 
         $response->assertRedirectToRoute('sudo');
         $this->get('probe')->assertRedirectToRoute('sudo');
-        $this->assertDatabaseCount(SecurityEvent::query()->where('type', 'sudo.granted')->toBase(), 1);
+        expect(SecurityEvent::query()->where('type', 'sudo.granted')->count())->toBe(1);
     });
 
     it('grants once the challenge a sign-in would demand is answered', function () {
@@ -360,41 +360,110 @@ describe('the replay', function () {
         }],
     ]);
 
-    it('verifies nothing for a type the step doesn\'t offer', function (Closure $arrange, string $type, array $input) {
+    it('verifies nothing and takes no failed attempt for a type the step doesn\'t offer', function (Closure $arrange, string $type, Closure $prove) {
+        $this->freezeSecond();
+        config(['keystone.rate_limits.failed_attempts_per_hour' => 1]);
         $rogue = new RogueType(fn () => throw new LogicException('verify must not run'), surfaces: ['sign-in', 'challenge']);
+        $input = $arrange->call($this, $this);
         $this->app->make(CredentialTypes::class)->register($rogue);
-        $this->app->instance('keystone.test-support.rogue', new FormTypeSupport('rogue'));
-        $arrange($this);
 
         $response = $this->post(route('sudo.submit', ['type' => $type]), $input);
 
         $response->assertRedirectToRoute('sudo')->assertSessionHasErrors([$type => __('keystone::messages.invalid_credential')]);
-        expect($rogue->calls)->toBe([]);
         $this->assertDatabaseMissing('user_security_events', ['type' => 'sudo.failed']);
         $this->get('probe')->assertRedirectToRoute('sudo');
+        $prove->call($this, $this, $rogue);
     })->with([
-        'a challenge type at the first step' => [function (AppTestCase $test) {
-            $test->createChallengedAccount(new FormTypeSupport('code'));
-            $test->passFirstFactor();
-            $test->post(route('login.challenge.submit', ['type' => 'code']), (new FormTypeSupport('code'))->validProof(Surface::CHALLENGE));
-            demandSudo($test);
-        }, 'code', ['secret' => 'correct horse battery staple']],
-        'the first factor\'s type at the challenge' => [function (AppTestCase $test) {
-            $test->createChallengedAccount(new FormTypeSupport('code'));
-            $test->passFirstFactor();
-            $test->post(route('login.challenge.submit', ['type' => 'code']), (new FormTypeSupport('code'))->validProof(Surface::CHALLENGE));
-            demandSudo($test);
-            $test->post(route('sudo.submit', ['type' => 'form']), (new FormTypeSupport)->validProof(Surface::SIGN_IN));
-        }, 'form', ['secret' => 'correct horse battery staple']],
-        'a type the account doesn\'t hold' => [function (AppTestCase $test) {
-            $test->signInAccount(new FormTypeSupport);
-            demandSudo($test);
-        }, 'rogue', ['secret' => 'anything']],
-        'no such type' => [function (AppTestCase $test) {
-            $test->signInAccount(new FormTypeSupport);
-            demandSudo($test);
-        }, 'no-such-type', ['secret' => 'anything']],
+        'a challenge type at the first step' => [
+            function (AppTestCase $test) {
+                $test->createChallengedAccount(new FormTypeSupport('code'));
+                $test->passFirstFactor();
+                $test->post(route('login.challenge.submit', ['type' => 'code']), (new FormTypeSupport('code'))->validProof(Surface::CHALLENGE));
+                demandSudo($test);
+
+                return (new FormTypeSupport('code'))->validProof(Surface::CHALLENGE);
+            },
+            'code',
+            function (AppTestCase $test) {
+                $test->post(route('sudo.submit', ['type' => 'form']), (new FormTypeSupport)->validProof(Surface::SIGN_IN))->assertRedirectToRoute('sudo');
+                $test->travel(7)->seconds();
+                $test->post(route('sudo.submit', ['type' => 'code']), (new FormTypeSupport('code'))->rejectedProof(Surface::CHALLENGE))->assertSessionHasErrors('code');
+                $test->travel(7)->seconds();
+                $test->post(route('sudo.submit', ['type' => 'code']), (new FormTypeSupport('code'))->rejectedProof(Surface::CHALLENGE))->assertTooManyRequests();
+            },
+        ],
+        'the first factor\'s type at the challenge' => [
+            function (AppTestCase $test) {
+                $test->createChallengedAccount(new FormTypeSupport('code'));
+                $test->passFirstFactor();
+                $test->post(route('login.challenge.submit', ['type' => 'code']), (new FormTypeSupport('code'))->validProof(Surface::CHALLENGE));
+                demandSudo($test);
+                $test->post(route('sudo.submit', ['type' => 'form']), (new FormTypeSupport)->validProof(Surface::SIGN_IN));
+
+                return (new FormTypeSupport)->validProof(Surface::SIGN_IN);
+            },
+            'form',
+            function (AppTestCase $test) {
+                demandSudo($test);
+                $test->travel(7)->seconds();
+                $test->post(route('sudo.submit', ['type' => 'form']), (new FormTypeSupport)->rejectedProof(Surface::SIGN_IN))->assertSessionHasErrors('form');
+                $test->travel(7)->seconds();
+                $test->post(route('sudo.submit', ['type' => 'form']), (new FormTypeSupport)->rejectedProof(Surface::SIGN_IN))->assertTooManyRequests();
+            },
+        ],
+        'a type the account doesn\'t hold' => [
+            function (AppTestCase $test) {
+                $test->signInAccount(new FormTypeSupport);
+                demandSudo($test);
+
+                return ['secret' => 'anything'];
+            },
+            'rogue',
+            fn (AppTestCase $test, RogueType $rogue) => expect($rogue->calls)->toBe([]),
+        ],
+        'no such type' => [
+            function (AppTestCase $test) {
+                $test->signInAccount(new FormTypeSupport);
+                demandSudo($test);
+
+                return ['secret' => 'anything'];
+            },
+            'no-such-type',
+            fn (AppTestCase $test) => $test->assertDatabaseMissing('user_security_events', ['type' => 'limit.tripped']),
+        ],
+        'recovery codes at the first step' => [
+            function (AppTestCase $test) {
+                $account = $test->createChallengedAccount(new FormTypeSupport('code'));
+                $codes = $test->arrangeRecoveryCodes($account);
+                $test->passFirstFactor();
+                $test->post(route('login.challenge.submit', ['type' => 'code']), (new FormTypeSupport('code'))->validProof(Surface::CHALLENGE));
+                demandSudo($test);
+
+                return ['code' => $codes[0]];
+            },
+            'recovery-code',
+            function (AppTestCase $test) {
+                $test->assertDatabaseCount('user_recovery_codes', 8);
+                $test->assertDatabaseMissing('user_security_events', ['type' => 'recovery_code.used']);
+            },
+        ],
     ]);
+
+    it('refuses invalid input without verifying, counting or recording anything', function () {
+        $this->freezeSecond();
+        config(['keystone.rate_limits.failed_attempts_per_hour' => 1]);
+        $this->signInAccount(new FormTypeSupport);
+        demandSudo($this);
+
+        $response = $this->post(route('sudo.submit', ['type' => 'form']), []);
+
+        $response->assertRedirectToRoute('sudo')->assertSessionHasErrors('secret');
+        $this->assertDatabaseMissing('user_security_events', ['type' => 'sudo.failed']);
+        $this->travel(7)->seconds();
+        $this->post(route('sudo.submit', ['type' => 'form']), (new FormTypeSupport)->rejectedProof(Surface::SIGN_IN))->assertSessionHasErrors('form');
+        $this->travel(7)->seconds();
+        $this->post(route('sudo.submit', ['type' => 'form']), (new FormTypeSupport)->rejectedProof(Surface::SIGN_IN))->assertTooManyRequests();
+    });
 
     it('verifies nothing once the sudo-in-progress has expired', function () {
         $this->freezeSecond();
@@ -507,6 +576,32 @@ describe('the replay', function () {
 
         $this->post(route('sudo.submit', ['type' => 'otp']), (new FormTypeSupport('otp'))->validProof(Surface::CHALLENGE))->assertTooManyRequests();
         $this->get('probe')->assertRedirectToRoute('sudo');
+    });
+
+    it('accepts an answer once failures at the challenge spent the count of a type that shares none', function () {
+        $this->freezeSecond();
+        $this->createChallengedAccount(new FormTypeSupport('code'));
+        $this->passFirstFactor();
+        $this->post(route('login.challenge.submit', ['type' => 'code']), (new FormTypeSupport('code'))->validProof(Surface::CHALLENGE));
+        demandSudo($this);
+        $this->travel(1)->minute();
+        $sudoSession = otherBrowser();
+        $this->passFirstFactor();
+
+        foreach (range(1, 20) as $ignored) {
+            $this->travel(7)->seconds();
+            $this->post(route('login.challenge.submit', ['type' => 'code']), (new FormTypeSupport('code'))->rejectedProof(Surface::CHALLENGE))->assertSessionHasErrors('code');
+        }
+
+        $this->post(route('login.challenge.submit', ['type' => 'code']), (new FormTypeSupport('code'))->validProof(Surface::CHALLENGE))->assertTooManyRequests();
+        $this->travel(1)->minute();
+        asBrowser($sudoSession);
+        $this->post(route('sudo.submit', ['type' => 'form']), (new FormTypeSupport)->validProof(Surface::SIGN_IN))->assertRedirectToRoute('sudo');
+
+        $response = $this->post(route('sudo.submit', ['type' => 'code']), (new FormTypeSupport('code'))->validProof(Surface::CHALLENGE));
+
+        $response->assertRedirect('/probe');
+        $this->get('probe')->assertOk();
     });
 
     it('leaves the counts of every other flow untouched when it grants', function () {
@@ -669,7 +764,7 @@ describe('the replay', function () {
         demandSudo($this);
         $this->withoutExceptionHandling();
         DB::connection()->beforeExecuting(function (string $query, array $bindings, Connection $connection) {
-            if ($connection->transactionLevel() > 0 && str_contains($query, 'from "users"')) {
+            if ($connection->transactionLevel() > 1 && str_contains($query, 'from "users"')) {
                 throw new RuntimeException('The row is locked by another connection.');
             }
         });
@@ -678,8 +773,8 @@ describe('the replay', function () {
 
         expect($request)->toThrow(RuntimeException::class, 'The row is locked by another connection.');
         $this->assertDatabaseMissing('user_security_events', ['type' => 'sudo.granted', 'flow' => 'sudo']);
-        expect(Keystone::guard()->sudoGrant())->toBeNull()
-            ->and(Keystone::guard()->sudoInProgress())->not->toBeNull();
+        $this->withExceptionHandling()->get('probe')->assertRedirectToRoute('sudo');
+        $this->get(route('sudo'))->assertOk();
     });
 
     it('rehashes a password that needs it without moving the credential epoch', function () {
@@ -921,7 +1016,7 @@ describe('ending sudo', function () {
         $this->delete(route('sudo.end'));
 
         $this->get(route('sudo'))->assertRedirect('/');
-        $this->assertDatabaseCount(SecurityEvent::query()->where('type', 'sudo.revoked')->toBase(), $recorded);
+        expect(SecurityEvent::query()->where('type', 'sudo.revoked')->count())->toBe($recorded);
     });
 });
 

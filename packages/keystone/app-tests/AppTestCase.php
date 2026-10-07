@@ -53,6 +53,11 @@ abstract class AppTestCase extends TestCase
     protected const string GATED_URI = 'keystone-app-tests/sudo-probe';
 
     /**
+     * What the route gatedRoute() registers answers once the sudo gate let the request through.
+     */
+    public const string GATED_PAGE = 'The gated page.';
+
+    /**
      * The headers of the hardening floor, besides Cache-Control, X-Frame-Options and Content-Security-Policy.
      */
     protected const array HARDENING_HEADERS = [
@@ -370,7 +375,7 @@ abstract class AppTestCase extends TestCase
      */
     public function gatedRoute(): string
     {
-        Route::middleware(['web', 'auth', 'sudo'])->match(['get', 'post'], self::GATED_URI, fn () => 'The gated page.');
+        Route::middleware(['web', 'auth', 'sudo'])->match(['get', 'post'], self::GATED_URI, fn () => self::GATED_PAGE);
 
         return self::GATED_URI;
     }

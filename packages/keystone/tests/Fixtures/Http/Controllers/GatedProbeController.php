@@ -9,9 +9,6 @@ use ClaudioDekker\Keystone\SudoGate;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
-/**
- * A gated Keystone controller as #45 will write one: sudo in its middleware list and on the first line of its action.
- */
 class GatedProbeController extends Controller
 {
     public static function middleware(): array

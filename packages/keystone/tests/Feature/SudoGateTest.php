@@ -2,9 +2,12 @@
 
 use ClaudioDekker\Keystone\Actions\RespondToSudoRequired;
 use ClaudioDekker\Keystone\AppTests\AppTestCase;
+use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Notifications\SecurityAlert;
+use ClaudioDekker\Keystone\PendingStage;
 use ClaudioDekker\Keystone\SecurityEvent;
+use ClaudioDekker\Keystone\SudoGate;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormTypeSupport;
 use ClaudioDekker\Keystone\Tests\Fixtures\Http\Controllers\GatedProbeController;
 use ClaudioDekker\Keystone\Tests\Fixtures\Http\Controllers\OverridingGatedProbeController;
@@ -23,6 +26,13 @@ beforeEach(function () {
     Route::middleware('web')->delete('gated/overridden', [OverridingGatedProbeController::class, 'destroy']);
     Route::middleware('web')->delete('gated/unguarded', [UnguardedGatedProbeController::class, 'destroy']);
     Route::middleware('web')->post('base-logout', fn () => auth()->logout());
+    Route::middleware('web')->get('whoami', fn () => (string) (auth()->id() ?? 'guest'));
+    Route::middleware('web')->get('probe-twice', function (Request $request) {
+        (new SudoGate(Keystone::guard()))->enforce($request);
+        (new SudoGate(Keystone::guard()))->enforce($request);
+
+        return 'the gated page, checked twice';
+    });
 });
 
 describe('the doors', function () {
@@ -76,9 +86,32 @@ describe('the doors', function () {
         'a JSON client' => [fn (AppTestCase $test) => $test->getJson('probe'), fn ($response) => $response->assertUnauthorized()],
     ]);
 
+    it('answers the same when it runs twice in one request', function (Closure $arrange, Closure $assert) {
+        $arrange($this);
+
+        $response = $this->get('probe-twice');
+
+        $assert($response);
+    })->with([
+        'a pass' => [fn (AppTestCase $test) => $test->signInAccount(new FormTypeSupport), fn ($response) => $response->assertOk()->assertContent('the gated page, checked twice')],
+        'a refusal' => [function (AppTestCase $test) {
+            $test->signInAccount(new FormTypeSupport);
+            $test->delete(route('sudo.end'));
+        }, fn ($response) => $response->assertRedirectToRoute('sudo')],
+        'a revocation, recorded once' => [function (AppTestCase $test) {
+            $test->createFirstFactorAccount();
+            $test->withServerVariables(['REMOTE_ADDR' => '203.0.113.77'])->submitSignIn(new FormTypeSupport, 'jane@example.com', (new FormTypeSupport)->validProof(Surface::SIGN_IN));
+            $test->withServerVariables(['REMOTE_ADDR' => '203.0.114.77']);
+        }, function ($response) {
+            $response->assertRedirectToRoute('sudo');
+            expect(SecurityEvent::query()->where('type', 'sudo.network_changed')->count())->toBe(1);
+        }],
+    ]);
+
     it('refuses a guest whose session Laravel\'s own logout left the sudo value in', function () {
         $this->signInAccount(new FormTypeSupport);
         $this->post('base-logout');
+        expect(session()->has('keystone_sudo_web'))->toBeTrue();
 
         $response = $this->get('probe');
 
@@ -212,7 +245,7 @@ describe('sessions without a grant', function () {
 
         $response->assertRedirectToRoute('sudo');
         $this->assertAuthenticatedAs($account);
-        $this->assertDatabaseCount(SecurityEvent::query()->where('type', 'sudo.granted')->toBase(), 1);
+        expect(SecurityEvent::query()->where('type', 'sudo.granted')->count())->toBe(1);
     });
 
     it('drops the grant of an expired session that a remember-me cookie restores', function () {
@@ -259,6 +292,15 @@ describe('sessions without a grant', function () {
     })->with([
         'ending sudo' => [fn (AppTestCase $test) => $test->delete(route('sudo.end'))],
         'a remembered return of a session past its absolute lifetime' => [fn (AppTestCase $test) => $test->travel(600)->seconds()],
+        'a sign-in held on the session' => [function (AppTestCase $test) {
+            $test->get('whoami');
+            Keystone::guard()->hold(Keystone::guard()->user(), firstFactor: 'form', stage: PendingStage::CHALLENGE, intendedUrl: '/');
+        }],
+        'a second sign-in on the session, from another subnet' => [function (AppTestCase $test) {
+            $test->withServerVariables(['REMOTE_ADDR' => '203.0.113.5'])->get('whoami');
+            Keystone::guard()->signIn(Keystone::guard()->user());
+            $test->withServerVariables(['REMOTE_ADDR' => '127.0.0.1']);
+        }],
     ]);
 });
 
@@ -322,7 +364,7 @@ describe('the subnet binding', function () {
         $response = $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.77'])->get('probe');
 
         $response->assertRedirectToRoute('sudo');
-        $this->assertDatabaseCount(SecurityEvent::query()->where('type', 'sudo.network_changed')->toBase(), 1);
+        expect(SecurityEvent::query()->where('type', 'sudo.network_changed')->count())->toBe(1);
     });
 
     it('rotates the session when it revokes a grant', function () {
