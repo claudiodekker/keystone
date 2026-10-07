@@ -43,22 +43,7 @@ class ChallengeAttempt extends CredentialAttempt
                 return Demand::REFUSE;
             }
 
-            if (! $this->advance($account, $type, $proof, $credential)) {
-                $this->recordRejected($account, $flow, $type, $credential, reason: 'keystone.superseded');
-
-                return Demand::REFUSE;
-            }
-
-            $passed = (new Entry($this->guard))->afterChallenge($pending);
-            $demand = $this->conclude($passed, $account, $flow, $type, $credential, $taken);
-
-            if ($demand === null) {
-                return Demand::REFUSE;
-            }
-
-            $this->storeUpdatedSecret($account, $type, $proof, $credential);
-
-            return $demand;
+            return $this->finish(new ChallengeEntry($this->guard, $pending), $account, $flow, $type, $proof, $credential, $taken) ?? Demand::REFUSE;
         }, self::TIMING_FLOOR_MICROSECONDS);
     }
 
@@ -73,8 +58,6 @@ class ChallengeAttempt extends CredentialAttempt
             return Demand::REFUSE;
         }
 
-        $passed = (new Entry($this->guard))->afterChallenge($pending);
-
-        return $this->conclude($passed, $pending->account, $flow, $type, credential: null, taken: $taken) ?? Demand::REFUSE;
+        return $this->conclude(new ChallengeEntry($this->guard, $pending), $pending->account, $flow, $type, credential: null, taken: $taken) ?? Demand::REFUSE;
     }
 }

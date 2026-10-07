@@ -38,9 +38,7 @@ class EnrollmentAttempt extends CredentialAttempt
 
         $this->guard->slots()->forget($type->name(), Surface::ENROLLMENT->value);
 
-        $passed = (new Entry($this->guard))->afterSecondFactorEnrollment();
-
-        return $this->accepted->conclude($passed, $account, Flow::ENROLLMENT, $type->name()) ?? Demand::REFUSE;
+        return $this->accepted->conclude(new SecondFactorEnrollmentEntry($this->guard), $account, Flow::ENROLLMENT, $type->name()) ?? Demand::REFUSE;
     }
 
     /**

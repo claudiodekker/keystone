@@ -1,8 +1,10 @@
 <?php
 
 use ClaudioDekker\Keystone\AcceptedProof;
+use ClaudioDekker\Keystone\ChallengeEntry;
 use ClaudioDekker\Keystone\Demand;
-use ClaudioDekker\Keystone\Entry;
+use ClaudioDekker\Keystone\EnrollmentEntry;
+use ClaudioDekker\Keystone\FirstFactorEntry;
 use ClaudioDekker\Keystone\Flow;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\CredentialType;
@@ -10,8 +12,10 @@ use ClaudioDekker\Keystone\Methods\RecoveryCodeType;
 use ClaudioDekker\Keystone\PendingStage;
 use ClaudioDekker\Keystone\RateLimiter;
 use ClaudioDekker\Keystone\RememberMe;
+use ClaudioDekker\Keystone\SecondFactorEnrollmentEntry;
 use ClaudioDekker\Keystone\Subnet;
-use ClaudioDekker\Keystone\SudoPass;
+use ClaudioDekker\Keystone\SudoFirstStepPass;
+use ClaudioDekker\Keystone\SudoGrantPass;
 use ClaudioDekker\Keystone\SudoResult;
 use ClaudioDekker\Keystone\TakenAttempt;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormType;
@@ -56,9 +60,9 @@ function stepLimiter(): RateLimiter
 function signInStep(User $account): array
 {
     $taken = stepLimiter()->takeFailedAttempt(Flow::SIGN_IN, new FormType, $account, 'someone@example.com');
-    $passed = (new Entry(Keystone::guard()))->afterFirstFactor($account, new FormType, '/home', RememberMe::NOT_ASKED);
+    $entry = new FirstFactorEntry(Keystone::guard(), $account, new FormType, '/home', RememberMe::NOT_ASKED);
 
-    return [$passed, $account, Flow::SIGN_IN, 'form', $taken];
+    return [$entry, $account, Flow::SIGN_IN, 'form', $taken];
 }
 
 function challengeStep(User $account, CredentialType $type, bool $suspend = false): array
@@ -71,7 +75,7 @@ function challengeStep(User $account, CredentialType $type, bool $suspend = fals
         suspendStepAccount($account);
     }
 
-    return [(new Entry(Keystone::guard()))->afterChallenge($pending), $account, Flow::CHALLENGE, $type->name(), $taken];
+    return [new ChallengeEntry(Keystone::guard(), $pending), $account, Flow::CHALLENGE, $type->name(), $taken];
 }
 
 function enrollmentStep(User $account, bool $suspend = false): array
@@ -82,14 +86,14 @@ function enrollmentStep(User $account, bool $suspend = false): array
         suspendStepAccount($account);
     }
 
-    return [(new Entry(Keystone::guard()))->afterSecondFactorEnrollment(), $account, Flow::ENROLLMENT, 'code', null];
+    return [new SecondFactorEnrollmentEntry(Keystone::guard()), $account, Flow::ENROLLMENT, 'code', null];
 }
 
 function recoveryCodeSetupStep(User $account): array
 {
     Keystone::guard()->hold($account, firstFactor: 'form', stage: PendingStage::ENROLLMENT, intendedUrl: '/home');
 
-    return [(new Entry(Keystone::guard()))->afterRecoveryCodeSetup(), $account, Flow::ENROLLMENT, 'recovery-code', null];
+    return [new EnrollmentEntry(Keystone::guard()), $account, Flow::ENROLLMENT, 'recovery-code', null];
 }
 
 function sudoFirstStep(User $account): array
@@ -98,7 +102,7 @@ function sudoFirstStep(User $account): array
     Keystone::guard()->beginSudo('/settings');
     $taken = stepLimiter()->takeFailedAttempt(Flow::SUDO, new FormType, $account, identifier: '');
 
-    return [(new SudoPass(Keystone::guard()))->passFirstStep(Keystone::guard()->sudoInProgress(), 'form'), $account, Flow::SUDO, 'form', $taken];
+    return [new SudoFirstStepPass(Keystone::guard(), Keystone::guard()->sudoInProgress(), 'form'), $account, Flow::SUDO, 'form', $taken];
 }
 
 function sudoChallengeStep(User $account, CredentialType $type): array
@@ -108,7 +112,7 @@ function sudoChallengeStep(User $account, CredentialType $type): array
     Keystone::guard()->passSudoFirstFactor(Keystone::guard()->sudoInProgress(), 'form');
     $taken = stepLimiter()->takeFailedAttempt(Flow::SUDO, $type, $account, identifier: '');
 
-    return [(new SudoPass(Keystone::guard()))->grant(Subnet::of('203.0.113.5')), $account, Flow::SUDO, $type->name(), $taken];
+    return [new SudoGrantPass(Keystone::guard(), Subnet::of('203.0.113.5')), $account, Flow::SUDO, $type->name(), $taken];
 }
 
 function sessionPhase(): string
@@ -145,9 +149,9 @@ function isGivenBack(?TakenAttempt $taken): ?bool
 }
 
 it('concludes each passed step with its session, its event and its taken attempt', function (Closure $step, mixed $outcome, string $session, array $events, ?bool $givenBack) {
-    [$passed, $account, $flow, $type, $taken] = $step();
+    [$pass, $account, $flow, $type, $taken] = $step();
 
-    $concluded = (new AcceptedProof(limiter: stepLimiter()))->conclude($passed, $account, $flow, $type, taken: $taken);
+    $concluded = (new AcceptedProof(limiter: stepLimiter()))->conclude($pass, $account, $flow, $type, taken: $taken);
 
     expect($concluded)->toBe($outcome)
         ->and(sessionPhase())->toBe($session)

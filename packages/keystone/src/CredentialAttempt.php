@@ -94,22 +94,54 @@ abstract class CredentialAttempt
     }
 
     /**
-     * Conclude the step with what its pass earned, ending the timing floor early once it stands.
+     * Write what the accepted proof changed, conclude its step with the pass, then store the secret the proof updated, refusing a proof another one overtook.
      *
      * @template TOutcome of Demand|SudoResult
      *
-     * @param  Passed<TOutcome>|null  $passed  what the pass earned, or null for an account barred from it
-     * @return TOutcome|null
+     * @param  Pass<TOutcome>  $pass
+     * @return TOutcome|null what the pass led to, or null for a refused step
+     */
+    protected function finish(
+        Pass $pass,
+        Model&KeystoneUser $account,
+        Flow $flow,
+        CredentialType $type,
+        Proof $proof,
+        StoredCredential $credential,
+        TakenAttempt $taken,
+    ): Demand|SudoResult|null {
+        if (! $this->advance($account, $type, $proof, $credential)) {
+            $this->recordRejected($account, $flow, $type, $credential, reason: 'keystone.superseded');
+
+            return null;
+        }
+
+        $outcome = $this->conclude($pass, $account, $flow, $type, $credential, $taken);
+
+        if ($outcome !== null) {
+            $this->storeUpdatedSecret($account, $type, $proof, $credential);
+        }
+
+        return $outcome;
+    }
+
+    /**
+     * Conclude the step with the pass, ending the timing floor early once it stands.
+     *
+     * @template TOutcome of Demand|SudoResult
+     *
+     * @param  Pass<TOutcome>  $pass
+     * @return TOutcome|null what the pass led to, or null for a barred account
      */
     protected function conclude(
-        ?Passed $passed,
+        Pass $pass,
         Model&KeystoneUser $account,
         Flow $flow,
         CredentialType $type,
         ?StoredCredential $credential,
         TakenAttempt $taken,
     ): Demand|SudoResult|null {
-        $outcome = $this->accepted->conclude($passed, $account, $flow, $type->name(), $credential, $taken);
+        $outcome = $this->accepted->conclude($pass, $account, $flow, $type->name(), $credential, $taken);
 
         if ($outcome !== null) {
             $this->timebox->returnEarly();

@@ -62,22 +62,9 @@ class SignInAttempt extends CredentialAttempt
                 return Demand::REFUSE;
             }
 
-            if (! $this->advance($account, $type, $proof, $credential)) {
-                $this->recordRejected($account, $flow, $type, $credential, reason: 'keystone.superseded');
+            $entry = new FirstFactorEntry($this->guard, $account, $type, $intendedUrl, $rememberMe);
 
-                return Demand::REFUSE;
-            }
-
-            $passed = (new Entry($this->guard))->afterFirstFactor($account, $type, $intendedUrl, $rememberMe);
-            $demand = $this->conclude($passed, $account, $flow, $type, $credential, $taken);
-
-            if ($demand === null) {
-                return Demand::REFUSE;
-            }
-
-            $this->storeUpdatedSecret($account, $type, $proof, $credential);
-
-            return $demand;
+            return $this->finish($entry, $account, $flow, $type, $proof, $credential, $taken) ?? Demand::REFUSE;
         }, self::TIMING_FLOOR_MICROSECONDS);
     }
 

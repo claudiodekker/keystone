@@ -2,6 +2,7 @@
 
 namespace ClaudioDekker\Keystone;
 
+use ClaudioDekker\Keystone\Exceptions\Barred;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
 use Illuminate\Database\Eloquent\Model;
 
@@ -23,22 +24,24 @@ class AcceptedProof
     }
 
     /**
-     * Conclude the step an accepted proof passed: give its taken attempt back and record what the pass earned, or refuse an account barred from it.
+     * Conclude the step an accepted proof passed: make its pass, give its taken attempt back and record what the pass earned, or refuse an account barred from it.
      *
      * @template TOutcome of Demand|SudoResult
      *
-     * @param  Passed<TOutcome>|null  $passed  what the pass earned, or null for an account barred from it
-     * @return TOutcome|null
+     * @param  Pass<TOutcome>  $pass
+     * @return TOutcome|null what the pass led to, or null for a barred account
      */
     public function conclude(
-        ?Passed $passed,
+        Pass $pass,
         Model&KeystoneUser $account,
         Flow $flow,
         string $credentialType,
         ?StoredCredential $credential = null,
         ?TakenAttempt $taken = null,
     ): Demand|SudoResult|null {
-        if ($passed === null) {
+        try {
+            $passed = $pass->make();
+        } catch (Barred) {
             $this->recorder->record(
                 $flow->rejectionType(),
                 account: $account,

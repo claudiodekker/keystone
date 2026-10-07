@@ -81,9 +81,11 @@ class SudoAttempt extends CredentialAttempt
                 return SudoResult::REFUSED;
             }
 
-            $pass = new SudoPass($this->guard);
-            $passed = $leadsTo === SudoResult::GRANTED ? $pass->grant($subnet) : $pass->passFirstStep($progress, $type->name());
-            $result = $this->conclude($passed, $account, $flow, $type, $credential, $taken);
+            $pass = $leadsTo === SudoResult::GRANTED
+                ? new SudoGrantPass($this->guard, $subnet)
+                : new SudoFirstStepPass($this->guard, $progress, $type->name());
+
+            $result = $this->conclude($pass, $account, $flow, $type, $credential, $taken);
 
             if ($result === null) {
                 return SudoResult::REFUSED;
@@ -138,9 +140,7 @@ class SudoAttempt extends CredentialAttempt
             return SudoResult::REFUSED;
         }
 
-        $passed = (new SudoPass($this->guard))->grant($subnet);
-
-        return $this->conclude($passed, $account, $flow, $type, credential: null, taken: $taken) ?? SudoResult::REFUSED;
+        return $this->conclude(new SudoGrantPass($this->guard, $subnet), $account, $flow, $type, credential: null, taken: $taken) ?? SudoResult::REFUSED;
     }
 
     /**
