@@ -84,7 +84,7 @@ function raceAfterTheChange(AppTestCase $test, string $beforeReading, Closure $r
             return;
         }
 
-        if ($changed && ! $raced && str_contains($query, 'from "'.$beforeReading.'"')) {
+        if ($changed && ! $raced && preg_match('/from [`"]'.$beforeReading.'[`"]/', $query) === 1) {
             $raced = true;
             $race();
         }
