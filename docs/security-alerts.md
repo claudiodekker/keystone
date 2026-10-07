@@ -39,7 +39,7 @@ An operator ending an account's sessions with `keystone:end-sessions` forgets it
 
 ## Abandoned challenges
 
-A sign-in that passes its first factor and never answers the [challenge](challenge.md) means someone has the account's first factor, such as its password, and not its second. Keystone tells the owner.
+A sign-in that passes its first factor and hasn't passed the [challenge](challenge.md) 7 minutes later suggests someone has the account's first factor, such as its password, and not its second. Keystone tells the owner. The mail says only that: a pending sign-in lasts 15 minutes, so the challenge can still be passed after the alert is sent.
 
 When a sign-in is held at the challenge from a browser that isn't one of the account's known devices, Keystone writes a row to `user_pending_challenges` with the browser's user agent and IP address, both encrypted. Only passing the challenge deletes the row. Cancelling the sign-in, letting it expire or starting another one keeps it, so nobody can silence the alert by walking away. Passing the first factor again for the same account in the same session keeps the row it already has, so a retry adds no second row and doesn't postpone the alert. A hold from a known device writes no row.
 

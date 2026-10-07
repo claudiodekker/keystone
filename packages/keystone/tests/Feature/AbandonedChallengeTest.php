@@ -444,6 +444,21 @@ describe('the sweep', function () {
             ->and(abandonedChallengeAlerts()[0][1]->occurredAt->toDateTimeString())->toBe('2026-10-06 12:00:00');
     });
 
+    it('mails only what is true when it runs, never that nobody was signed in, since the sign-in can still be finished', function () {
+        $this->travelTo('2026-10-06 12:00:00');
+        $this->createChallengedAccount(new FormTypeSupport('code'));
+        holdFrom($this);
+        $this->travelTo('2026-10-06 12:10:00');
+        $this->artisan('schedule:run')->assertSuccessful();
+        [$address, $alert] = abandonedChallengeAlerts()[0];
+
+        $mail = $alert->toMail((new AnonymousNotifiable)->route('mail', $address));
+
+        expect((string) $mail->render())->toContain(e(__('keystone::alerts.types.challenge.abandoned.what')))
+            ->not->toContain('Nobody was signed in')
+            ->and($mail->subject)->toBe(__('keystone::alerts.types.challenge.abandoned.subject'));
+    });
+
     it('sends each account its own alert about its own challenges', function () {
         $this->travelTo('2026-10-06 12:00:00');
         $this->createChallengedAccount(new FormTypeSupport('code'));
