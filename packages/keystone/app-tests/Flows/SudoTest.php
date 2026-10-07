@@ -144,6 +144,9 @@ describe('the replay', function () {
         $this->get($this->gated);
         $this->post(route('sudo.submit', ['type' => $first->type()]), $first->validProof(Surface::SIGN_IN));
 
+        // A type such as TOTP accepts each proof once, so the replay answers with a later one than the sign-in spent.
+        $this->travel(1)->minute();
+
         $response = $this->post(route('sudo.submit', ['type' => $second->type()]), $second->validProof(Surface::CHALLENGE));
 
         $this->assertSudoGranted($response, '/'.$this->gated);

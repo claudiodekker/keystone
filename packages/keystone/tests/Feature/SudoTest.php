@@ -764,7 +764,7 @@ describe('the replay', function () {
         demandSudo($this);
         $this->withoutExceptionHandling();
         DB::connection()->beforeExecuting(function (string $query, array $bindings, Connection $connection) {
-            if ($connection->transactionLevel() > 1 && str_contains($query, 'from "users"')) {
+            if ($connection->transactionLevel() > 1 && preg_match('/from .users./', $query) === 1) {
                 throw new RuntimeException('The row is locked by another connection.');
             }
         });
