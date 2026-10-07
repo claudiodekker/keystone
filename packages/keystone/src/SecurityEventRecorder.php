@@ -91,7 +91,7 @@ class SecurityEventRecorder
     /**
      * Record one event of the type about the account for each request context, alerting its owner once about all of them.
      *
-     * @param  list<RequestContext>  $contexts  the context of the request that caused each event
+     * @param  list<RequestContext>  $contexts
      */
     public function recordEach(SecurityEventType $type, Model&KeystoneUser $account, array $contexts, Actor $actor): void
     {
@@ -128,7 +128,7 @@ class SecurityEventRecorder
     /**
      * Log each event and append it to the account's trail, alert the owner once about them all, then dispatch each, every step rescued on its own.
      *
-     * @param  non-empty-list<SecurityEvent>  $events  events of one type about the one account
+     * @param  non-empty-list<SecurityEvent>  $events
      * @param  list<string>|null  $recipients
      */
     protected function publish(array $events, (Model&KeystoneUser)|null $account, ?array $recipients, bool $alert): void

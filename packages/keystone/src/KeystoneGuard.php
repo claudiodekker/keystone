@@ -116,8 +116,6 @@ class KeystoneGuard extends SessionGuard
 
     /**
      * Hold the account's sign-in until it passes the stage, replacing any pending one.
-     *
-     * A hold at the challenge from a browser that isn't a known device of the account opens a pending challenge, which only passing the challenge forgets.
      */
     public function hold(Model&KeystoneUser $account, string $firstFactor, PendingStage $stage, string $intendedUrl): void
     {

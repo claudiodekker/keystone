@@ -29,8 +29,6 @@ beforeEach(function () {
 });
 
 /**
- * Pass the address's first factor in a fresh session, from a browser holding the device cookie's value, or none.
- *
  * @return TestResponse<Response>
  */
 function holdFrom(AppTestCase $test, ?string $device = null, string $ip = '203.0.113.1', string $userAgent = FIREFOX_ON_WINDOWS, string $address = 'jane@example.com'): TestResponse
@@ -43,8 +41,6 @@ function holdFrom(AppTestCase $test, ?string $device = null, string $ip = '203.0
 }
 
 /**
- * Answer the held sign-in's challenge with the account's valid code.
- *
  * @return TestResponse<Response>
  */
 function answerChallenge(AppTestCase $test): TestResponse
@@ -53,8 +49,6 @@ function answerChallenge(AppTestCase $test): TestResponse
 }
 
 /**
- * Get the abandoned-challenge alerts sent, as the address each went to with its alert, in the order sent.
- *
  * @return list<array{string, SecurityAlert}>
  */
 function abandonedChallengeAlerts(): array
@@ -73,8 +67,6 @@ function abandonedChallengeAlerts(): array
 }
 
 /**
- * Get the recorded abandoned challenges, oldest first.
- *
  * @return list<SecurityEvent>
  */
 function abandonedChallengeEvents(): array

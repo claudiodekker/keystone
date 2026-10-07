@@ -57,8 +57,6 @@ class PendingChallenges
 
     /**
      * Record every challenge left unanswered for the threshold as abandoned, alert each account's owner once about all of theirs, then forget them.
-     *
-     * An account's rows go right after its events, so a sweep that dies halfway tells one owner again rather than never.
      */
     public function sweep(SecurityEventRecorder $recorder = new SecurityEventRecorder): void
     {

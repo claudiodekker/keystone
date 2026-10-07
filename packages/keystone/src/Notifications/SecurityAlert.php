@@ -162,8 +162,6 @@ class SecurityAlert extends Notification implements SecurityEventAlertContract, 
 
     /**
      * Name where the IP address is through the IP-location port, on the worker, so no request waits on the lookup.
-     *
-     * An alert about several IP addresses names no place.
      */
     protected function locate(): ?string
     {
