@@ -55,7 +55,7 @@ class SecurityAlert extends Notification implements SecurityEventAlertContract, 
     public int $count;
 
     /**
-     * When the first event occurred.
+     * When the earliest event occurred.
      */
     public CarbonImmutable $occurredAt;
 
@@ -92,7 +92,7 @@ class SecurityAlert extends Notification implements SecurityEventAlertContract, 
 
         $this->type = $event->type;
         $this->count = count($events);
-        $this->occurredAt = $event->occurred_at;
+        $this->occurredAt = min(array_map(fn (SecurityEvent $event) => $event->occurred_at, $events));
         $this->ipAddresses = $this->distinct(array_map(fn (SecurityEvent $event) => $event->ip_address, $events));
         $this->devices = $this->distinct(array_map(fn (SecurityEvent $event) => $this->describe($event->user_agent), $events));
         $this->credentialType = $event->credential_type;

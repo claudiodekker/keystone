@@ -174,7 +174,7 @@ class SecurityEventRecorder
         $keptOperator = $this->clean($operator, self::FIELD_LENGTH);
 
         return new SecurityEvent([
-            'occurred_at' => Date::now(),
+            'occurred_at' => $context->occurredAt ?? Date::now(),
             'type' => $type,
             'user_id' => $account?->getKey(),
             'actor' => $actor,

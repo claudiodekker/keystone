@@ -2,6 +2,7 @@
 
 namespace ClaudioDekker\Keystone;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
@@ -91,7 +92,7 @@ class PendingChallenges
     }
 
     /**
-     * Get the context of the request that held each challenge.
+     * Get the context of the request that held each challenge, dated by the hold.
      *
      * @param  Collection<int, stdClass>  $challenges
      * @return list<RequestContext>
@@ -101,6 +102,7 @@ class PendingChallenges
         return array_values($challenges->map(fn (stdClass $challenge) => new RequestContext(
             ipAddress: $this->decrypt($challenge->ip_address),
             userAgent: $this->decrypt($challenge->user_agent),
+            occurredAt: CarbonImmutable::parse($challenge->created_at),
         ))->all());
     }
 

@@ -43,13 +43,13 @@ A sign-in that passes its first factor and never answers the [challenge](challen
 
 When a sign-in is held at the challenge from a browser that isn't one of the account's known devices, Keystone writes a row to `user_pending_challenges` with the browser's user agent and IP address, both encrypted. Only passing the challenge deletes the row. Cancelling the sign-in, letting it expire or starting another one keeps it, so nobody can silence the alert by walking away. Passing the first factor again for the same account in the same session keeps the row it already has, so a retry adds no second row and doesn't postpone the alert. A hold from a known device writes no row.
 
-Keystone's scheduled `keystone:sweep-abandoned-challenges` task runs every five minutes, on one server, so run Laravel's scheduler. It records a `challenge.abandoned` event for each row at least 7 minutes old, with the IP address and user agent of the sign-in, then deletes the rows. A run never starts while an earlier one is still going. An account with several such rows gets one alert about all of them, which says how many there were and lists their devices and IP addresses. The 7 minutes aren't configurable.
+Keystone's scheduled `keystone:sweep-abandoned-challenges` task runs every five minutes, on one server, so run Laravel's scheduler. It records a `challenge.abandoned` event for each row at least 7 minutes old, with the time, IP address and user agent of the sign-in, then deletes the rows. A run never starts while an earlier one is still going. An account with several such rows gets one alert about all of them, which says how many there were and lists their devices and IP addresses. The 7 minutes aren't configurable.
 
 ## What they say
 
 The default alert is one notification class, `ClaudioDekker\Keystone\Notifications\SecurityAlert`, with a view and translation keys per type. Each mail says what happened and:
 
-- when, in UTC. For abandoned challenges that is when the sweep found them;
+- when, in UTC. For abandoned challenges that is when the first factor was passed, of the earliest one when the alert is about several;
 - the IP address of the request that caused it, and where that address is when the [IP-location port](#ip-location) knows. An alert about several IP addresses lists them and names no place;
 - the device, as the platform and browser the [session-info port](#session-info) parses from the user agent, or "Unknown device". The raw user agent never appears in a mail;
 - the type of the credential involved, when there is one, such as `passkey`. Never its label: its owner typed that, and a mail client could turn a label that looks like a web address into a link;

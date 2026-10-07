@@ -333,7 +333,7 @@ describe('the sweep', function () {
         $this->assertDatabaseCount('user_pending_challenges', 0);
     });
 
-    it('records a challenge left for seven minutes as abandoned, alerts the owner and deletes its row', function () {
+    it('records a challenge left for seven minutes as abandoned at the time it was held, alerts the owner and deletes its row', function () {
         $this->travelTo('2026-10-06 12:03:00');
         $account = $this->createChallengedAccount(new FormTypeSupport('code'));
         holdFrom($this, ip: '203.0.113.7', userAgent: FIREFOX_ON_WINDOWS);
@@ -349,7 +349,7 @@ describe('the sweep', function () {
             'user_agent' => FIREFOX_ON_WINDOWS,
             'request_id' => null,
             'known_device' => null,
-        ])->and($event->occurred_at->toDateTimeString())->toBe('2026-10-06 12:10:00');
+        ])->and($event->occurred_at->toDateTimeString())->toBe('2026-10-06 12:03:00');
         expect(abandonedChallengeAlerts())->toHaveCount(1)
             ->and(abandonedChallengeAlerts()[0][0])->toBe('jane@example.com');
         $this->assertDatabaseCount('user_pending_challenges', 0);
@@ -428,6 +428,20 @@ describe('the sweep', function () {
             ->and($alerts[0][1]->ipAddresses)->toBe(['203.0.113.7', '198.51.100.9'])
             ->and($alerts[0][1]->devices)->toBe(['Firefox on Windows', 'Chrome on Mac']);
         $this->assertDatabaseCount('user_pending_challenges', 0);
+    });
+
+    it('dates each abandoned challenge by its hold, and the alert by the earliest of them', function () {
+        $this->travelTo('2026-10-06 12:00:00');
+        $this->createChallengedAccount(new FormTypeSupport('code'));
+        holdFrom($this);
+        $this->travelTo('2026-10-06 12:02:00');
+        holdFrom($this);
+        $this->travelTo('2026-10-06 12:10:00');
+
+        $this->artisan('schedule:run')->assertSuccessful();
+
+        expect(array_map(fn (SecurityEvent $event) => $event->occurred_at->toDateTimeString(), abandonedChallengeEvents()))->toBe(['2026-10-06 12:00:00', '2026-10-06 12:02:00'])
+            ->and(abandonedChallengeAlerts()[0][1]->occurredAt->toDateTimeString())->toBe('2026-10-06 12:00:00');
     });
 
     it('sends each account its own alert about its own challenges', function () {
