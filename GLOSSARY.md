@@ -88,8 +88,11 @@ A short grant on a signed-in session, bound to its network, that allows changes 
 _Avoid_: password confirmation, step-up
 
 **Remember-me cookie**:
-Keystone's own long-lived cookie that restores a user's sign-in on return.
+Keystone's own long-lived cookie that restores a user's sign-in on return. A dead one never restores. A cookie is dead once its fixed lifetime, counted from its sign-in, has passed, or once the credential epoch has moved. It is also dead while its account is suspended, invalidated or deleted, or newly owes enrollment.
 _Avoid_: recaller
+
+**Remembered return**:
+A request that a live remember-me cookie signs in again, because its browser holds no signed-in session or one that outlived its absolute lifetime. It proves no factor.
 
 **Known device**:
 A browser that carries the device cookie an account's earlier sign-in left behind.

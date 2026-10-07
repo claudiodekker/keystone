@@ -68,7 +68,7 @@ class KeystoneServiceProvider extends ServiceProvider
 
         $router->pushMiddlewareToGroup('web', RefuseCrossSiteRequests::class);
 
-        EncryptCookies::except(KnownDevices::COOKIE);
+        EncryptCookies::except([KnownDevices::COOKIE, RememberTokens::COOKIE]);
 
         $this->callAfterResolving(Schedule::class, function (Schedule $schedule) {
             $schedule->call(fn () => (new KnownDevices(Keystone::guard()->userModel()))->prune())

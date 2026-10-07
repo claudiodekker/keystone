@@ -41,6 +41,11 @@ const labels = { 'sign-in': 'Sign in', challenge: 'Verify', enrollment: 'Set up'
 
         <slot :errors="errors" :processing="processing" />
 
+        <label v-if="surface === 'sign-in' && page.props.rememberOffered" class="flex items-center gap-2 text-sm text-gray-900">
+            <input name="remember" type="checkbox" value="1" />
+            Remember me
+        </label>
+
         <p v-if="errors[option.type]" class="text-sm text-red-600">{{ errors[option.type] }}</p>
 
         <button type="submit" :disabled="processing" class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">

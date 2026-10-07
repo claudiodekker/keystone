@@ -23,7 +23,7 @@ describe('the sign-in page', function () {
     it('lists the types serving sign-in with their initiate shapes', function () {
         $this->app->make(CredentialTypes::class)->register(new FormType(name: 'second-factor', surfaces: ['challenge']));
 
-        $this->get(route('login'))->assertExactJson(['types' => [['type' => 'form', 'shape' => 'form'], ['type' => 'password', 'shape' => 'form']], 'status' => null]);
+        $this->get(route('login'))->assertExactJson(['types' => [['type' => 'form', 'shape' => 'form'], ['type' => 'password', 'shape' => 'form']], 'status' => null, 'rememberOffered' => true]);
     });
 
     it('carries the translated status after signing out', function () {
@@ -504,7 +504,7 @@ describe('the methods allow-list', function () {
 
         $response = $this->get(route('login'));
 
-        $response->assertExactJson(['types' => [['type' => 'password', 'shape' => 'form']], 'status' => null]);
+        $response->assertExactJson(['types' => [['type' => 'password', 'shape' => 'form']], 'status' => null, 'rememberOffered' => true]);
     })->with([
         'a bare entry' => [['password', 'both' => ['challenge']]],
         'a narrowed entry' => [['password' => ['sign-in'], 'both' => ['challenge']]],

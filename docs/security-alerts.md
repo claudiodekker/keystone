@@ -33,6 +33,8 @@ Each sign-in hands the browser a fresh value and moves every account that knew t
 
 The first part of the value names the device and stays the same, so Keystone can tell a browser that still holds a replaced value from a new one. When such a browser signs in, two browsers held the same cookie: one of them copied it. Keystone alerts the owner with `device_cookie.reused` as well as `signed_in`, and the account now knows the browser that signed in rather than the other one. The first alert arrives when the second of the two browsers signs in, whichever that is, and each later sign-in from the browser left behind alerts again. Each account that knew the device is alerted at its own next sign-in. A sign-in whose response never reached the browser alerts the same way at that browser's next sign-in.
 
+A sign-in restored by a [remember-me cookie](remember-me.md#coming-back) is also checked for a known device, and alerts with `signed_in` when the browser isn't one, as it does when someone pastes a copied remember-me cookie into another browser. It is the one sign-in that hands out no fresh device value and doesn't count as seeing the device, so a browser whose last real sign-in is older than the retention alerts when it returns.
+
 A known device earns no trust beyond its own [failed-attempt count](rate-limiting.md#locking-an-accounts-owner-out): it is never spared a challenge, an enrollment or an alert of any other type.
 
 An operator ending an account's sessions with `keystone:end-sessions` forgets its known devices, and `--all` forgets every account's, so each browser's next sign-in alerts. Keystone's scheduled `keystone:prune-known-devices` task deletes devices unseen for the retention every night, on one server, so run Laravel's scheduler.

@@ -43,7 +43,7 @@ abstract class EnrollmentStep
         }
 
         try {
-            $knownDevice = $this->guard->signIn($pending->account);
+            $knownDevice = $this->guard->signIn($pending->account, $pending->rememberMe);
         } catch (LogicException) {
             return Demand::REFUSE;
         }

@@ -16,6 +16,7 @@ Your `config/keystone.php` is merged over Keystone's, key by key. A setting that
 | `require_second_factor` | `true` | `false` lets an account sign in with its first factor alone until it chooses to add a second. See [Enrollment](enrollment.md). |
 | `require_recovery_codes` | `true` | `false` lets an account go without recovery codes, and lets the last one answer the challenge, so an account can be left with none for account recovery. See [Enrollment](enrollment.md) and [Recovery codes](challenge.md#recovery-codes). |
 | `session.absolute_lifetime_seconds` | `43200` (12 hours) | A stolen session that is kept busy stays signed in longer. `null` lets it live forever. See [Session lifetime](#session-lifetime). |
+| `remember.lifetime_seconds` | `2592000` (30 days) | A stolen remember-me cookie signs its holder in for longer. `0` turns remember-me off. See [Remember me](remember-me.md#the-lifetime). |
 | `rate_limits.requests_per_minute.view` | `60` | Faster scripted probing of Keystone's pages per IP address and account. |
 | `rate_limits.requests_per_minute.start` / `.submit` / `.change` | `10` each | Faster scripted submissions per IP address and account. |
 | `rate_limits.failed_attempts_per_hour` | `20` | More online guesses at each account's credentials. See [Rate limiting](rate-limiting.md). |
@@ -28,7 +29,7 @@ Your `config/keystone.php` is merged over Keystone's, key by key. A setting that
 | `trusted_origins` | `[]`: only your app's own origin | Any page on a listed origin can submit to Keystone as your users. See [Hardening](hardening.md#cross-site-requests). |
 | `clear_site_data` | `['cache', 'storage']` | Whatever you leave out survives sign-out on a shared computer. See [Hardening](hardening.md#clearing-site-data). |
 
-Every limit is a whole number of at least 1. No setting takes a `0` or `null` that turns a control off without saying so; the `null`s that turn a control off are `session.absolute_lifetime_seconds`'s and each alert slot's, which silences only its own type.
+Every limit is a whole number of at least 1. No setting takes a `0` or `null` that turns a control off without saying so; the `null`s that turn a control off are `session.absolute_lifetime_seconds`'s and each alert slot's, which silences only its own type. The one `0` is `remember.lifetime_seconds`'s, and it turns off remember-me, which is a convenience and not a control.
 
 ## Methods
 
@@ -50,7 +51,7 @@ A session ends in two ways, whichever comes first:
 - **Idle:** Laravel's own `session.lifetime` (in minutes) ends a session nobody used for that long. Every request starts the count again.
 - **Absolute:** `session.absolute_lifetime_seconds` ends a signed-in session that long after the sign-in, however busy it was. Nothing extends it. A session whose sign-in time is missing or in the future counts as expired.
 
-Keystone checks the absolute lifetime whenever something asks who is signed in, so it needs no middleware of yours. When a session has expired, Keystone ends it, records `session.ended` with the reason `expired`, and sends `Clear-Site-Data`. When your `auth` middleware then refuses the request:
+Keystone checks the absolute lifetime whenever something asks who is signed in, so it needs no middleware of yours. A browser that holds a live remember-me cookie is signed in again at that moment, on a new session id, and none of what follows happens (see [Remember me](remember-me.md#coming-back)). Otherwise, when a session has expired, Keystone ends it, records `session.ended` with the reason `expired`, and sends `Clear-Site-Data`. When your `auth` middleware then refuses the request:
 
 - a browser is redirected to sign in, or wherever your `redirectGuestsTo` sends guests, and the sign-in page's `status` reads "Your session has expired. Please sign in again.";
 - a request expecting JSON gets a `401` with `{"message": "Your session has expired. Please sign in again.", "reason": "expired"}`.
@@ -83,6 +84,7 @@ Keystone checks its configuration every time your app boots, console commands in
 In every environment, it refuses:
 
 - a setting above of the wrong type, or a limit below 1;
+- a `remember.lifetime_seconds` that isn't a whole number of at least 0;
 - a `methods` entry that isn't a type name or a type name mapped to a list of surfaces, a type listed twice, a type no installed package registers, or a surface the type doesn't serve;
 - two installed packages registering credential types with one name, or a type named `recovery-code`, which Keystone keeps for recovery codes;
 - a setting of an installed method package's own config that the package refuses, such as a `keystone-totp.window_steps` below 0 (see [TOTP](totp.md#the-window));

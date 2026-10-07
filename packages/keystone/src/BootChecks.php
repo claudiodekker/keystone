@@ -67,6 +67,7 @@ class BootChecks
             ...$this->rateLimitFailures(),
             ...$this->mandateFailures(),
             ...$this->sessionFailures(),
+            ...$this->rememberFailures(),
             ...$this->floorFailures(['keystone.retention.known_devices_seconds']),
             ...$this->eventFailures(),
             ...$this->alertFailures(),
@@ -149,6 +150,22 @@ class BootChecks
         }
 
         return ['keystone.session.absolute_lifetime_seconds must be null or a whole number of at least 1.'];
+    }
+
+    /**
+     * Check that the remember-me lifetime is a whole number of at least 0.
+     *
+     * @return list<string>
+     */
+    protected function rememberFailures(): array
+    {
+        $lifetime = config('keystone.remember.lifetime_seconds');
+
+        if (is_int($lifetime) && $lifetime >= 0) {
+            return [];
+        }
+
+        return ['keystone.remember.lifetime_seconds must be a whole number of at least 0.'];
     }
 
     /**

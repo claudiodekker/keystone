@@ -14,6 +14,7 @@ use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\RecoveryCodes;
+use ClaudioDekker\Keystone\RememberTokens;
 use ClaudioDekker\Keystone\SignInDecision;
 use Closure;
 use Illuminate\Cache\RateLimiter as CacheRateLimiter;
@@ -23,6 +24,7 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
@@ -80,7 +82,7 @@ abstract class AppTestCase extends TestCase
     }
 
     /**
-     * Call the given URI as a fresh request, forgetting what the guard resolved.
+     * Call the given URI as a fresh request, forgetting what the guard resolved and the cookies the last request queued.
      *
      * @param  string  $method
      * @param  string  $uri
@@ -94,6 +96,7 @@ abstract class AppTestCase extends TestCase
     public function call($method, $uri, $parameters = [], $cookies = [], $files = [], $server = [], $content = null)
     {
         Auth::forgetGuards();
+        Cookie::flushQueuedCookies();
 
         return parent::call($method, $uri, $parameters, $cookies, $files, $server, $content);
     }
@@ -128,6 +131,26 @@ abstract class AppTestCase extends TestCase
     public function deviceCookieOf(TestResponse $response): ?string
     {
         return $response->getCookie(KnownDevices::COOKIE, decrypt: false)?->getValue();
+    }
+
+    /**
+     * Send the remember-me cookie on every later request, as the browser holding it would, or none, as a browser that was never remembered.
+     */
+    public function fromRememberCookie(?string $value): static
+    {
+        unset($this->unencryptedCookies[RememberTokens::COOKIE]);
+
+        return $value === null ? $this : $this->withUnencryptedCookie(RememberTokens::COOKIE, $value);
+    }
+
+    /**
+     * Get the value of the remember-me cookie the response handed the browser.
+     *
+     * @param  TestResponse<Response>  $response
+     */
+    public function rememberCookieOf(TestResponse $response): ?string
+    {
+        return $response->getCookie(RememberTokens::COOKIE, decrypt: false)?->getValue();
     }
 
     /**
