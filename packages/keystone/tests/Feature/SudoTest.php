@@ -149,7 +149,7 @@ describe('the lifetime of a grant', function () {
 
         $this->delete(route('sudo.end'));
 
-        $this->assertDatabaseCount(SecurityEvent::query()->where('type', 'sudo.revoked')->toBase(), $revoked);
+        expect(SecurityEvent::query()->where('type', 'sudo.revoked')->count())->toBe($revoked);
     })->with([
         'live a second before it runs out' => [59, 1],
         'gone the second it runs out' => [60, 0],
@@ -177,7 +177,7 @@ describe('sessions that bring no sudo', function () {
         $this->get('whoami')->assertContent((string) $account->getKey());
         $this->delete(route('sudo.end'));
 
-        $this->assertDatabaseCount(SecurityEvent::query()->where('type', 'sudo.granted')->toBase(), 1);
+        expect(SecurityEvent::query()->where('type', 'sudo.granted')->count())->toBe(1);
         $this->assertDatabaseMissing('user_security_events', ['type' => 'sudo.revoked']);
     });
 
