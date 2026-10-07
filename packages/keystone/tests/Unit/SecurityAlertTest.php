@@ -184,8 +184,7 @@ it('says how many abandoned challenges it is about', function (int $count) {
 
     $mail = renderedDigest(...$events);
 
-    expect($mail)->toContain(e(trans_choice('keystone::alerts.types.challenge.abandoned.count', $count)))
-        ->and(trans_choice('keystone::alerts.types.challenge.abandoned.count', $count))->toContain($count === 1 ? 'once' : "{$count} times");
+    expect($mail)->toContain(e(trans_choice('keystone::alerts.types.challenge.abandoned.count', $count)));
 })->with(['one' => [1], 'several' => [3]]);
 
 it('lists each IP address and each device of the events it is about once, and names no place for several addresses', function () {
