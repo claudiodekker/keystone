@@ -2,7 +2,7 @@
 
 namespace ClaudioDekker\Keystone;
 
-use LogicException;
+use ClaudioDekker\Keystone\Exceptions\Barred;
 
 /**
  * @internal
@@ -44,7 +44,9 @@ abstract class EnrollmentStep
 
         try {
             $knownDevice = $this->guard->signIn($pending->account, $pending->rememberMe);
-        } catch (LogicException) {
+        } catch (Barred) {
+            $this->recordRejected($pending, $enrolledType, reason: 'keystone.barred');
+
             return Demand::REFUSE;
         }
 

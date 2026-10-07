@@ -71,6 +71,26 @@ function raceInsideTheChange(AppTestCase $test, Closure $race): void
     });
 }
 
+function raceAfterTheChange(AppTestCase $test, string $beforeReading, Closure $race): void
+{
+    $changed = false;
+    $raced = false;
+    $outerLevel = DB::transactionLevel();
+
+    DB::beforeExecuting(function (string $query, array $bindings, Connection $connection) use (&$changed, &$raced, $outerLevel, $beforeReading, $race) {
+        if ($connection->transactionLevel() > $outerLevel) {
+            $changed = true;
+
+            return;
+        }
+
+        if ($changed && ! $raced && str_contains($query, 'from "'.$beforeReading.'"')) {
+            $raced = true;
+            $race();
+        }
+    });
+}
+
 describe('the hold', function () {
     it('holds the sign-in of an account owing a second factor, recording why', function () {
         $account = $this->createFirstFactorAccount();
@@ -478,6 +498,35 @@ describe('the answer', function () {
         $this->assertDatabaseHas('user_security_events', ['type' => 'proof.rejected', 'user_id' => $account->getKey(), 'flow' => 'enrollment', 'reason' => 'keystone.barred']);
     });
 
+    it('refuses an answer whose account is suspended once it is stored, before it is moved on', function () {
+        $account = $this->createFirstFactorAccount();
+        $this->passFirstFactor();
+        $ceremony = startEnrollment($this);
+        raceAfterTheChange($this, beforeReading: 'users', race: fn () => DB::table('users')->where('id', $account->getKey())->update(['suspended_at' => now()]));
+
+        $response = $this->post(route('login.enrollment.submit', ['type' => 'code']), ['secret' => $ceremony]);
+
+        $response->assertSessionHasErrors(['code' => __('keystone::messages.invalid_credential')]);
+        $this->assertGuest();
+        $this->assertDatabaseHas('user_credentials', ['user_id' => $account->getKey(), 'type' => 'code']);
+        $this->assertDatabaseHas('user_security_events', ['type' => 'proof.rejected', 'user_id' => $account->getKey(), 'flow' => 'enrollment', 'credential_type' => 'code', 'reason' => 'keystone.barred']);
+    });
+
+    it('refuses an answer whose account is suspended once it is moved on, before it is signed in', function () {
+        config(['keystone.require_recovery_codes' => false]);
+        $account = $this->createFirstFactorAccount();
+        $this->passFirstFactor();
+        $ceremony = startEnrollment($this);
+        raceAfterTheChange($this, beforeReading: 'user_credentials', race: fn () => DB::table('users')->where('id', $account->getKey())->update(['suspended_at' => now()]));
+
+        $response = $this->post(route('login.enrollment.submit', ['type' => 'code']), ['secret' => $ceremony]);
+
+        $response->assertSessionHasErrors(['code' => __('keystone::messages.invalid_credential')]);
+        $this->assertGuest();
+        $this->assertDatabaseHas('user_credentials', ['user_id' => $account->getKey(), 'type' => 'code']);
+        $this->assertDatabaseHas('user_security_events', ['type' => 'proof.rejected', 'user_id' => $account->getKey(), 'flow' => 'enrollment', 'credential_type' => 'code', 'reason' => 'keystone.barred']);
+    });
+
     it('refuses a proof that enrolls nothing', function () {
         $this->app->make(CredentialTypes::class)->register(new RogueType(fn () => Proof::proven(new StoredCredential(1, identifier: null, secret: null, label: null)), surfaces: ['challenge', 'enrollment']));
         $account = $this->createFirstFactorAccount();
@@ -632,6 +681,19 @@ describe('recovery codes', function () {
         $this->assertGuest();
         $this->assertDatabaseCount('user_recovery_codes', 0);
         $this->assertDatabaseHas('user_security_events', ['type' => 'proof.rejected', 'user_id' => $account->getKey(), 'flow' => 'enrollment', 'reason' => 'keystone.barred']);
+    });
+
+    it('refuses the staged set of an account suspended once it is saved, before it is signed in', function () {
+        $account = passChallengeOwingCodes($this);
+        $codes = $this->get(route('login.recovery-codes'))->json('codes');
+        raceAfterTheChange($this, beforeReading: 'user_credentials', race: fn () => DB::table('users')->where('id', $account->getKey())->update(['suspended_at' => now()]));
+
+        $response = $this->post(route('login.recovery-codes.submit'), ['code' => $codes[0]]);
+
+        $response->assertSessionHasErrors(['code']);
+        $this->assertGuest();
+        $this->assertDatabaseCount('user_recovery_codes', count($codes));
+        $this->assertDatabaseHas('user_security_events', ['type' => 'proof.rejected', 'user_id' => $account->getKey(), 'flow' => 'enrollment', 'credential_type' => 'recovery-code', 'reason' => 'keystone.barred']);
     });
 
     it('drops a held sign-in that saved its codes once the account gained a second factor meanwhile, so the next sign-in is challenged', function () {
