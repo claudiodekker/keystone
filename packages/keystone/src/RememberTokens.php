@@ -84,6 +84,31 @@ class RememberTokens
     }
 
     /**
+     * Hand the token a new value on the credential epoch its account moved to, keeping its id and expiry, when it was live on the epoch that moved.
+     */
+    public function reissue(int $id, int $movedFrom, int $movedTo): ?Cookie
+    {
+        $expiresAt = $this->query()
+            ->where('id', $id)
+            ->where('credential_epoch', $movedFrom)
+            ->where('expires_at', '>', Date::now())
+            ->value('expires_at');
+
+        if ($expiresAt === null) {
+            return null;
+        }
+
+        $value = bin2hex(random_bytes(self::VALUE_BYTES));
+
+        $moved = $this->query()->where('id', $id)->where('credential_epoch', $movedFrom)->update([
+            'token_hash' => static::digest($value),
+            'credential_epoch' => $movedTo,
+        ]);
+
+        return $moved === 0 ? null : static::cookie($value, CarbonImmutable::parse($expiresAt));
+    }
+
+    /**
      * Get the value of the remember-me cookie the request carries, when it has the shape of one Keystone hands out.
      */
     public static function cookieOf(Request $request): ?string

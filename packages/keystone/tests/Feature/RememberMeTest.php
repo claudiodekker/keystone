@@ -1,6 +1,7 @@
 <?php
 
 use ClaudioDekker\Keystone\AppTests\AppTestCase;
+use ClaudioDekker\Keystone\Jobs\EndSessions;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Notifications\SecurityAlert;
 use ClaudioDekker\Keystone\RememberTokens;
@@ -36,6 +37,7 @@ beforeEach(function () {
     Notification::fake();
     Route::middleware('web')->get('whoami', fn () => (string) (auth()->id() ?? 'guest'));
     Route::middleware(['web', 'auth'])->get('dashboard', fn () => 'The dashboard.');
+    Route::middleware(['web', 'auth'])->post('end-my-sessions', fn () => EndSessions::dispatchSync(auth()->user()));
     Route::middleware('web')->get('via-remember', fn () => auth()->check() && auth()->viaRemember() ? 'remembered' : 'not remembered');
 });
 
@@ -744,5 +746,130 @@ describe('a return and the known device', function () {
             ->and(signInAlerts())->toBe(1)
             ->and(DB::table('user_known_devices')->get())->toEqual($devices);
         $this->assertDatabaseMissing('user_security_events', ['type' => 'device_cookie.reused']);
+    });
+});
+
+describe('the user\'s own move of the credential epoch', function () {
+    beforeEach(function () {
+        $this->freezeSecond();
+        config(['keystone.remember.lifetime_seconds' => 600]);
+    });
+
+    it('hands their browser a new value for the same token, which still ends when it was going to', function () {
+        $this->createFirstFactorAccount();
+        [$remember, $device] = tickedBrowser($this);
+        $issued = DB::table('user_remember_tokens')->sole();
+        $this->fromRememberCookie($remember)->fromDevice($device);
+        $this->travel(100)->seconds();
+
+        $response = $this->post('end-my-sessions');
+
+        $cookie = $response->getCookie(RememberTokens::COOKIE, decrypt: false);
+        $moved = DB::table('user_remember_tokens')->sole();
+        expect($cookie->getValue())->toMatch('/^[0-9a-f]{64}$/')->not->toBe($remember)
+            ->and($cookie->getExpiresTime())->toBe(now()->addSeconds(500)->getTimestamp())
+            ->and($cookie->isSecure())->toBeTrue()
+            ->and($cookie->isHttpOnly())->toBeTrue()
+            ->and($cookie->getSameSite())->toBe('lax')
+            ->and($moved->id)->toBe($issued->id)
+            ->and($moved->token_hash)->toBe(hash('sha256', $cookie->getValue()))
+            ->and($moved->credential_epoch)->toEqual(1)
+            ->and($moved->expires_at)->toBe($issued->expires_at)
+            ->and(session('keystone_remember_web'))->toBe($issued->id);
+    });
+
+    it('restores from the new value and never from the one it replaced', function () {
+        $account = $this->createFirstFactorAccount();
+        [$remember, $device] = tickedBrowser($this);
+        $this->fromRememberCookie($remember)->fromDevice($device);
+        $fresh = $this->rememberCookieOf($this->post('end-my-sessions'));
+        comeBack($this, $remember);
+
+        $copy = $this->get('whoami');
+        comeBack($this, $fresh);
+        $owner = $this->get('whoami');
+
+        $copy->assertContent('guest');
+        $owner->assertContent((string) $account->getKey());
+    });
+
+    it('ends when the token was going to, however late the epoch moved', function () {
+        $this->createFirstFactorAccount();
+        [$remember, $device] = tickedBrowser($this);
+        $this->fromRememberCookie($remember)->fromDevice($device);
+        $this->travel(599)->seconds();
+        $fresh = $this->rememberCookieOf($this->post('end-my-sessions'));
+        $this->travel(1)->seconds();
+        comeBack($this, $fresh);
+
+        $response = $this->get('whoami');
+
+        $response->assertContent('guest');
+    });
+
+    it('leaves the tokens of the account\'s other devices dead', function () {
+        $this->createFirstFactorAccount();
+        [$phone, $phoneDevice] = tickedBrowser($this);
+        comeBack($this, null);
+        [$laptop, $laptopDevice] = tickedBrowser($this);
+        $this->fromRememberCookie($laptop)->fromDevice($laptopDevice)->post('end-my-sessions');
+        comeBack($this, $phone, $phoneDevice);
+
+        $response = $this->get('whoami');
+
+        $response->assertContent('guest');
+        expect(DB::table('user_remember_tokens')->pluck('credential_epoch')->all())->toEqual([1]);
+    });
+
+    it('hands out no cookie when the session\'s token has expired', function () {
+        $this->createFirstFactorAccount();
+        [$remember, $device] = tickedBrowser($this);
+        $issued = DB::table('user_remember_tokens')->sole();
+        $this->fromRememberCookie($remember)->fromDevice($device);
+        $this->travel(600)->seconds();
+
+        $response = $this->post('end-my-sessions');
+
+        expect($this->rememberCookieOf($response))->toBeNull()
+            ->and(DB::table('user_remember_tokens')->sole())->toEqual($issued);
+    });
+
+    it('hands out no cookie to a session that was never remembered', function () {
+        $this->createFirstFactorAccount();
+        $this->passFirstFactor();
+
+        $response = $this->post('end-my-sessions');
+
+        expect($this->rememberCookieOf($response))->toBeNull();
+        $this->assertDatabaseCount('user_remember_tokens', 0);
+    });
+});
+
+describe('a session demoted because its account newly owes enrollment', function () {
+    it('forgets its token and drops its cookie, so the browser is not refused a second time', function () {
+        $account = $this->createFirstFactorAccount();
+        [$remember, $device] = tickedBrowser($this);
+        $this->fromRememberCookie($remember)->fromDevice($device);
+        config(['keystone.require_second_factor' => true]);
+
+        $response = $this->get('dashboard');
+
+        $response->assertRedirectToRoute('login')->assertCookieExpired(RememberTokens::COOKIE);
+        $this->assertDatabaseHas('user_security_events', ['type' => 'session.ended', 'user_id' => $account->getKey(), 'reason' => 'demoted']);
+        $this->assertDatabaseMissing('user_security_events', ['type' => 'request.rejected']);
+        $this->assertDatabaseCount('user_remember_tokens', 0);
+    });
+
+    it('leaves the tokens of the account\'s other devices to be refused when they return', function () {
+        $this->createFirstFactorAccount();
+        tickedBrowser($this);
+        comeBack($this, null);
+        [$laptop, $laptopDevice] = tickedBrowser($this);
+        $this->fromRememberCookie($laptop)->fromDevice($laptopDevice);
+        config(['keystone.require_second_factor' => true]);
+
+        $this->get('dashboard');
+
+        $this->assertDatabaseCount('user_remember_tokens', 1);
     });
 });

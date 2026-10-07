@@ -244,7 +244,7 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Keep the session signed in across a move of its account's credential epoch, on a new session id, when it was live on the epoch that moved.
+     * Keep the session signed in across a move of its account's credential epoch, on a new session id and a new remember-me value, when it was live on the epoch that moved.
      */
     public function carryOver(Model&KeystoneUser $account, int $movedFrom): void
     {
@@ -261,6 +261,8 @@ class KeystoneGuard extends SessionGuard
         $this->rotate();
 
         $this->session->put($this->epochKey(), $this->epochOf($account));
+
+        $this->reissueRememberCookie($account, $movedFrom);
     }
 
     /**
@@ -556,6 +558,24 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
+     * Hand the session's remember token a new value on the epoch its account moved to, so a copy of the old value dies with every other session.
+     */
+    protected function reissueRememberCookie(Model&KeystoneUser $account, int $movedFrom): void
+    {
+        $id = $this->session->get($this->rememberKey());
+
+        if (! is_int($id)) {
+            return;
+        }
+
+        $cookie = (new RememberTokens($account))->reissue($id, movedFrom: $movedFrom, movedTo: $this->epochOf($account));
+
+        if ($cookie !== null) {
+            $this->getCookieJar()->queue($cookie);
+        }
+    }
+
+    /**
      * Forget the token that remembers the session on this device and drop its cookie.
      */
     protected function forgetRememberToken(): void
@@ -687,10 +707,12 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * End the session because its account newly owes enrollment, tell the user to sign in again, and record why.
+     * End the session because its account newly owes enrollment, forget the token that remembers it on this device, tell the user to sign in again, and record why.
      */
     protected function demote(Model&KeystoneUser $account): void
     {
+        $this->forgetRememberToken();
+
         $this->endSession();
 
         $this->session->flash(Status::SESSION_KEY, Status::ENROLLMENT_OWED->value);
