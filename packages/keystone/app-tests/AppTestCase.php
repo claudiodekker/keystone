@@ -26,6 +26,7 @@ use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
 use Illuminate\Support\ViewErrorBag;
@@ -45,6 +46,11 @@ abstract class AppTestCase extends TestCase
      * The namespace the app's own copies of the assertion traits live in.
      */
     public const string ASSERTIONS_NAMESPACE = 'Tests\\Keystone\\Assertions\\';
+
+    /**
+     * The URI of the route gatedRoute() registers behind sudo.
+     */
+    protected const string GATED_URI = 'keystone-app-tests/sudo-probe';
 
     /**
      * The headers of the hardening floor, besides Cache-Control, X-Frame-Options and Content-Security-Policy.
@@ -357,6 +363,24 @@ abstract class AppTestCase extends TestCase
         $support = $this->supportsFor(Surface::SIGN_IN)[0];
 
         return $this->submitSignIn($support, $address, $support->validProof(Surface::SIGN_IN));
+    }
+
+    /**
+     * Register a page and a mutation behind the app's `auth` and `sudo` middleware, returning their URI.
+     */
+    public function gatedRoute(): string
+    {
+        Route::middleware(['web', 'auth', 'sudo'])->match(['get', 'post'], self::GATED_URI, fn () => 'The gated page.');
+
+        return self::GATED_URI;
+    }
+
+    /**
+     * Travel past the end of the sudo the session holds.
+     */
+    public function outliveSudo(): void
+    {
+        $this->travel(config()->integer('keystone.sudo.lifetime_seconds'))->seconds();
     }
 
     /**
