@@ -13,6 +13,10 @@ return [
 
     'throttled' => 'Too many attempts. Please try again in :seconds seconds.',
 
+    'last_sign_in_credential' => 'You cannot remove your only way to sign in.',
+
+    'last_second_factor' => 'You cannot remove your last two-factor credential while two-factor authentication is required.',
+
     'sudo_required' => 'Please confirm it\'s you before making this change.',
 
     'status' => [

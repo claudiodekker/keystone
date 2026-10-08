@@ -108,9 +108,9 @@ class Credentials
     /**
      * Delete the account's credential with the id, of any type, disabled or not.
      */
-    public function delete(int $credentialId, int|string $accountId): bool
+    public function delete(int $credentialId, int|string $accountId): void
     {
-        return $this->query()->where('id', $credentialId)->where('user_id', $accountId)->delete() === 1;
+        $this->query()->where('id', $credentialId)->where('user_id', $accountId)->delete();
     }
 
     /**
@@ -130,14 +130,21 @@ class Credentials
      */
     public function holdsSecondFactor(int|string $accountId, ?string $firstFactor = null): bool
     {
-        $names = array_map(fn (CredentialType $type) => $type->name(), app(CredentialTypes::class)->serving(Surface::CHALLENGE));
-
-        return $this->query()
-            ->where('user_id', $accountId)
+        return $this->usableServing(Surface::CHALLENGE, $accountId)
             ->when($firstFactor !== null, fn (Builder $query) => $query->where('type', '!=', $firstFactor))
-            ->whereIn('type', $names)
-            ->whereNull('disabled_at')
             ->exists();
+    }
+
+    /**
+     * Lock the account's usable credentials of the listed types that serve the surface and get their ids, read as last committed whatever the transaction read before.
+     *
+     * @return list<int>
+     */
+    public function lockServing(int|string $accountId, Surface $surface): array
+    {
+        $ids = $this->usableServing($surface, $accountId)->orderBy('id')->lockForUpdate()->pluck('id');
+
+        return array_map(intval(...), array_values($ids->all()));
     }
 
     /**
@@ -174,6 +181,19 @@ class Credentials
     public function ownerOf(int $credentialId, string $type): int|string|null
     {
         return $this->usable($type)->where('id', $credentialId)->value('user_id');
+    }
+
+    /**
+     * Get a query for the account's usable credentials of the listed types that serve the surface.
+     */
+    protected function usableServing(Surface $surface, int|string $accountId): Builder
+    {
+        $names = array_map(fn (CredentialType $type) => $type->name(), app(CredentialTypes::class)->serving($surface));
+
+        return $this->query()
+            ->where('user_id', $accountId)
+            ->whereIn('type', $names)
+            ->whereNull('disabled_at');
     }
 
     /**

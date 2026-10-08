@@ -15,6 +15,11 @@ class CredentialRemovalController extends Controller
         return response()->json(['id' => $page->id, 'type' => $page->type, 'label' => $page->label, 'listed' => $page->listed]);
     }
 
+    protected function sendRemovalRefused(Request $request, int $credential, string $message): RedirectResponse
+    {
+        return to_route('security.credentials.remove', ['credential' => $credential])->withErrors(['credential' => $message]);
+    }
+
     protected function sendCredentialRemoved(Request $request): RedirectResponse
     {
         return to_route('security');

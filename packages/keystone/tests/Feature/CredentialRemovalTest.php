@@ -2,11 +2,15 @@
 
 use ClaudioDekker\Keystone\AppTests\AppTestCase;
 use ClaudioDekker\Keystone\Keystone;
+use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Notifications\SecurityAlert;
 use ClaudioDekker\Keystone\SecurityEventType;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormTypeSupport;
+use Illuminate\Database\Connection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Testing\TestResponse;
+use Symfony\Component\HttpFoundation\Response;
 
 pest()->extend(AppTestCase::class);
 
@@ -186,5 +190,181 @@ describe('removing', function () {
         }
 
         $this->delete(route('security.credentials.remove.submit', ['credential' => 999]))->assertTooManyRequests();
+    });
+});
+
+/**
+ * Run the race once, as the first query inside the account change reaches the users table, before the change takes the account's lock.
+ */
+function raceBeforeTheLock(Closure $race): void
+{
+    $raced = false;
+    $outerLevel = DB::transactionLevel();
+
+    DB::beforeExecuting(function (string $query, array $bindings, Connection $connection) use (&$raced, $outerLevel, $race) {
+        if (! $raced && $connection->transactionLevel() > $outerLevel && str_contains($query, 'users')) {
+            $raced = true;
+            $race();
+        }
+    });
+}
+
+/**
+ * Assert the removal was refused with the message, leaving the credential, the epoch and the trail as they were.
+ *
+ * @param  TestResponse<Response>  $response
+ */
+function assertKept(TestResponse $response, int $id, string $message): void
+{
+    $response->assertRedirectToRoute('security.credentials.remove', ['credential' => $id])
+        ->assertSessionHasErrors(['credential' => $message]);
+
+    test()->assertDatabaseHas('user_credentials', ['id' => $id]);
+    test()->assertDatabaseMissing('user_security_events', ['type' => 'credential.removed']);
+    test()->assertDatabaseHas('users', ['credential_epoch' => 0]);
+}
+
+describe('the last way to sign in', function () {
+    it('is kept', function () {
+        $this->signInAccount(new FormTypeSupport);
+        $id = DB::table('user_credentials')->value('id');
+
+        $response = $this->delete(route('security.credentials.remove.submit', ['credential' => $id]));
+
+        assertKept($response, $id, 'You cannot remove your only way to sign in.');
+        $this->assertAuthenticated();
+    });
+
+    it('is kept when the others can\'t sign in: disabled, a leftover, or a type that doesn\'t serve sign-in', function (string $type, array $columns) {
+        $this->signInAccount(new FormTypeSupport);
+        $id = DB::table('user_credentials')->value('id');
+        holdCredential($type, columns: $columns);
+
+        $response = $this->delete(route('security.credentials.remove.submit', ['credential' => $id]));
+
+        assertKept($response, $id, 'You cannot remove your only way to sign in.');
+    })->with([
+        'disabled' => ['form', ['disabled_at' => '2026-09-01 12:00:00']],
+        'a leftover' => ['uninstalled', []],
+        'a type listed but not on sign-in' => ['code', []],
+    ]);
+
+    it('can be removed once another way to sign in remains', function () {
+        $this->signInAccount(new FormTypeSupport);
+        $id = DB::table('user_credentials')->value('id');
+        holdCredential('form', 'Spare');
+
+        $response = $this->delete(route('security.credentials.remove.submit', ['credential' => $id]));
+
+        $response->assertRedirectToRoute('security');
+        $this->assertDatabaseMissing('user_credentials', ['id' => $id]);
+    });
+
+    it('doesn\'t keep a credential that can\'t sign in, whatever else the account holds', function (string $type, array $columns) {
+        $this->signInAccount(new FormTypeSupport);
+        DB::table('user_credentials')->update(['disabled_at' => now()]);
+        $id = holdCredential($type, columns: $columns);
+
+        $response = $this->delete(route('security.credentials.remove.submit', ['credential' => $id]));
+
+        $response->assertRedirectToRoute('security');
+        $this->assertDatabaseMissing('user_credentials', ['id' => $id]);
+    })->with([
+        'a disabled one' => ['form', ['disabled_at' => '2026-09-01 12:00:00']],
+        'a leftover' => ['uninstalled', []],
+    ]);
+
+    it('is kept when another removal took the other way to sign in just before this one took the lock', function () {
+        $this->signInAccount(new FormTypeSupport);
+        $id = DB::table('user_credentials')->value('id');
+        $other = holdCredential('form', 'Spare');
+        raceBeforeTheLock(fn () => DB::table('user_credentials')->delete($other));
+
+        $response = $this->delete(route('security.credentials.remove.submit', ['credential' => $id]));
+
+        assertKept($response, $id, 'You cannot remove your only way to sign in.');
+    });
+});
+
+describe('the last second factor', function () {
+    beforeEach(function () {
+        $this->signInAccount(new FormTypeSupport);
+        config(['keystone.require_second_factor' => true]);
+    });
+
+    it('is kept while the app requires a second factor', function () {
+        $id = holdCredential('code', 'Phone');
+
+        $response = $this->delete(route('security.credentials.remove.submit', ['credential' => $id]));
+
+        assertKept($response, $id, 'You cannot remove your last two-factor credential while two-factor authentication is required.');
+        $this->assertAuthenticated();
+    });
+
+    it('is kept when the others don\'t count as a second factor: disabled, a leftover, or a type not listed on the challenge', function (string $type, array $columns) {
+        $id = holdCredential('code', 'Phone');
+        holdCredential($type, columns: $columns);
+
+        $response = $this->delete(route('security.credentials.remove.submit', ['credential' => $id]));
+
+        assertKept($response, $id, 'You cannot remove your last two-factor credential while two-factor authentication is required.');
+    })->with([
+        'disabled' => ['code', ['disabled_at' => '2026-09-01 12:00:00']],
+        'a leftover' => ['uninstalled', []],
+        'a sign-in type' => ['form', []],
+    ]);
+
+    it('can be removed once another second factor remains, or when the app doesn\'t require one', function (Closure $arrange) {
+        $id = holdCredential('code', 'Phone');
+        $arrange();
+
+        $response = $this->delete(route('security.credentials.remove.submit', ['credential' => $id]));
+
+        $response->assertRedirectToRoute('security');
+        $this->assertDatabaseMissing('user_credentials', ['id' => $id]);
+    })->with([
+        'another second factor' => [fn () => holdCredential('code', 'Tablet')],
+        'no mandate' => [fn () => config(['keystone.require_second_factor' => false])],
+    ]);
+
+    it('doesn\'t keep a credential that counts as no second factor', function (string $type, array $columns) {
+        holdCredential('code', 'Phone');
+        $id = holdCredential($type, columns: $columns);
+
+        $response = $this->delete(route('security.credentials.remove.submit', ['credential' => $id]));
+
+        $response->assertRedirectToRoute('security');
+        $this->assertDatabaseMissing('user_credentials', ['id' => $id]);
+    })->with([
+        'a disabled one' => ['code', ['disabled_at' => '2026-09-01 12:00:00']],
+        'a leftover' => ['uninstalled', []],
+    ]);
+
+    it('is kept when another removal took the other second factor just before this one took the lock', function () {
+        $id = holdCredential('code', 'Phone');
+        $other = holdCredential('code', 'Tablet');
+        raceBeforeTheLock(fn () => DB::table('user_credentials')->delete($other));
+
+        $response = $this->delete(route('security.credentials.remove.submit', ['credential' => $id]));
+
+        assertKept($response, $id, 'You cannot remove your last two-factor credential while two-factor authentication is required.');
+    });
+});
+
+describe('a sign-in racing the removal', function () {
+    it('doesn\'t outlive the removal of the credential it proved', function () {
+        $account = $this->createAccount();
+        $this->arrangeCredential($account, new FormTypeSupport, Surface::SIGN_IN);
+        $id = DB::table('user_credentials')->value('id');
+        DB::table('user_credentials')->insertGetId(['user_id' => $account->getKey(), 'type' => 'form', 'label' => 'Spare']);
+        raceBeforeTheLock(function () use ($account, $id) {
+            DB::table('user_credentials')->delete($id);
+            DB::table('users')->where('id', $account->getKey())->increment('credential_epoch');
+        });
+
+        $this->submitSignIn(new FormTypeSupport, 'jane@example.com', (new FormTypeSupport)->validProof(Surface::SIGN_IN));
+
+        $this->get(route('security'))->assertRedirectToRoute('login');
+        $this->assertGuest();
     });
 });

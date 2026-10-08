@@ -21,6 +21,17 @@ trait CredentialRemovalAssertions
     }
 
     /**
+     * Assert the response refuses the removal, sending the user back to the credential's confirm step with the message.
+     *
+     * @param  TestResponse<Response>  $response
+     */
+    public function assertRemovalRefused(TestResponse $response, int $credential, string $message): void
+    {
+        $response->assertRedirectToRoute('security.credentials.remove', ['credential' => $credential])
+            ->assertSessionHasErrors(['credential' => $message]);
+    }
+
+    /**
      * Assert the response sends the user whose credential was removed to the security page.
      *
      * @param  TestResponse<Response>  $response

@@ -5,6 +5,8 @@ namespace ClaudioDekker\Keystone\Http\Controllers;
 use ClaudioDekker\Keystone\AccountChange;
 use ClaudioDekker\Keystone\AccountChanges;
 use ClaudioDekker\Keystone\Credentials;
+use ClaudioDekker\Keystone\Exceptions\LastSecondFactor;
+use ClaudioDekker\Keystone\Exceptions\LastSignInCredential;
 use ClaudioDekker\Keystone\Http\PageValues\CredentialRemovalPage;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\KeystoneUser;
@@ -64,7 +66,7 @@ abstract class CredentialRemovalController extends Controller
     }
 
     /**
-     * Remove the signed-in account's credential, ending its other sessions.
+     * Remove the signed-in account's credential, ending its other sessions, unless it is the last way to sign in or the last second factor the app requires.
      */
     public function destroy(Request $request, string $credential): Response|Responsable
     {
@@ -75,7 +77,17 @@ abstract class CredentialRemovalController extends Controller
         $account = $guard->user();
         $id = $this->credentialId($credential);
 
-        $removed = $id !== null && (new AccountChanges($guard))->change($account, fn (AccountChange $change) => $change->removeCredential($id));
+        if ($id === null) {
+            return $this->refuseUnknownCredential($request);
+        }
+
+        try {
+            $removed = (new AccountChanges($guard))->change($account, fn (AccountChange $change) => $change->removeCredential($id));
+        } catch (LastSignInCredential) {
+            return $this->sendRemovalRefused($request, $id, __('keystone::messages.last_sign_in_credential'));
+        } catch (LastSecondFactor) {
+            return $this->sendRemovalRefused($request, $id, __('keystone::messages.last_second_factor'));
+        }
 
         if (! $removed) {
             return $this->refuseUnknownCredential($request);
@@ -90,6 +102,11 @@ abstract class CredentialRemovalController extends Controller
      * Respond with the page confirming the credential's removal.
      */
     abstract protected function sendRemovalPage(Request $request, CredentialRemovalPage $page): Response|Responsable;
+
+    /**
+     * Respond to a refused removal, with the message saying why the credential is kept.
+     */
+    abstract protected function sendRemovalRefused(Request $request, int $credential, string $message): Response|Responsable;
 
     /**
      * Respond to a removed credential.

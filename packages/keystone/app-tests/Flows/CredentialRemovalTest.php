@@ -51,3 +51,28 @@ it('asks for sudo before removing anything', function () {
     $this->assertSudoRequired($this->delete(route('security.credentials.remove.submit', ['credential' => $id])));
     $this->assertDatabaseHas('user_credentials', ['id' => $id]);
 });
+
+it('keeps the account\'s only way to sign in', function () {
+    $account = $this->signInAccount($this->supportsFor(Surface::SIGN_IN)[0]);
+    $id = DB::table('user_credentials')->where('user_id', $account->getKey())->value('id');
+
+    $response = $this->delete(route('security.credentials.remove.submit', ['credential' => $id]));
+
+    $this->assertRemovalRefused($response, $id, __('keystone::messages.last_sign_in_credential'));
+    $this->assertDatabaseHas('user_credentials', ['id' => $id]);
+    $this->assertAuthenticatedAs($account);
+});
+
+it('keeps the account\'s last second factor while the app requires one', function () {
+    $account = $this->signInAccount($this->supportsFor(Surface::SIGN_IN)[0]);
+    $this->arrangeCredential($account, $this->supportsFor(Surface::CHALLENGE)[0], Surface::CHALLENGE);
+    $this->arrangeRecoveryCodes($account);
+    $id = DB::table('user_credentials')->where('user_id', $account->getKey())->max('id');
+    $this->withMandates();
+
+    $response = $this->delete(route('security.credentials.remove.submit', ['credential' => $id]));
+
+    $this->assertRemovalRefused($response, $id, __('keystone::messages.last_second_factor'));
+    $this->assertDatabaseHas('user_credentials', ['id' => $id]);
+    $this->assertAuthenticatedAs($account);
+});

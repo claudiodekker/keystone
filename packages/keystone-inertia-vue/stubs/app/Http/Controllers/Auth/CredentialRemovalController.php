@@ -27,6 +27,14 @@ class CredentialRemovalController extends Controller
     }
 
     /**
+     * Respond to a refused removal, sending the user back to the confirm step with the message.
+     */
+    protected function sendRemovalRefused(Request $request, int $credential, string $message): RedirectResponse
+    {
+        return to_route('security.credentials.remove', ['credential' => $credential])->withErrors(['credential' => $message]);
+    }
+
+    /**
      * Respond to a removed credential, sending the user to the security page.
      */
     protected function sendCredentialRemoved(Request $request): RedirectResponse

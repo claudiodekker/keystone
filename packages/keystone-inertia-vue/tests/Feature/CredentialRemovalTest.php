@@ -56,3 +56,15 @@ it('shows the status of a credential the account doesn\'t hold on the security p
         ->component('settings/Security')
         ->where('status', __('keystone::messages.status.credential-not-found')));
 });
+
+it('sends a refused removal back to the confirm step with the message', function () {
+    $account = $this->signInAccount(new PasswordTypeSupport);
+    $id = DB::table('user_credentials')->where('user_id', $account->getKey())->value('id');
+
+    $response = $this->delete(route('security.credentials.remove.submit', ['credential' => $id]));
+
+    $this->assertRemovalRefused($response, $id, __('keystone::messages.last_sign_in_credential'));
+    $this->get(route('security.credentials.remove', ['credential' => $id]))->assertInertia(fn (AssertableInertia $page) => $page
+        ->component('settings/CredentialRemoval')
+        ->where('errors.credential', __('keystone::messages.last_sign_in_credential')));
+});
