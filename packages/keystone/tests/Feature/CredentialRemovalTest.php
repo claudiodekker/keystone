@@ -367,4 +367,17 @@ describe('a sign-in racing the removal', function () {
         $this->get(route('security'))->assertRedirectToRoute('login');
         $this->assertGuest();
     });
+    it('is refused when the credential it proved is removed before its write', function () {
+        $account = $this->createAccount();
+        $this->arrangeCredential($account, new FormTypeSupport, Surface::SIGN_IN);
+        $id = DB::table('user_credentials')->value('id');
+        DB::table('user_credentials')->insertGetId(['user_id' => $account->getKey(), 'type' => 'form', 'label' => 'Spare']);
+        raceBeforeTheLock(fn () => DB::table('user_credentials')->delete($id));
+
+        $this->submitSignIn(new FormTypeSupport, 'jane@example.com', (new FormTypeSupport)->validProof(Surface::SIGN_IN));
+
+        $this->assertGuest();
+        $this->assertDatabaseHas('user_security_events', ['type' => 'proof.rejected', 'user_id' => $account->getKey(), 'reason' => 'keystone.superseded']);
+        $this->assertDatabaseMissing('user_security_events', ['type' => 'signed_in']);
+    });
 });

@@ -118,11 +118,11 @@ class AccountChange
     }
 
     /**
-     * Stamp the usable credential of the type as used now.
+     * Stamp the usable credential of the type as used now, or answer false when it is gone or disabled.
      */
-    public function stampLastUse(StoredCredential $credential, string $type): void
+    public function stampLastUse(StoredCredential $credential, string $type): bool
     {
-        $this->credentials->stampLastUse($credential->id, type: $type);
+        return $this->credentials->stampLastUse($credential->id, type: $type);
     }
 
     /**

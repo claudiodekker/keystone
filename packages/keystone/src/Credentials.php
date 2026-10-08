@@ -168,11 +168,11 @@ class Credentials
     }
 
     /**
-     * Set when the usable credential of the type was last used to now.
+     * Set when the usable credential of the type was last used to now, or answer false when it is gone or disabled.
      */
-    public function stampLastUse(int $credentialId, string $type): void
+    public function stampLastUse(int $credentialId, string $type): bool
     {
-        $this->usable($type)->where('id', $credentialId)->update(['last_used_at' => now()]);
+        return $this->usable($type)->where('id', $credentialId)->update(['last_used_at' => now()]) === 1;
     }
 
     /**
