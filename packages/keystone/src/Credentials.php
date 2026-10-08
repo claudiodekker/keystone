@@ -114,6 +114,14 @@ class Credentials
     }
 
     /**
+     * Delete every credential of the type the account holds, disabled or not, returning how many it held.
+     */
+    public function deleteOfType(int|string $accountId, string $type): int
+    {
+        return $this->query()->where('user_id', $accountId)->where('type', $type)->delete();
+    }
+
+    /**
      * Get the names of the types the account holds a usable credential of.
      *
      * @return list<string>

@@ -14,6 +14,7 @@ enum Flow: string
     case CHALLENGE = 'challenge';
     case ENROLLMENT = 'enrollment';
     case SUDO = 'sudo';
+    case SETTINGS = 'settings';
 
     /**
      * Derive the flow from the session's phase and the surface in use.
@@ -24,6 +25,7 @@ enum Flow: string
             $surface === Surface::SIGN_IN && $guard->guest() => self::SIGN_IN,
             $surface === Surface::CHALLENGE && $guard->guest() && $guard->isPendingAt(PendingStage::CHALLENGE) => self::CHALLENGE,
             $guard->check() && $guard->sudoInProgress()?->surface() === $surface => self::SUDO,
+            $surface === Surface::ENROLLMENT && $guard->check() => self::SETTINGS,
             default => throw new LogicException("No flow uses the [{$surface->value}] surface in this session's phase."),
         };
     }

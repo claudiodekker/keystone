@@ -97,12 +97,14 @@ class AccountChanges
     }
 
     /**
-     * Carry the mover's own session over the epoch move and record the change's events.
+     * Carry the mover's own session over the epoch move, or give it a new id when the change asks for one, and record the change's events.
      */
     protected function committed(AccountChange $change, ?int $movedFrom): void
     {
         if ($movedFrom !== null) {
             $this->guard->carryOver($change->account, movedFrom: $movedFrom);
+        } elseif ($change->rotatesSession()) {
+            $this->guard->rotateFor($change->account);
         }
 
         foreach ($change->events() as $record) {

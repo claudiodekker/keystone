@@ -248,9 +248,7 @@ class KeystoneGuard extends SessionGuard
      */
     public function carryOver(Model&KeystoneUser $account, int $movedFrom): void
     {
-        $signedInAs = $this->session->get($this->getName());
-
-        if (is_null($signedInAs) || (string) $signedInAs !== (string) $account->getAuthIdentifier()) {
+        if (! $this->isSignedInAs($account)) {
             return;
         }
 
@@ -263,6 +261,16 @@ class KeystoneGuard extends SessionGuard
         $this->session->put($this->epochKey(), $this->epochOf($account));
 
         $this->reissueRememberCookie($account, $movedFrom);
+    }
+
+    /**
+     * Rotate the id of the session signed in as the account, keeping its data, its sudo and its ceremony slots, and leaving any other session alone.
+     */
+    public function rotateFor(Model&KeystoneUser $account): void
+    {
+        if ($this->isSignedInAs($account)) {
+            $this->rotate();
+        }
     }
 
     /**
@@ -817,6 +825,16 @@ class KeystoneGuard extends SessionGuard
         }
 
         return $replaced['pending_challenge_id'];
+    }
+
+    /**
+     * Determine if the session is signed in as the account.
+     */
+    protected function isSignedInAs(Model&KeystoneUser $account): bool
+    {
+        $signedInAs = $this->session->get($this->getName());
+
+        return ! is_null($signedInAs) && (string) $signedInAs === (string) $account->getAuthIdentifier();
     }
 
     /**

@@ -4,6 +4,7 @@ use ClaudioDekker\Keystone\Flow;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\PendingStage;
+use ClaudioDekker\Keystone\SecurityEventType;
 use ClaudioDekker\Keystone\Tests\Fixtures\User;
 
 it('derives the sign-in flow for a guest on the sign-in surface', function () {
@@ -29,6 +30,17 @@ it('derives no flow for the challenge surface without a held sign-in', function 
 it('derives no flow for a surface no flow uses yet', function (Surface $surface) {
     Flow::of(Keystone::guard(), $surface);
 })->throws(LogicException::class)->with([Surface::REGISTRATION, Surface::ENROLLMENT]);
+
+it('derives the settings flow for a signed-in session on the enrollment surface', function () {
+    Keystone::guard()->setUser(User::factory()->create());
+
+    expect(Flow::of(Keystone::guard(), Surface::ENROLLMENT))->toBe(Flow::SETTINGS);
+});
+
+it('keeps the settings flow apart from the counts a first factor guards', function () {
+    expect(Flow::SETTINGS->sharesFailedAttempts())->toBeFalse()
+        ->and(Flow::SETTINGS->rejectionType())->toBe(SecurityEventType::PROOF_REJECTED);
+});
 
 it('derives the sudo flow for a signed-in session owing its first step on the sign-in surface', function () {
     Keystone::guard()->setUser(User::factory()->create());

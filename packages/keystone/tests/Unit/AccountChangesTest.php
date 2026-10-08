@@ -5,6 +5,7 @@ use ClaudioDekker\Keystone\AccountChanges;
 use ClaudioDekker\Keystone\Actor;
 use ClaudioDekker\Keystone\Flow;
 use ClaudioDekker\Keystone\KeystoneGuard;
+use ClaudioDekker\Keystone\Methods\EnrolledCredential;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
 use ClaudioDekker\Keystone\Notifications\SecurityAlert;
 use ClaudioDekker\Keystone\RecoveryCodes;
@@ -89,7 +90,81 @@ test('the credential epoch moves only for a change that removes, replaces or end
 
         $change->commitRecoveryCodes(['BBBBB-BBBBB'], flow: Flow::ENROLLMENT);
     }, true],
+    'enrolling a credential beside the ones held' => [fn (AccountChange $change) => $change->enroll(new FormType, new EnrolledCredential(identifier: null, secret: 'new'), Flow::SETTINGS), false],
+    'enrolling a first credential that replaces its type' => [fn (AccountChange $change) => $change->enroll(new FormType('code'), new EnrolledCredential(identifier: null, secret: 'new', replacesExisting: true), Flow::SETTINGS), false],
+    'enrolling a credential that replaces the one held' => [fn (AccountChange $change) => $change->enroll(new FormType, new EnrolledCredential(identifier: null, secret: 'new', replacesExisting: true), Flow::SETTINGS), true],
+    'enrolling again the replacing credential already held' => [fn (AccountChange $change) => $change->enroll(new FormType, new EnrolledCredential(identifier: null, secret: 'old-hash', replacesExisting: true), Flow::SETTINGS), false],
 ]);
+
+it('stores an enrolled credential beside the ones held and records credential.added in the flow', function () {
+    Notification::fake();
+    $user = User::factory()->create();
+    holdAddresses($user, ['jane@example.com' => true]);
+    $held = storeCredential($user);
+
+    changes()->change($user, fn (AccountChange $change) => $change->enroll(new FormType, new EnrolledCredential(identifier: null, secret: 'new', label: 'Phone'), Flow::SETTINGS));
+
+    $added = DB::table('user_credentials')->where('user_id', $user->getKey())->where('id', '!=', $held->id)->sole();
+    $event = SecurityEvent::query()->sole();
+    expect(Crypt::decryptString($added->secret))->toBe('new')
+        ->and($event->type)->toBe(SecurityEventType::CREDENTIAL_ADDED)
+        ->and($event->flow)->toBe('settings')
+        ->and($event->credential_type)->toBe('form')
+        ->and($event->credential_id)->toEqual($added->id)
+        ->and($event->credential_label)->toBe('Phone');
+    $this->assertDatabaseHas('user_credentials', ['id' => $held->id]);
+    Notification::assertSentOnDemandTimes(SecurityAlert::class, 1);
+});
+
+it('replaces every credential of the type, disabled ones included, when the enrolled one says so, and records only credential.added', function () {
+    $user = User::factory()->create();
+    $held = storeCredential($user);
+    $disabled = storeCredential($user);
+    DB::table('user_credentials')->where('id', $disabled->id)->update(['disabled_at' => now()]);
+    $other = changes()->change($user, fn (AccountChange $change) => $change->addCredential(new FormType('code'), identifier: null, secret: 'kept'));
+
+    changes()->change($user, fn (AccountChange $change) => $change->enroll(new FormType, new EnrolledCredential(identifier: null, secret: 'new', replacesExisting: true), Flow::SETTINGS));
+
+    $left = DB::table('user_credentials')->where('user_id', $user->getKey())->where('type', 'form')->sole();
+    expect(Crypt::decryptString($left->secret))->toBe('new')
+        ->and(SecurityEvent::query()->pluck('type')->all())->toBe([SecurityEventType::CREDENTIAL_ADDED]);
+    $this->assertDatabaseHas('user_credentials', ['id' => $other, 'type' => 'code']);
+});
+
+it('changes nothing when the replacing credential it enrolls is already held, as when the same answer arrives twice', function () {
+    Notification::fake();
+    $user = User::factory()->create();
+    holdAddresses($user, ['jane@example.com' => true]);
+    $held = storeCredential($user);
+    guard()->signIn($user);
+    $before = session()->getId();
+
+    changes()->change($user, fn (AccountChange $change) => $change->enroll(new FormType, new EnrolledCredential(identifier: null, secret: 'old-hash', replacesExisting: true), Flow::SETTINGS));
+
+    expect(DB::table('user_credentials')->where('user_id', $user->getKey())->pluck('id')->all())->toEqual([$held->id])
+        ->and(SecurityEvent::query()->where('type', 'credential.added')->count())->toBe(0)
+        ->and(session()->getId())->toBe($before)
+        ->and(epochOf($user))->toBe(0);
+    Notification::assertNothingSent();
+});
+
+it('stores a credential beside one with the same secret when it doesn\'t replace its type', function () {
+    $user = User::factory()->create();
+    storeCredential($user);
+
+    changes()->change($user, fn (AccountChange $change) => $change->enroll(new FormType, new EnrolledCredential(identifier: null, secret: 'old-hash'), Flow::SETTINGS));
+
+    expect(DB::table('user_credentials')->where('user_id', $user->getKey())->count())->toBe(2);
+});
+
+it('leaves another account\'s credentials of the type alone when an enrollment replaces', function () {
+    $user = User::factory()->create();
+    $stranger = storeCredential(User::factory()->create());
+
+    changes()->change($user, fn (AccountChange $change) => $change->enroll(new FormType, new EnrolledCredential(identifier: null, secret: 'new', replacesExisting: true), Flow::SETTINGS));
+
+    $this->assertDatabaseHas('user_credentials', ['id' => $stranger->id]);
+});
 
 it('records a first set of recovery codes without alerting, and a replacing set with an alert', function (bool $held, bool $alerts) {
     Notification::fake();
@@ -290,6 +365,46 @@ describe('the mover\'s own session', function () {
         $before = session()->getId();
 
         changes()->change($user, fn (AccountChange $change) => $change->addCredential(new FormType, identifier: null, secret: 'new'));
+
+        expect(session()->getId())->toBe($before);
+    });
+
+    it('gives it a new session id after an enrollment that moves no epoch, keeping its ceremony slots', function () {
+        $user = User::factory()->create();
+        guard()->signIn($user);
+        guard()->slots()->put('code', 'enrollment', 'ceremony-bytes', capSeconds: 300);
+        $before = session()->getId();
+
+        changes()->change($user, fn (AccountChange $change) => $change->enroll(new FormType, new EnrolledCredential(identifier: null, secret: 'new'), Flow::SETTINGS));
+
+        Auth::forgetGuards();
+        expect(session()->getId())->not->toBe($before)
+            ->and(guard()->user()?->getKey())->toBe($user->getKey())
+            ->and(guard()->slots()->get('code', 'enrollment'))->toBe('ceremony-bytes')
+            ->and(epochOf($user))->toBe(0);
+    });
+
+    it('keeps it signed in on a new session id and the new epoch after an enrollment that replaces', function () {
+        $user = User::factory()->create();
+        storeCredential($user);
+        guard()->signIn($user);
+        $before = session()->getId();
+
+        changes()->change($user, fn (AccountChange $change) => $change->enroll(new FormType, new EnrolledCredential(identifier: null, secret: 'new', replacesExisting: true), Flow::SETTINGS));
+
+        Auth::forgetGuards();
+        expect(session()->getId())->not->toBe($before)
+            ->and(guard()->user()?->getKey())->toBe($user->getKey())
+            ->and(epochOf($user))->toBe(1);
+    });
+
+    it('leaves a session signed in as another account on its id after an enrollment', function () {
+        $admin = User::factory()->create();
+        $user = User::factory()->create();
+        guard()->signIn($admin);
+        $before = session()->getId();
+
+        changes()->change($user, fn (AccountChange $change) => $change->enroll(new FormType, new EnrolledCredential(identifier: null, secret: 'new'), Flow::SETTINGS));
 
         expect(session()->getId())->toBe($before);
     });
