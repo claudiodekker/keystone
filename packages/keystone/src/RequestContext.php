@@ -5,7 +5,6 @@ namespace ClaudioDekker\Keystone;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
-use Symfony\Component\HttpFoundation\Request as SymfonyRequest;
 
 /**
  * @internal
@@ -14,11 +13,6 @@ use Symfony\Component\HttpFoundation\Request as SymfonyRequest;
  */
 readonly class RequestContext
 {
-    /**
-     * The request attribute that holds the context captured for the request.
-     */
-    protected const string ATTRIBUTE = 'keystone.request_context';
-
     /**
      * The user agent, cut to the length kept everywhere with control characters replaced by spaces.
      */
@@ -38,32 +32,16 @@ readonly class RequestContext
     }
 
     /**
-     * Get the context captured for the request, capturing it when none was.
+     * Capture the context of the request, giving it a new request id.
      */
-    public static function of(SymfonyRequest $request): static
+    public static function capture(Request $request): static
     {
-        $context = $request->attributes->get(static::ATTRIBUTE);
-
-        return $context instanceof static ? $context : static::capture($request);
-    }
-
-    /**
-     * Capture the context of the request, giving it a new request id, and keep it on the request.
-     */
-    public static function capture(SymfonyRequest $request): static
-    {
-        $illuminate = $request instanceof Request ? $request : Request::createFromBase($request);
-
-        $context = new static(
-            ipAddress: $illuminate->ip(),
-            userAgent: $illuminate->userAgent(),
-            path: $illuminate->path(),
+        return new static(
+            ipAddress: $request->ip(),
+            userAgent: $request->userAgent(),
+            path: $request->path(),
             requestId: (string) Str::ulid(),
         );
-
-        $request->attributes->set(static::ATTRIBUTE, $context);
-
-        return $context;
     }
 
     /**

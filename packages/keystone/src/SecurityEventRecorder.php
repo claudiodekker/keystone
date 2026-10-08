@@ -192,7 +192,7 @@ class SecurityEventRecorder
     }
 
     /**
-     * Cut a value taken from input to its length, with control characters and line and paragraph separators replaced by spaces so it can't break a log line.
+     * Cut a value taken from input to its length, with invalid UTF-8 made valid and control characters and line and paragraph separators replaced by spaces so it can't break a log line.
      */
     public static function clean(?string $value, int $length): ?string
     {
@@ -200,7 +200,7 @@ class SecurityEventRecorder
             return null;
         }
 
-        $printable = (string) preg_replace('/[\p{Cc}\p{Zl}\p{Zp}]/u', ' ', $value);
+        $printable = (string) preg_replace('/[\p{Cc}\p{Zl}\p{Zp}]/u', ' ', mb_scrub($value, 'UTF-8'));
 
         return Str::substr($printable, 0, $length);
     }

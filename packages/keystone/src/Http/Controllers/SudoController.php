@@ -9,6 +9,7 @@ use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\KeystoneUser;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\RateLimiter;
+use ClaudioDekker\Keystone\RequestContext;
 use ClaudioDekker\Keystone\SecurityEventRecorder;
 use ClaudioDekker\Keystone\SecurityEventType;
 use ClaudioDekker\Keystone\SignInDecision;
@@ -80,7 +81,7 @@ abstract class SudoController extends Controller
             return redirect()->route('sudo')->withErrors($validator->errors());
         }
 
-        $attempt = new SudoAttempt($guard, new RateLimiter($request, $guard));
+        $attempt = new SudoAttempt($guard, new RateLimiter($request, app(RequestContext::class), $guard));
 
         try {
             $result = $attempt->attempt($progress, $credentialType, $validator->validated());

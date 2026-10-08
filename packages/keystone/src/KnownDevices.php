@@ -8,6 +8,7 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
+use LogicException;
 use Symfony\Component\HttpFoundation\Cookie;
 use Symfony\Component\HttpFoundation\Request;
 
@@ -45,15 +46,13 @@ class KnownDevices
      */
     public function isKnown(Request $request): bool
     {
-        return $this->idOf($request) !== null;
+        return $this->deviceIdOf($request) !== null;
     }
 
     /**
      * Get the id of the device the request's device cookie marks, when the account has signed in from it within the retention.
-     *
-     * The id outlives the cookie's value, which every sign-in from the browser replaces.
      */
-    public function idOf(Request $request): ?int
+    public function deviceIdOf(Request $request): ?int
     {
         $value = static::cookieOf($request);
 
@@ -62,7 +61,7 @@ class KnownDevices
         }
 
         $id = $this->query()
-            ->where('user_id', $this->model->getKey())
+            ->where('user_id', $this->accountId())
             ->where('device_hash', static::deviceDigest($value))
             ->where('cookie_hash', static::digest($value))
             ->where('last_seen_at', '>', Date::now()->subSeconds(static::retentionSeconds()))
@@ -83,7 +82,7 @@ class KnownDevices
         }
 
         return $this->query()
-            ->where('user_id', $this->model->getKey())
+            ->where('user_id', $this->accountId())
             ->where('device_hash', static::deviceDigest($value))
             ->where('cookie_hash', '!=', static::digest($value))
             ->where('last_seen_at', '>', Date::now()->subSeconds(static::retentionSeconds()))
@@ -97,19 +96,20 @@ class KnownDevices
      */
     public function remember(Request $request, RequestContext $context): Cookie
     {
+        $accountId = $this->accountId();
         $previous = static::cookieOf($request);
         $device = $previous === null ? bin2hex(random_bytes(self::DEVICE_BYTES)) : Str::before($previous, '.');
         $value = $device.'.'.bin2hex(random_bytes(self::SECRET_BYTES));
         $digest = static::digest($value);
         $now = Date::now();
 
-        $this->model->getConnection()->transaction(function () use ($previous, $context, $value, $digest, $now) {
+        $this->model->getConnection()->transaction(function () use ($accountId, $previous, $context, $value, $digest, $now) {
             if ($previous !== null) {
                 $this->query()->where('cookie_hash', static::digest($previous))->update(['cookie_hash' => $digest]);
             }
 
             $this->query()->upsert([
-                'user_id' => $this->model->getKey(),
+                'user_id' => $accountId,
                 'device_hash' => static::deviceDigest($value),
                 'cookie_hash' => $digest,
                 'user_agent' => $this->encrypt($context->userAgent),
@@ -127,7 +127,7 @@ class KnownDevices
      */
     public function forget(): void
     {
-        $this->query()->where('user_id', $this->model->getKey())->delete();
+        $this->query()->where('user_id', $this->accountId())->delete();
     }
 
     /**
@@ -187,6 +187,22 @@ class KnownDevices
     public static function retentionSeconds(): int
     {
         return config()->integer('keystone.retention.known_devices_seconds');
+    }
+
+    /**
+     * Get the key of the account the devices belong to.
+     *
+     * @throws LogicException
+     */
+    protected function accountId(): int|string
+    {
+        $key = $this->model->getKey();
+
+        if ($key === null) {
+            throw new LogicException('Known devices of an account need a model with a key.');
+        }
+
+        return $key;
     }
 
     /**

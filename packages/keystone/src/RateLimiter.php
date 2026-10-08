@@ -67,6 +67,7 @@ class RateLimiter
      */
     public function __construct(
         protected Request $request,
+        protected RequestContext $context,
         protected KeystoneGuard $guard,
         protected SecurityEventRecorder $recorder = new SecurityEventRecorder,
     ) {
@@ -210,7 +211,7 @@ class RateLimiter
             return self::OTHER_SOURCE;
         }
 
-        $device = (new KnownDevices($account))->idOf($this->request);
+        $device = (new KnownDevices($account))->deviceIdOf($this->request);
 
         return $device === null ? self::OTHER_SOURCE : "device:{$device}";
     }
@@ -306,7 +307,7 @@ class RateLimiter
      */
     protected function address(): string
     {
-        return Subnet::networkOf(RequestContext::of($this->request)->ipAddress) ?? self::UNKNOWN_ADDRESS;
+        return Subnet::networkOf($this->context->ipAddress) ?? self::UNKNOWN_ADDRESS;
     }
 
     /**

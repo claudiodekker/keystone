@@ -15,6 +15,7 @@ use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\PendingSignIn;
 use ClaudioDekker\Keystone\PendingStage;
 use ClaudioDekker\Keystone\RateLimiter;
+use ClaudioDekker\Keystone\RequestContext;
 use ClaudioDekker\Keystone\SignInDecision;
 use ClaudioDekker\Keystone\Status;
 use ClaudioDekker\Keystone\StepKind;
@@ -79,7 +80,7 @@ abstract class ChallengeController extends Controller
             return redirect()->route('login.challenge')->withErrors($validator->errors());
         }
 
-        $attempt = new ChallengeAttempt(Keystone::guard(), new RateLimiter($request, Keystone::guard()));
+        $attempt = new ChallengeAttempt(Keystone::guard(), new RateLimiter($request, app(RequestContext::class), Keystone::guard()));
 
         try {
             $demand = $attempt->attempt($pending, $credentialType, $validator->validated());
