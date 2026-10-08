@@ -18,6 +18,7 @@ enum Status: string
     case SUDO_REVOKED = 'sudo-revoked';
     case CREDENTIAL_REMOVED = 'credential-removed';
     case CREDENTIAL_NOT_FOUND = 'credential-not-found';
+    case ENROLLED = 'enrolled';
 
     /**
      * The session key the status is flashed under.

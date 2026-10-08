@@ -32,6 +32,7 @@ class FormType implements CredentialType
         protected bool $multipleFactors = false,
         protected bool $sharesFailedAttempts = false,
         protected array $configFailures = [],
+        protected bool $replacesExisting = false,
     ) {
         //
     }
@@ -77,7 +78,7 @@ class FormType implements CredentialType
     {
         if ($surface === Surface::ENROLLMENT) {
             return is_string($ceremony) && hash_equals($ceremony, (string) $input['secret'])
-                ? Proof::enrolled(new EnrolledCredential(identifier: null, secret: static::hash($ceremony)))
+                ? Proof::enrolled(new EnrolledCredential(identifier: null, secret: static::hash($ceremony), replacesExisting: $this->replacesExisting))
                 : Proof::rejected("{$this->name}.mismatch");
         }
 

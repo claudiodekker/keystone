@@ -26,9 +26,9 @@ describe('credentials', function () {
         $response = $this->get(route('security'));
 
         $response->assertOk()->assertJsonPath('types', [
-            ['type' => 'form', 'credentials' => [['id' => $formId, 'label' => null, 'addedAt' => now()->subDays(2)->toIso8601String(), 'lastUsedAt' => now()->toIso8601String(), 'disabled' => false]]],
-            ['type' => 'code', 'credentials' => [['id' => $codeId, 'label' => 'Phone', 'addedAt' => now()->subDay()->toIso8601String(), 'lastUsedAt' => null, 'disabled' => false]]],
-            ['type' => 'totp', 'credentials' => []],
+            ['type' => 'form', 'enrollable' => false, 'credentials' => [['id' => $formId, 'label' => null, 'addedAt' => now()->subDays(2)->toIso8601String(), 'lastUsedAt' => now()->toIso8601String(), 'disabled' => false]]],
+            ['type' => 'code', 'enrollable' => true, 'credentials' => [['id' => $codeId, 'label' => 'Phone', 'addedAt' => now()->subDay()->toIso8601String(), 'lastUsedAt' => null, 'disabled' => false]]],
+            ['type' => 'totp', 'enrollable' => true, 'credentials' => []],
         ])->assertJsonPath('leftovers', []);
     });
 

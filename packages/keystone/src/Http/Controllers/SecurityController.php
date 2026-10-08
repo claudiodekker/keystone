@@ -8,6 +8,7 @@ use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\KeystoneUser;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
+use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\RecoveryCodes;
 use ClaudioDekker\Keystone\Status;
 use ClaudioDekker\Keystone\StepKind;
@@ -48,10 +49,12 @@ abstract class SecurityController extends Controller
         $account = $guard->user();
         $held = collect((new Credentials($account))->ofAccount($account->getKey()));
         $listed = array_map(fn (CredentialType $type) => $type->name(), app(CredentialTypes::class)->listed());
+        $enrollable = array_map(fn (CredentialType $type) => $type->name(), app(CredentialTypes::class)->serving(Surface::ENROLLMENT));
         $recoveryCodes = (new RecoveryCodes($account))->remaining($account->getKey());
 
         $types = array_map(fn (string $type) => [
             'type' => $type,
+            'enrollable' => in_array($type, $enrollable, true),
             'credentials' => array_values($held->where('type', $type)->map(fn (array $credential) => [
                 'id' => $credential['id'],
                 'label' => $credential['label'],
