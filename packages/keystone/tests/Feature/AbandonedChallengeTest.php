@@ -153,6 +153,14 @@ describe('a hold at the challenge', function () {
 
         expect(Crypt::decryptString(DB::table('user_pending_challenges')->value('user_agent')))->toBe(str_repeat('a', 512));
     });
+
+    it('replaces control characters in the user agent with spaces', function () {
+        $this->createChallengedAccount(new FormTypeSupport('code'));
+
+        holdFrom($this, userAgent: "Firefox/130.0\nforged\0line");
+
+        expect(Crypt::decryptString(DB::table('user_pending_challenges')->value('user_agent')))->toBe('Firefox/130.0 forged line');
+    });
 });
 
 describe('the pending challenge', function () {

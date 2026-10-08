@@ -147,7 +147,7 @@ class AccountChange
      */
     public function forgetDevices(): void
     {
-        $this->knownDevices->forget($this->account->getKey());
+        $this->knownDevices->forget();
     }
 
     /**

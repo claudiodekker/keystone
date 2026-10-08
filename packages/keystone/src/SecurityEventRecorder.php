@@ -168,10 +168,9 @@ class SecurityEventRecorder
         ?bool $knownDevice,
         RequestContext $context,
     ): SecurityEvent {
-        $userAgent = $this->clean($context->userAgent, self::USER_AGENT_LENGTH);
-        $label = $this->clean($credential?->label, self::FIELD_LENGTH);
+        $label = static::clean($credential?->label, self::FIELD_LENGTH);
         $keptReason = $this->reason($reason, $credentialType);
-        $keptOperator = $this->clean($operator, self::FIELD_LENGTH);
+        $keptOperator = static::clean($operator, self::FIELD_LENGTH);
 
         return new SecurityEvent([
             'occurred_at' => $context->occurredAt ?? Date::now(),
@@ -186,7 +185,7 @@ class SecurityEventRecorder
             'reason' => $keptReason,
             'ip_address' => $context->ipAddress,
             'location' => null,
-            'user_agent' => $userAgent,
+            'user_agent' => $context->userAgent,
             'known_device' => $knownDevice,
             'request_id' => $context->requestId,
         ]);
@@ -195,7 +194,7 @@ class SecurityEventRecorder
     /**
      * Cut a value taken from input to its length, with control characters and line and paragraph separators replaced by spaces so it can't break a log line.
      */
-    protected function clean(?string $value, int $length): ?string
+    public static function clean(?string $value, int $length): ?string
     {
         if ($value === null) {
             return null;

@@ -41,7 +41,7 @@ class SudoAttempt extends CredentialAttempt
             }
 
             $taken = $this->limiter->takeFailedAttempt($flow, $type, $account, identifier: '');
-            $subnet = $this->guard->subnet();
+            $subnet = RequestContext::of($this->guard->getRequest())->subnet();
 
             if ($subnet === null) {
                 $this->recordRejected($account, $flow, $type, credential: null, reason: 'keystone.unbindable_subnet');
