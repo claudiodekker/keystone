@@ -2,10 +2,15 @@
 
 namespace ClaudioDekker\Keystone\Totp;
 
+use BaconQrCode\Renderer\Image\SvgImageBackEnd;
+use BaconQrCode\Renderer\ImageRenderer;
+use BaconQrCode\Renderer\RendererStyle\RendererStyle;
+use BaconQrCode\Writer;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\EnrolledCredential;
 use ClaudioDekker\Keystone\Methods\InitiateShape;
 use ClaudioDekker\Keystone\Methods\Initiation;
+use ClaudioDekker\Keystone\Methods\PresentsCeremony;
 use ClaudioDekker\Keystone\Methods\Proof;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
 use ClaudioDekker\Keystone\Methods\Surface;
@@ -17,7 +22,7 @@ use ParagonIE\ConstantTime\Base32;
 /**
  * @internal
  */
-class TotpType implements CredentialType
+class TotpType implements CredentialType, PresentsCeremony
 {
     /**
      * The input field holding the typed code.
@@ -28,6 +33,11 @@ class TotpType implements CredentialType
      * How many random bytes a new key holds: 160 bits, as RFC 4226 recommends.
      */
     public const int KEY_BYTES = 20;
+
+    /**
+     * How many pixels wide and high the QR code of a new key is drawn.
+     */
+    protected const int QR_SIZE_PIXELS = 192;
 
     /**
      * Create a new TOTP type instance.
@@ -114,6 +124,14 @@ class TotpType implements CredentialType
     }
 
     /**
+     * Get the enrollment form's page with the QR code of its otpauth URI, drawn on every request so the session never holds it.
+     */
+    public function present(#[\SensitiveParameter] array $page): array
+    {
+        return [...$page, 'qr' => $this->qrCode($page['uri'])];
+    }
+
+    /**
      * Check the typed code against the steps in the window: at the challenge accepting it only from a step after the last one accepted, at enrollment against the new key.
      */
     public function verify(Surface $surface, #[\SensitiveParameter] array $input, array $credentials, #[\SensitiveParameter] mixed $ceremony = null): Proof
@@ -153,7 +171,7 @@ class TotpType implements CredentialType
     }
 
     /**
-     * Check the typed code against the key the enrollment made, storing the key with the code's step as the last one accepted.
+     * Check the typed code against the key the enrollment made, storing the key with the code's step as the last one accepted, in place of any key the account holds.
      */
     protected function enroll(#[\SensitiveParameter] string $typed, int $now, #[\SensitiveParameter] mixed $ceremony): Proof
     {
@@ -168,7 +186,11 @@ class TotpType implements CredentialType
             return Proof::rejected('totp.mismatch');
         }
 
-        return Proof::enrolled(new EnrolledCredential(identifier: null, secret: $secret->acceptedAt(max($matched))->toStored()));
+        return Proof::enrolled(new EnrolledCredential(
+            identifier: null,
+            secret: $secret->acceptedAt(max($matched))->toStored(),
+            replacesExisting: true,
+        ));
     }
 
     /**
@@ -188,6 +210,16 @@ class TotpType implements CredentialType
         ]);
 
         return "otpauth://totp/{$label}?{$query}";
+    }
+
+    /**
+     * Get the URI as a QR code an authenticator app scans: an SVG in a data URI, for an image to show.
+     */
+    protected function qrCode(#[\SensitiveParameter] string $uri): string
+    {
+        return 'data:image/svg+xml;base64,'.base64_encode(
+            (new Writer(new ImageRenderer(new RendererStyle(self::QR_SIZE_PIXELS), new SvgImageBackEnd)))->writeString($uri),
+        );
     }
 
     /**
