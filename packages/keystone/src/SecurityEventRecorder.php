@@ -30,11 +30,6 @@ class SecurityEventRecorder
     public const int ANONYMOUS_LOG_SECONDS = 60;
 
     /**
-     * The most characters of a user agent kept.
-     */
-    public const int USER_AGENT_LENGTH = 512;
-
-    /**
      * The most characters of a reason, a credential label or an operator kept.
      */
     public const int FIELD_LENGTH = 64;
@@ -168,9 +163,9 @@ class SecurityEventRecorder
         ?bool $knownDevice,
         RequestContext $context,
     ): SecurityEvent {
-        $label = static::clean($credential?->label, self::FIELD_LENGTH);
+        $label = RequestContext::clean($credential?->label, self::FIELD_LENGTH);
         $keptReason = $this->reason($reason, $credentialType);
-        $keptOperator = static::clean($operator, self::FIELD_LENGTH);
+        $keptOperator = RequestContext::clean($operator, self::FIELD_LENGTH);
 
         return new SecurityEvent([
             'occurred_at' => $context->occurredAt ?? Date::now(),
@@ -189,20 +184,6 @@ class SecurityEventRecorder
             'known_device' => $knownDevice,
             'request_id' => $context->requestId,
         ]);
-    }
-
-    /**
-     * Cut a value taken from input to its length, with control characters and line and paragraph separators replaced by spaces so it can't break a log line.
-     */
-    public static function clean(?string $value, int $length): ?string
-    {
-        if ($value === null) {
-            return null;
-        }
-
-        $printable = (string) preg_replace('/[\p{Cc}\p{Zl}\p{Zp}]/u', ' ', $value);
-
-        return Str::substr($printable, 0, $length);
     }
 
     /**

@@ -6,6 +6,7 @@ use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\RateLimiter;
+use ClaudioDekker\Keystone\RequestContext;
 use ClaudioDekker\Keystone\SudoAttempt;
 use ClaudioDekker\Keystone\SudoResult;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormType;
@@ -16,6 +17,7 @@ use Illuminate\Support\Facades\DB;
 beforeEach(function () {
     config(['cache.limiter' => 'array', 'keystone.require_second_factor' => false, 'keystone.require_recovery_codes' => false]);
     app()->forgetInstance(CacheRateLimiter::class);
+    app()->instance(RequestContext::class, RequestContext::capture(request()));
 });
 
 it('never grants an account the sign-in decision refuses, even one the guard still names', function (Closure $bar) {
@@ -26,7 +28,7 @@ it('never grants an account the sign-in decision refuses, even one the guard sti
     Keystone::guard()->setUser(User::query()->withoutGlobalScopes()->findOrFail($user->getKey()));
     Keystone::guard()->beginSudo('/settings');
 
-    $result = (new SudoAttempt(Keystone::guard(), new RateLimiter(request(), Keystone::guard())))->attempt(Keystone::guard()->sudoInProgress(), $type, ['secret' => 'correct horse battery staple']);
+    $result = (new SudoAttempt(Keystone::guard(), new RateLimiter(request(), app(RequestContext::class), Keystone::guard())))->attempt(Keystone::guard()->sudoInProgress(), $type, ['secret' => 'correct horse battery staple']);
 
     expect($result)->toBe(SudoResult::REFUSED)
         ->and(Keystone::guard()->sudoGrant())->toBeNull()

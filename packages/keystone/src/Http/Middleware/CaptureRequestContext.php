@@ -23,7 +23,7 @@ class CaptureRequestContext
     }
 
     /**
-     * Capture the request's context once, for every security event it records.
+     * Capture the request's context once.
      *
      * @param  Closure(Request): Response  $next
      */

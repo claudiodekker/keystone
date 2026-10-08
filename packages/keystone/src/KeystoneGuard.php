@@ -492,7 +492,7 @@ class KeystoneGuard extends SessionGuard
 
         $known = $devices->isKnown($request);
 
-        $this->getCookieJar()->queue($devices->remember($request, RequestContext::of($request)));
+        $this->getCookieJar()->queue($devices->remember($request, $this->context()));
 
         return $known;
     }
@@ -649,7 +649,7 @@ class KeystoneGuard extends SessionGuard
      */
     protected function bringSudo(Model&KeystoneUser $account): void
     {
-        $subnet = RequestContext::of($this->getRequest())->subnet();
+        $subnet = $this->context()->subnet();
 
         if (is_null($subnet)) {
             return;
@@ -793,7 +793,7 @@ class KeystoneGuard extends SessionGuard
         }
 
         // Postgres aborts the whole transaction a failed query ran in, so the queries get a savepoint of their own to fail in.
-        return rescue(fn () => $account->getConnection()->transaction(function () use ($account, $request) {
+        return rescue(fn () => $account->getConnection()->transaction(function () use ($account) {
             $challenges = new PendingChallenges($account);
             $replaced = $this->replacedPendingChallengeId($account);
 
@@ -801,7 +801,7 @@ class KeystoneGuard extends SessionGuard
                 return $replaced;
             }
 
-            return $challenges->open($account->getKey(), RequestContext::of($request));
+            return $challenges->open($account->getKey(), $this->context());
         }));
     }
 
@@ -1019,6 +1019,14 @@ class KeystoneGuard extends SessionGuard
     protected function signedInAtKey(): string
     {
         return 'keystone_signed_in_at_'.$this->name;
+    }
+
+    /**
+     * Get the request context bound in the container.
+     */
+    public function context(): RequestContext
+    {
+        return app(RequestContext::class);
     }
 
     /**

@@ -13,6 +13,7 @@ use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\PendingSignIn;
 use ClaudioDekker\Keystone\RateLimiter;
+use ClaudioDekker\Keystone\RequestContext;
 use ClaudioDekker\Keystone\SignInDecision;
 use ClaudioDekker\Keystone\Status;
 use ClaudioDekker\Keystone\StepKind;
@@ -134,7 +135,7 @@ abstract class EnrollmentController extends Controller
             return redirect()->route('login.enrollment.start', ['type' => $credentialType->name()])->withErrors($validator->errors());
         }
 
-        $attempt = new EnrollmentAttempt(Keystone::guard(), new RateLimiter($request, Keystone::guard()));
+        $attempt = new EnrollmentAttempt(Keystone::guard(), new RateLimiter($request, app(RequestContext::class), Keystone::guard()));
         $demand = $attempt->attempt($pending, $credentialType, $validator->validated(), $ceremony['ceremony']);
 
         return match ($demand) {

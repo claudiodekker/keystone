@@ -8,6 +8,7 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
+use LogicException;
 use Symfony\Component\HttpFoundation\Cookie;
 use Symfony\Component\HttpFoundation\Request;
 
@@ -32,12 +33,16 @@ class KnownDevices
     protected const int SECRET_BYTES = 32;
 
     /**
-     * Create a new known devices instance on the model's connection.
+     * Create a new known devices instance for the account's devices.
+     *
+     * @throws LogicException when the account has no key
      */
     public function __construct(
-        protected Model $model,
+        protected Model&KeystoneUser $account,
     ) {
-        //
+        if ($account->getKey() === null) {
+            throw new LogicException('Known devices belong to a saved account.');
+        }
     }
 
     /**
@@ -45,15 +50,13 @@ class KnownDevices
      */
     public function isKnown(Request $request): bool
     {
-        return $this->idOf($request) !== null;
+        return $this->deviceIdOf($request) !== null;
     }
 
     /**
      * Get the id of the device the request's device cookie marks, when the account has signed in from it within the retention.
-     *
-     * The id outlives the cookie's value, which every sign-in from the browser replaces.
      */
-    public function idOf(Request $request): ?int
+    public function deviceIdOf(Request $request): ?int
     {
         $value = static::cookieOf($request);
 
@@ -62,7 +65,6 @@ class KnownDevices
         }
 
         $id = $this->query()
-            ->where('user_id', $this->model->getKey())
             ->where('device_hash', static::deviceDigest($value))
             ->where('cookie_hash', static::digest($value))
             ->where('last_seen_at', '>', Date::now()->subSeconds(static::retentionSeconds()))
@@ -83,7 +85,6 @@ class KnownDevices
         }
 
         return $this->query()
-            ->where('user_id', $this->model->getKey())
             ->where('device_hash', static::deviceDigest($value))
             ->where('cookie_hash', '!=', static::digest($value))
             ->where('last_seen_at', '>', Date::now()->subSeconds(static::retentionSeconds()))
@@ -103,13 +104,13 @@ class KnownDevices
         $digest = static::digest($value);
         $now = Date::now();
 
-        $this->model->getConnection()->transaction(function () use ($previous, $context, $value, $digest, $now) {
+        $this->account->getConnection()->transaction(function () use ($previous, $context, $value, $digest, $now) {
             if ($previous !== null) {
-                $this->query()->where('cookie_hash', static::digest($previous))->update(['cookie_hash' => $digest]);
+                static::table($this->account)->where('cookie_hash', static::digest($previous))->update(['cookie_hash' => $digest]);
             }
 
-            $this->query()->upsert([
-                'user_id' => $this->model->getKey(),
+            static::table($this->account)->upsert([
+                'user_id' => $this->account->getKey(),
                 'device_hash' => static::deviceDigest($value),
                 'cookie_hash' => $digest,
                 'user_agent' => $this->encrypt($context->userAgent),
@@ -127,23 +128,23 @@ class KnownDevices
      */
     public function forget(): void
     {
-        $this->query()->where('user_id', $this->model->getKey())->delete();
+        $this->query()->delete();
     }
 
     /**
      * Forget every device of every account.
      */
-    public function forgetAll(): void
+    public static function forgetAll(Model $users): void
     {
-        $this->query()->delete();
+        static::table($users)->delete();
     }
 
     /**
      * Forget every device unseen for the retention, returning how many were forgotten.
      */
-    public function prune(): int
+    public static function prune(Model $users): int
     {
-        return $this->query()->where('last_seen_at', '<=', Date::now()->subSeconds(static::retentionSeconds()))->delete();
+        return static::table($users)->where('last_seen_at', '<=', Date::now()->subSeconds(static::retentionSeconds()))->delete();
     }
 
     /**
@@ -200,8 +201,16 @@ class KnownDevices
     /**
      * Get a query for the known devices table on the model's connection.
      */
+    protected static function table(Model $model): Builder
+    {
+        return $model->getConnection()->table('user_known_devices');
+    }
+
+    /**
+     * Get a query for the account's devices.
+     */
     protected function query(): Builder
     {
-        return $this->model->getConnection()->table('user_known_devices');
+        return static::table($this->account)->where('user_id', $this->account->getKey());
     }
 }
