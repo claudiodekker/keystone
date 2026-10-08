@@ -67,7 +67,8 @@ Use these handles. Each one comes from the stub pages and is stable:
 | Sign in | `/auth/login` | heading `Sign in`, label `Email address`, label `Password`, button `Sign in` |
 | Challenge | `/auth/login/challenge` | heading `Confirm it's you`, label `Code from your authenticator app` (TOTP), label `Recovery code`, button `Verify`, a button per other type named by type (`recovery-code`), button `Cancel sign-in` |
 | Home (signed in) | `/` | link `Security settings`, link `Page behind sudo`, button `End sudo` |
-| Security settings | `/settings/security` | heading `Security settings`, a section per type headed `Password`, `Authenticator app` and `Recovery codes`, section `Sudo` with button `End sudo` while sudo lasts, text `Sudo has ended.` after ending sudo; needs no sudo |
+| Security settings | `/settings/security` | heading `Security settings`, a section per type headed `Password`, `Authenticator app` and `Recovery codes`, section `Sudo` with button `End sudo` while sudo lasts, text `Sudo has ended.` after ending sudo, a link per credential named `Remove <name>` (`Remove Password`, `Remove Authenticator app`, or the credential's own name); needs no sudo |
+| Remove a credential | `/settings/security/credentials/<id>/remove` | heading `Remove <name>?`, button `Remove`, link `Keep it`, the refusal message above the button; behind sudo |
 | Page behind sudo | `/gated` | heading `A page behind sudo`, link `Home`; behind `['auth', 'sudo']`, workbench only |
 | Sudo | `/auth/sudo` | heading `Confirm it's you`, label `Password` then label `Code from your authenticator app`, button `Confirm`, a button per other type named by type |
 
