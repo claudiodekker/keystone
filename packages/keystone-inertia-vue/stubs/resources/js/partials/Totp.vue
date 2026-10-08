@@ -8,7 +8,12 @@ defineProps<{ option: CredentialTypeOption; surface: Surface; purpose?: Purpose 
 <template>
     <FormShape :option="option" :surface="surface" :purpose="purpose" :fields="['code']" v-slot="{ errors }">
         <div v-if="surface === 'enrollment' && option.ceremony" class="flex flex-col gap-2">
-            <p class="text-sm text-gray-600">Add this key to your authenticator app, or open the link on the device it runs on:</p>
+            <p v-if="purpose === 'settings'" class="text-sm text-gray-600">
+                If you already use an authenticator app with this account, this one replaces it and your other sessions are signed out.
+            </p>
+            <p class="text-sm text-gray-600">Scan this code with your authenticator app:</p>
+            <img :src="option.ceremony.qr" alt="QR code holding the key for your authenticator app" width="192" height="192" />
+            <p class="text-sm text-gray-600">Or add this key by hand, or open the link on the device the app runs on:</p>
             <code class="rounded-md bg-gray-100 px-3 py-2 font-mono text-sm break-all text-gray-900">{{ option.ceremony.key }}</code>
             <a :href="option.ceremony.uri" class="text-sm font-medium text-gray-900 underline">Open in authenticator app</a>
         </div>

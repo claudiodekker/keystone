@@ -2,7 +2,7 @@ export type InitiateShape = 'form' | 'clientCeremony' | 'redirect' | 'delivered'
 
 export type Surface = 'sign-in' | 'challenge' | 'enrollment';
 
-export type Purpose = 'sudo';
+export type Purpose = 'sudo' | 'settings';
 
 export type CredentialTypeOption = {
     type: string;
@@ -54,7 +54,7 @@ export type HeldCredential = {
 };
 
 export type SecurityPage = {
-    types: { type: string; credentials: HeldCredential[] }[];
+    types: { type: string; enrollable: boolean; credentials: HeldCredential[] }[];
     leftovers: (HeldCredential & { type: string })[];
     recoveryCodes: number;
     recoveryCodesLow: boolean;
