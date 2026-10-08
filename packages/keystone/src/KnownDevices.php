@@ -41,7 +41,7 @@ class KnownDevices
         protected Model&KeystoneUser $account,
     ) {
         if ($account->getKey() === null) {
-            throw new LogicException('Known devices belong to a saved account.');
+            throw new LogicException('Known devices belong to an account with a key.');
         }
     }
 

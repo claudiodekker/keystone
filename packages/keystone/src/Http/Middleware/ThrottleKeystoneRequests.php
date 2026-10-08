@@ -16,22 +16,13 @@ use Symfony\Component\HttpFoundation\Response;
 class ThrottleKeystoneRequests
 {
     /**
-     * Create a new middleware instance.
-     */
-    public function __construct(
-        protected RequestContext $context,
-    ) {
-        //
-    }
-
-    /**
      * Count the request against its step kind's limits, letting a spent limit's Throttled render as the 429.
      *
      * @param  Closure(Request): Response  $next
      */
     public function handle(Request $request, Closure $next, string $kind): Response
     {
-        (new RateLimiter($request, $this->context, Keystone::guard()))->hitRequest(StepKind::from($kind));
+        (new RateLimiter($request, app(RequestContext::class), Keystone::guard()))->hitRequest(StepKind::from($kind));
 
         return $next($request);
     }

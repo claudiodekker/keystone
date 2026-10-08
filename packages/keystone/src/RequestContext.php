@@ -66,8 +66,24 @@ readonly class RequestContext
             return null;
         }
 
-        $printable = (string) preg_replace('/[\p{Cc}\p{Zl}\p{Zp}]/u', ' ', mb_scrub($value, 'UTF-8'));
+        $printable = (string) preg_replace('/[\p{Cc}\p{Zl}\p{Zp}]/u', ' ', static::scrub($value));
 
         return Str::substr($printable, 0, $length);
+    }
+
+    /**
+     * Make the value valid UTF-8, with each invalid byte replaced by a question mark whatever substitute character mbstring is set to.
+     */
+    protected static function scrub(string $value): string
+    {
+        $substitute = mb_substitute_character();
+
+        mb_substitute_character(0x3F);
+
+        try {
+            return mb_scrub($value, 'UTF-8');
+        } finally {
+            mb_substitute_character($substitute);
+        }
     }
 }
