@@ -44,3 +44,20 @@ export type SudoPage = {
     preselect: string | null;
     surface: 'sign-in' | 'challenge';
 };
+
+export type HeldCredential = {
+    id: number;
+    label: string | null;
+    addedAt: string | null;
+    lastUsedAt: string | null;
+    disabled: boolean;
+};
+
+export type SecurityPage = {
+    types: { type: string; credentials: HeldCredential[] }[];
+    leftovers: (HeldCredential & { type: string })[];
+    recoveryCodes: number;
+    recoveryCodesLow: boolean;
+    sudoEndsAt: string | null;
+    status: string | null;
+};

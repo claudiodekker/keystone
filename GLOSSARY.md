@@ -147,6 +147,10 @@ _Avoid_: requirement, policy
 Adding to an account what a mandate requires and it doesn't hold: a second factor, or a set of recovery codes. Owed at sign-in, after the first factor and the challenge, and never while signed in.
 _Avoid_: setup, onboarding
 
+**Leftover credential**:
+A stored credential of a type the application no longer lists, or no installed package registers. It counts as no factor, and counts again if the type is listed again.
+_Avoid_: orphaned credential
+
 **Holdings**:
 Whether an account holds a second factor and recovery codes, read from its credentials and codes whenever a request needs to know what it owes.
 

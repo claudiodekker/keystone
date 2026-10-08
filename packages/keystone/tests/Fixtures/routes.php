@@ -3,6 +3,7 @@
 use ClaudioDekker\Keystone\Tests\Fixtures\Http\Controllers\ChallengeController;
 use ClaudioDekker\Keystone\Tests\Fixtures\Http\Controllers\EnrollmentController;
 use ClaudioDekker\Keystone\Tests\Fixtures\Http\Controllers\RecoveryCodesController;
+use ClaudioDekker\Keystone\Tests\Fixtures\Http\Controllers\SecurityController;
 use ClaudioDekker\Keystone\Tests\Fixtures\Http\Controllers\SignInController;
 use ClaudioDekker\Keystone\Tests\Fixtures\Http\Controllers\SignOutController;
 use ClaudioDekker\Keystone\Tests\Fixtures\Http\Controllers\SudoController;
@@ -24,4 +25,5 @@ Route::middleware('web')->group(function () {
     Route::get('sudo', [SudoController::class, 'show'])->name('sudo');
     Route::post('sudo/{type}', [SudoController::class, 'store'])->name('sudo.submit');
     Route::delete('sudo', [SudoController::class, 'destroy'])->name('sudo.end');
+    Route::get('settings/security', [SecurityController::class, 'show'])->name('security');
 });

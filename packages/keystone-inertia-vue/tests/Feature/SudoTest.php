@@ -13,14 +13,14 @@ pest()->extend(StubsTestCase::class)->use(SudoAssertions::class);
 beforeEach(function () {
     $this->withoutMandates();
     config(['keystone.methods' => ['password', 'totp']]);
-    Route::middleware(['web', 'sudo'])->get('settings/security', fn () => 'the gated page');
+    Route::middleware(['web', 'sudo'])->get('gated', fn () => 'the gated page');
 });
 
 describe('the sudo page', function () {
     it('renders the first step with the page value\'s fields', function () {
         $this->signInAccount(new PasswordTypeSupport);
         $this->delete(route('sudo.end'));
-        $this->get('settings/security');
+        $this->get('gated');
 
         $response = $this->get(route('sudo'));
 
@@ -37,7 +37,7 @@ describe('the sudo page', function () {
         $this->passFirstFactor();
         $this->post(route('login.challenge.submit', ['type' => 'totp']), (new TotpTypeSupport)->validProof(Surface::CHALLENGE));
         $this->delete(route('sudo.end'));
-        $this->get('settings/security');
+        $this->get('gated');
         $this->post(route('sudo.submit', ['type' => 'password']), (new PasswordTypeSupport)->validProof(Surface::SIGN_IN));
 
         $response = $this->get(route('sudo'));
@@ -53,7 +53,7 @@ describe('the sudo page', function () {
     it('encrypts the sudo page in the browser\'s history', function () {
         $this->signInAccount(new PasswordTypeSupport);
         $this->delete(route('sudo.end'));
-        $this->get('settings/security');
+        $this->get('gated');
 
         $response = $this->get(route('sudo'));
 
@@ -66,7 +66,7 @@ describe('the replay', function () {
         $this->signInAccount(new PasswordTypeSupport);
         $this->delete(route('sudo.end'));
 
-        $response = $this->get('settings/security');
+        $response = $this->get('gated');
 
         $this->assertSudoRequired($response);
     });
@@ -74,7 +74,7 @@ describe('the replay', function () {
     it('sends a refused answer back to the sudo page with the message on the type', function () {
         $this->signInAccount(new PasswordTypeSupport);
         $this->delete(route('sudo.end'));
-        $this->get('settings/security');
+        $this->get('gated');
 
         $response = $this->post(route('sudo.submit', ['type' => 'password']), (new PasswordTypeSupport)->rejectedProof(Surface::SIGN_IN));
 
@@ -86,7 +86,7 @@ describe('the replay', function () {
         $this->passFirstFactor();
         $this->post(route('login.challenge.submit', ['type' => 'totp']), (new TotpTypeSupport)->validProof(Surface::CHALLENGE));
         $this->delete(route('sudo.end'));
-        $this->get('settings/security');
+        $this->get('gated');
 
         $response = $this->post(route('sudo.submit', ['type' => 'password']), (new PasswordTypeSupport)->validProof(Surface::SIGN_IN));
 
@@ -96,17 +96,17 @@ describe('the replay', function () {
     it('sends the user on to the page they were refused once sudo is granted', function () {
         $this->signInAccount(new PasswordTypeSupport);
         $this->delete(route('sudo.end'));
-        $this->get('settings/security');
+        $this->get('gated');
 
         $response = $this->post(route('sudo.submit', ['type' => 'password']), (new PasswordTypeSupport)->validProof(Surface::SIGN_IN));
 
-        $this->assertSudoGranted($response, '/settings/security');
-        $this->get('settings/security')->assertOk();
+        $this->assertSudoGranted($response, '/gated');
+        $this->get('gated')->assertOk();
     });
 });
 
 describe('ending sudo', function () {
-    it('sends the user whose sudo ended to the root when they came from no page', function () {
+    it('sends the user whose sudo ended to the security page', function () {
         $this->signInAccount(new PasswordTypeSupport);
 
         $response = $this->delete(route('sudo.end'));
@@ -115,10 +115,10 @@ describe('ending sudo', function () {
         expect(session('keystone.status'))->toBe('sudo-revoked');
     });
 
-    it('sends the user whose sudo ended back to the page they ended it from', function () {
+    it('sends the user whose sudo ended to the security page whatever page they ended it from', function () {
         $this->signInAccount(new PasswordTypeSupport);
 
-        $response = $this->from('/settings/security')->delete(route('sudo.end'));
+        $response = $this->from('/gated')->delete(route('sudo.end'));
 
         $response->assertRedirect('/settings/security');
     });

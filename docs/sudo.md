@@ -9,12 +9,12 @@ Keystone keeps the grant in the session, next to the sign-in itself, so it needs
 Put `sudo` after `auth` on any route that changes how the account signs in or reaches it:
 
 ```php
-use App\Http\Controllers\Settings\SecurityController;
+use App\Http\Controllers\Settings\ApiTokenController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'sudo'])->group(function () {
-    Route::get('settings/security', [SecurityController::class, 'show'])->name('settings.security');
-    Route::delete('settings/security/passkeys/{passkey}', [SecurityController::class, 'destroy'])->name('settings.security.passkeys.destroy');
+    Route::get('settings/api-tokens', [ApiTokenController::class, 'index'])->name('settings.api-tokens');
+    Route::delete('settings/api-tokens/{token}', [ApiTokenController::class, 'destroy'])->name('settings.api-tokens.destroy');
 });
 ```
 
@@ -104,7 +104,7 @@ Only the grant is bound. The session itself follows the user from one network to
 
 ## Ending it
 
-A user who is done with their changes can end sudo before it runs out, for example on a computer they share. The published `SudoController` does it on the `sudo.end` route, `DELETE /auth/sudo`. The response sends the user back to the page they came from, so the button belongs on a page that needs no sudo, such as your security overview. A button on such a page:
+A user who is done with their changes can end sudo before it runs out, for example on a computer they share. The published `SudoController` does it on the `sudo.end` route, `DELETE /auth/sudo`. The response sends the user to the [security page](security-settings.md), which needs no sudo and already shows this button while the session has sudo. A button on another page of yours:
 
 ```vue
 <script setup lang="ts">
@@ -119,16 +119,16 @@ import { end } from '@/routes/sudo';
 </template>
 ```
 
-Keystone then drops the grant, or the sudo-in-progress, rotates the session id, records `sudo.revoked` when a live grant was ended, and flashes the status `sudo-revoked`. The user stays signed in. `sendSudoEnded()` in your `app/Http/Controllers/Auth/SudoController.php` sends them back to the page they came from, or to `/` when the request names none. From a gated page, going back meets the gate again and lands on the sudo page.
+Keystone then drops the grant, or the sudo-in-progress, rotates the session id, records `sudo.revoked` when a live grant was ended, and flashes the status `sudo-revoked`. The user stays signed in. `sendSudoEnded()` in your `app/Http/Controllers/Auth/SudoController.php` sends them to the security page, which shows the status's translated message:
 
 ```php
 protected function sendSudoEnded(Request $request): RedirectResponse
 {
-    return back(fallback: '/');
+    return to_route('security');
 }
 ```
 
-The page they land on reads the flashed status and passes its translated message along, as the sign-in page does:
+To send them somewhere else, such as back to the page they came from, return that redirect instead. The page they land on reads the flashed status and passes its translated message along, as the security page does:
 
 ```php
 use ClaudioDekker\Keystone\Status;
@@ -153,7 +153,7 @@ Ending sudo is safe to repeat. A request from a session whose grant already ende
 
 ## Testing
 
-Keystone's AppTests register a route behind `['auth', 'sudo']`, sign in, end sudo, meet the gate, replay the sign-in and end sudo again. They check your responses through `Tests\Keystone\Assertions\SudoAssertions`. If you change what a hook returns, redefine its assertion there. For a `sendSudoEnded()` that goes to your security page:
+Keystone's AppTests register a route behind `['auth', 'sudo']`, sign in, end sudo, meet the gate, replay the sign-in and end sudo again. They check your responses through `Tests\Keystone\Assertions\SudoAssertions`. If you change what a hook returns, redefine its assertion there. For a `sendSudoEnded()` that returns `back(fallback: '/')`, which lands on `/` because the AppTests end sudo from no page:
 
 ```php
 namespace Tests\Keystone\Assertions;
@@ -167,7 +167,7 @@ trait SudoAssertions
 
     public function assertSudoEnded(TestResponse $response): void
     {
-        $response->assertRedirectToRoute('settings.security');
+        $response->assertRedirect('/');
     }
 }
 ```

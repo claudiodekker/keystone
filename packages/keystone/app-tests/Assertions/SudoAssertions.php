@@ -66,13 +66,13 @@ trait SudoAssertions
     }
 
     /**
-     * Assert the response sends the user whose sudo ended back to the page they came from, which is the root when they came from none.
+     * Assert the response sends the user whose sudo ended to the security page.
      *
      * @param  TestResponse<Response>  $response
      */
     public function assertSudoEnded(TestResponse $response): void
     {
-        $response->assertRedirect('/');
+        $response->assertRedirectToRoute('security');
     }
 
     /**

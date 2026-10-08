@@ -33,6 +33,11 @@ class RecoveryCodes
     public const string ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 
     /**
+     * How few unspent codes an account may hold before it is running low.
+     */
+    public const int RUNNING_LOW = 3;
+
+    /**
      * The shape of a code imported from Fortify, which matches only exactly as typed.
      */
     public const string FORTIFY_PATTERN = '/^[A-Za-z0-9]{10}-[A-Za-z0-9]{10}$/';

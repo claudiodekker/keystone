@@ -9,6 +9,7 @@ use ClaudioDekker\Keystone\Methods\Surface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Date;
 
 /**
  * @internal
@@ -64,6 +65,30 @@ class Credentials
             secret: $row->secret === null ? null : Crypt::decryptString($row->secret),
             label: $row->label,
         ));
+
+        return array_values($credentials->all());
+    }
+
+    /**
+     * Get the account's credentials of every type, disabled ones included, oldest first, with when each was added and last used as ISO 8601.
+     *
+     * @return list<array{id: int, type: string, label: ?string, addedAt: ?string, lastUsedAt: ?string, disabled: bool}>
+     */
+    public function ofAccount(int|string $accountId): array
+    {
+        $rows = $this->query()
+            ->where('user_id', $accountId)
+            ->orderBy('id')
+            ->get(['id', 'type', 'label', 'created_at', 'last_used_at', 'disabled_at']);
+
+        $credentials = $rows->map(fn (object $row) => [
+            'id' => (int) $row->id,
+            'type' => $row->type,
+            'label' => $row->label,
+            'addedAt' => $row->created_at === null ? null : Date::parse($row->created_at)->toIso8601String(),
+            'lastUsedAt' => $row->last_used_at === null ? null : Date::parse($row->last_used_at)->toIso8601String(),
+            'disabled' => $row->disabled_at !== null,
+        ]);
 
         return array_values($credentials->all());
     }

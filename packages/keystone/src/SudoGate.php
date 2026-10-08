@@ -52,13 +52,11 @@ class SudoGate
             throw new AuthenticationException;
         }
 
-        $grant = $this->guard->sudoGrant();
-
-        if ($grant?->subnet->equals($this->guard->context()->subnet())) {
+        if ($this->liveGrant() !== null) {
             return;
         }
 
-        if ($grant !== null) {
+        if ($this->guard->sudoGrant() !== null) {
             $this->guard->endSudo();
 
             $this->recorder->record(SecurityEventType::SUDO_NETWORK_CHANGED, account: $account);
@@ -69,6 +67,16 @@ class SudoGate
         $request->attributes->set(self::REFUSED, true);
 
         throw new SudoRequired;
+    }
+
+    /**
+     * Get the session's live sudo grant when it is bound to the subnet the request comes from, so the gate lets the request through.
+     */
+    public function liveGrant(): ?SudoGrant
+    {
+        $grant = $this->guard->sudoGrant();
+
+        return $grant?->subnet->equals($this->guard->context()->subnet()) ? $grant : null;
     }
 
     /**
