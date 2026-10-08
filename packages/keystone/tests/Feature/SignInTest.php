@@ -162,6 +162,51 @@ describe('proofs', function () {
     });
 });
 
+describe('last use', function () {
+    it('stamps the last use of the credential that signs in', function () {
+        $this->freezeSecond();
+        $account = $this->createAccount();
+        $this->arrangeCredential($account, new FormTypeSupport, Surface::SIGN_IN);
+
+        $this->post(route('login.submit', ['type' => 'form']), ['identifier' => 'jane@example.com', ...(new FormTypeSupport)->validProof(Surface::SIGN_IN)]);
+
+        $this->assertAuthenticatedAs($account);
+        expect(DB::table('user_credentials')->where('user_id', $account->getKey())->value('last_used_at'))->toBe(now()->toDateTimeString());
+    });
+
+    it('stamps the last use of a first factor whose account still owes the challenge', function () {
+        $this->freezeSecond();
+        $account = $this->createChallengedAccount(new FormTypeSupport('code'));
+        $lastUse = fn (string $type) => DB::table('user_credentials')->where('user_id', $account->getKey())->where('type', $type)->value('last_used_at');
+
+        $this->passFirstFactor()->assertRedirectToRoute('login.challenge');
+
+        expect($lastUse('form'))->toBe(now()->toDateTimeString())
+            ->and($lastUse('code'))->toBeNull();
+    });
+
+    it('stamps nothing for a refused proof', function () {
+        $account = $this->createAccount();
+        $this->arrangeCredential($account, new FormTypeSupport, Surface::SIGN_IN);
+
+        $this->post(route('login.submit', ['type' => 'form']), ['identifier' => 'jane@example.com', ...(new FormTypeSupport)->rejectedProof(Surface::SIGN_IN)]);
+
+        $this->assertGuest();
+        expect(DB::table('user_credentials')->where('user_id', $account->getKey())->value('last_used_at'))->toBeNull();
+    });
+
+    it('stamps nothing for a suspended account\'s valid proof', function () {
+        $account = $this->createAccount();
+        $this->arrangeCredential($account, new FormTypeSupport, Surface::SIGN_IN);
+        DB::table('users')->where('id', $account->getKey())->update(['suspended_at' => now()]);
+
+        $this->post(route('login.submit', ['type' => 'form']), ['identifier' => 'jane@example.com', ...(new FormTypeSupport)->validProof(Surface::SIGN_IN)]);
+
+        $this->assertGuest();
+        expect(DB::table('user_credentials')->where('user_id', $account->getKey())->value('last_used_at'))->toBeNull();
+    });
+});
+
 describe('updated secrets', function () {
     it('stores the updated secret a proven proof carries, without moving the epoch', function () {
         $account = $this->createAccount();

@@ -148,18 +148,8 @@ class SudoAttempt extends CredentialAttempt
      */
     protected function write(Model&KeystoneUser $account, CredentialType $type, Proof $proof, StoredCredential $credential, SudoResult $leadsTo): bool
     {
-        $changes = new AccountChanges($this->guard);
-
-        return $changes->change($account, function (AccountChange $change) use ($credential, $type, $proof, $leadsTo) {
-            if ($proof->advancedSecret !== null && ! $change->advance($credential, type: $type->name(), secret: (string) $proof->advancedSecret)) {
-                return false;
-            }
-
-            if ($leadsTo === SudoResult::GRANTED) {
-                $change->stampLastUse($credential, type: $type->name());
-            }
-
-            return true;
-        });
+        return $leadsTo === SudoResult::GRANTED
+            ? $this->markUsed($account, $type, $proof, $credential)
+            : $this->advance($account, $type, $proof, $credential);
     }
 }

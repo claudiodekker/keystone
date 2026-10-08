@@ -232,6 +232,32 @@ describe('answers', function () {
         $this->assertDatabaseHas('user_security_events', ['type' => 'proof.rejected', 'credential_id' => $id, 'reason' => 'keystone.superseded']);
     });
 
+    it('stamps the last use of the credential that answers', function () {
+        $this->freezeSecond();
+        $account = $this->createChallengedAccount(new FormTypeSupport('code'));
+        $this->passFirstFactor();
+        $this->travel(1)->minute();
+
+        $this->post(route('login.challenge.submit', ['type' => 'code']), (new FormTypeSupport('code'))->validProof(Surface::CHALLENGE))->assertRedirect('/');
+
+        expect(DB::table('user_credentials')->where('user_id', $account->getKey())->where('type', 'code')->value('last_used_at'))->toBe(now()->toDateTimeString());
+    });
+
+    it('stamps nothing for an advanced proof another proof overtook', function () {
+        $account = $this->createChallengedAccount(new FormTypeSupport('code'));
+        $id = DB::table('user_credentials')->insertGetId(['user_id' => $account->getKey(), 'type' => 'rogue', 'secret' => Crypt::encryptString('step-1')]);
+        $this->app->make(CredentialTypes::class)->register(new RogueType(function () use ($id) {
+            DB::table('user_credentials')->where('id', $id)->update(['secret' => Crypt::encryptString('step-2')]);
+
+            return Proof::advanced(new StoredCredential($id, identifier: null, secret: 'step-1', label: null), 'step-2');
+        }, surfaces: ['challenge']));
+        $this->passFirstFactor();
+
+        $this->post(route('login.challenge.submit', ['type' => 'rogue']))->assertSessionHasErrors('rogue');
+
+        expect(DB::table('user_credentials')->where('id', $id)->value('last_used_at'))->toBeNull();
+    });
+
     it('refuses inside the timing floor, and returns early once signed in', function () {
         $this->createChallengedAccount(new FormTypeSupport('code'));
         $this->passFirstFactor();

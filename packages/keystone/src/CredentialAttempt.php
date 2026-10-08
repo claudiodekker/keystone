@@ -94,7 +94,7 @@ abstract class CredentialAttempt
     }
 
     /**
-     * Write what the accepted proof changed, conclude its step with the pass, then store the secret the proof updated, refusing a proof another one overtook.
+     * Write what the accepted proof changed and stamp its credential's last use, conclude its step with the pass, then store the secret the proof updated, refusing a proof another one overtook.
      *
      * @template TOutcome of Demand|SudoResult
      *
@@ -110,7 +110,7 @@ abstract class CredentialAttempt
         StoredCredential $credential,
         TakenAttempt $taken,
     ): Demand|SudoResult|null {
-        if (! $this->advance($account, $type, $proof, $credential)) {
+        if (! $this->markUsed($account, $type, $proof, $credential)) {
             $this->recordRejected($account, $flow, $type, $credential, reason: 'keystone.superseded');
 
             return null;
@@ -209,6 +209,24 @@ abstract class CredentialAttempt
 
         return $changes->change($account, function (AccountChange $change) use ($credential, $type, $proof) {
             return $change->advance($credential, type: $type->name(), secret: (string) $proof->advancedSecret);
+        });
+    }
+
+    /**
+     * Store the secret the proof moved its credential on to and stamp the credential as used now, in one locked change, refusing a proof another one overtook.
+     */
+    protected function markUsed(Model&KeystoneUser $account, CredentialType $type, Proof $proof, StoredCredential $credential): bool
+    {
+        $changes = new AccountChanges($this->guard);
+
+        return $changes->change($account, function (AccountChange $change) use ($credential, $type, $proof) {
+            if ($proof->advancedSecret !== null && ! $change->advance($credential, type: $type->name(), secret: (string) $proof->advancedSecret)) {
+                return false;
+            }
+
+            $change->stampLastUse($credential, type: $type->name());
+
+            return true;
         });
     }
 

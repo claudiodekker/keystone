@@ -324,7 +324,6 @@ describe('the replay', function () {
         $this->freezeSecond();
         $account = $this->signInAccount(new FormTypeSupport);
         $credentialId = DB::table('user_credentials')->where('user_id', $account->getKey())->value('id');
-        expect(DB::table('user_credentials')->where('id', $credentialId)->value('last_used_at'))->toBeNull();
         demandSudo($this);
         $this->travel(5)->minutes();
 
@@ -871,17 +870,19 @@ describe('the replay', function () {
         $account = $this->createChallengedAccount(new FormTypeSupport('code'));
         $this->passFirstFactor();
         $this->post(route('login.challenge.submit', ['type' => 'code']), (new FormTypeSupport('code'))->validProof(Surface::CHALLENGE));
+        $signedInAt = now()->toDateTimeString();
         demandSudo($this);
+        $this->travel(5)->minutes();
         $lastUse = fn (string $type) => DB::table('user_credentials')->where('user_id', $account->getKey())->where('type', $type)->value('last_used_at');
 
         $this->post(route('sudo.submit', ['type' => 'form']), (new FormTypeSupport)->validProof(Surface::SIGN_IN))->assertRedirectToRoute('sudo');
 
-        expect($lastUse('form'))->toBeNull()
-            ->and($lastUse('code'))->toBeNull();
+        expect($lastUse('form'))->toBe($signedInAt)
+            ->and($lastUse('code'))->toBe($signedInAt);
 
         $this->post(route('sudo.submit', ['type' => 'code']), (new FormTypeSupport('code'))->validProof(Surface::CHALLENGE))->assertRedirect('/probe');
 
-        expect($lastUse('form'))->toBeNull()
+        expect($lastUse('form'))->toBe($signedInAt)
             ->and($lastUse('code'))->toBe(now()->toDateTimeString());
     });
 
