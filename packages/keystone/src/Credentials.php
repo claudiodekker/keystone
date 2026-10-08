@@ -94,6 +94,26 @@ class Credentials
     }
 
     /**
+     * Get the account's credential with the id, of any type, disabled or not.
+     *
+     * @return array{id: int, type: string, label: ?string}|null
+     */
+    public function find(int $credentialId, int|string $accountId): ?array
+    {
+        $row = $this->query()->where('id', $credentialId)->where('user_id', $accountId)->first(['id', 'type', 'label']);
+
+        return $row === null ? null : ['id' => (int) $row->id, 'type' => $row->type, 'label' => $row->label];
+    }
+
+    /**
+     * Delete the account's credential with the id, of any type, disabled or not.
+     */
+    public function delete(int $credentialId, int|string $accountId): bool
+    {
+        return $this->query()->where('id', $credentialId)->where('user_id', $accountId)->delete() === 1;
+    }
+
+    /**
      * Get the names of the types the account holds a usable credential of.
      *
      * @return list<string>

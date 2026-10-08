@@ -23,5 +23,7 @@ return [
         'enrollment-expired' => 'Your enrollment session expired. Please start again.',
         'enrollment-owed' => 'Please sign in again to finish setting up two-factor authentication.',
         'sudo-revoked' => 'Sudo has ended. You will be asked to prove your identity again before your next sensitive change.',
+        'credential-removed' => 'The credential was removed. Your other sessions were signed out.',
+        'credential-not-found' => 'That credential was not found. It may already have been removed.',
     ],
 ];

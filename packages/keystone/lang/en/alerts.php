@@ -39,6 +39,10 @@ return [
                 'subject' => 'A sign-in method was added to your account',
                 'what' => 'A new way to sign in or confirm it\'s you was added to your account.',
             ],
+            'removed' => [
+                'subject' => 'A sign-in method was removed from your account',
+                'what' => 'A way to sign in or confirm it\'s you was removed from your account. Every other session of your account was signed out.',
+            ],
         ],
         'device_cookie' => [
             'reused' => [

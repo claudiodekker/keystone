@@ -63,6 +63,29 @@ class AccountChange
     }
 
     /**
+     * Remove the account's credential with the id, of any type, disabled or not, ending its other sessions.
+     */
+    public function removeCredential(int $credentialId): bool
+    {
+        $accountId = $this->account->getKey();
+        $credential = $this->credentials->find($credentialId, $accountId);
+
+        if ($credential === null || ! $this->credentials->delete($credentialId, $accountId)) {
+            return false;
+        }
+
+        $this->endSessions();
+
+        $this->record(
+            SecurityEventType::CREDENTIAL_REMOVED,
+            credentialType: $credential['type'],
+            credential: new StoredCredential($credentialId, identifier: null, secret: null, label: $credential['label']),
+        );
+
+        return true;
+    }
+
+    /**
      * Replace the credential's secret with a rehash of the same secret, only while it still holds the one that was verified.
      */
     public function rehash(StoredCredential $credential, string $type, #[\SensitiveParameter] string $secret): bool

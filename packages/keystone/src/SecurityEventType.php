@@ -23,6 +23,7 @@ enum SecurityEventType: string
     case RECOVERY_CODE_USED = 'recovery_code.used';
     case RECOVERY_CODES_GENERATED = 'recovery_codes.generated';
     case CREDENTIAL_ADDED = 'credential.added';
+    case CREDENTIAL_REMOVED = 'credential.removed';
     case SUDO_GRANTED = 'sudo.granted';
     case SUDO_FAILED = 'sudo.failed';
     case SUDO_REVOKED = 'sudo.revoked';

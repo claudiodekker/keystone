@@ -61,3 +61,10 @@ export type SecurityPage = {
     sudoEndsAt: string | null;
     status: string | null;
 };
+
+export type CredentialRemovalPage = {
+    id: number;
+    type: string;
+    label: string | null;
+    listed: boolean;
+};

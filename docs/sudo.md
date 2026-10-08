@@ -30,7 +30,7 @@ Keystone registers the `sudo` alias. On every request to the route it checks the
 
 The redirect and the 403 carry the [hardening headers](hardening.md#headers), even though your route isn't a Keystone route. The gate itself records nothing: a session being asked for sudo is not an event. Once sudo is granted, the user lands on the page they asked for. A request that would have changed something is never replayed; the user lands on the page it came from instead, or on `/` when that page isn't one of yours.
 
-A core controller that needs sudo checks it twice: in its middleware list and on the first line of the action. Replacing either in your published copy still leaves the action refused without sudo. The first such controllers arrive with the security settings.
+A core controller that needs sudo checks it twice: in its middleware list and on the first line of the action. Replacing either in your published copy still leaves the action refused without sudo. The confirm step and the removal of [removing a credential](security-settings.md#removing-a-credential) are the first such actions.
 
 To answer a refused request differently, such as with a modal rather than a redirect, bind your own `RespondToSudoRequired` in a service provider. The decision stays Keystone's; only the response changes:
 

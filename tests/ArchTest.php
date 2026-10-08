@@ -161,6 +161,15 @@ test('only the account change unit writes credentials and recovery codes', funct
         ->and($recoveryCodeWriters)->toBe([]);
 });
 
+test('only the account change unit deletes credentials', function () {
+    $files = packageFiles('src');
+    $callers = preg_grep('#/src/(AccountChange|Credentials)\.php$#', $files, PREG_GREP_INVERT);
+    $deleters = filesContaining($callers, '/(?:credentials|Credentials\([^()]*\)\))->delete\(|[\'"]user_credentials[\'"]\)[^;]*->delete\(/i');
+
+    expect($files)->not->toBe([])
+        ->and($deleters)->toBe([]);
+});
+
 test('package tests live in Unit or Feature', function () {
     $files = packageFiles('tests');
     $tests = preg_grep('/Test\.php$/', $files);
