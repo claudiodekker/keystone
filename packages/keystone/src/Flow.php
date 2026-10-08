@@ -35,4 +35,12 @@ enum Flow: string
     {
         return $this === self::CHALLENGE || $this === self::SUDO;
     }
+
+    /**
+     * Get the event a refused answer in the flow records.
+     */
+    public function rejectionType(): SecurityEventType
+    {
+        return $this === self::SUDO ? SecurityEventType::SUDO_FAILED : SecurityEventType::PROOF_REJECTED;
+    }
 }

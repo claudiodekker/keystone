@@ -28,10 +28,9 @@ class ChallengeAttempt extends CredentialAttempt
             $account = $pending->account;
             $flow = Flow::of($this->guard, Surface::CHALLENGE);
             $taken = $this->limiter->takeFailedAttempt($flow, $type, $account, identifier: '');
-            $demand = $this->owed($pending);
 
             if ($type instanceof RecoveryCodeType) {
-                return $this->answerWithRecoveryCode($pending, $flow, $type, (string) $input[RecoveryCodeType::FIELD], $taken, $demand);
+                return $this->answerWithRecoveryCode($pending, $flow, $type, (string) $input[RecoveryCodeType::FIELD], $taken);
             }
 
             [$proof, $credential] = $type->name() === $pending->firstFactor
@@ -44,19 +43,7 @@ class ChallengeAttempt extends CredentialAttempt
                 return Demand::REFUSE;
             }
 
-            $entered = $this->finish(
-                account: $account,
-                flow: $flow,
-                type: $type,
-                proof: $proof,
-                credential: $credential,
-                taken: $taken,
-                enter: fn () => $this->enter($pending, $demand),
-                recorded: $this->recorded($demand),
-                reason: $this->reason($demand),
-            );
-
-            return $entered ? $demand : Demand::REFUSE;
+            return $this->finish(new ChallengeEntry($this->guard, $pending), $account, $flow, $type, $proof, $credential, $taken) ?? Demand::REFUSE;
         }, self::TIMING_FLOOR_MICROSECONDS);
     }
 
@@ -65,72 +52,12 @@ class ChallengeAttempt extends CredentialAttempt
      *
      * @throws LastRecoveryCode
      */
-    protected function answerWithRecoveryCode(PendingSignIn $pending, Flow $flow, RecoveryCodeType $type, #[\SensitiveParameter] string $typed, TakenAttempt $taken, Demand $demand): Demand
+    protected function answerWithRecoveryCode(PendingSignIn $pending, Flow $flow, RecoveryCodeType $type, #[\SensitiveParameter] string $typed, TakenAttempt $taken): Demand
     {
-        $entered = $this->spendRecoveryCode(
-            account: $pending->account,
-            flow: $flow,
-            type: $type,
-            typed: $typed,
-            taken: $taken,
-            enter: fn () => $this->enter($pending, $demand),
-            recorded: $this->recorded($demand),
-            keepLast: config()->boolean('keystone.require_recovery_codes'),
-            reason: $this->reason($demand),
-        );
-
-        return $entered ? $demand : Demand::REFUSE;
-    }
-
-    /**
-     * Decide what passing the challenge leads to: the enrollment the account still owes, or the sign-in.
-     */
-    protected function owed(PendingSignIn $pending): Demand
-    {
-        return (new SignInDecision)->owesEnrollment($pending->account) ? Demand::ENROLLMENT : Demand::SIGN_IN;
-    }
-
-    /**
-     * Move the pending sign-in past its challenge, returning whether a signed-in browser was a known device, then forget the pending challenge its hold opened.
-     */
-    protected function enter(PendingSignIn $pending, Demand $demand): ?bool
-    {
-        $knownDevice = $this->pass($pending, $demand);
-
-        if ($pending->pendingChallengeId !== null) {
-            rescue(fn () => (new PendingChallenges($pending->account))->forget($pending->pendingChallengeId));
+        if (! $this->spendRecoveryCode($pending->account, $flow, $type, $typed, keepLast: config()->boolean('keystone.require_recovery_codes'))) {
+            return Demand::REFUSE;
         }
 
-        return $knownDevice;
-    }
-
-    /**
-     * Move the pending sign-in past its challenge: on to the enrollment the account still owes, or into a signed-in session.
-     */
-    protected function pass(PendingSignIn $pending, Demand $demand): ?bool
-    {
-        if ($demand === Demand::ENROLLMENT) {
-            $this->guard->passSecondFactor();
-
-            return null;
-        }
-
-        return $this->guard->signIn($pending->account, $pending->rememberMe);
-    }
-
-    /**
-     * Get the event a passed challenge records.
-     */
-    protected function recorded(Demand $demand): SecurityEventType
-    {
-        return $demand === Demand::ENROLLMENT ? SecurityEventType::SIGN_IN_HELD : SecurityEventType::SIGNED_IN;
-    }
-
-    /**
-     * Get the reason a passed challenge records.
-     */
-    protected function reason(Demand $demand): ?string
-    {
-        return $demand === Demand::ENROLLMENT ? 'keystone.enrollment' : null;
+        return $this->conclude(new ChallengeEntry($this->guard, $pending), $pending->account, $flow, $type, credential: null, taken: $taken) ?? Demand::REFUSE;
     }
 }

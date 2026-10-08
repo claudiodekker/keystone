@@ -3,7 +3,6 @@
 namespace ClaudioDekker\Keystone;
 
 use ClaudioDekker\Keystone\Actions\AccountLookup;
-use ClaudioDekker\Keystone\Exceptions\Barred;
 use ClaudioDekker\Keystone\Exceptions\Throttled;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\Surface;
@@ -57,46 +56,16 @@ class SignInAttempt extends CredentialAttempt
                 return Demand::REFUSE;
             }
 
-            $demand = (new SignInDecision)->demand($account, $type);
-
-            if ($demand === Demand::REFUSE) {
+            if ((new SignInDecision)->isBarred($account)) {
                 $this->recordRejected($account, $flow, $type, $credential, reason: 'keystone.barred');
 
                 return Demand::REFUSE;
             }
 
-            $entered = $this->finish(
-                account: $account,
-                flow: $flow,
-                type: $type,
-                proof: $proof,
-                credential: $credential,
-                taken: $taken,
-                enter: fn () => $this->enter($account, $type, $demand, $intendedUrl, $rememberMe),
-                recorded: $demand === Demand::SIGN_IN ? SecurityEventType::SIGNED_IN : SecurityEventType::SIGN_IN_HELD,
-                reason: $demand === Demand::SIGN_IN ? null : "keystone.{$demand->value}",
-            );
+            $entry = new FirstFactorEntry($this->guard, $account, $type, $intendedUrl, $rememberMe);
 
-            return $entered ? $demand : Demand::REFUSE;
+            return $this->finish($entry, $account, $flow, $type, $proof, $credential, $taken) ?? Demand::REFUSE;
         }, self::TIMING_FLOOR_MICROSECONDS);
-    }
-
-    /**
-     * Sign the account in, returning whether the browser was a known device of it, or hold its sign-in at the challenge or an enrollment, as the decision demands.
-     *
-     * @throws Barred
-     */
-    protected function enter(Model&KeystoneUser $account, CredentialType $type, Demand $demand, string $intendedUrl, RememberMe $rememberMe): ?bool
-    {
-        if ($demand === Demand::SIGN_IN) {
-            return $this->guard->signIn($account, $rememberMe);
-        }
-
-        $stage = $demand === Demand::CHALLENGE ? PendingStage::CHALLENGE : PendingStage::ENROLLMENT;
-
-        $this->guard->hold($account, firstFactor: $type->name(), stage: $stage, intendedUrl: $intendedUrl, rememberMe: $rememberMe);
-
-        return null;
     }
 
     /**

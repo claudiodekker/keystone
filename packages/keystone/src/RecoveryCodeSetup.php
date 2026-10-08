@@ -8,8 +8,23 @@ use ClaudioDekker\Keystone\Methods\Surface;
 /**
  * @internal
  */
-class RecoveryCodeSetup extends EnrollmentStep
+class RecoveryCodeSetup
 {
+    /**
+     * What concludes the setup once the typed code is accepted.
+     */
+    protected AcceptedProof $accepted;
+
+    /**
+     * Create a new recovery code setup instance.
+     */
+    public function __construct(
+        protected KeystoneGuard $guard,
+        protected SecurityEventRecorder $recorder = new SecurityEventRecorder,
+    ) {
+        $this->accepted = new AcceptedProof($recorder);
+    }
+
     /**
      * Get the set of codes staged for the pending sign-in, staging a new set when none is.
      *
@@ -40,7 +55,7 @@ class RecoveryCodeSetup extends EnrollmentStep
         $staged = $this->guard->slots()->get(CredentialTypes::RECOVERY_CODE, Surface::ENROLLMENT->value);
 
         if (! is_array($staged) || ! $this->matches($staged, $typed)) {
-            $this->recordRejected($pending, CredentialTypes::RECOVERY_CODE, reason: 'recovery-code.mismatch');
+            $this->recordRejected($pending, reason: 'recovery-code.mismatch');
 
             return Demand::REFUSE;
         }
@@ -48,14 +63,14 @@ class RecoveryCodeSetup extends EnrollmentStep
         $refusal = $this->commit($pending, $staged);
 
         if ($refusal !== null) {
-            $this->recordRejected($pending, CredentialTypes::RECOVERY_CODE, reason: $refusal);
+            $this->recordRejected($pending, reason: $refusal);
 
             return Demand::REFUSE;
         }
 
         $this->guard->slots()->forget(CredentialTypes::RECOVERY_CODE, Surface::ENROLLMENT->value);
 
-        return $this->proceed(CredentialTypes::RECOVERY_CODE);
+        return $this->accepted->conclude(new EnrollmentEntry($this->guard), $pending->account, Flow::ENROLLMENT, CredentialTypes::RECOVERY_CODE) ?? Demand::REFUSE;
     }
 
     /**
@@ -102,5 +117,19 @@ class RecoveryCodeSetup extends EnrollmentStep
 
             return null;
         });
+    }
+
+    /**
+     * Record a refused recovery-code setup for the pending sign-in's account.
+     */
+    protected function recordRejected(PendingSignIn $pending, string $reason): void
+    {
+        $this->recorder->record(
+            SecurityEventType::PROOF_REJECTED,
+            account: $pending->account,
+            flow: Flow::ENROLLMENT->value,
+            credentialType: CredentialTypes::RECOVERY_CODE,
+            reason: $reason,
+        );
     }
 }
