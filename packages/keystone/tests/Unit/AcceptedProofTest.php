@@ -12,6 +12,7 @@ use ClaudioDekker\Keystone\Methods\RecoveryCodeType;
 use ClaudioDekker\Keystone\PendingStage;
 use ClaudioDekker\Keystone\RateLimiter;
 use ClaudioDekker\Keystone\RememberMe;
+use ClaudioDekker\Keystone\RequestContext;
 use ClaudioDekker\Keystone\SecondFactorEnrollmentEntry;
 use ClaudioDekker\Keystone\Subnet;
 use ClaudioDekker\Keystone\SudoFirstStepPass;
@@ -26,6 +27,7 @@ use Illuminate\Support\Facades\DB;
 beforeEach(function () {
     config(['cache.limiter' => 'array', 'keystone.require_second_factor' => false, 'keystone.require_recovery_codes' => false]);
     app()->forgetInstance(CacheRateLimiter::class);
+    app()->instance(RequestContext::class, RequestContext::capture(request()));
 });
 
 function stepAccount(bool $secondFactor = false, bool $recoveryCodes = false, bool $suspended = false): User
@@ -54,7 +56,7 @@ function suspendStepAccount(User $account): void
 
 function stepLimiter(): RateLimiter
 {
-    return new RateLimiter(request(), Keystone::guard());
+    return new RateLimiter(request(), app(RequestContext::class), Keystone::guard());
 }
 
 function signInStep(User $account): array

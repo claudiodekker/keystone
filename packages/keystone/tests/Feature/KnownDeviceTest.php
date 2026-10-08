@@ -146,6 +146,16 @@ describe('the device cookie', function () {
         expect(Crypt::decryptString(DB::table('user_known_devices')->value('user_agent')))->toBe('Firefox/130.0 forged line');
     });
 
+    it('keeps the readable text of a user agent that is not valid UTF-8', function () {
+        $account = $this->createAccount();
+        $this->arrangeCredential($account, new FormTypeSupport, Surface::SIGN_IN);
+        $this->withHeader('User-Agent', "Fire\xfffox");
+
+        signInOnDevice($this, null);
+
+        expect(Crypt::decryptString(DB::table('user_known_devices')->value('user_agent')))->toBe('Fire?fox');
+    });
+
     it('hands out no cookie when the sign-in is refused', function () {
         $account = $this->createAccount();
         $this->arrangeCredential($account, new FormTypeSupport, Surface::SIGN_IN);

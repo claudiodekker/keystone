@@ -75,7 +75,7 @@ class KeystoneServiceProvider extends ServiceProvider
         EncryptCookies::except([KnownDevices::COOKIE, RememberTokens::COOKIE]);
 
         $this->callAfterResolving(Schedule::class, function (Schedule $schedule) {
-            $schedule->call(fn () => (new KnownDevices(Keystone::guard()->userModel()))->prune())
+            $schedule->call(fn () => KnownDevices::prune(Keystone::guard()->userModel()))
                 ->name('keystone:prune-known-devices')
                 ->daily()
                 ->onOneServer();

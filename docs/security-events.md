@@ -56,11 +56,11 @@ Every event has the same fields, and never typed input, secrets, codes, tokens o
 | `type` | one of the types above |
 | `user_id` | the account, or null |
 | `actor` | `user`, `operator` or `system` |
-| `operator` | who acted, as the operator command or job named them, cut to 64 characters with control characters and line and paragraph separators replaced by spaces; null otherwise |
+| `operator` | who acted, as the operator command or job named them, cut to 64 characters with invalid UTF-8 bytes replaced by `?` and control characters and line and paragraph separators replaced by spaces; null otherwise |
 | `flow` | where it happened, such as `sign-in`, `challenge`, `enrollment` or `sudo` |
 | `credential_type`, `credential_id`, `credential_label` | the credential involved and its label at the time; a refusal names only a credential the account holds |
 | `reason` | a short code such as `form.mismatch`, `keystone.barred` or `remembered`; a reason that isn't a lowercase code of at most 64 characters prefixed by its credential type or `keystone.` is stored as `<type>.invalid_reason` |
-| `ip_address`, `user_agent` | the request's, the user agent cut to 512 characters with control characters and line and paragraph separators replaced by spaces |
+| `ip_address`, `user_agent` | the request's, the user agent cut to 512 characters with invalid UTF-8 bytes replaced by `?` and control characters and line and paragraph separators replaced by spaces |
 | `location` | always null (alerts look the location up when they are sent, see [IP location](security-alerts.md#ip-location)) |
 | `known_device` | for `signed_in`, whether the browser was one of the account's known devices; null otherwise |
 | `request_id` | an id Keystone gives each request, shared by every event it records |

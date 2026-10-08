@@ -14,6 +14,7 @@ use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\RateLimiter;
 use ClaudioDekker\Keystone\RememberMe;
 use ClaudioDekker\Keystone\RememberTokens;
+use ClaudioDekker\Keystone\RequestContext;
 use ClaudioDekker\Keystone\SignInAttempt;
 use ClaudioDekker\Keystone\Status;
 use ClaudioDekker\Keystone\StepKind;
@@ -100,7 +101,7 @@ abstract class SignInController extends Controller
         $intended = $request->session()->get('url.intended');
         $intendedUrl = IntendedUrl::sanitize($intended, (string) config('app.url'));
 
-        $attempt = new SignInAttempt(Keystone::guard(), app(AccountLookup::class), new RateLimiter($request, Keystone::guard()));
+        $attempt = new SignInAttempt(Keystone::guard(), app(AccountLookup::class), new RateLimiter($request, app(RequestContext::class), Keystone::guard()));
         $demand = $attempt->attempt($credentialType, $identifier, $proofInput, $intendedUrl, RememberMe::fromRequest($request));
 
         if ($demand === Demand::REFUSE) {

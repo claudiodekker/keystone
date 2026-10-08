@@ -62,7 +62,7 @@ class AccountChanges
         $users->getConnection()->transaction(function () use ($users, $movedAt) {
             $users->newQueryWithoutScopes()->toBase()->increment('credential_epoch', extra: ['credential_epoch_moved_at' => $movedAt]);
 
-            (new KnownDevices($users))->forgetAll();
+            KnownDevices::forgetAll($users);
         });
 
         $users->getConnection()->afterCommit(function () use ($operator) {

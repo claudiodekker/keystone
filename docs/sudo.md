@@ -96,9 +96,9 @@ A grant is bound to the subnet it was earned from, so the same session cookie us
 
 When a live grant is used from another subnet, the gate revokes it at once, rotates the session id, records `sudo.network_changed` and mails the owner (see [Security alerts](security-alerts.md)), then asks for the replay as if the session had no grant. The session stays signed in. A grant that already ran out is dropped without a record, whatever subnet the request comes from. A request from an address that isn't an IP address can't be shown to come from the bound subnet, so it revokes a live grant too.
 
-Keystone reads the address Laravel resolves for the request, as `$request->ip()` does. Behind a load balancer, configure Laravel's trusted proxies, or every grant is bound to the balancer's subnet and the check stops telling networks apart.
+Keystone reads the request's address once, when its global middleware runs, after any trusted-proxy middleware in the global middleware stack. Behind a load balancer, configure Laravel's trusted proxies there, or every grant is bound to the balancer's subnet and the check stops telling networks apart.
 
-When the address of a sign-in isn't an IP address at all, the sign-in still completes, but it brings no sudo and records no `sudo.granted`. A grant is never made without a subnet.
+When a sign-in has no address, such as one made from a command or a queued job, or its address isn't an IP address, the sign-in still completes, but it brings no sudo and records no `sudo.granted`. A grant is never made without a subnet.
 
 Only the grant is bound. The session itself follows the user from one network to another, as it did before.
 

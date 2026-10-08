@@ -5,7 +5,6 @@ namespace ClaudioDekker\Keystone;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
-use Symfony\Component\HttpFoundation\Request as SymfonyRequest;
 
 /**
  * @internal
@@ -15,12 +14,12 @@ use Symfony\Component\HttpFoundation\Request as SymfonyRequest;
 readonly class RequestContext
 {
     /**
-     * The request attribute that holds the context captured for the request.
+     * The most characters of a user agent kept, everywhere one is stored.
      */
-    protected const string ATTRIBUTE = 'keystone.request_context';
+    protected const int USER_AGENT_LENGTH = 512;
 
     /**
-     * The user agent, cut to the length kept everywhere with control characters replaced by spaces.
+     * The user agent, cleaned and cut to the length kept everywhere.
      */
     public ?string $userAgent;
 
@@ -34,36 +33,20 @@ readonly class RequestContext
         public ?string $requestId = null,
         public ?CarbonImmutable $occurredAt = null,
     ) {
-        $this->userAgent = SecurityEventRecorder::clean($userAgent, SecurityEventRecorder::USER_AGENT_LENGTH);
+        $this->userAgent = static::clean($userAgent, static::USER_AGENT_LENGTH);
     }
 
     /**
-     * Get the context captured for the request, capturing it when none was.
+     * Capture the context of the request, giving it a new request id.
      */
-    public static function of(SymfonyRequest $request): static
+    public static function capture(Request $request): static
     {
-        $context = $request->attributes->get(static::ATTRIBUTE);
-
-        return $context instanceof static ? $context : static::capture($request);
-    }
-
-    /**
-     * Capture the context of the request, giving it a new request id, and keep it on the request.
-     */
-    public static function capture(SymfonyRequest $request): static
-    {
-        $illuminate = $request instanceof Request ? $request : Request::createFromBase($request);
-
-        $context = new static(
-            ipAddress: $illuminate->ip(),
-            userAgent: $illuminate->userAgent(),
-            path: $illuminate->path(),
+        return new static(
+            ipAddress: $request->ip(),
+            userAgent: $request->userAgent(),
+            path: $request->path(),
             requestId: (string) Str::ulid(),
         );
-
-        $request->attributes->set(static::ATTRIBUTE, $context);
-
-        return $context;
     }
 
     /**
@@ -72,5 +55,35 @@ readonly class RequestContext
     public function subnet(): ?Subnet
     {
         return Subnet::of($this->ipAddress);
+    }
+
+    /**
+     * Cut a value taken from input to the length, with invalid UTF-8 made valid and control characters and line and paragraph separators replaced by spaces.
+     */
+    public static function clean(?string $value, int $length): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $printable = (string) preg_replace('/[\p{Cc}\p{Zl}\p{Zp}]/u', ' ', static::scrub($value));
+
+        return Str::substr($printable, 0, $length);
+    }
+
+    /**
+     * Make the value valid UTF-8, with each invalid byte replaced by a question mark whatever substitute character mbstring is set to.
+     */
+    protected static function scrub(string $value): string
+    {
+        $substitute = mb_substitute_character();
+
+        mb_substitute_character(0x3F);
+
+        try {
+            return mb_scrub($value, 'UTF-8');
+        } finally {
+            mb_substitute_character($substitute);
+        }
     }
 }

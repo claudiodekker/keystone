@@ -400,3 +400,9 @@ describe('the absolute lifetime', function () {
         $this->assertDatabaseMissing('user_security_events', ['type' => 'session.ended']);
     });
 });
+
+it('never brings sudo with a sign-in when no request context was captured', function () {
+    Auth::guard('web')->signIn(User::factory()->create());
+
+    expect(Auth::guard('web')->sudoGrant())->toBeNull();
+});

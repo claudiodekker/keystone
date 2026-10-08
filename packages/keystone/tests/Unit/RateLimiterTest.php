@@ -5,6 +5,7 @@ use ClaudioDekker\Keystone\Flow;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\PendingStage;
 use ClaudioDekker\Keystone\RateLimiter;
+use ClaudioDekker\Keystone\RequestContext;
 use ClaudioDekker\Keystone\SecurityEventRecorded;
 use ClaudioDekker\Keystone\StepKind;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormType;
@@ -24,7 +25,7 @@ function limiter(string $ip = '203.0.113.5'): RateLimiter
 {
     $request = Request::create('/', server: ['REMOTE_ADDR' => $ip]);
 
-    return new RateLimiter($request, Keystone::guard());
+    return new RateLimiter($request, RequestContext::capture($request), Keystone::guard());
 }
 
 function hitTimes(RateLimiter $limiter, StepKind $kind, int $times): void
