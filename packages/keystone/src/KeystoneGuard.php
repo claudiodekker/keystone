@@ -236,7 +236,7 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Get the ceremony slots, which end no later than the sign-in, pending or signed in, that opens them.
+     * Get the ceremony slots, which end no later than the sign-in, pending or signed in, that opens them, or the sudo a signed-in session holds.
      */
     public function slots(): CeremonySlots
     {
@@ -920,7 +920,7 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Get the time the session's current phase ends: a pending sign-in's end, a sudo-in-progress's end, a sign-in's absolute lifetime, or never.
+     * Get the time the session's current phase ends: a pending sign-in's end, a signed-in session's sudo or absolute lifetime, or never.
      */
     protected function phaseEndsAt(): ?CarbonInterface
     {
@@ -934,19 +934,25 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Get the time a signed-in session's phase ends: its sudo-in-progress's end or its absolute lifetime, whichever comes first, or never.
+     * Get the time a signed-in session's phase ends: the end of its sudo, granted or in progress, or its absolute lifetime, whichever comes first, or never.
      */
     protected function signedInPhaseEndsAt(): ?CarbonInterface
     {
         $lifetimeSeconds = config('keystone.session.absolute_lifetime_seconds');
         $signedInEndsAt = is_int($lifetimeSeconds) ? $this->signedInAt()?->addSeconds($lifetimeSeconds) : null;
-        $progressEndsAt = $this->sudoInProgress()?->endsAt();
+        $sudo = $this->heldSudo();
 
-        if ($progressEndsAt === null) {
+        $sudoEndsAt = match (true) {
+            $sudo instanceof SudoGrant => $sudo->endsAt,
+            $sudo instanceof SudoInProgress => $sudo->endsAt(),
+            default => null,
+        };
+
+        if ($sudoEndsAt === null) {
             return $signedInEndsAt;
         }
 
-        return $signedInEndsAt?->lessThan($progressEndsAt) ? $signedInEndsAt : $progressEndsAt;
+        return $signedInEndsAt?->lessThan($sudoEndsAt) ? $signedInEndsAt : $sudoEndsAt;
     }
 
     /**

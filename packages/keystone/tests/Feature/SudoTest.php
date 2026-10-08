@@ -1058,6 +1058,30 @@ describe('the lifetime of a grant', function () {
         'gone the second it runs out' => [60, 0],
     ]);
 
+    it('closes a ceremony slot when the grant it was opened under ends, whatever cap the slot was given', function () {
+        $this->freezeSecond();
+        $this->signInAccount(new FormTypeSupport);
+        $this->travel(100)->seconds();
+        Keystone::guard()->slots()->put('rogue', 'enrollment', 'ceremony-bytes', capSeconds: 3600);
+        $this->travel(799)->seconds();
+        expect(Keystone::guard()->slots()->get('rogue', 'enrollment'))->toBe('ceremony-bytes');
+        $this->travel(1)->seconds();
+
+        expect(Keystone::guard()->slots()->get('rogue', 'enrollment'))->toBeNull();
+    });
+
+    it('closes a ceremony slot when the grant or the sign-in ends, whichever comes first', function () {
+        $this->freezeSecond();
+        config(['keystone.session.absolute_lifetime_seconds' => 600]);
+        $this->signInAccount(new FormTypeSupport);
+        Keystone::guard()->slots()->put('rogue', 'enrollment', 'ceremony-bytes', capSeconds: 3600);
+        $this->travel(599)->seconds();
+        expect(Keystone::guard()->slots()->get('rogue', 'enrollment'))->toBe('ceremony-bytes');
+        $this->travel(1)->seconds();
+
+        expect(Keystone::guard()->slots()->get('rogue', 'enrollment'))->toBeNull();
+    });
+
     it('keeps the grant across the owner\'s own epoch move', function () {
         $account = $this->signInAccount(new FormTypeSupport);
         $this->post('end-my-sessions');
