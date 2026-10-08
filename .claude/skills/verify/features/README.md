@@ -39,5 +39,6 @@ Each feature file starts with an H1 title and one paragraph describing the user-
 - [Second-factor challenge](./second-factor-challenge.md) covers the hold after the first factor, answering with TOTP, a wrong or replayed code, switching type and cancelling.
 - [Recovery codes](./recovery-codes.md) covers answering the challenge with a recovery code, the code being spent, the alert mail and the last code being kept.
 - [Sign out](./sign-out.md) covers signing out from home and the status shown afterwards.
-- [Sudo](./sudo.md) covers the gated security page, ending sudo, the gate's redirect and the replay through the password and the TOTP code.
+- [Sudo](./sudo.md) covers the workbench's page behind sudo, ending sudo, the gate's redirect and the replay through the password and the TOTP code.
+- [Security settings](./security-settings.md) covers the security page: the credentials with their last use, the recovery-code count, the sudo end time and ending sudo from it.
 - [Operator commands](./operator-commands.md) covers `keystone:end-sessions`, `keystone:suspend` and `keystone:unsuspend` and their effect on a signed-in browser.

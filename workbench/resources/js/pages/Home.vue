@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { Form, Link } from '@inertiajs/vue3';
 import SignOutButton from '@/components/SignOutButton.vue';
-import { login } from '@/routes';
-import { security } from '@/routes/settings';
+import { gated, login, security } from '@/routes';
 import { end } from '@/routes/sudo';
 
 defineProps<{ signedIn: boolean; status: string | null }>();
@@ -14,6 +13,7 @@ defineProps<{ signedIn: boolean; status: string | null }>();
         <template v-if="signedIn">
             <p class="text-gray-900">You're signed in.</p>
             <Link :href="security()" class="text-gray-900 underline">Security settings</Link>
+            <Link :href="gated()" class="text-gray-900 underline">Page behind sudo</Link>
             <Form v-bind="end.form()">
                 <button type="submit" class="text-sm font-medium text-gray-900 underline">End sudo</button>
             </Form>

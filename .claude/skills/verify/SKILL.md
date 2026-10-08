@@ -1,6 +1,6 @@
 ---
 name: verify
-description: Launch the Keystone testbench workbench (the Inertia-Vue sign-in, second-factor challenge, recovery-code and sign-out pages plus the keystone:* operator commands) on its own port and database, drive it in headless Chromium through Playwright, and capture screenshots, network logs and security-event rows as proof. Use to confirm an auth change works in the real app, to reproduce a sign-in bug on the browser surface, or before opening a PR that changes user-facing behaviour.
+description: Launch the Keystone testbench workbench (the Inertia-Vue sign-in, second-factor challenge, recovery-code, sudo, security settings and sign-out pages plus the keystone:* operator commands) on its own port and database, drive it in headless Chromium through Playwright, and capture screenshots, network logs and security-event rows as proof. Use to confirm an auth change works in the real app, to reproduce a sign-in bug on the browser surface, or before opening a PR that changes user-facing behaviour.
 ---
 
 # Verify Keystone in the workbench
@@ -66,8 +66,9 @@ Use these handles. Each one comes from the stub pages and is stable:
 | Home | `/` | link `Sign in` (guest), text `You're signed in.` and button `Sign out` (signed in) |
 | Sign in | `/auth/login` | heading `Sign in`, label `Email address`, label `Password`, button `Sign in` |
 | Challenge | `/auth/login/challenge` | heading `Confirm it's you`, label `Code from your authenticator app` (TOTP), label `Recovery code`, button `Verify`, a button per other type named by type (`recovery-code`), button `Cancel sign-in` |
-| Home (signed in) | `/` | link `Security settings`, button `End sudo`, text `Sudo has ended.` after ending sudo |
-| Security settings | `/settings/security` | heading `Security settings`, link `Home`; behind `['auth', 'sudo']` |
+| Home (signed in) | `/` | link `Security settings`, link `Page behind sudo`, button `End sudo` |
+| Security settings | `/settings/security` | heading `Security settings`, a section per type headed `Password`, `Authenticator app` and `Recovery codes`, section `Sudo` with button `End sudo` while sudo lasts, text `Sudo has ended.` after ending sudo; needs no sudo |
+| Page behind sudo | `/gated` | heading `A page behind sudo`, link `Home`; behind `['auth', 'sudo']`, workbench only |
 | Sudo | `/auth/sudo` | heading `Confirm it's you`, label `Password` then label `Code from your authenticator app`, button `Confirm`, a button per other type named by type |
 
 Errors render as red text under the field they belong to. Assert them with `page.getByText('…')`. The message strings are in `packages/keystone/lang/en/messages.php`.

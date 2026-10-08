@@ -15,5 +15,5 @@ Route::middleware(['web', Middleware::class])->group(function () {
         'status' => Status::flashed($request)?->label(),
     ]))->name('home');
 
-    Route::middleware(['auth', 'sudo'])->get('settings/security', fn () => Inertia::render('Security'))->name('settings.security');
+    Route::middleware(['auth', 'sudo'])->get('gated', fn () => Inertia::render('Gated'))->name('gated');
 });
