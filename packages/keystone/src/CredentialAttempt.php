@@ -213,7 +213,7 @@ abstract class CredentialAttempt
     }
 
     /**
-     * Store the secret the proof moved its credential on to and stamp the credential as used now, in one locked change, refusing a proof another one overtook.
+     * Store the secret the proof moved its credential on to and stamp the credential as used now, in one locked change, refusing a proof another one overtook or whose credential was removed meanwhile.
      */
     protected function markUsed(Model&KeystoneUser $account, CredentialType $type, Proof $proof, StoredCredential $credential): bool
     {
@@ -224,9 +224,7 @@ abstract class CredentialAttempt
                 return false;
             }
 
-            $change->stampLastUse($credential, type: $type->name());
-
-            return true;
+            return $change->stampLastUse($credential, type: $type->name());
         });
     }
 

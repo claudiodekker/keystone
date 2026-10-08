@@ -13,6 +13,10 @@ return [
 
     'throttled' => 'Too many attempts. Please try again in :seconds seconds.',
 
+    'last_sign_in_credential' => 'You cannot remove your only way to sign in.',
+
+    'last_second_factor' => 'You cannot remove your last two-factor credential while two-factor authentication is required.',
+
     'sudo_required' => 'Please confirm it\'s you before making this change.',
 
     'status' => [
@@ -23,5 +27,7 @@ return [
         'enrollment-expired' => 'Your enrollment session expired. Please start again.',
         'enrollment-owed' => 'Please sign in again to finish setting up two-factor authentication.',
         'sudo-revoked' => 'Sudo has ended. You will be asked to prove your identity again before your next sensitive change.',
+        'credential-removed' => 'The credential was removed. Your other sessions were signed out.',
+        'credential-not-found' => 'That credential was not found. It may already have been removed.',
     ],
 ];

@@ -1,6 +1,7 @@
 <?php
 
 use ClaudioDekker\Keystone\Tests\Fixtures\Http\Controllers\ChallengeController;
+use ClaudioDekker\Keystone\Tests\Fixtures\Http\Controllers\CredentialRemovalController;
 use ClaudioDekker\Keystone\Tests\Fixtures\Http\Controllers\EnrollmentController;
 use ClaudioDekker\Keystone\Tests\Fixtures\Http\Controllers\RecoveryCodesController;
 use ClaudioDekker\Keystone\Tests\Fixtures\Http\Controllers\SecurityController;
@@ -26,4 +27,6 @@ Route::middleware('web')->group(function () {
     Route::post('sudo/{type}', [SudoController::class, 'store'])->name('sudo.submit');
     Route::delete('sudo', [SudoController::class, 'destroy'])->name('sudo.end');
     Route::get('settings/security', [SecurityController::class, 'show'])->name('security');
+    Route::get('settings/security/credentials/{credential}/remove', [CredentialRemovalController::class, 'show'])->name('security.credentials.remove');
+    Route::delete('settings/security/credentials/{credential}', [CredentialRemovalController::class, 'destroy'])->name('security.credentials.remove.submit');
 });

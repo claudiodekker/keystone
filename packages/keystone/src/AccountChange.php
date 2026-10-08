@@ -4,10 +4,13 @@ namespace ClaudioDekker\Keystone;
 
 use ClaudioDekker\Keystone\Exceptions\AlreadySuspended;
 use ClaudioDekker\Keystone\Exceptions\LastRecoveryCode;
+use ClaudioDekker\Keystone\Exceptions\LastSecondFactor;
+use ClaudioDekker\Keystone\Exceptions\LastSignInCredential;
 use ClaudioDekker\Keystone\Exceptions\NotSuspended;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
+use ClaudioDekker\Keystone\Methods\Surface;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Date;
@@ -63,6 +66,42 @@ class AccountChange
     }
 
     /**
+     * Remove the account's credential with the id, of any type, disabled or not, ending its other sessions.
+     *
+     * @throws LastSignInCredential
+     * @throws LastSecondFactor
+     */
+    public function removeCredential(int $credentialId): bool
+    {
+        $accountId = $this->account->getKey();
+        $credential = $this->credentials->find($credentialId, $accountId);
+
+        if ($credential === null) {
+            return false;
+        }
+
+        if ($this->isLastSignInCredential($credentialId)) {
+            throw new LastSignInCredential;
+        }
+
+        if (config('keystone.require_second_factor') === true && $this->isLastSecondFactor($credentialId)) {
+            throw new LastSecondFactor;
+        }
+
+        $this->credentials->delete($credentialId, $accountId);
+
+        $this->endSessions();
+
+        $this->record(
+            SecurityEventType::CREDENTIAL_REMOVED,
+            credentialType: $credential['type'],
+            credential: new StoredCredential($credentialId, identifier: null, secret: null, label: $credential['label']),
+        );
+
+        return true;
+    }
+
+    /**
      * Replace the credential's secret with a rehash of the same secret, only while it still holds the one that was verified.
      */
     public function rehash(StoredCredential $credential, string $type, #[\SensitiveParameter] string $secret): bool
@@ -79,11 +118,11 @@ class AccountChange
     }
 
     /**
-     * Stamp the usable credential of the type as used now.
+     * Stamp the usable credential of the type as used now, or answer false when it is gone or disabled.
      */
-    public function stampLastUse(StoredCredential $credential, string $type): void
+    public function stampLastUse(StoredCredential $credential, string $type): bool
     {
-        $this->credentials->stampLastUse($credential->id, type: $type);
+        return $this->credentials->stampLastUse($credential->id, type: $type);
     }
 
     /**
@@ -203,6 +242,22 @@ class AccountChange
             recipients: $this->recipients,
             alert: $alert,
         );
+    }
+
+    /**
+     * Determine if the credential is the account's only one that can sign in.
+     */
+    protected function isLastSignInCredential(int $credentialId): bool
+    {
+        return $this->credentials->lockServing($this->account->getKey(), Surface::SIGN_IN) === [$credentialId];
+    }
+
+    /**
+     * Determine if the credential is the account's only second factor.
+     */
+    protected function isLastSecondFactor(int $credentialId): bool
+    {
+        return $this->credentials->lockServing($this->account->getKey(), Surface::CHALLENGE) === [$credentialId];
     }
 
     /**

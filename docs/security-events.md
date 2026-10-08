@@ -34,6 +34,7 @@ To keep the audit trail but drop the log line, set `keystone.log_channel` to Lar
 | `account.suspended` | an operator suspended the account (see [Operator commands](operator-commands.md#suspending-accounts)); alerts the account's owner |
 | `account.unsuspended` | an operator lifted the account's suspension; alerts the account's owner |
 | `credential.added` | a credential was added to the account, such as a second factor at [enrollment](enrollment.md); alerts the account's owner |
+| `credential.removed` | the user [removed a credential](security-settings.md#removing-a-credential) from their security settings, with its type, id and name; signs out the account's other sessions and alerts the account's owner |
 | `sudo.granted` | a session got [sudo](sudo.md#when-a-session-has-it): at a sign-in, with the reason `keystone.sign_in` and no credential, or at the end of a [replay](sudo.md#the-replay), with flow `sudo` and the credential that earned it. A sign-in restored by a remember-me cookie, or from an address that isn't an IP address, records none |
 | `sudo.failed` | an answer at a [replay](sudo.md#the-replay) is refused, with flow `sudo` and the reasons `proof.rejected` uses, plus `keystone.unbindable_subnet` for an answer from an address that isn't an IP address; alerts the account's owner, from a known device too |
 | `sudo.network_changed` | a live sudo grant was used from another [subnet](sudo.md#the-subnet) than the one it was earned from and was revoked; alerts the account's owner, from a known device too |

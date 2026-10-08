@@ -94,6 +94,26 @@ class Credentials
     }
 
     /**
+     * Get the account's credential with the id, of any type, disabled or not.
+     *
+     * @return array{id: int, type: string, label: ?string}|null
+     */
+    public function find(int $credentialId, int|string $accountId): ?array
+    {
+        $row = $this->query()->where('id', $credentialId)->where('user_id', $accountId)->first(['id', 'type', 'label']);
+
+        return $row === null ? null : ['id' => (int) $row->id, 'type' => $row->type, 'label' => $row->label];
+    }
+
+    /**
+     * Delete the account's credential with the id, of any type, disabled or not.
+     */
+    public function delete(int $credentialId, int|string $accountId): void
+    {
+        $this->query()->where('id', $credentialId)->where('user_id', $accountId)->delete();
+    }
+
+    /**
      * Get the names of the types the account holds a usable credential of.
      *
      * @return list<string>
@@ -110,14 +130,21 @@ class Credentials
      */
     public function holdsSecondFactor(int|string $accountId, ?string $firstFactor = null): bool
     {
-        $names = array_map(fn (CredentialType $type) => $type->name(), app(CredentialTypes::class)->serving(Surface::CHALLENGE));
-
-        return $this->query()
-            ->where('user_id', $accountId)
+        return $this->usableServing(Surface::CHALLENGE, $accountId)
             ->when($firstFactor !== null, fn (Builder $query) => $query->where('type', '!=', $firstFactor))
-            ->whereIn('type', $names)
-            ->whereNull('disabled_at')
             ->exists();
+    }
+
+    /**
+     * Lock the account's usable credentials of the listed types that serve the surface and get their ids, read as last committed whatever the transaction read before.
+     *
+     * @return list<int>
+     */
+    public function lockServing(int|string $accountId, Surface $surface): array
+    {
+        $ids = $this->usableServing($surface, $accountId)->orderBy('id')->lockForUpdate()->pluck('id');
+
+        return array_map(intval(...), array_values($ids->all()));
     }
 
     /**
@@ -141,11 +168,11 @@ class Credentials
     }
 
     /**
-     * Set when the usable credential of the type was last used to now.
+     * Set when the usable credential of the type was last used to now, or answer false when it is gone or disabled.
      */
-    public function stampLastUse(int $credentialId, string $type): void
+    public function stampLastUse(int $credentialId, string $type): bool
     {
-        $this->usable($type)->where('id', $credentialId)->update(['last_used_at' => now()]);
+        return $this->usable($type)->where('id', $credentialId)->update(['last_used_at' => now()]) === 1;
     }
 
     /**
@@ -154,6 +181,19 @@ class Credentials
     public function ownerOf(int $credentialId, string $type): int|string|null
     {
         return $this->usable($type)->where('id', $credentialId)->value('user_id');
+    }
+
+    /**
+     * Get a query for the account's usable credentials of the listed types that serve the surface.
+     */
+    protected function usableServing(Surface $surface, int|string $accountId): Builder
+    {
+        $names = array_map(fn (CredentialType $type) => $type->name(), app(CredentialTypes::class)->serving($surface));
+
+        return $this->query()
+            ->where('user_id', $accountId)
+            ->whereIn('type', $names)
+            ->whereNull('disabled_at');
     }
 
     /**

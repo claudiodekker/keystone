@@ -12,6 +12,7 @@ Alerts are queued. Run a queue worker, or they are never sent: `queue.default` s
 | `account.unsuspended` | an operator lifted the account's suspension |
 | `challenge.abandoned` | a sign-in from a browser that isn't one of the account's [known devices](#new-devices) passed its first factor and hasn't passed the [challenge](challenge.md) 7 minutes later (see [Abandoned challenges](#abandoned-challenges)) |
 | `credential.added` | a credential was added to the account, such as a second factor at [enrollment](enrollment.md) |
+| `credential.removed` | the user [removed a credential](security-settings.md#removing-a-credential) from the account |
 | `device_cookie.reused` | a browser signed in with a [device cookie](#new-devices) that a later sign-in had already replaced, so two browsers held the same cookie |
 | `limit.tripped` | wrong answers spent one of the account's [failed-attempt counts](rate-limiting.md#locking-an-accounts-owner-out), once per count and window; a spent request limit alerts nobody |
 | `recovery_code.used` | a [recovery code](challenge.md#recovery-codes) answered the challenge; the mail says how many codes the account has left |

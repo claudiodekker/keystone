@@ -1,5 +1,11 @@
 <?php
 
+use ClaudioDekker\Keystone\Http\Middleware\RequireSudo;
+use ClaudioDekker\Keystone\Tests\Fixtures\Http\Controllers\GatedProbeController;
+use ClaudioDekker\Keystone\Tests\Fixtures\Http\Controllers\OverridingGatedProbeController;
+use ClaudioDekker\Keystone\Tests\Fixtures\Http\Controllers\UnguardedGatedProbeController;
+use Illuminate\Routing\Controllers\Middleware;
+
 const METHOD_NAMESPACES = [
     'ClaudioDekker\Keystone\Password',
     'ClaudioDekker\Keystone\WebAuthn',
@@ -87,6 +93,38 @@ function filesContaining(array $files, string $pattern): array
     return array_values($matches);
 }
 
+function coreControllerClasses(): array
+{
+    $files = glob(dirname(__DIR__).'/packages/keystone/src/Http/Controllers/*Controller.php');
+    $names = array_map(fn (string $file) => basename($file, '.php'), $files);
+    $names = array_values(array_diff($names, ['Controller']));
+
+    return array_combine($names, array_map(fn (string $name) => 'ClaudioDekker\Keystone\Http\Controllers\\'.$name, $names));
+}
+
+function unpairedSudoActions(string $controller): array
+{
+    $listed = [];
+    $enforced = [];
+
+    foreach ($controller::middleware() as $middleware) {
+        if ($middleware instanceof Middleware && $middleware->middleware === RequireSudo::class) {
+            $listed = [...$listed, ...$middleware->only ?? []];
+        }
+    }
+
+    foreach ((new ReflectionClass($controller))->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
+        $source = implode('', array_slice(file($method->getFileName()), $method->getStartLine() - 1, $method->getEndLine() - $method->getStartLine() + 1));
+        $body = substr($source, strpos($source, '{') + 1);
+
+        if (preg_match('/^\s*\(new SudoGate\(Keystone::guard\(\)\)\)->enforce\(\$request\);/', $body) === 1) {
+            $enforced[] = $method->getName();
+        }
+    }
+
+    return array_values(array_unique([...array_diff($listed, $enforced), ...array_diff($enforced, $listed)]));
+}
+
 test('app tests check responses only through their overridable assertion traits', function () {
     $files = packageFiles('app-tests');
     $appTests = preg_grep('/Test\.php$/', $files);
@@ -123,6 +161,15 @@ test('only the account change unit writes credentials and recovery codes', funct
         ->and($recoveryCodeWriters)->toBe([]);
 });
 
+test('only the account change unit deletes credentials', function () {
+    $files = packageFiles('src');
+    $callers = preg_grep('#/src/(AccountChange|Credentials)\.php$#', $files, PREG_GREP_INVERT);
+    $deleters = filesContaining($callers, '/(?:credentials|Credentials\([^()]*\)\))->delete\(|[\'"]user_credentials[\'"]\)[^;]*->delete\(/i');
+
+    expect($files)->not->toBe([])
+        ->and($deleters)->toBe([]);
+});
+
 test('package tests live in Unit or Feature', function () {
     $files = packageFiles('tests');
     $tests = preg_grep('/Test\.php$/', $files);
@@ -148,4 +195,14 @@ test('every Keystone mail and notification is encrypted on the queue', function 
 
     expect($messages)->not->toBe([])
         ->and($offenders)->toBe([]);
+});
+
+test('every core action behind the sudo middleware enforces the gate on its first line, and every action enforcing it is behind the middleware', function (string $controller) {
+    expect(unpairedSudoActions($controller))->toBe([]);
+})->with(fn () => coreControllerClasses());
+
+test('the sudo pairing check catches an action missing either half', function () {
+    expect(unpairedSudoActions(GatedProbeController::class))->toBe([])
+        ->and(unpairedSudoActions(UnguardedGatedProbeController::class))->toBe(['destroy'])
+        ->and(unpairedSudoActions(OverridingGatedProbeController::class))->toBe(['destroy']);
 });

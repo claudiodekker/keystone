@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\ChallengeController;
+use App\Http\Controllers\Auth\CredentialRemovalController;
 use App\Http\Controllers\Auth\EnrollmentController;
 use App\Http\Controllers\Auth\RecoveryCodesController;
 use App\Http\Controllers\Auth\SecurityController;
@@ -42,4 +43,8 @@ Route::prefix('auth')->group(function () {
     });
 });
 
-Route::get('settings/security', [SecurityController::class, 'show'])->name('security');
+Route::prefix('settings/security')->group(function () {
+    Route::get('/', [SecurityController::class, 'show'])->name('security');
+    Route::get('credentials/{credential}/remove', [CredentialRemovalController::class, 'show'])->name('security.credentials.remove');
+    Route::delete('credentials/{credential}', [CredentialRemovalController::class, 'destroy'])->name('security.credentials.remove.submit');
+});
