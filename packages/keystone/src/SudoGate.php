@@ -54,7 +54,7 @@ class SudoGate
 
         $grant = $this->guard->sudoGrant();
 
-        if ($grant?->subnet->equals($this->guard->subnet())) {
+        if ($grant?->subnet->equals(RequestContext::of($request)->subnet())) {
             return;
         }
 

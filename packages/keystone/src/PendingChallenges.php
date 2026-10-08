@@ -8,7 +8,6 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Date;
-use Illuminate\Support\Str;
 use stdClass;
 
 /**
@@ -38,12 +37,12 @@ class PendingChallenges
     /**
      * Note that a sign-in of the account is held at the challenge, returning the id its pass forgets it by.
      */
-    public function open(int|string $accountId, ?string $userAgent, ?string $ipAddress): int
+    public function open(int|string $accountId, RequestContext $context): int
     {
         return $this->query()->insertGetId([
             'user_id' => $accountId,
-            'user_agent' => $this->encrypt($userAgent === null ? null : Str::substr($userAgent, 0, SecurityEventRecorder::USER_AGENT_LENGTH)),
-            'ip_address' => $this->encrypt($ipAddress),
+            'user_agent' => $this->encrypt($context->userAgent),
+            'ip_address' => $this->encrypt($context->ipAddress),
             'created_at' => Date::now(),
         ]);
     }

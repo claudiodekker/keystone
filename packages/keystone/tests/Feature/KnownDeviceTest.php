@@ -136,6 +136,16 @@ describe('the device cookie', function () {
             ->and(Crypt::decryptString($row->ip_address))->toBe('198.51.100.7');
     });
 
+    it('replaces control characters in the user agent label with spaces', function () {
+        $account = $this->createAccount();
+        $this->arrangeCredential($account, new FormTypeSupport, Surface::SIGN_IN);
+        $this->withHeader('User-Agent', "Firefox/130.0\nforged\0line");
+
+        signInOnDevice($this, null);
+
+        expect(Crypt::decryptString(DB::table('user_known_devices')->value('user_agent')))->toBe('Firefox/130.0 forged line');
+    });
+
     it('hands out no cookie when the sign-in is refused', function () {
         $account = $this->createAccount();
         $this->arrangeCredential($account, new FormTypeSupport, Surface::SIGN_IN);

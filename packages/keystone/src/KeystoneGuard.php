@@ -11,7 +11,6 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Date;
 use LogicException;
-use Symfony\Component\HttpFoundation\Cookie;
 
 /**
  * @internal
@@ -293,14 +292,6 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Get the subnet the request comes from, or null when its IP address can't be parsed.
-     */
-    public function subnet(): ?Subnet
-    {
-        return Subnet::of($this->getRequest()->getClientIp());
-    }
-
-    /**
      * Get the session's live sudo grant, whatever subnet the request comes from.
      */
     public function sudoGrant(): ?SudoGrant
@@ -493,23 +484,15 @@ class KeystoneGuard extends SessionGuard
     protected function recognizeDevice(Model&KeystoneUser $account): bool
     {
         $request = $this->getRequest();
-        $previous = KnownDevices::cookieOf($request);
         $devices = new KnownDevices($account);
 
-        if ($previous !== null && $devices->isReused($account->getKey(), $previous)) {
+        if ($devices->isReused($request)) {
             (new SecurityEventRecorder)->record(SecurityEventType::DEVICE_COOKIE_REUSED, account: $account);
         }
 
-        $known = $devices->isKnown($account->getKey(), $previous);
-        $value = $devices->remember($account->getKey(), previous: $previous, userAgent: $request->headers->get('User-Agent'), ipAddress: $request->getClientIp());
+        $known = $devices->isKnown($request);
 
-        $this->getCookieJar()->queue(Cookie::create(
-            KnownDevices::COOKIE,
-            $value,
-            expire: Date::now()->addSeconds(KnownDevices::retentionSeconds()),
-            secure: true,
-            sameSite: Cookie::SAMESITE_LAX,
-        ));
+        $this->getCookieJar()->queue($devices->remember($request, RequestContext::of($request)));
 
         return $known;
     }
@@ -571,7 +554,7 @@ class KeystoneGuard extends SessionGuard
      */
     protected function signInRemembered(Model&KeystoneUser $account, RememberToken $token): Model
     {
-        $knownDevice = (new KnownDevices($account))->isKnown($account->getKey(), KnownDevices::cookieOf($this->getRequest()));
+        $knownDevice = (new KnownDevices($account))->isKnown($this->getRequest());
 
         $this->startSignedInSession($account, $token->id);
 
@@ -666,7 +649,7 @@ class KeystoneGuard extends SessionGuard
      */
     protected function bringSudo(Model&KeystoneUser $account): void
     {
-        $subnet = $this->subnet();
+        $subnet = RequestContext::of($this->getRequest())->subnet();
 
         if (is_null($subnet)) {
             return;
@@ -805,7 +788,7 @@ class KeystoneGuard extends SessionGuard
     {
         $request = $this->getRequest();
 
-        if ((new KnownDevices($account))->isKnown($account->getKey(), KnownDevices::cookieOf($request))) {
+        if ((new KnownDevices($account))->isKnown($request)) {
             return null;
         }
 
@@ -818,7 +801,7 @@ class KeystoneGuard extends SessionGuard
                 return $replaced;
             }
 
-            return $challenges->open($account->getKey(), userAgent: $request->headers->get('User-Agent'), ipAddress: $request->getClientIp());
+            return $challenges->open($account->getKey(), RequestContext::of($request));
         }));
     }
 

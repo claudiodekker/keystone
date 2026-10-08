@@ -27,6 +27,39 @@ it('never changes how an address maps to its subnet', function (?string $ip, ?st
     'an address with a prefix length' => ['203.0.113.0/24', null],
 ]);
 
+it('never changes how an address maps to the network a request limit counts it under', function (?string $ip, ?string $network) {
+    expect(Subnet::networkOf($ip))->toBe($network);
+})->with([
+    'an IPv4 address' => ['203.0.113.5', '203.0.113.5'],
+    'the first address of a /24' => ['203.0.113.0', '203.0.113.0'],
+    'the last address of a /24' => ['203.0.113.255', '203.0.113.255'],
+    'an IPv4-mapped IPv6 address' => ['::ffff:203.0.113.5', '203.0.113.5'],
+    'an IPv4-mapped IPv6 address in hexadecimal' => ['::ffff:cb00:7105', '203.0.113.5'],
+    'an IPv6 address' => ['2001:db8:0:1:aaaa:bbbb:cccc:dddd', '2001:db8:0:1::'],
+    'the first address of a /64' => ['2001:db8:0:1::', '2001:db8:0:1::'],
+    'the last address of a /64' => ['2001:db8:0:1:ffff:ffff:ffff:ffff', '2001:db8:0:1::'],
+    'the next /64' => ['2001:db8:0:2::1', '2001:db8:0:2::'],
+    'an uncompressed IPv6 address' => ['2001:0db8:0000:0001:0000:0000:0000:0001', '2001:db8:0:1::'],
+    'the IPv6 loopback' => ['::1', '::'],
+    'no address' => [null, null],
+    'an empty address' => ['', null],
+    'a hostname' => ['not-an-ip', null],
+    'an IPv4 address with a port' => ['203.0.113.77:443', null],
+    'an IPv4 address out of range' => ['203.0.113.256', null],
+    'an IPv6 address in brackets' => ['[2001:db8::1]', null],
+    'an IPv6 address with a zone' => ['fe80::1%eth0', null],
+    'an address with a prefix length' => ['203.0.113.0/24', null],
+]);
+
+it('never counts two addresses under one network unless a request limit shares it', function (string $ip, string $other, bool $shared) {
+    expect(Subnet::networkOf($ip) === Subnet::networkOf($other))->toBe($shared);
+})->with([
+    'one IPv6 /64' => ['2001:db8:0:1::1', '2001:db8:0:1:ffff:ffff:ffff:ffff', true],
+    'IPv4-mapped IPv6 and IPv4' => ['::ffff:203.0.113.5', '203.0.113.5', true],
+    'two addresses in one /24' => ['203.0.113.5', '203.0.113.6', false],
+    'two /64s' => ['2001:db8:0:1::1', '2001:db8:0:2::1', false],
+]);
+
 it('never calls two subnets equal unless they are the same one', function (string $ip, ?string $other, bool $equal) {
     expect(Subnet::of($ip)->equals(Subnet::of($other)))->toBe($equal);
 })->with([

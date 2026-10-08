@@ -53,16 +53,6 @@ class RateLimiter
     public const int GIVE_BACK_MARGIN_SECONDS = 1;
 
     /**
-     * The bytes an IPv4-mapped IPv6 address starts with.
-     */
-    public const string IPV4_MAPPED_PREFIX = "\0\0\0\0\0\0\0\0\0\0\xff\xff";
-
-    /**
-     * The bytes of an IPv6 address its /64 network keeps.
-     */
-    public const int IPV6_NETWORK_BYTES = 8;
-
-    /**
      * The source part of a failed attempt from a browser that isn't a known device.
      */
     public const string OTHER_SOURCE = 'other';
@@ -220,7 +210,7 @@ class RateLimiter
             return self::OTHER_SOURCE;
         }
 
-        $device = (new KnownDevices($account))->idOf($account->getKey(), KnownDevices::cookieOf($this->request));
+        $device = (new KnownDevices($account))->idOf($this->request);
 
         return $device === null ? self::OTHER_SOURCE : "device:{$device}";
     }
@@ -316,21 +306,7 @@ class RateLimiter
      */
     protected function address(): string
     {
-        $ip = $this->request->ip();
-
-        if (! is_string($ip) || filter_var($ip, FILTER_VALIDATE_IP) === false) {
-            return self::UNKNOWN_ADDRESS;
-        }
-
-        $packed = (string) inet_pton($ip);
-
-        $masked = match (true) {
-            ! str_contains($ip, ':') => $packed,
-            str_starts_with($packed, self::IPV4_MAPPED_PREFIX) => substr($packed, strlen(self::IPV4_MAPPED_PREFIX)),
-            default => substr($packed, 0, self::IPV6_NETWORK_BYTES).str_repeat("\0", self::IPV6_NETWORK_BYTES),
-        };
-
-        return (string) inet_ntop($masked);
+        return Subnet::networkOf(RequestContext::of($this->request)->ipAddress) ?? self::UNKNOWN_ADDRESS;
     }
 
     /**

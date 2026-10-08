@@ -2,11 +2,13 @@
 
 namespace ClaudioDekker\Keystone;
 
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\Cookie;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
@@ -39,26 +41,28 @@ class KnownDevices
     }
 
     /**
-     * Determine if the cookie's value marks a device the account has signed in from within the retention.
+     * Determine if the request's device cookie marks a device the account has signed in from within the retention.
      */
-    public function isKnown(int|string $accountId, #[\SensitiveParameter] ?string $value): bool
+    public function isKnown(Request $request): bool
     {
-        return $this->idOf($accountId, $value) !== null;
+        return $this->idOf($request) !== null;
     }
 
     /**
-     * Get the id of the device the cookie's value marks, when the account has signed in from it within the retention.
+     * Get the id of the device the request's device cookie marks, when the account has signed in from it within the retention.
      *
-     * The id outlives the value, which every sign-in from the browser replaces.
+     * The id outlives the cookie's value, which every sign-in from the browser replaces.
      */
-    public function idOf(int|string $accountId, #[\SensitiveParameter] ?string $value): ?int
+    public function idOf(Request $request): ?int
     {
+        $value = static::cookieOf($request);
+
         if ($value === null) {
             return null;
         }
 
         $id = $this->query()
-            ->where('user_id', $accountId)
+            ->where('user_id', $this->model->getKey())
             ->where('device_hash', static::deviceDigest($value))
             ->where('cookie_hash', static::digest($value))
             ->where('last_seen_at', '>', Date::now()->subSeconds(static::retentionSeconds()))
@@ -68,12 +72,18 @@ class KnownDevices
     }
 
     /**
-     * Determine if the cookie's value names a device of the account, seen within the retention, that a later sign-in handed a new value.
+     * Determine if the request's device cookie names a device of the account, seen within the retention, that a later sign-in handed a new value.
      */
-    public function isReused(int|string $accountId, #[\SensitiveParameter] string $value): bool
+    public function isReused(Request $request): bool
     {
+        $value = static::cookieOf($request);
+
+        if ($value === null) {
+            return false;
+        }
+
         return $this->query()
-            ->where('user_id', $accountId)
+            ->where('user_id', $this->model->getKey())
             ->where('device_hash', static::deviceDigest($value))
             ->where('cookie_hash', '!=', static::digest($value))
             ->where('last_seen_at', '>', Date::now()->subSeconds(static::retentionSeconds()))
@@ -81,42 +91,43 @@ class KnownDevices
     }
 
     /**
-     * Mint a new value for the browser, move every account that knew its previous value to it, and remember it for the account.
+     * Mint a new value for the browser, move every account that knew its previous value to it, and remember it for the account, returning the device cookie that carries it.
      *
      * The value keeps the previous one's device part, so the account's row follows the browser and another browser still holding a replaced value can be told from a new one.
      */
-    public function remember(int|string $accountId, #[\SensitiveParameter] ?string $previous, ?string $userAgent, ?string $ipAddress): string
+    public function remember(Request $request, RequestContext $context): Cookie
     {
+        $previous = static::cookieOf($request);
         $device = $previous === null ? bin2hex(random_bytes(self::DEVICE_BYTES)) : Str::before($previous, '.');
         $value = $device.'.'.bin2hex(random_bytes(self::SECRET_BYTES));
         $digest = static::digest($value);
         $now = Date::now();
 
-        $this->model->getConnection()->transaction(function () use ($accountId, $previous, $userAgent, $ipAddress, $value, $digest, $now) {
+        $this->model->getConnection()->transaction(function () use ($previous, $context, $value, $digest, $now) {
             if ($previous !== null) {
                 $this->query()->where('cookie_hash', static::digest($previous))->update(['cookie_hash' => $digest]);
             }
 
             $this->query()->upsert([
-                'user_id' => $accountId,
+                'user_id' => $this->model->getKey(),
                 'device_hash' => static::deviceDigest($value),
                 'cookie_hash' => $digest,
-                'user_agent' => $this->encrypt($userAgent === null ? null : Str::substr($userAgent, 0, SecurityEventRecorder::USER_AGENT_LENGTH)),
-                'ip_address' => $this->encrypt($ipAddress),
+                'user_agent' => $this->encrypt($context->userAgent),
+                'ip_address' => $this->encrypt($context->ipAddress),
                 'last_seen_at' => $now,
                 'created_at' => $now,
             ], ['user_id', 'device_hash'], ['cookie_hash', 'user_agent', 'ip_address', 'last_seen_at']);
         });
 
-        return $value;
+        return static::cookie($value, $now->copy()->addSeconds(static::retentionSeconds()));
     }
 
     /**
      * Forget every device the account knows.
      */
-    public function forget(int|string $accountId): void
+    public function forget(): void
     {
-        $this->query()->where('user_id', $accountId)->delete();
+        $this->query()->where('user_id', $this->model->getKey())->delete();
     }
 
     /**
@@ -138,12 +149,20 @@ class KnownDevices
     /**
      * Get the value of the device cookie the request carries, when it has the shape of one Keystone hands out.
      */
-    public static function cookieOf(Request $request): ?string
+    protected static function cookieOf(Request $request): ?string
     {
         $value = $request->cookies->get(static::COOKIE);
         $pattern = sprintf('/\A[0-9a-f]{%d}\.[0-9a-f]{%d}\z/', self::DEVICE_BYTES * 2, self::SECRET_BYTES * 2);
 
         return is_string($value) && preg_match($pattern, $value) === 1 ? $value : null;
+    }
+
+    /**
+     * Get the device cookie holding the value until the time.
+     */
+    protected static function cookie(#[\SensitiveParameter] string $value, CarbonInterface $expiresAt): Cookie
+    {
+        return Cookie::create(static::COOKIE, $value, expire: $expiresAt, secure: true, sameSite: Cookie::SAMESITE_LAX);
     }
 
     /**
