@@ -22,7 +22,7 @@ Only a credential of a type that `keystone.methods` lists on the `challenge` sur
 
 ## Answering
 
-A wrong answer is refused with "The provided credential is invalid." on the type's field, counts one failed attempt against the account for that type, and records `proof.rejected` with flow `challenge`. Nothing typed is flashed back. A correct answer signs the session in, records `signed_in` with flow `challenge` and the answering credential, and sends the user on to the page they were headed for before the first factor. When the account still owes [enrollment](enrollment.md), such as recovery codes, the answer instead moves the held sign-in on to it and records `sign_in.held` with the reason `keystone.enrollment`. Input that fails the type's validation rules is sent back to the challenge page with its errors, without counting a wrong answer or recording anything.
+A wrong answer is refused with "The provided credential is invalid." on the type's field, counts one failed attempt against the account for that type, and records `proof.rejected` with flow `challenge`. Nothing typed is flashed back. A correct answer signs the session in, stamps the answering credential's last use (shown on the [security page](security-settings.md)), records `signed_in` with flow `challenge` and the answering credential, and sends the user on to the page they were headed for before the first factor. When the account still owes [enrollment](enrollment.md), such as recovery codes, the answer instead moves the held sign-in on to it and records `sign_in.held` with the reason `keystone.enrollment`. Input that fails the type's validation rules is sent back to the challenge page with its errors, without counting a wrong answer or recording anything.
 
 ## Recovery codes
 

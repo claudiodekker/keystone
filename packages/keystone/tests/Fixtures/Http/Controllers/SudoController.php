@@ -32,6 +32,6 @@ class SudoController extends Controller
 
     protected function sendSudoEnded(Request $request): RedirectResponse
     {
-        return back(fallback: '/');
+        return to_route('security');
     }
 }

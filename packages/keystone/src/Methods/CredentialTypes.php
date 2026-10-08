@@ -99,6 +99,18 @@ class CredentialTypes
     }
 
     /**
+     * Get every type keystone.methods allows on some surface it serves.
+     *
+     * @return list<CredentialType>
+     */
+    public function listed(): array
+    {
+        $listed = array_filter($this->types, fn (CredentialType $type) => collect(Surface::cases())->contains(fn (Surface $surface) => $this->serves($type, $surface)));
+
+        return array_values($listed);
+    }
+
+    /**
      * Determine if the type serves the surface and keystone.methods allows it there.
      */
     protected function serves(CredentialType $type, Surface $surface): bool

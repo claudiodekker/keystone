@@ -942,7 +942,7 @@ describe('ending sudo', function () {
 
         $response = $this->delete(route('sudo.end'));
 
-        $response->assertRedirect('/');
+        $response->assertRedirectToRoute('security');
         $this->assertAuthenticatedAs($account);
         $revoked = SecurityEvent::query()->where('type', 'sudo.revoked')->sole();
         expect($revoked->user_id)->toEqual($account->getKey())
@@ -960,7 +960,7 @@ describe('ending sudo', function () {
 
         $response = $this->delete(route('sudo.end'));
 
-        $response->assertRedirect('/');
+        $response->assertRedirectToRoute('security');
         $this->assertAuthenticatedAs($account);
         expect(SecurityEvent::query()->where('type', 'sudo.revoked')->count())->toBe($recorded)
             ->and(session()->getId())->not->toBe($sessionId)

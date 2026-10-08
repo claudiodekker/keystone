@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\ChallengeController;
 use App\Http\Controllers\Auth\EnrollmentController;
 use App\Http\Controllers\Auth\RecoveryCodesController;
+use App\Http\Controllers\Auth\SecurityController;
 use App\Http\Controllers\Auth\SignInController;
 use App\Http\Controllers\Auth\SignOutController;
 use App\Http\Controllers\Auth\SudoController;
@@ -40,3 +41,5 @@ Route::prefix('auth')->group(function () {
         Route::delete('/', [SudoController::class, 'destroy'])->name('sudo.end');
     });
 });
+
+Route::get('settings/security', [SecurityController::class, 'show'])->name('security');

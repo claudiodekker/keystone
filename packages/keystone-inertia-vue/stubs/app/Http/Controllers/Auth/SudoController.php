@@ -50,10 +50,10 @@ class SudoController extends Controller
     }
 
     /**
-     * Respond to an ended sudo, sending the user back to the page they ended it from.
+     * Respond to an ended sudo, sending the user to the security page.
      */
     protected function sendSudoEnded(Request $request): RedirectResponse
     {
-        return back(fallback: '/');
+        return to_route('security');
     }
 }
