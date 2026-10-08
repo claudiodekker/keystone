@@ -14,6 +14,7 @@ use ClaudioDekker\Keystone\Notifications\SecurityAlert;
 use ClaudioDekker\Keystone\PendingSignIn;
 use ClaudioDekker\Keystone\PendingStage;
 use ClaudioDekker\Keystone\SecurityEventType;
+use ClaudioDekker\Keystone\Tests\Fixtures\DrawingType;
 use ClaudioDekker\Keystone\Tests\Fixtures\FlakyAlert;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormType;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormTypeSupport;
@@ -373,6 +374,20 @@ describe('the ceremony', function () {
 
         expect($type->started)->toBe(1)
             ->and(Keystone::guard()->slots()->get('plain', Surface::ENROLLMENT->value))->not->toBeNull();
+    });
+
+    it('shows what a type draws from its ceremony\'s page on every visit, keeping none of it in the session', function () {
+        $this->app->make(CredentialTypes::class)->register(new DrawingType);
+        $this->createFirstFactorAccount();
+        $this->passFirstFactor();
+
+        $first = $this->get(route('login.enrollment.start', ['type' => 'drawn']))->json('ceremony');
+        $second = $this->get(route('login.enrollment.start', ['type' => 'drawn']))->json('ceremony');
+
+        $kept = Keystone::guard()->slots()->get('drawn', Surface::ENROLLMENT->value);
+        expect($first['drawing'])->toBe(str_repeat($first['code'], 1024))
+            ->and($second)->toBe($first)
+            ->and($kept['page'])->toBe(['code' => $first['code'], 'account' => 'jane@example.com']);
     });
 
     it('reports a ceremony that fails to start and sends the user back to the offer', function () {
