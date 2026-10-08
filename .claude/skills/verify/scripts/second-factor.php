@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\DB;
 use ParagonIE\ConstantTime\Base32;
 use Workbench\App\Models\User;
 
-// Enrolling an authenticator has no UI yet, so the fixture writes the credential the way enrolment will.
+// Seed a TOTP credential so a recipe can start past the enrollment a first sign-in is held at.
 $account = User::findOrFail(DB::table('user_emails')->where('address', 'jane@example.com')->value('user_id'));
 
 DB::table('user_credentials')->where('user_id', $account->getKey())->where('type', 'totp')->delete();

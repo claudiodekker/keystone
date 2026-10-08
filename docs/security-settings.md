@@ -6,7 +6,7 @@ The page needs no sudo. Looking at your own settings changes nothing, so asking 
 
 ## What it shows
 
-Each credential type that `keystone.methods` lists on any surface gets its own section, in the order the method packages registered them, even when the account holds none of that type. Each section lists the account's credentials of that type, oldest first, with:
+Each credential type that `keystone.methods` lists on any surface gets its own section, in the order the method packages registered them, even when the account holds none of that type. A type listed on `enrollment` has a Set up link to [its enrollment step](#adding-a-credential). Each section lists the account's credentials of that type, oldest first, with:
 
 - the name the user gave it, or none;
 - when it was added;
@@ -30,7 +30,7 @@ The page shows only the signed-in account's own credentials and codes. A credent
 
 | Field | Value |
 |---|---|
-| `types` | one entry per listed type: `type`, and `credentials`, each with `id`, `label`, `addedAt`, `lastUsedAt` and `disabled` |
+| `types` | one entry per listed type: `type`, `enrollable` (whether `keystone.methods` lists it on `enrollment`), and `credentials`, each with `id`, `label`, `addedAt`, `lastUsedAt` and `disabled` |
 | `leftovers` | the credentials of types no longer listed, each with `id`, `type`, `label`, `addedAt`, `lastUsedAt` and `disabled` |
 | `recoveryCodes` | how many unspent recovery codes the account holds |
 | `recoveryCodesLow` | whether that is three or fewer |
@@ -56,6 +56,59 @@ protected function sendSecurityPage(Request $request, SecurityPage $page): Respo
 ```
 
 The page names the types it knows, such as "Authenticator app" for `totp`, and shows any other type by its name. Add your own names to `typeNames` in `resources/js/lib/credentialTypes.ts`, which the security page and the confirm step share.
+
+## Adding a credential
+
+The Set up link opens the type's enrollment step at `GET /settings/security/enroll/{type}`, named `security.enroll`. The step starts the type's ceremony, such as [TOTP](totp.md#enrolling) making a new key, and shows its form. Reloading shows the same ceremony. The user answers with `POST /settings/security/enroll/{type}`, named `security.enroll.submit`, and cancels with `DELETE /settings/security/enroll/{type}`, named `security.enroll.cancel`.
+
+The step and the answer need [sudo](sudo.md#gating-a-route). A session without it is sent to confirm who the user is, and then back to the type's step. Cancelling needs no sudo, because it only forgets the ceremony. The step counts against the `start` [request limit](rate-limiting.md), the answer against the `submit` limit and cancelling against the `change` limit, each 10 a minute by default. A type that `keystone.methods` doesn't list on `enrollment` has no step: the user is sent back to the security page.
+
+A ceremony lasts 15 minutes at most, and never longer than the sudo it was started under. When the sudo runs out, the user ends it, or the user's network changes, the ceremony ends too, so sudo earned again never finishes an enrollment the earlier sudo started. An answer that arrives with no ceremony running sends the user back to the type's step with the `enrollment-expired` status, where a new ceremony starts.
+
+A correct answer stores the credential and records `credential.added` with flow `settings` in one change, which [alerts](security-alerts.md) the account's owner. The user's session gets a new session id and keeps its sudo, and the user is sent to the security page with the `enrolled` status. Adding a credential signs out no other session. The exception is a type whose new credential replaces the one the account holds, as a [TOTP key](totp.md#enrolling) does: the old credential is deleted in the same change, and every other session of the account is signed out.
+
+A wrong answer stores nothing and keeps the ceremony. It is refused with "The provided credential is invalid." on the type's field, and nothing typed is flashed back. It records `proof.rejected` with flow `settings` and counts as a failed attempt in the `settings` flow, apart from the counts that sign-in, the challenge and the sudo replay keep.
+
+Keystone checks three things again as it writes, while it holds the account's row lock, because time passes while an answer is verified:
+
+- An account suspended in the meantime gets nothing stored, recording `proof.rejected` with the reason `keystone.barred`.
+- A type taken off `enrollment` in the meantime gets nothing stored, recording the reason `keystone.unoffered`.
+- A session whose sudo ended in the meantime gets nothing stored. The user is asked to confirm who they are again and lands back on the type's step. This doesn't count as a wrong answer.
+
+`CredentialEnrollmentController::sendCredentialEnrollmentForm()` receives the same `EnrollmentFormPage` as the form a [held sign-in](enrollment.md#choosing-a-second-factor) enrolls with, and renders it:
+
+| Field | Value |
+|---|---|
+| `type` | the credential type |
+| `shape` | the shape of its form, such as `form` |
+| `ceremony` | what the type's ceremony shows, such as a new key; empty for a type with no ceremony |
+| `status` | the translated `enrollment-expired` status when an earlier ceremony ended, or `null` |
+
+```php
+protected function sendCredentialEnrollmentForm(Request $request, EnrollmentFormPage $page): Response
+{
+    Inertia::encryptHistory();
+
+    return Inertia::render('settings/CredentialEnrollment', [
+        'type' => $page->type,
+        'shape' => $page->shape,
+        'ceremony' => $page->ceremony,
+        'status' => $page->status,
+    ]);
+}
+```
+
+The other outcomes each have a hook in the published `app/Http/Controllers/Auth/CredentialEnrollmentController.php`:
+
+| Hook | Outcome | The published controller |
+|---|---|---|
+| `sendCredentialEnrollmentNotStarted()` | the type's ceremony couldn't start | sends the user to the security page with the message on the type |
+| `sendCredentialEnrollmentRefused()` | a wrong answer | sends the user back to the type's step with the message on the type's field |
+| `sendCredentialEnrollmentExpired()` | an answer with no ceremony running | sends the user back to the type's step, which shows the flashed status |
+| `sendCredentialEnrolled()` | the credential was stored | sends the user to the security page, which shows the flashed status |
+| `sendCredentialEnrollmentCancelled()` | the user cancelled | sends the user to the security page |
+
+The published page, `resources/js/pages/settings/CredentialEnrollment.vue`, shows the same credential type form as the sign-in pages. It passes the form the `settings` purpose, so the form posts to `security.enroll.submit`.
 
 ## Removing a credential
 
@@ -102,5 +155,7 @@ protected function sendRemovalPage(Request $request, CredentialRemovalPage $page
 ## Testing
 
 Keystone's AppTests sign in, give the account's credential a name, add another account's credential and open the page. They check your response through `Tests\Keystone\Assertions\SecurityAssertions`: `assertSecurityPage()` receives the names the page must list in order, and `assertSecurityPageOmits()` a name it must not list. A guest's redirect goes through `assertGuestSentAwayFromSecurity()`. If you change what `sendSecurityPage()` returns, redefine the assertion there.
+
+The enrollment AppTests set up a credential of the first type an account can enroll as a second factor. They also answer wrongly, answer with no ceremony running, cancel, try without sudo and try a type whose ceremony can't start. They check your responses through `Tests\Keystone\Assertions\CredentialEnrollmentAssertions`, which has an assertion named after each hook, and `assertCredentialEnrollmentRestarted()` for the form that shows the `enrollment-expired` status.
 
 The removal AppTests remove a credential, try another account's and try without sudo. They also try to remove the account's only way to sign in, and its last second factor while one is required. They check your responses through `Tests\Keystone\Assertions\CredentialRemovalAssertions`: `assertRemovalPage()` receives the name the confirm step must show, `assertRemovalRefused()` the credential's id and the message, and `assertCredentialRemoved()` and `assertCredentialNotFound()` check the other outcomes.

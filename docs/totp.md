@@ -4,7 +4,13 @@
 
 ## Enrolling
 
-Enrolling makes a new 160-bit key and shows it in Base32, with an `otpauth://` link that adds it to an authenticator app, labelled with your `app.name` and the account's first alert address. The user types back a code the new key makes, and the key is stored with that code's step as the last one accepted, so the same code can't answer the next challenge. A code the key doesn't make records `proof.rejected` with the reason `totp.mismatch`. The page shows the key and the link, not a QR code.
+Enrolling makes a new 160-bit key and shows it three ways: as a QR code to scan, in Base32 to type by hand, and as the `otpauth://` link the QR code holds, which adds the key to an authenticator app on the same device. The key is labelled with your `app.name` and the account's first alert address. The user types back a code the new key makes, and the key is stored with that code's step as the last one accepted, so the same code can't answer the next challenge. A code the key doesn't make records `proof.rejected` with the reason `totp.mismatch` and keeps the key, so the user can try again with the same QR code.
+
+Keystone renders the QR code on the server as an SVG, with `bacon/bacon-qr-code`, and hands it to the page as a `data:` URI in the ceremony's `qr` field, beside `key` and `uri`. It draws the code from the link on every request and keeps only the key and the link in the session, so enrolling works on every session driver, the `cookie` driver included. The key never goes to another service to be drawn. The published `resources/js/partials/Totp.vue` shows it in an `<img>`. If your app sends a `Content-Security-Policy` with an `img-src` directive, that directive must allow `data:` on the enrollment pages. The package requires PHP's `xmlwriter` extension to draw the SVG.
+
+A user enrolls TOTP in two places. A sign-in that [owes a second factor](enrollment.md) is held until it enrolls one, and a signed-in user sets one up from the [security settings](security-settings.md#adding-a-credential), behind sudo. Both show the same form.
+
+An account holds one TOTP key. Setting up a new one from the security settings replaces every TOTP credential the account holds, a disabled one included, and signs out the account's other sessions, because whoever held the old key no longer holds a factor of the account. An account's first key signs nobody out. Both record `credential.added` with flow `settings`. A held sign-in never replaces anything: it only enrolls when the account holds no second factor it can use.
 
 ## Codes
 

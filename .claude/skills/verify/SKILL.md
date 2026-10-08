@@ -28,7 +28,7 @@ Start a run:
 
 `start` runs `npm run build` when any file under `packages/*/stubs`, `workbench/resources` or `workbench/routes` is newer than the last build, creates `.verify/runs/<run>/database.sqlite`, then runs `migrate:fresh` and seeds Jane into it. It serves on the first free port from 8100 and waits until `GET /auth/login` answers 200. It then runs `doctor` and prints `run=… url=…` only when every check passes. Pass the printed run id to every other command. Every process `app.sh` starts for a run gets `DB_DATABASE`, `APP_URL`, `CACHE_STORE=database`, `QUEUE_CONNECTION=database` and `MAIL_MAILER=log` for that run, and never relies on a skeleton `.env`, so the run never touches the workbench's shared database in `vendor/orchestra/testbench-core/laravel/database/database.sqlite`.
 
-The challenge needs a second factor, and enrolling one has no UI yet. Give Jane a fresh TOTP secret and 8 recovery codes:
+The challenge needs a second factor. A fresh Jane holds none, so her first sign-in is held until she enrolls one. To start past that, give Jane a fresh TOTP secret and 8 recovery codes:
 
 ```shell
 .claude/skills/verify/scripts/app.sh second-factor <run>
@@ -67,7 +67,8 @@ Use these handles. Each one comes from the stub pages and is stable:
 | Sign in | `/auth/login` | heading `Sign in`, label `Email address`, label `Password`, button `Sign in` |
 | Challenge | `/auth/login/challenge` | heading `Confirm it's you`, label `Code from your authenticator app` (TOTP), label `Recovery code`, button `Verify`, a button per other type named by type (`recovery-code`), button `Cancel sign-in` |
 | Home (signed in) | `/` | link `Security settings`, link `Page behind sudo`, button `End sudo` |
-| Security settings | `/settings/security` | heading `Security settings`, a section per type headed `Password`, `Authenticator app` and `Recovery codes`, section `Sudo` with button `End sudo` while sudo lasts, text `Sudo has ended.` after ending sudo, a link per credential named `Remove <name>` (`Remove Password`, `Remove Authenticator app`, or the credential's own name); needs no sudo |
+| Security settings | `/settings/security` | heading `Security settings`, a section per type headed `Password`, `Authenticator app` and `Recovery codes`, section `Sudo` with button `End sudo` while sudo lasts, text `Sudo has ended.` after ending sudo, a link per credential named `Remove <name>` (`Remove Password`, `Remove Authenticator app`, or the credential's own name), a link per type named `Set up <name>`, text `The new credential was added.` after an enrollment; needs no sudo |
+| Set up a credential | `/settings/security/enroll/<type>` | heading `Set up <name>` (`Set up Authenticator app`), image `QR code holding the key for your authenticator app`, the key in the page's one `code` element, link `Open in authenticator app`, label `Code from your authenticator app`, button `Set up`, button `Cancel`; reached by the link `Set up <name>` on the security page; behind sudo |
 | Remove a credential | `/settings/security/credentials/<id>/remove` | heading `Remove <name>?`, button `Remove`, link `Keep it`, the refusal message above the button; behind sudo |
 | Page behind sudo | `/gated` | heading `A page behind sudo`, link `Home`; behind `['auth', 'sudo']`, workbench only |
 | Sudo | `/auth/sudo` | heading `Confirm it's you`, label `Password` then label `Code from your authenticator app`, button `Confirm`, a button per other type named by type |
@@ -104,7 +105,7 @@ Each scenario writes to `.verify/evidence/<run>/<scenario>/`: the numbered scree
 
 Proof standards:
 
-- Drive the real user path. Click through the pages. Never post to a route the page wouldn't post to, and never call a Keystone class instead of the UI. `second-factor` is the one exception, and only because enrolment has no UI yet.
+- Drive the real user path. Click through the pages. Never post to a route the page wouldn't post to, and never call a Keystone class instead of the UI. `second-factor` is the one exception: it stands in for the enrollment a first sign-in is held at, so a recipe that isn't about enrolling starts past it.
 - Capture the action and the resulting state: a `step()` before submitting and another after the redirect lands, not only the final screen.
 - Verify the side effect next to what is visible: the security-event rows, the recovery-code count, the alert in `laravel.log`, the operator command's exit code and output.
 - Test the failure path too. A refused answer must show its message and record `proof.rejected` with the matching `reason`.
