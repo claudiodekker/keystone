@@ -1,17 +1,13 @@
 <script setup lang="ts">
 import { Form, Head, Link } from '@inertiajs/vue3';
+import { typeName } from '@/lib/credentialTypes';
 import { security } from '@/routes';
 import { submit } from '@/routes/security/credentials/remove';
 import type { CredentialRemovalPage } from '@/types/auth';
 
 const props = defineProps<CredentialRemovalPage>();
 
-const typeNames: Record<string, string> = {
-    password: 'Password',
-    totp: 'Authenticator app',
-};
-
-const name = props.label ?? typeNames[props.type] ?? props.type;
+const name = props.label ?? typeName(props.type);
 </script>
 
 <template>
@@ -22,7 +18,7 @@ const name = props.label ?? typeNames[props.type] ?? props.type;
             <h1 class="text-xl font-semibold text-gray-900">Remove {{ name }}?</h1>
 
             <p v-if="listed" class="text-sm text-gray-600">
-                You won't be able to sign in or confirm it's you with it any more. Your other sessions will be signed out.
+                Once it's removed, it can't be used to sign in or confirm it's you. Your other sessions will be signed out.
             </p>
             <p v-else class="text-sm text-gray-600">This app no longer accepts it. Your other sessions will be signed out.</p>
 

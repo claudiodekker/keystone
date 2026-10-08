@@ -1,16 +1,11 @@
 <script setup lang="ts">
-import { Form, Head } from '@inertiajs/vue3';
+import { Form, Head, Link } from '@inertiajs/vue3';
+import { typeName } from '@/lib/credentialTypes';
+import { remove } from '@/routes/security/credentials';
 import { end } from '@/routes/sudo';
 import type { SecurityPage } from '@/types/auth';
 
 defineProps<SecurityPage>();
-
-const typeNames: Record<string, string> = {
-    password: 'Password',
-    totp: 'Authenticator app',
-};
-
-const typeName = (type: string) => typeNames[type] ?? type;
 
 const date = (value: string | null) => (value === null ? 'never' : new Date(value).toLocaleString());
 
@@ -33,6 +28,10 @@ const time = (value: string) => new Date(value).toLocaleTimeString([], { hour: '
                     <p class="text-sm text-gray-600">{{ group.credentials.some((credential) => !credential.disabled) ? 'Set' : 'Not set' }}</p>
                     <p v-for="credential in group.credentials" :key="credential.id" class="text-sm text-gray-600">
                         Added {{ date(credential.addedAt) }}, last used {{ date(credential.lastUsedAt) }}
+                        <span v-if="credential.disabled" class="font-medium text-red-600">Disabled</span>
+                        <Link :href="remove(credential.id)" :aria-label="`Remove ${typeName(group.type)}`" class="font-medium text-gray-900 underline"
+                            >Remove</Link
+                        >
                     </p>
                 </template>
 
@@ -41,6 +40,12 @@ const time = (value: string) => new Date(value).toLocaleTimeString([], { hour: '
                         <span v-if="credential.label" class="font-medium text-gray-900">{{ credential.label }}</span>
                         <span class="block text-gray-600">Added {{ date(credential.addedAt) }}, last used {{ date(credential.lastUsedAt) }}</span>
                         <span v-if="credential.disabled" class="block font-medium text-red-600">Disabled</span>
+                        <Link
+                            :href="remove(credential.id)"
+                            :aria-label="`Remove ${credential.label ?? typeName(group.type)}`"
+                            class="font-medium text-gray-900 underline"
+                            >Remove</Link
+                        >
                     </li>
                 </ul>
 
@@ -57,6 +62,12 @@ const time = (value: string) => new Date(value).toLocaleTimeString([], { hour: '
                         <span class="font-medium text-gray-900">{{ credential.label ?? typeName(credential.type) }}</span>
                         <span class="block text-gray-600">Added {{ date(credential.addedAt) }}, last used {{ date(credential.lastUsedAt) }}</span>
                         <span v-if="credential.disabled" class="block font-medium text-red-600">Disabled</span>
+                        <Link
+                            :href="remove(credential.id)"
+                            :aria-label="`Remove ${credential.label ?? typeName(credential.type)}`"
+                            class="font-medium text-gray-900 underline"
+                            >Remove</Link
+                        >
                     </li>
                 </ul>
             </section>

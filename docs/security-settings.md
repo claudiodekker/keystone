@@ -55,7 +55,7 @@ protected function sendSecurityPage(Request $request, SecurityPage $page): Respo
 }
 ```
 
-The page names the types it knows, such as "Authenticator app" for `totp`, and shows any other type by its name. Add your own names to `typeNames` in `Security.vue`.
+The page names the types it knows, such as "Authenticator app" for `totp`, and shows any other type by its name. Add your own names to `typeNames` in `resources/js/lib/credentialTypes.ts`, which the security page and the confirm step share.
 
 ## Removing a credential
 
