@@ -15,6 +15,7 @@ use ClaudioDekker\Keystone\KnownDevices;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
+use ClaudioDekker\Keystone\RecoveryCodeRegeneration;
 use ClaudioDekker\Keystone\RecoveryCodes;
 use ClaudioDekker\Keystone\RememberTokens;
 use ClaudioDekker\Keystone\SignInDecision;
@@ -384,6 +385,16 @@ abstract class AppTestCase extends TestCase
         $staged = Keystone::guard()->slots()->get(CredentialTypes::RECOVERY_CODE, Surface::ENROLLMENT->value);
 
         return is_array($staged) ? array_values($staged) : [];
+    }
+
+    /**
+     * Get the replacement recovery codes staged for the signed-in account's regeneration, or none.
+     *
+     * @return list<string>
+     */
+    protected function regenerationCodes(): array
+    {
+        return (new RecoveryCodeRegeneration(Keystone::guard()))->staged()?->codes ?? [];
     }
 
     /**

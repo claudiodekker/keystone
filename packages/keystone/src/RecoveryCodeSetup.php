@@ -54,7 +54,7 @@ class RecoveryCodeSetup
     {
         $staged = $this->guard->slots()->get(CredentialTypes::RECOVERY_CODE, Surface::ENROLLMENT->value);
 
-        if (! is_array($staged) || ! $this->matches($staged, $typed)) {
+        if (! is_array($staged) || ! RecoveryCodes::contains($staged, $typed)) {
             $this->recordRejected($pending, reason: 'recovery-code.mismatch');
 
             return Demand::REFUSE;
@@ -71,23 +71,6 @@ class RecoveryCodeSetup
         $this->guard->slots()->forget(CredentialTypes::RECOVERY_CODE, Surface::ENROLLMENT->value);
 
         return $this->accepted->conclude(new EnrollmentEntry($this->guard), $pending->account, Flow::ENROLLMENT, CredentialTypes::RECOVERY_CODE) ?? Demand::REFUSE;
-    }
-
-    /**
-     * Determine if the typed code is one of the staged set, compared as normalized.
-     *
-     * @param  array<array-key, mixed>  $staged
-     */
-    protected function matches(#[\SensitiveParameter] array $staged, #[\SensitiveParameter] string $typed): bool
-    {
-        $normalized = RecoveryCodes::normalize($typed);
-        $matched = false;
-
-        foreach ($staged as $code) {
-            $matched = hash_equals(RecoveryCodes::normalize((string) $code), $normalized) || $matched;
-        }
-
-        return $matched;
     }
 
     /**

@@ -70,7 +70,7 @@ return [
         'recovery_codes' => [
             'generated' => [
                 'subject' => 'Your recovery codes were replaced',
-                'what' => 'A new set of recovery codes was saved for your account. Your old codes no longer work.',
+                'what' => 'A new set of recovery codes was saved for your account. Your old codes no longer work. Every other session of your account was signed out.',
             ],
         ],
         'session' => [
