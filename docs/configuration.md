@@ -88,7 +88,7 @@ In every environment, it refuses:
 - a `remember.lifetime_seconds` that isn't a whole number of at least 0;
 - a `methods` entry that isn't a type name or a type name mapped to a list of surfaces, a type listed twice, a type no installed package registers, or a surface the type doesn't serve;
 - two installed packages registering credential types with one name, or a type named `recovery-code`, which Keystone keeps for recovery codes;
-- a setting of an installed method package's own config that the package refuses, such as a `keystone-totp.window_steps` below 0 (see [TOTP](totp.md#the-window));
+- a setting of an installed method package's own config that the package refuses, such as a `keystone-totp.window_steps` below 0 (see [TOTP](totp.md#the-window)) or a `keystone-password.min_length` entry below 8 (see [Password](password.md#minimum-length));
 - a `log_channel` that isn't one of your `logging.channels`;
 - a `notifications` slot for a type that isn't a security event, holding anything but `null` or a notification class, naming a notification that doesn't implement `SecurityEventAlertContract`, or naming `SecurityAlert` for a type it has no mail for (see [Security alerts](security-alerts.md#changing-or-silencing-an-alert));
 - a user model on another database connection than your default one, which Keystone's tables are migrated on.

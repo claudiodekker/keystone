@@ -77,6 +77,13 @@ What a credential type's verify answers: the typed input proves one stored crede
 Single-use break-glass codes that stand in for a lost factor.
 _Avoid_: backup codes
 
+**Blocklist**:
+What a new password may not contain or be: a context word, one of the most common passwords, or a password seen in a known breach (NIST SP 800-63B's term). An app's own password rules replace it, with the minimum length.
+_Avoid_: denylist, banned passwords
+
+**Context word**:
+A word of 4 or more characters taken from the app's name, the host of its URL, its configured `context_words`, or the part before the `@` of an address the user holds.
+
 **Account recovery**:
 Getting back into an account after losing a factor, by proving the inbox plus one second factor the account still holds, or the inbox alone when it holds none. Every other credential is removed, and a new first factor is enrolled unless the prover signs in on its own.
 _Avoid_: password reset, forgot password
