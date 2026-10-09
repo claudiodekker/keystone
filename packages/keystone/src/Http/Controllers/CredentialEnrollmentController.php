@@ -52,7 +52,14 @@ abstract class CredentialEnrollmentController extends Controller
 
         /** @var Model&KeystoneUser $account */
         $account = Keystone::guard()->user();
-        $credentialType = $this->enrollable($type);
+        $types = app(CredentialTypes::class);
+        $refusal = $types->enrollmentRefusal($type);
+
+        if ($refusal !== null) {
+            return $this->sendCredentialEnrollmentNotStarted($request, $type, $refusal);
+        }
+
+        $credentialType = $this->enrollable($types, $type);
 
         if ($credentialType === null) {
             return $this->refuseUnofferedType();
@@ -84,7 +91,14 @@ abstract class CredentialEnrollmentController extends Controller
     {
         (new SudoGate(Keystone::guard()))->enforce($request);
 
-        $credentialType = $this->enrollable($type);
+        $types = app(CredentialTypes::class);
+        $refusal = $types->enrollmentRefusal($type);
+
+        if ($refusal !== null) {
+            return $this->sendCredentialEnrollmentNotStarted($request, $type, $refusal);
+        }
+
+        $credentialType = $this->enrollable($types, $type);
 
         if ($credentialType === null) {
             return $this->refuseUnofferedType();
@@ -107,7 +121,7 @@ abstract class CredentialEnrollmentController extends Controller
 
         return match ($result) {
             SettingsEnrollmentResult::ADDED => $this->enrolled($request, Status::ENROLLED),
-            SettingsEnrollmentResult::REPLACED => $this->enrolled($request, Status::CREDENTIAL_REPLACED),
+            SettingsEnrollmentResult::REPLACED => $this->enrolled($request, $types->replacedStatus($credentialType)),
             SettingsEnrollmentResult::REFUSED => $this->sendCredentialEnrollmentRefused($request, $credentialType->name(), __('keystone::messages.invalid_credential')),
             SettingsEnrollmentResult::SUDO_ENDED => $this->refuseWithoutSudo($request, $credentialType->name()),
         };
@@ -124,7 +138,7 @@ abstract class CredentialEnrollmentController extends Controller
             return redirect()->route('login');
         }
 
-        $credentialType = $this->enrollable($type);
+        $credentialType = $this->enrollable(app(CredentialTypes::class), $type);
 
         if ($credentialType !== null) {
             (new EnrollmentCeremonies(Keystone::guard()))->close($credentialType);
@@ -166,9 +180,9 @@ abstract class CredentialEnrollmentController extends Controller
     /**
      * Get the named type when keystone.methods lists it on enrollment.
      */
-    protected function enrollable(string $name): ?CredentialType
+    protected function enrollable(CredentialTypes $types, string $name): ?CredentialType
     {
-        return app(CredentialTypes::class)->find($name, Surface::ENROLLMENT);
+        return $types->find($name, Surface::ENROLLMENT);
     }
 
     /**

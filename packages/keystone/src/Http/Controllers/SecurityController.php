@@ -51,7 +51,8 @@ abstract class SecurityController extends Controller
         $held = collect((new Credentials($account))->ofAccount($account->getKey()));
         $credentialTypes = app(CredentialTypes::class);
         $listed = array_map(fn (CredentialType $type) => $type->name(), $credentialTypes->listed());
-        $enrollable = array_map(fn (CredentialType $type) => $type->name(), $credentialTypes->serving(Surface::ENROLLMENT));
+        $offered = array_filter($credentialTypes->serving(Surface::ENROLLMENT), fn (CredentialType $type) => $credentialTypes->enrollmentRefusal($type->name()) === null);
+        $enrollable = array_map(fn (CredentialType $type) => $type->name(), $offered);
         $recoveryCodes = (new RecoveryCodes($account))->remaining($account->getKey());
         $status = Status::flashed($request);
         $sessions = $guard->sessions($account);

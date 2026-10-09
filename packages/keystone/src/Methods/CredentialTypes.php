@@ -2,6 +2,8 @@
 
 namespace ClaudioDekker\Keystone\Methods;
 
+use ClaudioDekker\Keystone\Status;
+
 /**
  * @internal
  */
@@ -58,6 +60,34 @@ class CredentialTypes
     public function registered(string $name): ?CredentialType
     {
         return $this->types[$name] ?? null;
+    }
+
+    /**
+     * Get why the app can't enroll the named registered type, as the type words it, or null when nothing refuses it.
+     */
+    public function enrollmentRefusal(string $name): ?string
+    {
+        $type = $this->registered($name);
+
+        return $type instanceof RefusesEnrollment ? $type->enrollmentRefusal($this) : null;
+    }
+
+    /**
+     * Get the status saying a credential of the type took the place of the ones held: the type's own, or the generic one.
+     */
+    public function replacedStatus(CredentialType $type): Status
+    {
+        return $type instanceof NamesStatuses ? $type->replacedStatus() : Status::CREDENTIAL_REPLACED;
+    }
+
+    /**
+     * Get the status saying a credential of the named type was removed: the registered type's own, or the generic one.
+     */
+    public function removedStatus(string $name): Status
+    {
+        $type = $this->registered($name);
+
+        return $type instanceof NamesStatuses ? $type->removedStatus() : Status::CREDENTIAL_REMOVED;
     }
 
     /**

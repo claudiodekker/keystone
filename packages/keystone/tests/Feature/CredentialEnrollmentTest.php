@@ -15,6 +15,7 @@ use ClaudioDekker\Keystone\Tests\Fixtures\DrawingType;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormType;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormTypeSupport;
 use ClaudioDekker\Keystone\Tests\Fixtures\RogueType;
+use ClaudioDekker\Keystone\Tests\Fixtures\WordedType;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
@@ -133,6 +134,21 @@ describe('the enrollment step', function () {
         'a type that only serves sign-in' => ['form', null],
         'a type keystone.methods keeps off enrollment' => ['code', ['form', 'code' => ['challenge']]],
         'a type nothing registered' => ['passkey', null],
+    ]);
+
+    it('refuses a type that says the app can\'t enroll it, with its reason, opening no ceremony and storing nothing', function (?array $methods) {
+        config(['keystone.methods' => $methods]);
+        $this->app->make(CredentialTypes::class)->register(new WordedType);
+        $this->signInAccount(new FormTypeSupport);
+
+        $this->get(route('security.enroll', ['type' => 'worded']))->assertRedirectToRoute('security')->assertSessionHasErrors(['worded' => WordedType::REFUSAL]);
+        $this->post(route('security.enroll.submit', ['type' => 'worded']), ['secret' => 'anything'])->assertRedirectToRoute('security')->assertSessionHasErrors(['worded' => WordedType::REFUSAL]);
+
+        expect(Keystone::guard()->slots()->get('worded', Surface::ENROLLMENT->value))->toBeNull();
+        $this->assertDatabaseMissing('user_credentials', ['type' => 'worded']);
+    })->with([
+        'listed on enrollment only' => [['form', 'worded' => ['enrollment']]],
+        'not listed at all' => [['form']],
     ]);
 
     it('asks for sudo first, and comes back to the type\'s step', function () {
@@ -339,6 +355,18 @@ describe('the answer', function () {
         $this->assertDatabaseMissing('user_security_events', ['type' => 'credential.replaced']);
         $this->assertDatabaseHas('users', ['id' => $account->getKey(), 'credential_epoch' => 0]);
         $this->get(route('security'))->assertJsonPath('status', __('keystone::messages.status.enrolled'));
+    });
+
+    it('says it with the type\'s own status when the type names one for a replacement', function () {
+        $this->app->make(CredentialTypes::class)->register(new WordedType);
+        $account = $this->signInAccount(new FormTypeSupport);
+        DB::table('user_credentials')->insert(['user_id' => $account->getKey(), 'type' => 'worded', 'secret' => Crypt::encryptString('held')]);
+        $this->get(route('security.enroll', ['type' => 'worded']));
+
+        $this->post(route('security.enroll.submit', ['type' => 'worded']), ['secret' => $this->enrollmentCeremony('worded')]);
+
+        $this->get(route('security'))->assertJsonPath('status', __('keystone::messages.status.other-sessions-revoked'));
+        $this->assertDatabaseHas('user_security_events', ['type' => 'credential.replaced', 'credential_type' => 'worded']);
     });
 
     it('leaves another account\'s credentials of a replacing type alone', function () {
@@ -767,6 +795,14 @@ describe('the security page', function () {
             ->assertJsonPath('types.0.enrollable', false)
             ->assertJsonPath('types.1.type', 'code')
             ->assertJsonPath('types.1.enrollable', true);
+    });
+
+    it('marks a type that says the app can\'t enroll it as one the user can\'t set up', function () {
+        config(['keystone.methods' => ['form', 'worded' => ['enrollment']]]);
+        $this->app->make(CredentialTypes::class)->register(new WordedType);
+        $this->signInAccount(new FormTypeSupport);
+
+        $this->get(route('security'))->assertJsonPath('types.1.type', 'worded')->assertJsonPath('types.1.enrollable', false);
     });
 
     it('marks a type keystone.methods keeps off enrollment as one the user can\'t set up', function () {

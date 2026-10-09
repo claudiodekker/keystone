@@ -2,10 +2,12 @@
 
 use ClaudioDekker\Keystone\AppTests\AppTestCase;
 use ClaudioDekker\Keystone\Keystone;
+use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Notifications\SecurityAlert;
 use ClaudioDekker\Keystone\SecurityEventType;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormTypeSupport;
+use ClaudioDekker\Keystone\Tests\Fixtures\WordedType;
 use Illuminate\Database\Connection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
@@ -147,6 +149,22 @@ describe('removing', function () {
     })->with([
         'a leftover' => ['uninstalled', []],
         'a disabled credential' => ['code', ['disabled_at' => '2026-09-01 12:00:00']],
+    ]);
+
+    it('says it with the status the credential\'s type names for a removal, even once the type is no longer listed', function (array $methods) {
+        config(['keystone.methods' => $methods]);
+        $this->app->make(CredentialTypes::class)->register(new WordedType);
+        $this->signInAccount(new FormTypeSupport);
+        $id = holdCredential('worded');
+
+        $response = $this->delete(route('security.credentials.remove.submit', ['credential' => $id]));
+
+        $response->assertRedirectToRoute('security');
+        $this->assertDatabaseMissing('user_credentials', ['id' => $id]);
+        $this->get(route('security'))->assertJsonPath('status', __('keystone::messages.status.session-revoked'));
+    })->with([
+        'listed' => [['form', 'worded']],
+        'no longer listed' => [['form']],
     ]);
 
     it('removes nothing for a credential the account doesn\'t hold, and says so on the security page', function (int|string $credential) {

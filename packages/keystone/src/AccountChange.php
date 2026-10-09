@@ -137,16 +137,18 @@ class AccountChange
     /**
      * Remove the account's credential with the id, of any type, disabled or not, ending its other sessions.
      *
+     * @return array{id: int, type: string, label: ?string}|null
+     *
      * @throws LastSignInCredential
      * @throws LastSecondFactor
      */
-    public function removeCredential(int $credentialId): bool
+    public function removeCredential(int $credentialId): ?array
     {
         $accountId = $this->account->getKey();
         $credential = $this->credentials->find($credentialId, $accountId);
 
         if ($credential === null) {
-            return false;
+            return null;
         }
 
         $refusal = $this->credentials->removalRefusal($accountId, $credentialId);
@@ -165,7 +167,7 @@ class AccountChange
             credential: new StoredCredential($credentialId, identifier: null, secret: null, label: $credential['label']),
         );
 
-        return true;
+        return $credential;
     }
 
     /**
