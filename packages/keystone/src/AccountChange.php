@@ -13,7 +13,6 @@ use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\EnrolledCredential;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
-use ClaudioDekker\Keystone\Methods\Surface;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Date;
@@ -150,12 +149,10 @@ class AccountChange
             return false;
         }
 
-        if ($this->isLastSignInCredential($credentialId)) {
-            throw new LastSignInCredential;
-        }
+        $refusal = $this->credentials->removalRefusal($accountId, $credentialId);
 
-        if (config('keystone.require_second_factor') === true && $this->isLastSecondFactor($credentialId)) {
-            throw new LastSecondFactor;
+        if ($refusal !== null) {
+            throw $refusal;
         }
 
         $this->credentials->delete($credentialId, $accountId);
@@ -372,22 +369,6 @@ class AccountChange
             alert: $alert,
             context: $context,
         );
-    }
-
-    /**
-     * Determine if the credential is the account's only one that can sign in.
-     */
-    protected function isLastSignInCredential(int $credentialId): bool
-    {
-        return $this->credentials->lockServing($this->account->getKey(), Surface::SIGN_IN) === [$credentialId];
-    }
-
-    /**
-     * Determine if the credential is the account's only second factor.
-     */
-    protected function isLastSecondFactor(int $credentialId): bool
-    {
-        return $this->credentials->lockServing($this->account->getKey(), Surface::CHALLENGE) === [$credentialId];
     }
 
     /**

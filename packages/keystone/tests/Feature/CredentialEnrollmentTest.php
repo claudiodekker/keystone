@@ -48,6 +48,7 @@ describe('the enrollment step', function () {
             'shape' => 'form',
             'ceremony' => ['code' => $ceremony['ceremony'], 'account' => 'jane@example.com'],
             'status' => null,
+            'held' => [],
         ]);
         $this->assertAuthenticatedAs($account);
     });
@@ -72,6 +73,43 @@ describe('the enrollment step', function () {
         expect($first['drawing'])->toBe(str_repeat($first['code'], 1024))
             ->and($second)->toBe($first)
             ->and($kept['page'])->toBe(['code' => $first['code'], 'account' => 'jane@example.com']);
+    });
+
+    it('reports the account\'s usable credentials of the type, and that each can be removed while another way to sign in remains', function () {
+        $account = $this->signInAccount(new FormTypeSupport);
+        $first = DB::table('user_credentials')->insertGetId(['user_id' => $account->getKey(), 'type' => 'code', 'label' => 'Phone', 'secret' => Crypt::encryptString('first')]);
+        $second = DB::table('user_credentials')->insertGetId(['user_id' => $account->getKey(), 'type' => 'code', 'secret' => Crypt::encryptString('second')]);
+        DB::table('user_credentials')->insert(['user_id' => $account->getKey(), 'type' => 'code', 'secret' => Crypt::encryptString('disabled'), 'disabled_at' => now()]);
+        DB::table('user_credentials')->insert(['user_id' => $account->getKey(), 'type' => 'form', 'secret' => Crypt::encryptString('another type')]);
+
+        $response = $this->get(route('security.enroll', ['type' => 'code']));
+
+        $response->assertOk()->assertJsonPath('held', [
+            ['id' => $first, 'label' => 'Phone', 'removable' => true],
+            ['id' => $second, 'label' => null, 'removable' => true],
+        ]);
+    });
+
+    it('reports the only usable way to sign in as not removable', function () {
+        $this->app->make(CredentialTypes::class)->register(new FormType(name: 'both', surfaces: ['sign-in', 'enrollment']));
+        $account = $this->signInAccount(new FormTypeSupport);
+        $held = DB::table('user_credentials')->where('user_id', $account->getKey())->value('id');
+        DB::table('user_credentials')->where('id', $held)->update(['type' => 'both']);
+        DB::table('user_credentials')->insert(['user_id' => $account->getKey(), 'type' => 'form', 'secret' => Crypt::encryptString('disabled'), 'disabled_at' => now()]);
+
+        $response = $this->get(route('security.enroll', ['type' => 'both']));
+
+        $response->assertOk()->assertJsonPath('held', [['id' => $held, 'label' => null, 'removable' => false]]);
+    });
+
+    it('reports the only second factor as not removable while the app requires one', function () {
+        $account = $this->signInAccount(new FormTypeSupport);
+        $held = DB::table('user_credentials')->insertGetId(['user_id' => $account->getKey(), 'type' => 'code', 'secret' => Crypt::encryptString('held')]);
+        config(['keystone.require_second_factor' => true]);
+
+        $response = $this->get(route('security.enroll', ['type' => 'code']));
+
+        $response->assertOk()->assertJsonPath('held', [['id' => $held, 'label' => null, 'removable' => false]]);
     });
 
     it('puts the hardening floor on the step, so the browser stores none of it', function () {

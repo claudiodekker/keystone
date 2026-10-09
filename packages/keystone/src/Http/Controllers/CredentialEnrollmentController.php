@@ -2,6 +2,7 @@
 
 namespace ClaudioDekker\Keystone\Http\Controllers;
 
+use ClaudioDekker\Keystone\Credentials;
 use ClaudioDekker\Keystone\EnrollmentCeremonies;
 use ClaudioDekker\Keystone\Http\PageValues\EnrollmentFormPage;
 use ClaudioDekker\Keystone\Keystone;
@@ -70,6 +71,7 @@ abstract class CredentialEnrollmentController extends Controller
             shape: $credentialType->surfaces()[Surface::ENROLLMENT->value]->value,
             ceremony: $running->page,
             status: Status::flashed($request)?->label(),
+            held: $this->held($account, $credentialType),
         );
 
         return $this->sendCredentialEnrollmentForm($request, $page);
@@ -167,6 +169,24 @@ abstract class CredentialEnrollmentController extends Controller
     protected function enrollable(string $name): ?CredentialType
     {
         return app(CredentialTypes::class)->find($name, Surface::ENROLLMENT);
+    }
+
+    /**
+     * Get the account's usable credentials of the type, and whether removing each would be allowed.
+     *
+     * @return list<array{id: int, label: ?string, removable: bool}>
+     */
+    protected function held(Model&KeystoneUser $account, CredentialType $type): array
+    {
+        $credentials = new Credentials($account);
+        $held = array_filter($credentials->ofAccount($account->getKey()), fn (array $credential) => $credential['type'] === $type->name() && ! $credential['disabled']);
+        $refusals = $credentials->removalRefusals($account->getKey());
+
+        return array_values(array_map(fn (array $credential) => [
+            'id' => $credential['id'],
+            'label' => $credential['label'],
+            'removable' => ! isset($refusals[$credential['id']]),
+        ], $held));
     }
 
     /**

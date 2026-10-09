@@ -100,6 +100,7 @@ abstract class EnrollmentController extends Controller
             shape: $credentialType->surfaces()[Surface::ENROLLMENT->value]->value,
             ceremony: $running->page,
             status: Status::flashed($request)?->label(),
+            held: [],
         );
 
         return $this->sendEnrollmentForm($request, $page);

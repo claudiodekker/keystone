@@ -15,7 +15,7 @@ class CredentialEnrollmentController extends Controller
      */
     protected function sendCredentialEnrollmentForm(Request $request, EnrollmentFormPage $page): JsonResponse
     {
-        return response()->json(['type' => $page->type, 'shape' => $page->shape, 'ceremony' => $page->ceremony, 'status' => $page->status]);
+        return response()->json(['type' => $page->type, 'shape' => $page->shape, 'ceremony' => $page->ceremony, 'status' => $page->status, 'held' => $page->held]);
     }
 
     /**
