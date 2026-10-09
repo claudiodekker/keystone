@@ -121,7 +121,7 @@ abstract class CredentialEnrollmentController extends Controller
 
         return match ($result) {
             SettingsEnrollmentResult::ADDED => $this->enrolled($request, Status::ENROLLED),
-            SettingsEnrollmentResult::REPLACED => $this->enrolled($request, $types->replacedStatus($credentialType)),
+            SettingsEnrollmentResult::REPLACED => $this->enrolled($request, Status::CREDENTIAL_REPLACED),
             SettingsEnrollmentResult::REFUSED => $this->sendCredentialEnrollmentRefused($request, $credentialType->name(), __('keystone::messages.invalid_credential')),
             SettingsEnrollmentResult::SUDO_ENDED => $this->refuseWithoutSudo($request, $credentialType->name()),
         };

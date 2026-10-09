@@ -45,7 +45,7 @@ return [
             ],
             'replaced' => [
                 'subject' => 'A sign-in method on your account was changed',
-                'what' => 'A way to sign in or confirm it\'s you was replaced with a new one, such as a changed password. The old one no longer works. Every other session of your account was signed out.',
+                'what' => 'A way to sign in or confirm it\'s you was replaced with a new one. The old one no longer works. Every other session of your account was signed out.',
             ],
         ],
         'device_cookie' => [

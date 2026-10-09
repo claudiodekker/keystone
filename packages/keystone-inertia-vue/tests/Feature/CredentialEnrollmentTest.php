@@ -119,7 +119,7 @@ it('puts a refused password change on the current password field, not on the new
         ->assertSessionDoesntHaveErrors('password');
 });
 
-it('shows the password-changed status on the security page, without offering to sign out the other sessions', function () {
+it('shows the credential-replaced status on the security page, without offering to sign out the other sessions', function () {
     $this->signInAccount(new PasswordTypeSupport);
     $this->get(route('security.enroll', ['type' => 'password']));
     $this->post(route('security.enroll.submit', ['type' => 'password']), [
@@ -132,6 +132,6 @@ it('shows the password-changed status on the security page, without offering to 
 
     $response->assertInertia(fn (AssertableInertia $page) => $page
         ->component('settings/Security')
-        ->where('status', __('keystone::messages.status.password-changed'))
+        ->where('status', __('keystone::messages.status.credential-replaced'))
         ->where('offersSignOutOthers', false));
 });

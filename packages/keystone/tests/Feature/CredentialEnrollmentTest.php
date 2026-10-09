@@ -357,18 +357,6 @@ describe('the answer', function () {
         $this->get(route('security'))->assertJsonPath('status', __('keystone::messages.status.enrolled'));
     });
 
-    it('says it with the type\'s own status when the type names one for a replacement', function () {
-        $this->app->make(CredentialTypes::class)->register(new WordedType);
-        $account = $this->signInAccount(new FormTypeSupport);
-        DB::table('user_credentials')->insert(['user_id' => $account->getKey(), 'type' => 'worded', 'secret' => Crypt::encryptString('held')]);
-        $this->get(route('security.enroll', ['type' => 'worded']));
-
-        $this->post(route('security.enroll.submit', ['type' => 'worded']), ['secret' => $this->enrollmentCeremony('worded')]);
-
-        $this->get(route('security'))->assertJsonPath('status', __('keystone::messages.status.other-sessions-revoked'));
-        $this->assertDatabaseHas('user_security_events', ['type' => 'credential.replaced', 'credential_type' => 'worded']);
-    });
-
     it('leaves another account\'s credentials of a replacing type alone', function () {
         $this->app->make(CredentialTypes::class)->register(new FormType(name: 'single', surfaces: ['challenge', 'enrollment'], replacesExisting: true));
         $stranger = DB::table('user_credentials')->insertGetId(['user_id' => $this->createAccount('john@example.com')->getKey(), 'type' => 'single', 'secret' => Crypt::encryptString('held')]);

@@ -89,11 +89,11 @@ abstract class CredentialRemovalController extends Controller
             return $this->sendRemovalRefused($request, $id, __('keystone::messages.last_second_factor'));
         }
 
-        if ($removed === null) {
+        if (! $removed) {
             return $this->refuseUnknownCredential($request);
         }
 
-        app(CredentialTypes::class)->removedStatus($removed['type'])->flash($request);
+        Status::CREDENTIAL_REMOVED->flash($request);
 
         return $this->sendCredentialRemoved($request);
     }

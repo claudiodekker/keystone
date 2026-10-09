@@ -10,12 +10,10 @@ use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\EnrolledCredential;
 use ClaudioDekker\Keystone\Methods\InitiateShape;
 use ClaudioDekker\Keystone\Methods\Initiation;
-use ClaudioDekker\Keystone\Methods\NamesStatuses;
 use ClaudioDekker\Keystone\Methods\Proof;
 use ClaudioDekker\Keystone\Methods\RefusesEnrollment;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
 use ClaudioDekker\Keystone\Methods\Surface;
-use ClaudioDekker\Keystone\Status;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
@@ -26,7 +24,7 @@ use LogicException;
 /**
  * @internal
  */
-class PasswordType implements CredentialType, NamesStatuses, RefusesEnrollment
+class PasswordType implements CredentialType, RefusesEnrollment
 {
     /**
      * The input field holding the typed password.
@@ -143,22 +141,6 @@ class PasswordType implements CredentialType, NamesStatuses, RefusesEnrollment
             Surface::ENROLLMENT => $this->enroll($input, $credentials),
             default => throw new LogicException("Verifying a password on {$surface->value} isn't built yet."),
         };
-    }
-
-    /**
-     * Get the status shown once a new password replaced the account's password.
-     */
-    public function replacedStatus(): Status
-    {
-        return Status::PASSWORD_CHANGED;
-    }
-
-    /**
-     * Get the status shown once the account's password was removed.
-     */
-    public function removedStatus(): Status
-    {
-        return Status::PASSWORD_REMOVED;
     }
 
     /**

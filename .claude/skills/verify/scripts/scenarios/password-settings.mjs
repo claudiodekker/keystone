@@ -79,7 +79,7 @@ try {
     await page.getByLabel('New password', { exact: true }).fill(changed);
     await page.getByLabel('Confirm new password', { exact: true }).fill(changed);
     await page.getByRole('button', { name: 'Change password' }).click();
-    await page.getByText('Your password was changed. Your other sessions were signed out.').waitFor();
+    await page.getByText("The credential was replaced. Your other sessions were signed out.").waitFor();
     assert.equal(new URL(page.url()).pathname, '/settings/security', 'a change lands on the security page');
     assert.equal(await page.getByRole('button', { name: 'Sign out your other sessions' }).count(), 0, 'a change already signed the others out, so it offers nothing');
     await step('password-changed');

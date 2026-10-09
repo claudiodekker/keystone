@@ -210,7 +210,7 @@ describe('adding a password', function () {
 });
 
 describe('changing the password', function () {
-    it('changes the password given the current one, records credential.replaced with an alert, moves the epoch and says password-changed', function () {
+    it('changes the password given the current one, records credential.replaced with an alert, moves the epoch and says credential-replaced', function () {
         $account = $this->signInAccount(new PasswordTypeSupport);
         Notification::fake();
 
@@ -224,7 +224,7 @@ describe('changing the password', function () {
         $this->assertDatabaseHas('users', ['id' => $account->getKey(), 'credential_epoch' => 1]);
         $this->assertAuthenticatedAs($account);
         $this->get(route('security'))
-            ->assertJsonPath('status', __('keystone::messages.status.password-changed'))
+            ->assertJsonPath('status', __('keystone::messages.status.credential-replaced'))
             ->assertJsonPath('offersSignOutOthers', false);
     });
 
@@ -301,7 +301,7 @@ describe('changing the password', function () {
 });
 
 describe('removing the password', function () {
-    it('removes the password behind sudo while another way to sign in remains, records credential.removed with an alert, moves the epoch and says password-removed', function () {
+    it('removes the password behind sudo while another way to sign in remains, records credential.removed with an alert, moves the epoch and says credential-removed', function () {
         $account = $this->signInAccount(new FormTypeSupport);
         $id = givePassword($account, CURRENT_PASSWORD);
         Notification::fake();
@@ -313,7 +313,7 @@ describe('removing the password', function () {
         $this->assertDatabaseHas('user_security_events', ['type' => 'credential.removed', 'user_id' => $account->getKey(), 'credential_type' => 'password', 'credential_id' => $id]);
         Notification::assertSentOnDemand(SecurityAlert::class, fn (SecurityAlert $alert) => $alert->type === SecurityEventType::CREDENTIAL_REMOVED);
         $this->assertDatabaseHas('users', ['id' => $account->getKey(), 'credential_epoch' => 1]);
-        $this->get(route('security'))->assertJsonPath('status', __('keystone::messages.status.password-removed'));
+        $this->get(route('security'))->assertJsonPath('status', __('keystone::messages.status.credential-removed'));
     });
 
     it('confirms the removal on its own step first', function () {
@@ -348,7 +348,7 @@ describe('removing the password', function () {
         $this->assertDatabaseHas('users', ['id' => $account->getKey(), 'credential_epoch' => 0]);
     });
 
-    it('removes a leftover password once passwords are no longer listed, still saying password-removed', function () {
+    it('removes a leftover password once passwords are no longer listed', function () {
         config(['keystone.methods' => ['form', 'code']]);
         $account = $this->signInAccount(new FormTypeSupport);
         $id = givePassword($account, CURRENT_PASSWORD);
@@ -356,7 +356,7 @@ describe('removing the password', function () {
         $this->delete(route('security.credentials.remove.submit', ['credential' => $id]));
 
         $this->assertDatabaseMissing('user_credentials', ['id' => $id]);
-        $this->get(route('security'))->assertJsonPath('status', __('keystone::messages.status.password-removed'));
+        $this->get(route('security'))->assertJsonPath('status', __('keystone::messages.status.credential-removed'));
     });
 
     it('says the credential was not found for a password the account no longer holds', function () {
