@@ -31,6 +31,7 @@ To keep the audit trail but drop the log line, set `keystone.log_channel` to Lar
 | `signed_out` | the user signs out |
 | `session.ended` | Keystone ended a session; the reason says why: `expired` once the [absolute lifetime](configuration.md#session-lifetime) passed, or `demoted` once its account newly owed [enrollment](enrollment.md#signed-in-sessions-that-newly-owe) |
 | `sessions.terminated` | an operator ended every session of the account, or of every account with reason `keystone.every_account` (see [Operator commands](operator-commands.md#ending-sessions)); alerts the account's owner |
+| `sessions.revoked_others` | the user [signed out their other sessions](security-settings.md#signing-out-other-sessions) from their security settings; alerts the account's owner |
 | `account.suspended` | an operator suspended the account (see [Operator commands](operator-commands.md#suspending-accounts)); alerts the account's owner |
 | `account.unsuspended` | an operator lifted the account's suspension; alerts the account's owner |
 | `credential.added` | a credential was added to the account: a second factor at [enrollment](enrollment.md), with flow `enrollment`, or one the user added from their [security settings](security-settings.md#adding-a-credential), with flow `settings`; alerts the account's owner |
