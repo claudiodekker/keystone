@@ -38,6 +38,7 @@ class EnrollmentController extends Controller
             'shape' => $page->shape,
             'ceremony' => $page->ceremony,
             'status' => $page->status,
+            'held' => $page->held,
         ]);
     }
 

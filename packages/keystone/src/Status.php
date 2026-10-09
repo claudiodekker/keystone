@@ -17,6 +17,7 @@ enum Status: string
     case ENROLLMENT_OWED = 'enrollment-owed';
     case SUDO_REVOKED = 'sudo-revoked';
     case CREDENTIAL_REMOVED = 'credential-removed';
+    case CREDENTIAL_REPLACED = 'credential-replaced';
     case CREDENTIAL_NOT_FOUND = 'credential-not-found';
     case OTHER_SESSIONS_REVOKED = 'other-sessions-revoked';
     case SESSION_REVOKED = 'session-revoked';

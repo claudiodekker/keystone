@@ -89,7 +89,7 @@ function loggedWarnings(): array
 
 function assertReachedVerification(TestResponse $response): void
 {
-    $response->assertSessionHasErrors(['password' => __('keystone::messages.invalid_credential')]);
+    $response->assertRedirectToRoute('security')->assertSessionHasNoErrors();
 }
 
 describe('the minimum length', function () {

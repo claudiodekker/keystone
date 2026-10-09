@@ -8,15 +8,17 @@ import type { CredentialTypeOption, EnrollmentFormPage } from '@/types/auth';
 
 const props = defineProps<EnrollmentFormPage>();
 
-const option = computed<CredentialTypeOption>(() => ({ type: props.type, shape: props.shape, ceremony: props.ceremony }));
+const option = computed<CredentialTypeOption>(() => ({ type: props.type, shape: props.shape, ceremony: props.ceremony, held: props.held }));
+
+const heading = computed(() => (props.type === 'password' && props.held.length ? 'Change password' : `Set up ${typeName(props.type)}`));
 </script>
 
 <template>
-    <Head :title="`Set up ${typeName(type)}`" />
+    <Head :title="heading" />
 
     <div class="flex min-h-svh justify-center bg-gray-50 p-6">
         <main class="flex w-full max-w-md flex-col gap-6 rounded-lg bg-white p-6 shadow-sm ring-1 ring-gray-200">
-            <h1 class="text-xl font-semibold text-gray-900">Set up {{ typeName(type) }}</h1>
+            <h1 class="text-xl font-semibold text-gray-900">{{ heading }}</h1>
 
             <p v-if="status" class="text-sm font-medium text-red-600">{{ status }}</p>
 

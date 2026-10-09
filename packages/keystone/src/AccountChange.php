@@ -8,11 +8,11 @@ use ClaudioDekker\Keystone\Exceptions\LastRecoveryCode;
 use ClaudioDekker\Keystone\Exceptions\LastSecondFactor;
 use ClaudioDekker\Keystone\Exceptions\LastSignInCredential;
 use ClaudioDekker\Keystone\Exceptions\NotSuspended;
+use ClaudioDekker\Keystone\Exceptions\Superseded;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\EnrolledCredential;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
-use ClaudioDekker\Keystone\Methods\Surface;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Date;
@@ -86,19 +86,37 @@ class AccountChange
     }
 
     /**
-     * Store the enrolled credential on the account and record it in the flow.
+     * Store the enrolled credential on the account and record in the flow whether it was added or replaced what the account held.
      *
-     * A credential that replaces its type takes the place of every credential of the type the account holds, disabled or not, and ends the account's other sessions when it held one.
+     * A credential that replaces its type takes the place of every credential of the type the account holds, disabled or not.
      *
      * A replacing credential the account already holds was stored by the same answer arriving twice, so it is not stored, recorded or replaced again.
+     *
+     * @param  list<StoredCredential>  $provedAgainst
+     *
+     * @throws Superseded
      */
-    public function enroll(CredentialType $type, EnrolledCredential $enrolled, Flow $flow): void
+    public function enroll(CredentialType $type, EnrolledCredential $enrolled, Flow $flow, array $provedAgainst): SettingsEnrollmentResult
     {
-        if ($enrolled->replacesExisting && $this->holds($type, $enrolled)) {
-            return;
+        $stored = $enrolled->replacesExisting ? $this->storedBySameAnswer($type, $enrolled) : null;
+
+        if ($stored !== null) {
+            $others = array_filter($provedAgainst, fn (StoredCredential $credential) => $credential->id !== $stored->id);
+
+            return $others === [] ? SettingsEnrollmentResult::ADDED : SettingsEnrollmentResult::REPLACED;
         }
 
-        if ($enrolled->replacesExisting && $this->credentials->deleteOfType($this->account->getKey(), $type->name()) > 0) {
+        if ($enrolled->replacesExisting && ! $this->stillHolds($type, $provedAgainst)) {
+            throw new Superseded;
+        }
+
+        if ($enrolled->replacesExisting) {
+            $this->credentials->deleteOfType($this->account->getKey(), $type->name());
+        }
+
+        $replaced = $enrolled->replacesExisting && $provedAgainst !== [];
+
+        if ($replaced) {
             $this->endSessions();
         }
 
@@ -107,11 +125,13 @@ class AccountChange
         $this->rotatesSession = true;
 
         $this->record(
-            SecurityEventType::CREDENTIAL_ADDED,
+            $replaced ? SecurityEventType::CREDENTIAL_REPLACED : SecurityEventType::CREDENTIAL_ADDED,
             flow: $flow->value,
             credentialType: $type->name(),
             credential: new StoredCredential($id, identifier: null, secret: null, label: $enrolled->label),
         );
+
+        return $replaced ? SettingsEnrollmentResult::REPLACED : SettingsEnrollmentResult::ADDED;
     }
 
     /**
@@ -129,12 +149,10 @@ class AccountChange
             return false;
         }
 
-        if ($this->isLastSignInCredential($credentialId)) {
-            throw new LastSignInCredential;
-        }
+        $refusal = $this->credentials->removalRefusal($accountId, $credentialId);
 
-        if (config('keystone.require_second_factor') === true && $this->isLastSecondFactor($credentialId)) {
-            throw new LastSecondFactor;
+        if ($refusal !== null) {
+            throw $refusal;
         }
 
         $this->credentials->delete($credentialId, $accountId);
@@ -354,22 +372,6 @@ class AccountChange
     }
 
     /**
-     * Determine if the credential is the account's only one that can sign in.
-     */
-    protected function isLastSignInCredential(int $credentialId): bool
-    {
-        return $this->credentials->lockServing($this->account->getKey(), Surface::SIGN_IN) === [$credentialId];
-    }
-
-    /**
-     * Determine if the credential is the account's only second factor.
-     */
-    protected function isLastSecondFactor(int $credentialId): bool
-    {
-        return $this->credentials->lockServing($this->account->getKey(), Surface::CHALLENGE) === [$credentialId];
-    }
-
-    /**
      * Determine if the locked account is still on the credential epoch.
      */
     public function isOnEpoch(int $epoch): bool
@@ -386,17 +388,29 @@ class AccountChange
     }
 
     /**
-     * Determine if the account holds a usable credential of the type with the secret of the enrolled one.
+     * Get the account's usable credential of the type holding the enrolled one's secret, which the same answer stored when it arrived before.
      */
-    protected function holds(CredentialType $type, EnrolledCredential $enrolled): bool
+    protected function storedBySameAnswer(CredentialType $type, EnrolledCredential $enrolled): ?StoredCredential
     {
         if ($enrolled->secret === null) {
-            return false;
+            return null;
         }
 
         $held = $this->credentials->ofType($this->account->getKey(), $type->name());
 
-        return array_any($held, fn (StoredCredential $credential) => $credential->secret !== null && hash_equals($credential->secret, $enrolled->secret));
+        return array_find($held, fn (StoredCredential $credential) => $credential->secret !== null && hash_equals($credential->secret, $enrolled->secret));
+    }
+
+    /**
+     * Determine if the account's usable credentials of the type are still exactly the ones listed.
+     *
+     * @param  list<StoredCredential>  $credentials
+     */
+    protected function stillHolds(CredentialType $type, array $credentials): bool
+    {
+        $held = $this->credentials->ofType($this->account->getKey(), $type->name());
+
+        return array_column($held, 'id') === array_column($credentials, 'id');
     }
 
     /**

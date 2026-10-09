@@ -158,6 +158,7 @@ return [
         'challenge.abandoned' => SecurityAlert::class,
         'credential.added' => SecurityAlert::class,
         'credential.removed' => SecurityAlert::class,
+        'credential.replaced' => SecurityAlert::class,
         'device_cookie.reused' => SecurityAlert::class,
         'limit.tripped' => SecurityAlert::class,
         'recovery_code.used' => SecurityAlert::class,

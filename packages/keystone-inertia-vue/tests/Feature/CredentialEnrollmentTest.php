@@ -4,6 +4,7 @@ use ClaudioDekker\Keystone\InertiaVue\AppTests\Assertions\CredentialEnrollmentAs
 use ClaudioDekker\Keystone\InertiaVue\Tests\StubsTestCase;
 use ClaudioDekker\Keystone\Password\AppTests\Support\PasswordTypeSupport;
 use ClaudioDekker\Keystone\Totp\AppTests\Support\TotpTypeSupport;
+use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia;
 
 pest()->extend(StubsTestCase::class)->use(CredentialEnrollmentAssertions::class);
@@ -89,4 +90,48 @@ it('tells the security page which types the user can set up', function () {
         ->where('types.0.enrollable', false)
         ->where('types.1.type', 'totp')
         ->where('types.1.enrollable', true));
+});
+
+it('passes the account\'s held credentials of the type to the form, and whether each can be removed', function () {
+    $account = $this->signInAccount(new PasswordTypeSupport);
+    $password = DB::table('user_credentials')->where('user_id', $account->getKey())->value('id');
+
+    $response = $this->get(route('security.enroll', ['type' => 'password']));
+
+    $response->assertInertia(fn (AssertableInertia $page) => $page
+        ->component('settings/CredentialEnrollment')
+        ->where('type', 'password')
+        ->where('held', [['id' => $password, 'label' => null, 'removable' => false]]));
+});
+
+it('puts a refused password change on the current password field, not on the new password', function () {
+    $this->signInAccount(new PasswordTypeSupport);
+    $this->get(route('security.enroll', ['type' => 'password']));
+
+    $response = $this->post(route('security.enroll.submit', ['type' => 'password']), [
+        'current_password' => 'wrong password',
+        'password' => 'tq8#vbnz-wx4!kp-lantern',
+        'password_confirmation' => 'tq8#vbnz-wx4!kp-lantern',
+    ]);
+
+    $response->assertRedirectToRoute('security.enroll', ['type' => 'password'])
+        ->assertSessionHasErrors(['current_password' => __('keystone::messages.invalid_credential')])
+        ->assertSessionDoesntHaveErrors('password');
+});
+
+it('shows the credential-replaced status on the security page, without offering to sign out the other sessions', function () {
+    $this->signInAccount(new PasswordTypeSupport);
+    $this->get(route('security.enroll', ['type' => 'password']));
+    $this->post(route('security.enroll.submit', ['type' => 'password']), [
+        'current_password' => 'correct horse battery staple',
+        'password' => 'tq8#vbnz-wx4!kp-lantern',
+        'password_confirmation' => 'tq8#vbnz-wx4!kp-lantern',
+    ]);
+
+    $response = $this->get(route('security'));
+
+    $response->assertInertia(fn (AssertableInertia $page) => $page
+        ->component('settings/Security')
+        ->where('status', __('keystone::messages.status.credential-replaced'))
+        ->where('offersSignOutOthers', false));
 });

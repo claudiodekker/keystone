@@ -6,9 +6,13 @@ use ClaudioDekker\Keystone\Addresses;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\KeystoneUser;
 use ClaudioDekker\Keystone\Methods\CredentialType;
+use ClaudioDekker\Keystone\Methods\CredentialTypes;
+use ClaudioDekker\Keystone\Methods\EnrolledCredential;
 use ClaudioDekker\Keystone\Methods\InitiateShape;
 use ClaudioDekker\Keystone\Methods\Initiation;
 use ClaudioDekker\Keystone\Methods\Proof;
+use ClaudioDekker\Keystone\Methods\RefusesEnrollment;
+use ClaudioDekker\Keystone\Methods\StoredCredential;
 use ClaudioDekker\Keystone\Methods\Surface;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
@@ -20,12 +24,17 @@ use LogicException;
 /**
  * @internal
  */
-class PasswordType implements CredentialType
+class PasswordType implements CredentialType, RefusesEnrollment
 {
     /**
      * The input field holding the typed password.
      */
     public const string FIELD = 'password';
+
+    /**
+     * The input field holding the password the account holds, typed to change it.
+     */
+    public const string CURRENT_FIELD = 'current_password';
 
     /**
      * The most bytes of a password bcrypt hashes; it ignores the rest.
@@ -109,7 +118,8 @@ class PasswordType implements CredentialType
     {
         return match ($surface) {
             Surface::SIGN_IN => [self::FIELD => ['required', 'string', 'max:'.self::MAX_CHARACTERS]],
-            default => [self::FIELD => ['bail', 'required', 'string', 'confirmed', $this->lengthCap(), ...$this->strengthRules()]],
+            Surface::ENROLLMENT => [self::CURRENT_FIELD => ['nullable', 'string', 'max:'.self::MAX_CHARACTERS], ...$this->newPasswordRules()],
+            default => $this->newPasswordRules(),
         };
     }
 
@@ -122,16 +132,36 @@ class PasswordType implements CredentialType
     }
 
     /**
-     * Check the typed password against the subject's password, or against the dummy hash when there is none.
+     * Check the typed password against the subject's password at sign-in, or set the account's new password from the security settings.
      */
     public function verify(Surface $surface, array $input, array $credentials, mixed $ceremony = null): Proof
     {
-        if ($surface !== Surface::SIGN_IN) {
-            throw new LogicException("Verifying a password on {$surface->value} isn't built yet.");
+        return match ($surface) {
+            Surface::SIGN_IN => $this->signIn($input[self::FIELD], $credentials),
+            Surface::ENROLLMENT => $this->enroll($input, $credentials),
+            default => throw new LogicException("Verifying a password on {$surface->value} isn't built yet."),
+        };
+    }
+
+    /**
+     * Get why the app can't set a password: it doesn't list passwords on sign-in, so one would never be used.
+     */
+    public function enrollmentRefusal(CredentialTypes $types): ?string
+    {
+        if ($types->find($this->name(), Surface::SIGN_IN) !== null) {
+            return null;
         }
 
-        $password = $input[self::FIELD];
+        return __('keystone-password::messages.unsupported');
+    }
 
+    /**
+     * Check the typed password against the subject's password, or against the dummy hash when there is none.
+     *
+     * @param  list<StoredCredential>  $credentials
+     */
+    protected function signIn(#[\SensitiveParameter] string $password, array $credentials): Proof
+    {
         foreach ($credentials as $credential) {
             if ($this->check($password, (string) $credential->secret)) {
                 return Proof::proven($credential, updatedSecret: $this->rehash($password, (string) $credential->secret));
@@ -143,6 +173,47 @@ class PasswordType implements CredentialType
         }
 
         return Proof::rejected('password.mismatch', $credentials[0] ?? null);
+    }
+
+    /**
+     * Set the account's first password, or replace the one it holds once the current one is typed.
+     *
+     * @param  array<string, mixed>  $input
+     * @param  list<StoredCredential>  $credentials
+     */
+    protected function enroll(#[\SensitiveParameter] array $input, array $credentials): Proof
+    {
+        if ($credentials !== [] && ! $this->checkCurrent($input[self::CURRENT_FIELD] ?? null, $credentials)) {
+            return Proof::rejected('password.mismatch', $credentials[0]);
+        }
+
+        return Proof::enrolled(EnrolledCredential::replacing(identifier: null, secret: Hash::make($input[self::FIELD])));
+    }
+
+    /**
+     * Determine if the typed current password is one of the account's passwords, taking as long as a check when nothing was typed.
+     *
+     * @param  list<StoredCredential>  $credentials
+     */
+    protected function checkCurrent(#[\SensitiveParameter] ?string $typed, array $credentials): bool
+    {
+        if ($typed === null) {
+            $this->checkDummy('');
+
+            return false;
+        }
+
+        return array_any($credentials, fn (StoredCredential $credential) => $this->check($typed, (string) $credential->secret));
+    }
+
+    /**
+     * Get the rules for a new password: confirmed, fitting what the hashing driver takes, and strong enough.
+     *
+     * @return array<string, list<mixed>>
+     */
+    protected function newPasswordRules(): array
+    {
+        return [self::FIELD => ['bail', 'required', 'string', 'confirmed', $this->lengthCap(), ...$this->strengthRules()]];
     }
 
     /**

@@ -43,6 +43,10 @@ return [
                 'subject' => 'A sign-in method was removed from your account',
                 'what' => 'A way to sign in or confirm it\'s you was removed from your account. Every other session of your account was signed out.',
             ],
+            'replaced' => [
+                'subject' => 'A sign-in method on your account was changed',
+                'what' => 'A way to sign in or confirm it\'s you was replaced with a new one. The old one no longer works. Every other session of your account was signed out.',
+            ],
         ],
         'device_cookie' => [
             'reused' => [

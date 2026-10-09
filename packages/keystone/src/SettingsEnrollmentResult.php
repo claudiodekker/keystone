@@ -7,7 +7,16 @@ namespace ClaudioDekker\Keystone;
  */
 enum SettingsEnrollmentResult
 {
-    case ENROLLED;
+    /**
+     * The credential was stored beside what the account held.
+     */
+    case ADDED;
+
+    /**
+     * The credential was stored in place of the credentials of its type the account held.
+     */
+    case REPLACED;
+
     case REFUSED;
 
     /**

@@ -4,9 +4,15 @@ The security page shows a signed-in user how their account is protected: the cre
 
 The page needs no sudo. Looking at your own settings changes nothing, so asking the user to prove who they are again would only get in the way. A guest is redirected to sign in. The route counts against the `view` [request limit](rate-limiting.md), 60 a minute by default, and its responses carry the [hardening headers](hardening.md#headers).
 
+Password managers open the page through `GET /.well-known/change-password`, named `well-known.change-password`, which the published routes file redirects to `security`. It needs no sign-in: the page's own check sends a guest to sign in first.
+
+```php
+Route::get('.well-known/change-password', fn () => to_route('security'))->name('well-known.change-password');
+```
+
 ## What it shows
 
-Each credential type that `keystone.methods` lists on any surface gets its own section, in the order the method packages registered them, even when the account holds none of that type. A type listed on `enrollment` has a Set up link to [its enrollment step](#adding-a-credential). Each section lists the account's credentials of that type, oldest first, with:
+Each credential type that `keystone.methods` lists on any surface gets its own section, in the order the method packages registered them, even when the account holds none of that type. A type listed on `enrollment` has a Set up link to [its enrollment step](#adding-a-credential), unless the type refuses to be set up, as a password does while `keystone.methods` doesn't list passwords on `sign-in`. Each section lists the account's credentials of that type, oldest first, with:
 
 - the name the user gave it, or none;
 - when it was added;
@@ -14,7 +20,7 @@ Each credential type that `keystone.methods` lists on any surface gets its own s
 
 A first factor is stamped when it passes, even when the account still owes the challenge. At the sudo replay only the credential that grants sudo is stamped, so a password that passed the replay's first step keeps its earlier time.
 
-The password section says whether the account has a password it can sign in with. A password has no name and the account holds at most one.
+The password section says whether the account has a password it can sign in with, and its link reads Change once one is set. A password has no name and the account holds at most one.
 
 Credentials of a type that `keystone.methods` no longer lists, or that no installed package registers, are shown apart as leftovers. They don't count as a way to sign in or as a second factor, and Keystone keeps them stored so they count again if you list the type again.
 
@@ -32,7 +38,7 @@ The page shows only the signed-in account's own credentials, codes and sessions.
 
 | Field | Value |
 |---|---|
-| `types` | one entry per listed type: `type`, `enrollable` (whether `keystone.methods` lists it on `enrollment`), and `credentials`, each with `id`, `label`, `addedAt`, `lastUsedAt` and `disabled` |
+| `types` | one entry per listed type: `type`, `enrollable` (whether `keystone.methods` lists it on `enrollment` and the type doesn't refuse to be set up), and `credentials`, each with `id`, `label`, `addedAt`, `lastUsedAt` and `disabled` |
 | `leftovers` | the credentials of types no longer listed, each with `id`, `type`, `label`, `addedAt`, `lastUsedAt` and `disabled` |
 | `recoveryCodes` | how many unspent recovery codes the account holds |
 | `recoveryCodesLow` | whether that is three or fewer |
@@ -40,7 +46,7 @@ The page shows only the signed-in account's own credentials, codes and sessions.
 | `status` | the translated status a previous request flashed, such as the one for `sudo-revoked`, or `null` |
 | `sessions` | the account's [live sessions](#sessions), this device first, each a `SessionRow`; empty on a driver that can't list them |
 | `sessionsStatus` | the translated `sessions-unavailable` status on a driver that can't list sessions, or `null` |
-| `offersSignOutOthers` | whether to offer [signing out the other sessions](#signing-out-other-sessions) next to the status, after an enrollment from this page |
+| `offersSignOutOthers` | whether to offer [signing out the other sessions](#signing-out-other-sessions) next to the status, after an enrollment from this page added a credential |
 
 Times are ISO 8601 strings in UTC, which the published page formats in the browser's locale.
 
@@ -69,11 +75,13 @@ The page names the types it knows, such as "Authenticator app" for `totp`, and s
 
 The Set up link opens the type's enrollment step at `GET /settings/security/enroll/{type}`, named `security.enroll`. The step starts the type's ceremony, such as [TOTP](totp.md#enrolling) making a new key, and shows its form. Reloading shows the same ceremony. The user answers with `POST /settings/security/enroll/{type}`, named `security.enroll.submit`, and cancels with `DELETE /settings/security/enroll/{type}`, named `security.enroll.cancel`.
 
-The step and the answer need [sudo](sudo.md#gating-a-route). A session without it is sent to confirm who the user is, and then back to the type's step. Cancelling needs no sudo, because it only forgets the ceremony. The step counts against the `start` [request limit](rate-limiting.md), the answer against the `submit` limit and cancelling against the `change` limit, each 10 a minute by default. A type that `keystone.methods` doesn't list on `enrollment` has no step: the user is sent back to the security page.
+The step and the answer need [sudo](sudo.md#gating-a-route). A session without it is sent to confirm who the user is, and then back to the type's step. Cancelling needs no sudo, because it only forgets the ceremony. The step counts against the `start` [request limit](rate-limiting.md), the answer against the `submit` limit and cancelling against the `change` limit, each 10 a minute by default. A type that `keystone.methods` doesn't list on `enrollment` has no step: the user is sent back to the security page. A type can also refuse to be set up, with a reason worded for the user. A [password](#passwords) refuses while `keystone.methods` doesn't list passwords on `sign-in`. The step and the answer then send the user to the security page with that reason on the type, through `sendCredentialEnrollmentNotStarted()`.
 
 A ceremony lasts 15 minutes at most, and never longer than the sudo it was started under. The ceremony also ends with its sudo: when the sudo runs out, when the user ends it, or when the user's network changes. A later sudo never finishes an enrollment that an earlier one started. An answer that arrives with no ceremony running sends the user back to the type's step with the `enrollment-expired` status, where a new ceremony starts.
 
-A correct answer stores the credential and records `credential.added` with flow `settings` in one change, which [alerts](security-alerts.md) the account's owner. The user's session gets a new session id and keeps its sudo, and the user is sent to the security page with the `enrolled` status, which [offers to sign out the other sessions](#after-an-enrollment). Adding a credential signs out no other session. The exception is a type whose new credential replaces the one the account holds, as a [TOTP key](totp.md#enrolling) does: the old credential is deleted in the same change, and every other session of the account is signed out.
+A correct answer stores the credential and records `credential.added` with flow `settings` in one change, which [alerts](security-alerts.md) the account's owner. The user's session gets a new session id and keeps its sudo, and the user is sent to the security page with the `enrolled` status, which [offers to sign out the other sessions](#after-an-enrollment). Adding a credential signs out no other session.
+
+Some types keep one credential per account, as a [TOTP key](totp.md#enrolling) and a [password](#passwords) do. When the account already holds a usable one, the new credential replaces it in the same change: the old one is deleted, every other session of the account is signed out, and Keystone records `credential.replaced` with flow `settings` in place of `credential.added`. It alerts the account's owner, and no `credential.removed` is recorded. The user lands on the security page with the `credential-replaced` status. The other sessions are already signed out, so the page doesn't offer to sign them out. A disabled credential of the type is deleted too, but it was no way in, so setting one up over it counts as an addition: `credential.added`, the `enrolled` status, and no other session signed out.
 
 A wrong answer stores nothing and keeps the ceremony. It is refused with "The provided credential is invalid." on the type's field, and nothing typed is flashed back. It records `proof.rejected` with flow `settings` and counts as a failed attempt in the `settings` flow, apart from the counts that sign-in, the challenge and the sudo replay keep.
 
@@ -82,6 +90,7 @@ Keystone checks three things again as it writes, while it holds the account's ro
 - An account suspended in the meantime gets nothing stored, recording `proof.rejected` with the reason `keystone.barred`.
 - A type taken off `enrollment` in the meantime gets nothing stored, recording the reason `keystone.unoffered`.
 - A session whose sudo ended in the meantime gets nothing stored. The user is asked to confirm who they are again and lands back on the type's step. This doesn't count as a wrong answer.
+- A credential that replaces what the account holds gets nothing stored when the account's credentials of the type changed in the meantime, such as a second password change sent at the same time, recording the reason `keystone.superseded`. The answer was checked against credentials the account no longer holds. The same answer arriving twice, as a double click sends a TOTP code, stores the credential once and refuses nothing.
 
 `CredentialEnrollmentController::sendCredentialEnrollmentForm()` receives the same `EnrollmentFormPage` as the form a [held sign-in](enrollment.md#choosing-a-second-factor) enrolls with, and renders it:
 
@@ -91,6 +100,7 @@ Keystone checks three things again as it writes, while it holds the account's ro
 | `shape` | the shape of its form, such as `form` |
 | `ceremony` | what the type's ceremony shows, such as a new key; empty for a type with no ceremony |
 | `status` | the translated `enrollment-expired` status when an earlier ceremony ended, or `null` |
+| `held` | the account's usable credentials of the type, each with `id`, `label` and `removable`, whether removing it would be allowed; always empty for a held sign-in |
 
 ```php
 protected function sendCredentialEnrollmentForm(Request $request, EnrollmentFormPage $page): Response
@@ -102,6 +112,7 @@ protected function sendCredentialEnrollmentForm(Request $request, EnrollmentForm
         'shape' => $page->shape,
         'ceremony' => $page->ceremony,
         'status' => $page->status,
+        'held' => $page->held,
     ]);
 }
 ```
@@ -110,13 +121,31 @@ The other outcomes each have a hook in the published `app/Http/Controllers/Auth/
 
 | Hook | Outcome | The published controller |
 |---|---|---|
-| `sendCredentialEnrollmentNotStarted()` | the type's ceremony couldn't start | sends the user to the security page with the message on the type |
-| `sendCredentialEnrollmentRefused()` | a wrong answer | sends the user back to the type's step with the message on the type's field |
+| `sendCredentialEnrollmentNotStarted()` | the type's ceremony couldn't start, or the type refuses to be set up | sends the user to the security page with the message on the type |
+| `sendCredentialEnrollmentRefused()` | a wrong answer | sends the user back to the type's step with the message on the type's field, or on `current_password` for a password |
 | `sendCredentialEnrollmentExpired()` | an answer with no ceremony running | sends the user back to the type's step, which shows the flashed status |
 | `sendCredentialEnrolled()` | the credential was stored | sends the user to the security page, which shows the flashed status |
 | `sendCredentialEnrollmentCancelled()` | the user cancelled | sends the user to the security page |
 
 The published page, `resources/js/pages/settings/CredentialEnrollment.vue`, shows the same credential type form as the sign-in pages. It passes the form the `settings` purpose, so the form posts to `security.enroll.submit`.
+
+### Passwords
+
+A password is added and changed through the same step, at `/settings/security/enroll/password`, and removed like any other credential. The Change or Set up link in the password section opens it.
+
+An account without a password sees "Your account does not have a password set." and two fields: `password` and `password_confirmation`, both with `autocomplete="new-password"`. The new password must pass the [rules for new passwords](password.md#new-passwords). It is stored with `credential.added` and the `enrolled` status, and signs out no other session.
+
+An account with a password also sees `current_password`, with `autocomplete="current-password"`, above the two new-password fields. Keystone checks the current password inside the timing floor, against the password the account holds. A wrong, empty or missing one is a wrong answer: it records `proof.rejected` with the reason `password.mismatch` and counts as a failed attempt in the `settings` flow. A `current_password` that isn't a string is refused as invalid input before anything is checked. The published controller puts the refusal on `current_password`, because the type's field and the new password share the name `password`. A right one stores the new password in place of the old one, records `credential.replaced`, signs out every other session and shows the `credential-replaced` status:
+
+```html
+<input name="current_password" type="password" autocomplete="current-password" />
+<input name="password" type="password" autocomplete="new-password" />
+<input name="password_confirmation" type="password" autocomplete="new-password" />
+```
+
+The step's `held` says whether a password is set and whether it can be removed. The published form links to its confirm step with "Remove password" while another way to sign in remains. Removing it shows the `credential-removed` status, and removing the only way to sign in is refused as for any credential. A removal names the credential by its id, so there is no request that removes "the password" of an account that holds none. An id the account doesn't hold gives `credential-not-found`.
+
+While `keystone.methods` doesn't list passwords on `sign-in`, the step and every answer are refused with "Passwords are not supported on this application.", because a password the app can't sign in with protects nothing. A password the account still holds then shows as a leftover, and it can still be removed.
 
 ## Removing a credential
 
@@ -244,7 +273,7 @@ protected function sendSignOutOthersPage(Request $request): Response
 
 ### After an enrollment
 
-A credential added from this page is a good moment to sign out a browser the user doesn't recognise. After an [enrollment](#adding-a-credential), `offersSignOutOthers` is `true` and the published page shows a "Sign out your other sessions" button next to the `enrolled` status. The button sends `DELETE /settings/security/sessions/others` straight away, without the confirm step, because clicking it is the confirmation. The enrollment kept the session's sudo, so the sign-out passes the gate.
+A credential added from this page is a good moment to sign out a browser the user doesn't recognise. After an [enrollment](#adding-a-credential) that added a credential, `offersSignOutOthers` is `true` and the published page shows a "Sign out your other sessions" button next to the `enrolled` status. An enrollment that replaced a credential already signed the other sessions out, so it offers nothing. The button sends `DELETE /settings/security/sessions/others` straight away, without the confirm step, because clicking it is the confirmation. The enrollment kept the session's sudo, so the sign-out passes the gate.
 
 On the `database` driver, Keystone first checks `session.table` and offers the sign-out only when the account has another session that has made a request since its credential epoch last moved. On other drivers Keystone can't tell, so it always offers it.
 

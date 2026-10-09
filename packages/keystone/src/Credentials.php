@@ -2,6 +2,8 @@
 
 namespace ClaudioDekker\Keystone;
 
+use ClaudioDekker\Keystone\Exceptions\LastSecondFactor;
+use ClaudioDekker\Keystone\Exceptions\LastSignInCredential;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
@@ -153,6 +155,45 @@ class Credentials
         $ids = $this->usableServing($surface, $accountId)->orderBy('id')->lockForUpdate()->pluck('id');
 
         return array_map(intval(...), array_values($ids->all()));
+    }
+
+    /**
+     * Get why removing the account's credential would be refused: it is the only usable one that signs in, or the only second factor while the app requires one.
+     *
+     * Inside a transaction it locks the credentials it reads, so the answer holds until the transaction ends.
+     */
+    public function removalRefusal(int|string $accountId, int $credentialId): LastSignInCredential|LastSecondFactor|null
+    {
+        return $this->removalRefusals($accountId)[$credentialId] ?? null;
+    }
+
+    /**
+     * Get why removing each of the account's credentials would be refused, keyed by id, leaving out those whose removal is allowed.
+     *
+     * Inside a transaction it locks the credentials it reads, so the answers hold until the transaction ends.
+     *
+     * @return array<int, LastSignInCredential|LastSecondFactor>
+     */
+    public function removalRefusals(int|string $accountId): array
+    {
+        $refusals = [];
+        $signIn = $this->lockServing($accountId, Surface::SIGN_IN);
+
+        if (count($signIn) === 1) {
+            $refusals[$signIn[0]] = new LastSignInCredential;
+        }
+
+        if (config('keystone.require_second_factor') !== true) {
+            return $refusals;
+        }
+
+        $challenge = $this->lockServing($accountId, Surface::CHALLENGE);
+
+        if (count($challenge) === 1) {
+            $refusals[$challenge[0]] ??= new LastSecondFactor;
+        }
+
+        return $refusals;
     }
 
     /**

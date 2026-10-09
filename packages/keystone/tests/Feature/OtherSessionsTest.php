@@ -2,10 +2,13 @@
 
 use ClaudioDekker\Keystone\AppTests\AppTestCase;
 use ClaudioDekker\Keystone\Keystone;
+use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Notifications\SecurityAlert;
 use ClaudioDekker\Keystone\SecurityEventType;
+use ClaudioDekker\Keystone\Tests\Fixtures\FormType;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormTypeSupport;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Route;
@@ -184,6 +187,18 @@ describe('the offer after an enrollment', function () {
 
         $this->get(route('security'))->assertJsonPath('status', __('keystone::messages.status.enrolled'))->assertJsonPath('offersSignOutOthers', true);
         $this->get(route('security'))->assertJsonPath('offersSignOutOthers', false);
+    });
+
+    it('offers nothing after an enrollment that replaced a held credential, which already signed the other sessions out', function () {
+        config(['keystone.methods' => ['form', 'code', 'single']]);
+        $this->app->make(CredentialTypes::class)->register(new FormType(name: 'single', surfaces: ['challenge', 'enrollment'], replacesExisting: true));
+        $account = $this->signInAccount(new FormTypeSupport);
+        DB::table('user_credentials')->insert(['user_id' => $account->getKey(), 'type' => 'single', 'secret' => Crypt::encryptString('held')]);
+        $this->get(route('security.enroll', ['type' => 'single']));
+
+        $this->post(route('security.enroll.submit', ['type' => 'single']), ['secret' => $this->enrollmentCeremony('single')]);
+
+        $this->get(route('security'))->assertJsonPath('status', __('keystone::messages.status.credential-replaced'))->assertJsonPath('offersSignOutOthers', false);
     });
 
     it('offers nothing with any other status', function () {

@@ -62,11 +62,12 @@ try {
     await signInOther(account.recovery_codes[1]);
     await other.step('other-browser-signed-in-again');
 
+    sql("delete from user_credentials where user_id = 1 and type = 'password'");
     await page.goto('/settings/security');
-    await page.getByRole('link', { name: 'Set up Authenticator app' }).click();
-    await page.getByRole('heading', { name: 'Set up Authenticator app' }).waitFor();
-    const key = (await page.locator('code').innerText()).replace(/\s+/g, '');
-    await page.getByLabel('Code from your authenticator app').fill(totp(key));
+    await page.getByRole('link', { name: 'Set up Password' }).click();
+    await page.getByRole('heading', { name: 'Set up Password' }).waitFor();
+    await page.getByLabel('New password', { exact: true }).fill('copper-meadow-whistle-17');
+    await page.getByLabel('Confirm new password', { exact: true }).fill('copper-meadow-whistle-17');
     await page.getByRole('button', { name: 'Set up' }).click();
     await page.getByText('The new credential was added.').waitFor();
     await page.getByRole('button', { name: 'Sign out your other sessions' }).waitFor();

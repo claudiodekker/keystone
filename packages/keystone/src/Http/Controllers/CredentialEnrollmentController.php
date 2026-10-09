@@ -2,6 +2,7 @@
 
 namespace ClaudioDekker\Keystone\Http\Controllers;
 
+use ClaudioDekker\Keystone\Credentials;
 use ClaudioDekker\Keystone\EnrollmentCeremonies;
 use ClaudioDekker\Keystone\Http\PageValues\EnrollmentFormPage;
 use ClaudioDekker\Keystone\Keystone;
@@ -51,7 +52,14 @@ abstract class CredentialEnrollmentController extends Controller
 
         /** @var Model&KeystoneUser $account */
         $account = Keystone::guard()->user();
-        $credentialType = $this->enrollable($type);
+        $types = app(CredentialTypes::class);
+        $refusal = $types->enrollmentRefusal($type);
+
+        if ($refusal !== null) {
+            return $this->sendCredentialEnrollmentNotStarted($request, $type, $refusal);
+        }
+
+        $credentialType = $this->enrollable($types, $type);
 
         if ($credentialType === null) {
             return $this->refuseUnofferedType();
@@ -70,6 +78,7 @@ abstract class CredentialEnrollmentController extends Controller
             shape: $credentialType->surfaces()[Surface::ENROLLMENT->value]->value,
             ceremony: $running->page,
             status: Status::flashed($request)?->label(),
+            held: $this->held($account, $credentialType),
         );
 
         return $this->sendCredentialEnrollmentForm($request, $page);
@@ -82,7 +91,14 @@ abstract class CredentialEnrollmentController extends Controller
     {
         (new SudoGate(Keystone::guard()))->enforce($request);
 
-        $credentialType = $this->enrollable($type);
+        $types = app(CredentialTypes::class);
+        $refusal = $types->enrollmentRefusal($type);
+
+        if ($refusal !== null) {
+            return $this->sendCredentialEnrollmentNotStarted($request, $type, $refusal);
+        }
+
+        $credentialType = $this->enrollable($types, $type);
 
         if ($credentialType === null) {
             return $this->refuseUnofferedType();
@@ -104,7 +120,8 @@ abstract class CredentialEnrollmentController extends Controller
             ->attempt($credentialType, $validator->validated(), $running);
 
         return match ($result) {
-            SettingsEnrollmentResult::ENROLLED => $this->enrolled($request),
+            SettingsEnrollmentResult::ADDED => $this->enrolled($request, Status::ENROLLED),
+            SettingsEnrollmentResult::REPLACED => $this->enrolled($request, Status::CREDENTIAL_REPLACED),
             SettingsEnrollmentResult::REFUSED => $this->sendCredentialEnrollmentRefused($request, $credentialType->name(), __('keystone::messages.invalid_credential')),
             SettingsEnrollmentResult::SUDO_ENDED => $this->refuseWithoutSudo($request, $credentialType->name()),
         };
@@ -121,7 +138,7 @@ abstract class CredentialEnrollmentController extends Controller
             return redirect()->route('login');
         }
 
-        $credentialType = $this->enrollable($type);
+        $credentialType = $this->enrollable(app(CredentialTypes::class), $type);
 
         if ($credentialType !== null) {
             (new EnrollmentCeremonies(Keystone::guard()))->close($credentialType);
@@ -163,9 +180,27 @@ abstract class CredentialEnrollmentController extends Controller
     /**
      * Get the named type when keystone.methods lists it on enrollment.
      */
-    protected function enrollable(string $name): ?CredentialType
+    protected function enrollable(CredentialTypes $types, string $name): ?CredentialType
     {
-        return app(CredentialTypes::class)->find($name, Surface::ENROLLMENT);
+        return $types->find($name, Surface::ENROLLMENT);
+    }
+
+    /**
+     * Get the account's usable credentials of the type, and whether removing each would be allowed.
+     *
+     * @return list<array{id: int, label: ?string, removable: bool}>
+     */
+    protected function held(Model&KeystoneUser $account, CredentialType $type): array
+    {
+        $credentials = new Credentials($account);
+        $held = array_filter($credentials->ofAccount($account->getKey()), fn (array $credential) => $credential['type'] === $type->name() && ! $credential['disabled']);
+        $refusals = $credentials->removalRefusals($account->getKey());
+
+        return array_values(array_map(fn (array $credential) => [
+            'id' => $credential['id'],
+            'label' => $credential['label'],
+            'removable' => ! isset($refusals[$credential['id']]),
+        ], $held));
     }
 
     /**
@@ -187,11 +222,11 @@ abstract class CredentialEnrollmentController extends Controller
     }
 
     /**
-     * Send the user on from a stored credential, saying so.
+     * Send the user on from a stored credential, saying so with the status.
      */
-    protected function enrolled(Request $request): Response|Responsable
+    protected function enrolled(Request $request, Status $status): Response|Responsable
     {
-        Status::ENROLLED->flash($request);
+        $status->flash($request);
 
         return $this->sendCredentialEnrolled($request);
     }

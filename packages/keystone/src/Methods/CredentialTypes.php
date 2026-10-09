@@ -61,6 +61,16 @@ class CredentialTypes
     }
 
     /**
+     * Get why the app can't enroll the named registered type, as the type words it, or null when nothing refuses it.
+     */
+    public function enrollmentRefusal(string $name): ?string
+    {
+        $type = $this->registered($name);
+
+        return $type instanceof RefusesEnrollment ? $type->enrollmentRefusal($this) : null;
+    }
+
+    /**
      * Get the names more than one type was registered under.
      *
      * @return list<string>

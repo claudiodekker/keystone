@@ -91,10 +91,10 @@ test('the credential epoch moves only for a change that removes, replaces or end
 
         $change->commitRecoveryCodes(['BBBBB-BBBBB'], flow: Flow::ENROLLMENT);
     }, true],
-    'enrolling a credential beside the ones held' => [fn (AccountChange $change) => $change->enroll(new FormType, new EnrolledCredential(identifier: null, secret: 'new'), Flow::SETTINGS), false],
-    'enrolling a first credential that replaces its type' => [fn (AccountChange $change) => $change->enroll(new FormType('code'), EnrolledCredential::replacing(identifier: null, secret: 'new'), Flow::SETTINGS), false],
-    'enrolling a credential that replaces the one held' => [fn (AccountChange $change) => $change->enroll(new FormType, EnrolledCredential::replacing(identifier: null, secret: 'new'), Flow::SETTINGS), true],
-    'enrolling again the replacing credential already held' => [fn (AccountChange $change) => $change->enroll(new FormType, EnrolledCredential::replacing(identifier: null, secret: 'old-hash'), Flow::SETTINGS), false],
+    'enrolling a credential beside the ones held' => [fn (AccountChange $change) => $change->enroll(new FormType, new EnrolledCredential(identifier: null, secret: 'new'), Flow::SETTINGS, provedAgainst: []), false],
+    'enrolling a first credential that replaces its type' => [fn (AccountChange $change) => $change->enroll(new FormType('code'), EnrolledCredential::replacing(identifier: null, secret: 'new'), Flow::SETTINGS, provedAgainst: []), false],
+    'enrolling a credential that replaces the one held' => [fn (AccountChange $change, StoredCredential $credential) => $change->enroll(new FormType, EnrolledCredential::replacing(identifier: null, secret: 'new'), Flow::SETTINGS, provedAgainst: [$credential]), true],
+    'enrolling again the replacing credential already held' => [fn (AccountChange $change, StoredCredential $credential) => $change->enroll(new FormType, EnrolledCredential::replacing(identifier: null, secret: 'old-hash'), Flow::SETTINGS, provedAgainst: [$credential]), false],
 ]);
 
 it('records a first set of recovery codes without alerting, and a replacing set with an alert', function (bool $held, bool $alerts) {
@@ -306,7 +306,7 @@ describe('the mover\'s own session', function () {
         guard()->signIn($admin);
         $before = session()->getId();
 
-        changes()->change($user, fn (AccountChange $change) => $change->enroll(new FormType, new EnrolledCredential(identifier: null, secret: 'new'), Flow::SETTINGS));
+        changes()->change($user, fn (AccountChange $change) => $change->enroll(new FormType, new EnrolledCredential(identifier: null, secret: 'new'), Flow::SETTINGS, provedAgainst: []));
 
         expect(session()->getId())->toBe($before);
     });

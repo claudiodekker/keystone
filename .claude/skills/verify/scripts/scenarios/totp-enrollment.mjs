@@ -74,8 +74,9 @@ try {
     await page.getByLabel('Code from your authenticator app').fill(totp(key));
     await step('code-typed');
     await page.getByRole('button', { name: 'Set up' }).click();
-    await page.getByText('The new credential was added.').waitFor();
+    await page.getByText('The credential was replaced. Your other sessions were signed out.').waitFor();
     assert.equal(new URL(page.url()).pathname, '/settings/security', 'an enrollment lands on the security page');
+    assert.equal(await page.getByRole('button', { name: 'Sign out your other sessions' }).count(), 0, 'a replacement already signed the others out, so it offers nothing');
     assert.equal(await section('Authenticator app').locator('li').count(), 1, 'the new authenticator took the place of the old one');
     await section('Sudo').getByText("Changes won't ask again until").waitFor();
     await step('enrolled');
@@ -88,7 +89,7 @@ try {
     assert.notEqual(second, key, 'the next enrollment makes a new key');
     await page.getByLabel('Code from your authenticator app').fill(totp(second));
     await page.getByRole('button', { name: 'Set up' }).click();
-    await page.getByText('The new credential was added.').waitFor();
+    await page.getByText('The credential was replaced. Your other sessions were signed out.').waitFor();
     await step('enrolled-again');
 
     assert.equal(value("select count(*) from user_credentials where user_id = 1 and type = 'totp'"), '1', 'one TOTP credential is stored after the second enrollment');
@@ -104,7 +105,7 @@ try {
 
     const events = sql("select type, flow, credential_type, reason from user_security_events where flow = 'settings' order by id");
     assert.match(events, /proof\.rejected\s+settings\s+totp\s+totp\.mismatch/, 'the wrong code is on the trail in the settings flow');
-    assert.equal(events.match(/credential\.added\s+settings\s+totp/g)?.length, 2, 'both enrollments are on the trail in the settings flow');
+    assert.equal(events.match(/credential\.replaced\s+settings\s+totp/g)?.length, 2, 'both replacements are on the trail in the settings flow');
     assert.equal(value("select count(*) from user_security_events where type = 'credential.removed'"), '0', 'a replacement records no removal');
     console.log(events);
     console.log(`credential_epoch ${epoch} -> ${value('select credential_epoch from users where id = 1')}`);
