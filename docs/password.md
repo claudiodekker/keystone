@@ -2,6 +2,8 @@
 
 `keystone-password` lets users sign in with a password. It serves sign-in, registration and enrollment, always as a form, and is a first factor only: a password never counts as a second factor.
 
+Users add, change and remove their password from the [security settings](security-settings.md#passwords). Changing it asks for the current password, signs out every other session and records `credential.replaced`. While `keystone.methods` doesn't list passwords on `sign-in`, setting one is refused with "Passwords are not supported on this application."
+
 ## Hashing
 
 Passwords are hashed with Laravel's `Hash`, using your app's `config/hashing.php`. Keystone adds no settings of its own and encrypts every hash with your app key before storing it.
@@ -12,7 +14,7 @@ An imported hash is the plain string `Hash` writes (`$2y$…`, `$argon2i$…` or
 
 ## New passwords
 
-At registration and enrollment a new password must be typed twice, in `password` and `password_confirmation`, and fit what your hashing driver takes (see [Length](#length)). Keystone then checks that it is strong enough, in this order, and stops at the first check it fails:
+At registration and enrollment a new password must be typed twice, in `password` and `password_confirmation`, which the published forms mark `autocomplete="new-password"`, and fit what your hashing driver takes (see [Length](#length)). Keystone then checks that it is strong enough, in this order, and stops at the first check it fails:
 
 1. it has at least the [minimum length](#minimum-length);
 2. it contains no [context word](#context-words);

@@ -10,7 +10,7 @@ Keystone renders the QR code on the server as an SVG, with `bacon/bacon-qr-code`
 
 A user enrolls TOTP in two places. A sign-in that [owes a second factor](enrollment.md) is held until it enrolls one, and a signed-in user adds one from the [security settings](security-settings.md#adding-a-credential), behind sudo. Both show the same form.
 
-An account holds one TOTP key. Enrolling a new one from the security settings replaces every TOTP credential the account holds, a disabled one included, and signs out the account's other sessions, because whoever held the old key no longer holds a factor of the account. An account's first key signs nobody out. Both record `credential.added` with flow `settings`. A held sign-in never replaces anything: it only enrolls when the account holds no second factor it can use.
+An account holds one TOTP key. Enrolling a new one from the security settings replaces every TOTP credential the account holds, a disabled one included, and signs out the account's other sessions, because whoever held the old key no longer holds a factor of the account. An account's first key signs nobody out and records `credential.added` with flow `settings`. A new key that replaced one records `credential.replaced` instead. A held sign-in never replaces anything: it only enrolls when the account holds no second factor it can use.
 
 ## Codes
 
