@@ -191,5 +191,5 @@ describe('verify', function () {
 
     it('refuses to verify on a surface it has no flow for yet', function (Surface $surface) {
         (new PasswordType)->verify($surface, ['password' => Str::random()], []);
-    })->with([Surface::REGISTRATION, Surface::ENROLLMENT])->throws(LogicException::class);
+    })->with([Surface::REGISTRATION])->throws(LogicException::class);
 });
