@@ -2,7 +2,9 @@
 
 namespace ClaudioDekker\Keystone\Http\Controllers;
 
+use ClaudioDekker\Keystone\Http\Middleware\RequireOpenRegistration;
 use ClaudioDekker\Keystone\Http\Middleware\RequireSudo;
+use ClaudioDekker\Keystone\Http\Middleware\SendNoReferrer;
 use ClaudioDekker\Keystone\Http\Middleware\ThrottleKeystoneRequests;
 use ClaudioDekker\Keystone\StepKind;
 use Illuminate\Routing\Controllers\HasMiddleware;
@@ -19,6 +21,22 @@ abstract class Controller implements HasMiddleware
     protected static function throttle(StepKind $kind, string ...$actions): Middleware
     {
         return new Middleware(ThrottleKeystoneRequests::class.':'.$kind->value, only: $actions);
+    }
+
+    /**
+     * Send no referrer from the given actions, whose URLs carry an emailed link, whatever answers them.
+     */
+    protected static function noReferrer(string ...$actions): Middleware
+    {
+        return new Middleware(SendNoReferrer::class, only: $actions);
+    }
+
+    /**
+     * Require registration to be open before every action runs, whatever an app's override of them does.
+     */
+    protected static function openRegistration(): Middleware
+    {
+        return new Middleware(RequireOpenRegistration::class);
     }
 
     /**

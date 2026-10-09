@@ -67,6 +67,7 @@ abstract class SignInController extends Controller
             types: $types,
             status: Status::flashed($request)?->label(),
             rememberOffered: RememberTokens::isOffered(),
+            registrationOpen: $this->types()->serving(Surface::REGISTRATION) !== [],
         );
 
         return $this->sendSignInPage($request, $page);

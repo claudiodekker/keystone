@@ -81,6 +81,11 @@ class KeystoneServiceProvider extends ServiceProvider
                 ->daily()
                 ->onOneServer();
 
+            $schedule->call(fn () => EmailedLinks::prune(Keystone::guard()->userModel()))
+                ->name('keystone:prune-used-email-links')
+                ->hourly()
+                ->onOneServer();
+
             $schedule->call(fn () => (new PendingChallenges(Keystone::guard()->userModel()))->sweep())
                 ->name('keystone:sweep-abandoned-challenges')
                 ->everyFiveMinutes()

@@ -23,6 +23,7 @@ class SignInController extends Controller
             'status' => $page->status,
             'identifier' => $request->old(self::IDENTIFIER),
             'rememberOffered' => $page->rememberOffered,
+            'registrationOpen' => $page->registrationOpen,
         ]);
     }
 

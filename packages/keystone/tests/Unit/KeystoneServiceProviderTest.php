@@ -16,6 +16,7 @@ describe('merging the app\'s config', function () {
         expect(config('keystone.rate_limits'))->toBe([
             'requests_per_minute' => ['view' => 120, 'start' => 10, 'submit' => 10, 'change' => 10],
             'failed_attempts_per_hour' => 20,
+            'deliveries_per_ten_minutes' => 3,
         ])
             ->and(config('keystone.hardening'))->toBe(['frame_ancestors' => []])
             ->and(config('keystone.log_channel'))->toBe('stack')

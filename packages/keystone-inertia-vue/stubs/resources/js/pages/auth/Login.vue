@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { Head } from '@inertiajs/vue3';
+import { Head, Link } from '@inertiajs/vue3';
 import CredentialTypeForm from '@/components/CredentialTypeForm.vue';
 import AuthLayout from '@/layouts/AuthLayout.vue';
+import { register } from '@/routes';
 import type { SignInPage } from '@/types/auth';
 
 defineOptions({ layout: AuthLayout });
@@ -17,4 +18,6 @@ defineProps<SignInPage>();
     <p v-if="status" class="text-sm font-medium text-green-600">{{ status }}</p>
 
     <CredentialTypeForm v-for="option in types" :key="option.type" :option="option" surface="sign-in" />
+
+    <Link v-if="registrationOpen" :href="register()" class="text-sm text-gray-600 underline">Create an account</Link>
 </template>

@@ -26,6 +26,7 @@ enum Status: string
     case ENROLLED = 'enrolled';
     case RECOVERY_CODES_REGENERATED = 'recovery-codes-regenerated';
     case RECOVERY_CODES_EXPIRED = 'recovery-codes-expired';
+    case REGISTRATION_UNAVAILABLE = 'registration-unavailable';
 
     /**
      * The session key the status is flashed under.

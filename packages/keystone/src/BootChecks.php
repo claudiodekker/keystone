@@ -92,11 +92,12 @@ class BootChecks
     protected function rateLimitFailures(): array
     {
         $requests = config('keystone.rate_limits.requests_per_minute');
+        $allowances = ['keystone.rate_limits.failed_attempts_per_hour', 'keystone.rate_limits.deliveries_per_ten_minutes'];
 
         if (! is_array($requests)) {
             return [
                 'keystone.rate_limits.requests_per_minute must map each kind of step to its limit.',
-                ...$this->floorFailures(['keystone.rate_limits.failed_attempts_per_hour']),
+                ...$this->floorFailures($allowances),
             ];
         }
 
@@ -105,7 +106,7 @@ class BootChecks
         $keys = array_map(fn (StepKind $kind) => "keystone.rate_limits.requests_per_minute.{$kind->value}", StepKind::cases());
 
         return [
-            ...$this->floorFailures([...$keys, 'keystone.rate_limits.failed_attempts_per_hour']),
+            ...$this->floorFailures([...$keys, ...$allowances]),
             ...array_values($unknownFailures),
         ];
     }

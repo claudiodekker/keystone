@@ -93,9 +93,9 @@ return [
     | Rate Limits
     |--------------------------------------------------------------------------
     |
-    | How many requests to each kind of step one IP address or signed-in
-    | account may make a minute, and how many wrong answers an account
-    | may give per credential type and flow an hour before refusal.
+    | How many requests to each kind of step an IP address or an account
+    | may make a minute, wrong answers an account gives per type and
+    | flow an hour, and emails one address may get in ten minutes.
     |
     */
 
@@ -107,6 +107,7 @@ return [
             'change' => 10,
         ],
         'failed_attempts_per_hour' => 20,
+        'deliveries_per_ten_minutes' => 3,
     ],
 
     /*
@@ -155,6 +156,7 @@ return [
     'notifications' => [
         'account.suspended' => SecurityAlert::class,
         'account.unsuspended' => SecurityAlert::class,
+        'address.claim_attempted' => SecurityAlert::class,
         'challenge.abandoned' => SecurityAlert::class,
         'credential.added' => SecurityAlert::class,
         'credential.removed' => SecurityAlert::class,

@@ -62,6 +62,14 @@ describe('the sanity floors', function () {
         'false changes' => ['requests_per_minute.change', false],
     ]);
 
+    it('refuses a delivery allowance that isn\'t a whole number of at least 1', function (mixed $value) {
+        config(['keystone.rate_limits.deliveries_per_ten_minutes' => $value]);
+
+        $failures = bootFailures();
+
+        expect($failures)->toBe(['keystone.rate_limits.deliveries_per_ten_minutes must be a whole number of at least 1.']);
+    })->with(['zero' => [0], 'null' => [null], 'a string' => ['3']]);
+
     it('accepts a limit of 1', function () {
         config([
             'keystone.rate_limits.failed_attempts_per_hour' => 1,

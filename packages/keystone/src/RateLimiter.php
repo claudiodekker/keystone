@@ -43,6 +43,11 @@ class RateLimiter
     public const int FAILED_ATTEMPT_WINDOW_SECONDS = 3600;
 
     /**
+     * The window a delivery limit counts over.
+     */
+    public const int DELIVERY_WINDOW_SECONDS = 600;
+
+    /**
      * How long a refusal asks the client to wait while the store is down.
      */
     public const int OUTAGE_RETRY_AFTER_SECONDS = 60;
@@ -155,6 +160,41 @@ class RateLimiter
     }
 
     /**
+     * Take a delivery of the mail kind to the account, or to the address when the caller names no account, before anything is mailed.
+     *
+     * @throws Throttled once the limit is spent, and while the store is down
+     */
+    public function takeDelivery(Flow $flow, string $kind, (Model&KeystoneUser)|null $account, string $address): void
+    {
+        $key = $this->key('delivery', [$this->subject($account, $address), $kind, $flow->value, $this->source($account)]);
+        $allowance = config()->integer('keystone.rate_limits.deliveries_per_ten_minutes');
+
+        try {
+            $count = $this->counter()->increment($key, self::DELIVERY_WINDOW_SECONDS);
+            $retryAfterSeconds = $count > $allowance ? $this->retryAfter([$key]) : null;
+        } catch (Throwable $e) {
+            report($e);
+
+            throw new Throttled(self::OUTAGE_RETRY_AFTER_SECONDS);
+        }
+
+        if ($count === $allowance + 1) {
+            $this->recorder->record(
+                SecurityEventType::LIMIT_TRIPPED,
+                account: $account,
+                flow: $flow->value,
+                reason: 'keystone.delivery_limit',
+            );
+
+            $this->dispatchLockout();
+        }
+
+        if ($retryAfterSeconds !== null) {
+            throw new Throttled($retryAfterSeconds);
+        }
+    }
+
+    /**
      * Give back a failed attempt that didn't count, unless the window it was taken in has ended.
      */
     public function giveBack(TakenAttempt $attempt): void
@@ -203,7 +243,7 @@ class RateLimiter
     }
 
     /**
-     * Get the source part of a failed attempt: the id of the account's known device the browser is, else other.
+     * Get the source part of a failed attempt or a delivery: the id of the account's known device the browser is, else other.
      */
     protected function source((Model&KeystoneUser)|null $account): string
     {

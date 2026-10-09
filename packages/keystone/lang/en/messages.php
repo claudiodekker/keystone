@@ -39,5 +39,6 @@ return [
         'session-revoked' => 'The session was signed out.',
         'session-not-found' => 'That session was not found. It may already have been signed out.',
         'sessions-unavailable' => 'Your sessions cannot be listed in this app.',
+        'registration-unavailable' => 'Registration is not available.',
     ],
 ];

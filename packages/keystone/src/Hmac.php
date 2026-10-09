@@ -12,8 +12,14 @@ class Hmac
      */
     public static function make(string $purpose, string $message): string
     {
-        $subkey = hash_hmac('sha256', $purpose, app('encrypter')->getKey(), binary: true);
+        return hash_hmac('sha256', $message, static::subkey($purpose));
+    }
 
-        return hash_hmac('sha256', $message, $subkey);
+    /**
+     * Get the purpose's own 32-byte subkey of the current app key, which no previous key ever derives.
+     */
+    public static function subkey(string $purpose): string
+    {
+        return hash_hmac('sha256', $purpose, app('encrypter')->getKey(), binary: true);
     }
 }

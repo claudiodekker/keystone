@@ -22,6 +22,22 @@ export type SignInPage = {
     status: string | null;
     identifier: string | null;
     rememberOffered: boolean;
+    registrationOpen: boolean;
+};
+
+export type RegisterPage = {
+    status: string | null;
+    email: string | null;
+};
+
+export type EmailedLinkPage = {
+    action: string;
+};
+
+export type RegisterFinishPage = {
+    address: string;
+    types: CredentialTypeOption[];
+    status: string | null;
 };
 
 export type ChallengePage = {
