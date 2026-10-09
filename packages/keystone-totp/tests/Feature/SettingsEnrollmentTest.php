@@ -124,7 +124,7 @@ it('replaces the TOTP credentials the account holds, disabled ones included, and
     $stored = DB::table('user_credentials')->where('user_id', $account->getKey())->where('type', 'totp')->sole();
     expect(TotpSecret::fromStored(Crypt::decryptString($stored->secret))->key)->toBe($key)
         ->and($stored->disabled_at)->toBeNull()
-        ->and(SecurityEvent::query()->whereIn('type', ['credential.added', 'credential.removed'])->pluck('type')->all())->toBe([SecurityEventType::CREDENTIAL_ADDED]);
+        ->and(SecurityEvent::query()->whereIn('type', ['credential.added', 'credential.removed', 'credential.replaced'])->pluck('type')->all())->toBe([SecurityEventType::CREDENTIAL_REPLACED]);
     $this->assertDatabaseHas('users', ['id' => $account->getKey(), 'credential_epoch' => 1]);
     $this->assertAuthenticatedAs($account);
 });

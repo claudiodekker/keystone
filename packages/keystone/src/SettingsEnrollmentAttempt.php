@@ -79,7 +79,7 @@ class SettingsEnrollmentAttempt extends CredentialAttempt
 
         $this->timebox->returnEarly();
 
-        return SettingsEnrollmentResult::ENROLLED;
+        return $outcome;
     }
 
     /**
@@ -104,9 +104,7 @@ class SettingsEnrollmentAttempt extends CredentialAttempt
                 return SettingsEnrollmentResult::SUDO_ENDED;
             }
 
-            $change->enroll($type, $enrolled, $flow);
-
-            return SettingsEnrollmentResult::ENROLLED;
+            return $change->enroll($type, $enrolled, $flow);
         });
     }
 }

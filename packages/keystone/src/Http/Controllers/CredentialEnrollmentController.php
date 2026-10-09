@@ -104,7 +104,8 @@ abstract class CredentialEnrollmentController extends Controller
             ->attempt($credentialType, $validator->validated(), $running);
 
         return match ($result) {
-            SettingsEnrollmentResult::ENROLLED => $this->enrolled($request),
+            SettingsEnrollmentResult::ADDED => $this->enrolled($request, Status::ENROLLED),
+            SettingsEnrollmentResult::REPLACED => $this->enrolled($request, Status::CREDENTIAL_REPLACED),
             SettingsEnrollmentResult::REFUSED => $this->sendCredentialEnrollmentRefused($request, $credentialType->name(), __('keystone::messages.invalid_credential')),
             SettingsEnrollmentResult::SUDO_ENDED => $this->refuseWithoutSudo($request, $credentialType->name()),
         };
@@ -187,11 +188,11 @@ abstract class CredentialEnrollmentController extends Controller
     }
 
     /**
-     * Send the user on from a stored credential, saying so.
+     * Send the user on from a stored credential, saying so with the status.
      */
-    protected function enrolled(Request $request): Response|Responsable
+    protected function enrolled(Request $request, Status $status): Response|Responsable
     {
-        Status::ENROLLED->flash($request);
+        $status->flash($request);
 
         return $this->sendCredentialEnrolled($request);
     }

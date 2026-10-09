@@ -86,19 +86,21 @@ class AccountChange
     }
 
     /**
-     * Store the enrolled credential on the account and record it in the flow.
+     * Store the enrolled credential on the account and record in the flow whether it was added or replaced what the account held.
      *
      * A credential that replaces its type takes the place of every credential of the type the account holds, disabled or not, and ends the account's other sessions when it held one.
      *
      * A replacing credential the account already holds was stored by the same answer arriving twice, so it is not stored, recorded or replaced again.
      */
-    public function enroll(CredentialType $type, EnrolledCredential $enrolled, Flow $flow): void
+    public function enroll(CredentialType $type, EnrolledCredential $enrolled, Flow $flow): SettingsEnrollmentResult
     {
         if ($enrolled->replacesExisting && $this->holds($type, $enrolled)) {
-            return;
+            return SettingsEnrollmentResult::ADDED;
         }
 
-        if ($enrolled->replacesExisting && $this->credentials->deleteOfType($this->account->getKey(), $type->name()) > 0) {
+        $replaced = $enrolled->replacesExisting && $this->credentials->deleteOfType($this->account->getKey(), $type->name()) > 0;
+
+        if ($replaced) {
             $this->endSessions();
         }
 
@@ -107,11 +109,13 @@ class AccountChange
         $this->rotatesSession = true;
 
         $this->record(
-            SecurityEventType::CREDENTIAL_ADDED,
+            $replaced ? SecurityEventType::CREDENTIAL_REPLACED : SecurityEventType::CREDENTIAL_ADDED,
             flow: $flow->value,
             credentialType: $type->name(),
             credential: new StoredCredential($id, identifier: null, secret: null, label: $enrolled->label),
         );
+
+        return $replaced ? SettingsEnrollmentResult::REPLACED : SettingsEnrollmentResult::ADDED;
     }
 
     /**
