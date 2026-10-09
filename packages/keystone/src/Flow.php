@@ -15,6 +15,7 @@ enum Flow: string
     case ENROLLMENT = 'enrollment';
     case SUDO = 'sudo';
     case SETTINGS = 'settings';
+    case REGISTRATION = 'registration';
 
     /**
      * Derive the flow from the session's phase and the surface in use.
@@ -23,6 +24,7 @@ enum Flow: string
     {
         return match (true) {
             $surface === Surface::SIGN_IN && $guard->guest() => self::SIGN_IN,
+            $surface === Surface::REGISTRATION && $guard->guest() => self::REGISTRATION,
             $surface === Surface::CHALLENGE && $guard->guest() && $guard->isPendingAt(PendingStage::CHALLENGE) => self::CHALLENGE,
             $guard->check() && $guard->sudoInProgress()?->surface() === $surface => self::SUDO,
             $surface === Surface::ENROLLMENT && $guard->check() => self::SETTINGS,

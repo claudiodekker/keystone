@@ -3,6 +3,8 @@
 namespace ClaudioDekker\Keystone\Tests\Unit;
 
 use ClaudioDekker\Keystone\KeystoneGuard;
+use ClaudioDekker\Keystone\PendingStage;
+use ClaudioDekker\Keystone\Registering;
 use ClaudioDekker\Keystone\Tests\Fixtures\Member;
 use ClaudioDekker\Keystone\Tests\Fixtures\User;
 use ClaudioDekker\Keystone\Tests\Fixtures\UserWithArchivedAt;
@@ -405,4 +407,69 @@ it('never brings sudo with a sign-in when no request context was captured', func
     Auth::guard('web')->signIn(User::factory()->create());
 
     expect(Auth::guard('web')->sudoGrant())->toBeNull();
+});
+
+describe('a registration', function () {
+    it('keeps the proven address until its window ends', function () {
+        $this->freezeSecond();
+        Auth::guard('web')->startRegistration('new@example.com');
+
+        $this->travel(Registering::WINDOW_SECONDS - 1)->seconds();
+        expect(nextRequest()->registration())->address->toBe('new@example.com')
+            ->endsAt->toEqual(now()->addSecond()->toImmutable());
+
+        $this->travel(1)->second();
+        expect(nextRequest()->registration())->toBeNull()
+            ->and(session()->has('keystone_registration_web'))->toBeFalse();
+    });
+
+    it('ignores a proven address with no believable time', function (mixed $held) {
+        session()->put('keystone_registration_web', $held);
+
+        expect(Auth::guard('web')->registration())->toBeNull();
+    })->with([
+        'a future time' => fn () => ['address' => 'new@example.com', 'proven_at' => now()->addMinute()->getTimestamp()],
+        'no time' => [['address' => 'new@example.com']],
+        'no address' => fn () => ['proven_at' => now()->getTimestamp()],
+        'not an array' => ['new@example.com'],
+    ]);
+
+    it('starts on a new session id, dropping sudo, every ceremony slot and the pending sign-in', function () {
+        $guard = Auth::guard('web');
+        $guard->hold(User::factory()->create(), 'form', PendingStage::CHALLENGE, '/');
+        $guard->slots()->put('form', 'challenge', 'bytes', capSeconds: 300);
+        session()->put('keystone_sudo_web', ['started_at' => now()->getTimestamp(), 'intended_url' => '/settings']);
+        $before = session()->getId();
+
+        $guard->startRegistration('new@example.com');
+
+        expect(session()->getId())->not->toBe($before)
+            ->and($guard->pending())->toBeNull()
+            ->and(session()->has('keystone_sudo_web'))->toBeFalse()
+            ->and($guard->slots()->get('form', 'challenge'))->toBeNull()
+            ->and($guard->registration()?->address)->toBe('new@example.com');
+    });
+
+    it('ends with every change of auth level', function (Closure $change) {
+        $guard = Auth::guard('web');
+        $guard->startRegistration('new@example.com');
+
+        $change($guard, User::factory()->create());
+
+        expect($guard->registration())->toBeNull();
+    })->with([
+        'a sign-in' => [fn (KeystoneGuard $guard, User $account) => $guard->signIn($account)],
+        'a hold' => [fn (KeystoneGuard $guard, User $account) => $guard->hold($account, 'form', PendingStage::ENROLLMENT, '/')],
+    ]);
+
+    it('ends without an account, closing every ceremony slot', function () {
+        $guard = Auth::guard('web');
+        $guard->startRegistration('new@example.com');
+        $guard->slots()->put('form', 'registration', 'bytes', capSeconds: 300);
+
+        $guard->endRegistration();
+
+        expect($guard->registration())->toBeNull()
+            ->and($guard->slots()->get('form', 'registration'))->toBeNull();
+    });
 });
