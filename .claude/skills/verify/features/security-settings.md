@@ -1,6 +1,6 @@
 # Security settings
 
-A signed-in user opens the security page from home. It lists the password and the authenticator app with when each was added and last used, how many recovery codes are left, and until when the session has sudo. Ending sudo there brings the user back to the same page with "Sudo has ended." shown. The page itself never asks for sudo. Each credential has a Remove link to a confirm step behind sudo. The password and the last authenticator are kept with a message, and a removed credential signs out every other browser. Each type has a Set up link to its enrollment step behind sudo, where the authenticator app shows a QR code and a key, and a new authenticator takes the place of the old one.
+A signed-in user opens the security page from home. It lists the password and the authenticator app with when each was added and last used, how many recovery codes are left, and until when the session has sudo. Ending sudo there brings the user back to the same page with "Sudo has ended." shown. The page itself never asks for sudo. Each credential has a Remove link to a confirm step behind sudo. The password and the last authenticator are kept with a message, and a removed credential signs out every other browser. Each type has a Set up link to its enrollment step behind sudo, where the authenticator app shows a QR code and a key, and a new authenticator takes the place of the old one. The `Sessions` section links to a confirm step behind sudo that signs out every other browser, and after an enrollment the page offers the same sign-out as a button next to the status.
 
 ## Sub-features
 
@@ -16,6 +16,8 @@ A signed-in user opens the security page from home. It lists the password and th
 - `security-enroll-refused` a code the shown key doesn't make shows `The provided credential is invalid.` and keeps the key.
 - `security-enroll` a code from the shown key lands on `/settings/security` with `The new credential was added.`, one entry under `Authenticator app`, sudo kept and the credential epoch moved by one.
 - `security-enroll-cancel` `Cancel` goes back to the page, and the next `Set up Authenticator app` shows another key.
+- `security-sign-out-others` `Sign out other sessions` opens `/settings/security/sessions/others/revoke`, and confirming lands on `/settings/security` with `Your other sessions were signed out.` while another browser signed in as Jane is signed out.
+- `security-sign-out-others-offer` after `Set up Authenticator app`, the button `Sign out your other sessions` shows under `The new credential was added.`, signs out the other browser without a confirm step and is gone afterwards. It never shows without an enrollment.
 - `security-remove` removing a leftover lands on `/settings/security` with `The credential was removed. Your other sessions were signed out.`, the credential gone, and another browser signed in as Jane signed out.
 
 ## How to get to it (user POV)
@@ -24,6 +26,7 @@ A signed-in user opens the security page from home. It lists the password and th
 - End sudo from home or from the page itself, which lands on the page.
 - Choose `Remove <name>` next to a credential on the page, then `Remove` on the confirm step.
 - Choose `Set up Authenticator app` on the page, scan the QR code or copy the key, then type a code and choose `Set up`.
+- Choose `Sign out other sessions` in the `Sessions` section, then `Sign out other sessions` on the confirm step, or `Sign out your other sessions` after an enrollment.
 
 ## Driving it with Playwright
 
@@ -44,7 +47,10 @@ Preconditions:
 - **Set up.** `getByRole('link', { name: 'Set up Authenticator app' }).click()` opens the heading `Set up Authenticator app`. `getByRole('img', { name: 'QR code holding the key for your authenticator app' })` is the QR code, `page.locator('code').innerText()` the key and the link `Open in authenticator app` the URI. Fill `Code from your authenticator app` with `totp(key)` and click `Set up`. `The new credential was added.` appears at `/settings/security`.
 - **Set-up proof.** `user_security_events` gains `credential.added` with flow `settings` and type `totp`, and a wrong code `proof.rejected` with flow `settings` and reason `totp.mismatch`. `select count(*) from user_credentials where type = 'totp'` stays `1`, and `select credential_epoch from users where id = 1` goes up by one for each enrollment.
 
-The whole overview path is `scripts/scenarios/security-overview.mjs`: `node .claude/skills/verify/scripts/scenarios/security-overview.mjs <run>`. The removal path, with both refusals, the sudo gate and the other browser, is `scripts/scenarios/credential-removal.mjs`, which adds the leftover itself and spends two recovery codes. The set-up path, with the QR code, a wrong code, two enrollments and a cancel, is `scripts/scenarios/totp-enrollment.mjs`.
+- **Sign out others.** `getByRole('link', { name: 'Sign out other sessions' }).click()` opens the heading `Sign out other sessions?`. `getByRole('button', { name: 'Sign out other sessions' }).click()` shows `Your other sessions were signed out.` at `/settings/security`. After a set-up, `getByRole('button', { name: 'Sign out your other sessions' })` does the same in one click.
+- **Sign-out proof.** `user_security_events` gains `sessions.revoked_others`, `app.sh mail <run>` shows `Your other sessions were signed out`, and a second browser signed in as Jane lands on a guest home.
+
+The whole overview path is `scripts/scenarios/security-overview.mjs`: `node .claude/skills/verify/scripts/scenarios/security-overview.mjs <run>`. The removal path, with both refusals, the sudo gate and the other browser, is `scripts/scenarios/credential-removal.mjs`, which adds the leftover itself and spends two recovery codes. The set-up path, with the QR code, a wrong code, two enrollments and a cancel, is `scripts/scenarios/totp-enrollment.mjs`. The sign-out path, through the confirm step and through the offer after a set-up, is `scripts/scenarios/sign-out-others.mjs`, which signs the second browser in twice with recovery codes.
 
 ## Gotchas
 
@@ -54,4 +60,5 @@ The whole overview path is `scripts/scenarios/security-overview.mjs`: `node .cla
 - Jane holds an authenticator once `second-factor` ran, so every set-up in a default run replaces one and moves the epoch. A first authenticator that moves no epoch needs an account signed in without a second factor, which the workbench's mandates never allow.
 - After `totp-enrollment.mjs` the fixture's `totp_key` no longer answers the challenge. Start a fresh run for the next scenario.
 - The QR code is scanned with the browser's `BarcodeDetector`. Where the browser has none, the scenario says so and checks the rest.
+- The workbench keeps sessions in files, so the offer always shows after a set-up there. The check against the `sessions` table runs only on the `database` driver, which the feature tests cover.
 - To see `running low`, spend codes first or delete rows with `app.sh sql`, since `second-factor` always gives 8.
