@@ -3,6 +3,7 @@
 namespace ClaudioDekker\Keystone;
 
 use ClaudioDekker\Keystone\Exceptions\AlreadySuspended;
+use ClaudioDekker\Keystone\Exceptions\CurrentSession;
 use ClaudioDekker\Keystone\Exceptions\LastRecoveryCode;
 use ClaudioDekker\Keystone\Exceptions\LastSecondFactor;
 use ClaudioDekker\Keystone\Exceptions\LastSignInCredential;
@@ -35,6 +36,13 @@ class AccountChange
      * Whether the rows of the account's other sessions must be deleted once the mover's own session carries its new id.
      */
     protected bool $dropsSessions = false;
+
+    /**
+     * The sessions the change revoked, whose rows must be deleted once it commits.
+     *
+     * @var list<ListedSession>
+     */
+    protected array $revokedSessions = [];
 
     /**
      * The events to record once the change commits.
@@ -235,12 +243,48 @@ class AccountChange
     }
 
     /**
+     * Revoke the account's live session the handle names, forgetting the remember token it stored, without ending any other session, and record it.
+     *
+     * @throws CurrentSession
+     */
+    public function revokeSession(string $handle): bool
+    {
+        if ($this->sessions === null) {
+            return false;
+        }
+
+        $session = $this->sessions->find($handle);
+
+        if ($session === null) {
+            return false;
+        }
+
+        if ($session->current) {
+            throw new CurrentSession;
+        }
+
+        if ($session->rememberTokenId !== null) {
+            (new RememberTokens($this->account))->forget($this->account->getKey(), $session->rememberTokenId);
+        }
+
+        $this->revokedSessions[] = $session;
+
+        $this->record(SecurityEventType::SESSION_REVOKED, context: $this->sessions->contextOf($session));
+
+        return true;
+    }
+
+    /**
      * Delete the rows of the sessions the change signed out, once the mover's own session carries the id it will be stored under.
      */
     public function dropSessions(): void
     {
         if ($this->dropsSessions) {
             $this->sessions?->deleteOthers();
+        }
+
+        foreach ($this->revokedSessions as $session) {
+            $this->sessions?->delete($session);
         }
     }
 
@@ -293,6 +337,7 @@ class AccountChange
         ?string $flow = null,
         ?string $credentialType = null,
         ?StoredCredential $credential = null,
+        ?RequestContext $context = null,
     ): void {
         $this->events[] = fn (SecurityEventRecorder $recorder) => $recorder->record(
             $type,
@@ -304,6 +349,7 @@ class AccountChange
             operator: $operator,
             recipients: $this->recipients,
             alert: $alert,
+            context: $context,
         );
     }
 

@@ -12,6 +12,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Session\CacheBasedSessionHandler;
 use Illuminate\Session\CookieSessionHandler;
+use Illuminate\Session\DatabaseSessionHandler;
 use Illuminate\Session\FileSessionHandler;
 use Illuminate\Session\Store;
 use Illuminate\Support\Facades\Auth;
@@ -48,6 +49,7 @@ function visit(string $driver, array &$browser, Closure $callback): mixed
         'file' => new FileSessionHandler(app('files'), test()->sessionPath, 120),
         'redis' => new CacheBasedSessionHandler(Cache::store('redis'), 120),
         'cookie' => tap(new CookieSessionHandler(app('cookie'), 120, false))->setRequest($request),
+        'database' => new DatabaseSessionHandler(DB::connection(), 'sessions', 120, app()),
     };
 
     $session = new Store(SESSION_COOKIE, $handler, $browser[SESSION_COOKIE] ?? null);
@@ -86,7 +88,7 @@ it('ends the account\'s other sessions when its epoch moves', function (string $
     expect(visit($driver, $laptop, fn (KeystoneGuard $guard) => $guard->user()))->toBeNull()
         ->and(visit($driver, $phone, fn (KeystoneGuard $guard) => $guard->user()))->toBeNull()
         ->and(visit($driver, $replayed, fn (KeystoneGuard $guard) => $guard->user()))->toBeNull();
-})->with(['file', 'redis', 'cookie']);
+})->with(['file', 'redis', 'cookie', 'database']);
 
 it('ends every other session of the account when a change ends them, keeping the mover\'s', function (string $driver) {
     $user = User::factory()->create();
@@ -99,7 +101,7 @@ it('ends every other session of the account when a change ends them, keeping the
 
     expect(visit($driver, $laptop, fn (KeystoneGuard $guard) => $guard->user()))->not->toBeNull()
         ->and(visit($driver, $phone, fn (KeystoneGuard $guard) => $guard->user()))->toBeNull();
-})->with(['file', 'redis', 'cookie']);
+})->with(['file', 'redis', 'cookie', 'database']);
 
 it('ends every account\'s sessions', function (string $driver) {
     $jane = User::factory()->create();
@@ -113,7 +115,7 @@ it('ends every account\'s sessions', function (string $driver) {
 
     expect(visit($driver, $laptop, fn (KeystoneGuard $guard) => $guard->user()))->toBeNull()
         ->and(visit($driver, $phone, fn (KeystoneGuard $guard) => $guard->user()))->toBeNull();
-})->with(['file', 'redis', 'cookie']);
+})->with(['file', 'redis', 'cookie', 'database']);
 
 it('keeps a running enrollment ceremony across requests, in a session small enough for a cookie, whatever its type draws for the form', function (string $driver) {
     $user = User::factory()->create();
@@ -128,4 +130,4 @@ it('keeps a running enrollment ceremony across requests, in a session small enou
     expect(strlen($started->page['drawing']))->toBe(16384)
         ->and($running)->toEqual($started)
         ->and($stored)->toBeLessThan(2048);
-})->with(['file', 'redis', 'cookie']);
+})->with(['file', 'redis', 'cookie', 'database']);

@@ -1,14 +1,18 @@
 <script setup lang="ts">
-import { Form, Head, Link } from '@inertiajs/vue3';
+import { Form, Head, Link, usePage } from '@inertiajs/vue3';
 import { typeName } from '@/lib/credentialTypes';
+import { sessionName } from '@/lib/sessions';
 import { enroll } from '@/routes/security';
 import { remove } from '@/routes/security/credentials';
-import { revoke } from '@/routes/security/sessions/others';
+import { revoke } from '@/routes/security/sessions';
+import { revoke as revokeOthersStep } from '@/routes/security/sessions/others';
 import { submit as revokeOthers } from '@/routes/security/sessions/others/revoke';
 import { end } from '@/routes/sudo';
 import type { SecurityPage } from '@/types/auth';
 
 defineProps<SecurityPage>();
+
+const page = usePage<{ errors: Partial<Record<string, string>> }>();
 
 const date = (value: string | null) => (value === null ? 'never' : new Date(value).toLocaleString());
 
@@ -101,8 +105,27 @@ const time = (value: string) => new Date(value).toLocaleTimeString([], { hour: '
 
             <section class="flex flex-col gap-2 rounded-lg bg-white p-6 shadow-sm ring-1 ring-gray-200">
                 <h2 class="font-medium text-gray-900">Sessions</h2>
+                <p v-if="page.props.errors.session" class="text-sm text-red-600">{{ page.props.errors.session }}</p>
+                <p v-if="sessionsStatus" class="text-sm text-gray-600">{{ sessionsStatus }}</p>
+                <ul v-else class="flex flex-col gap-2">
+                    <li v-for="session in sessions" :key="session.handle" class="text-sm">
+                        <span class="font-medium text-gray-900">{{ sessionName(session) }}</span>
+                        <span v-if="session.current" class="ml-2 text-green-600">This device</span>
+                        <span class="block text-gray-600">
+                            {{ session.ipAddress ?? 'Unknown IP address' }}<template v-if="session.location">, {{ session.location }}</template
+                            >, last active {{ date(session.lastActiveAt) }}
+                        </span>
+                        <Link
+                            v-if="!session.current"
+                            :href="revoke(session.handle)"
+                            :aria-label="`Sign out ${sessionName(session)}`"
+                            class="font-medium text-gray-900 underline"
+                            >Sign out</Link
+                        >
+                    </li>
+                </ul>
                 <p class="text-sm text-gray-600">Signed in somewhere you don't recognise, or on a device you no longer use?</p>
-                <Link :href="revoke()" class="text-sm font-medium text-gray-900 underline">Sign out other sessions</Link>
+                <Link :href="revokeOthersStep()" class="text-sm font-medium text-gray-900 underline">Sign out other sessions</Link>
             </section>
 
             <section class="flex flex-col gap-2 rounded-lg bg-white p-6 shadow-sm ring-1 ring-gray-200">

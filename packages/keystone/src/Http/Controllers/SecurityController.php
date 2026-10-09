@@ -4,6 +4,7 @@ namespace ClaudioDekker\Keystone\Http\Controllers;
 
 use ClaudioDekker\Keystone\Credentials;
 use ClaudioDekker\Keystone\Http\PageValues\SecurityPage;
+use ClaudioDekker\Keystone\Http\PageValues\SessionRow;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\KeystoneUser;
 use ClaudioDekker\Keystone\Methods\CredentialType;
@@ -53,6 +54,7 @@ abstract class SecurityController extends Controller
         $enrollable = array_map(fn (CredentialType $type) => $type->name(), $credentialTypes->serving(Surface::ENROLLMENT));
         $recoveryCodes = (new RecoveryCodes($account))->remaining($account->getKey());
         $status = Status::flashed($request);
+        $sessions = $guard->sessions($account);
 
         $types = array_map(fn (string $type) => [
             'type' => $type,
@@ -73,7 +75,9 @@ abstract class SecurityController extends Controller
             recoveryCodesLow: $recoveryCodes <= RecoveryCodes::RUNNING_LOW,
             sudoEndsAt: (new SudoGate($guard))->liveGrant()?->endsAt->toIso8601String(),
             status: $status?->label(),
-            offersSignOutOthers: $status === Status::ENROLLED && ($guard->sessions($account)?->mayHaveOthers() ?? true),
+            sessions: $sessions === null ? [] : SessionRow::listOf($sessions->live()),
+            sessionsStatus: $sessions === null ? Status::SESSIONS_UNAVAILABLE->label() : null,
+            offersSignOutOthers: $status === Status::ENROLLED && ($sessions?->mayHaveOthers() ?? true),
         );
 
         return $this->sendSecurityPage($request, $page);

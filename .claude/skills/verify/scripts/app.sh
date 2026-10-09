@@ -8,7 +8,7 @@ cd "$root"
 
 usage() {
   cat >&2 <<'EOF'
-usage: app.sh start [port]          build assets, create a run with its own database, serve it
+usage: app.sh start [port]          build assets, create a run with its own database, serve it (SESSION_DRIVER=database to keep sessions in a table)
        app.sh doctor <run>          is this run's server ours, up, and serving the sign-in page?
        app.sh second-factor <run>   give jane@example.com a TOTP authenticator and 8 recovery codes
        app.sh artisan <run> ...     run a testbench (artisan) command against the run's database
@@ -24,6 +24,7 @@ run_env() {
   local dir="$runs/$1"
   [ -d "$dir" ] || { echo "no run $1 under $runs" >&2; exit 1; }
   export DB_CONNECTION=sqlite DB_DATABASE="$dir/database.sqlite" CACHE_STORE=database QUEUE_CONNECTION=database MAIL_MAILER=log APP_URL="$(cat "$dir/url")"
+  export SESSION_DRIVER="$(cat "$dir/session-driver" 2>/dev/null || echo file)"
 }
 
 free_port() {
@@ -56,6 +57,7 @@ case "$cmd" in
     port="$(free_port "${1:-8100}")"
     mkdir -p "$dir" "$evidence/$run"
     echo "http://127.0.0.1:$port" > "$dir/url"
+    echo "${SESSION_DRIVER:-file}" > "$dir/session-driver"
     touch "$dir/database.sqlite"
     run_env "$run"
 
@@ -113,6 +115,12 @@ case "$cmd" in
     fi
     accounts="$(sqlite3 "$DB_DATABASE" "select count(*) from user_emails where address = 'jane@example.com'" 2>/dev/null || echo 0)"
     [ "$accounts" = 1 ] && echo "ok   jane@example.com is seeded in $DB_DATABASE" || { echo "FAIL jane@example.com is missing"; ok=0; }
+    if [ "$SESSION_DRIVER" = database ]; then
+      table="$(sqlite3 "$DB_DATABASE" "select count(*) from sqlite_master where type = 'table' and name = 'sessions'" 2>/dev/null || echo 0)"
+      [ "$table" = 1 ] && echo "ok   sessions are kept in the sessions table" || { echo "FAIL the database session driver has no sessions table"; ok=0; }
+    else
+      echo "ok   sessions are kept by the $SESSION_DRIVER driver"
+    fi
     [ "$ok" = 1 ]
     ;;
 

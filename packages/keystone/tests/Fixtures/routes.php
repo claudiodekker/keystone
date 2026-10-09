@@ -7,6 +7,7 @@ use ClaudioDekker\Keystone\Tests\Fixtures\Http\Controllers\EnrollmentController;
 use ClaudioDekker\Keystone\Tests\Fixtures\Http\Controllers\OtherSessionsController;
 use ClaudioDekker\Keystone\Tests\Fixtures\Http\Controllers\RecoveryCodesController;
 use ClaudioDekker\Keystone\Tests\Fixtures\Http\Controllers\SecurityController;
+use ClaudioDekker\Keystone\Tests\Fixtures\Http\Controllers\SessionRevocationController;
 use ClaudioDekker\Keystone\Tests\Fixtures\Http\Controllers\SignInController;
 use ClaudioDekker\Keystone\Tests\Fixtures\Http\Controllers\SignOutController;
 use ClaudioDekker\Keystone\Tests\Fixtures\Http\Controllers\SudoController;
@@ -36,4 +37,6 @@ Route::middleware('web')->group(function () {
     Route::delete('settings/security/credentials/{credential}', [CredentialRemovalController::class, 'destroy'])->name('security.credentials.remove.submit');
     Route::get('settings/security/sessions/others/revoke', [OtherSessionsController::class, 'show'])->name('security.sessions.others.revoke');
     Route::delete('settings/security/sessions/others', [OtherSessionsController::class, 'destroy'])->name('security.sessions.others.revoke.submit');
+    Route::get('settings/security/sessions/{session}/revoke', [SessionRevocationController::class, 'show'])->name('security.sessions.revoke');
+    Route::delete('settings/security/sessions/{session}', [SessionRevocationController::class, 'destroy'])->name('security.sessions.revoke.submit');
 });

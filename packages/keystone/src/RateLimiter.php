@@ -324,18 +324,9 @@ class RateLimiter
         }, $parts);
 
         $message = json_encode($canonical, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE);
-        $subkey = hash_hmac('sha256', "keystone.rate-limiter.{$purpose}", $this->appKey(), binary: true);
-        $digest = hash_hmac('sha256', $message, $subkey);
+        $digest = Hmac::make("keystone.rate-limiter.{$purpose}", $message);
 
         return "keystone:{$digest}";
-    }
-
-    /**
-     * Get the app key the keys are hashed under.
-     */
-    protected function appKey(): string
-    {
-        return app('encrypter')->getKey();
     }
 
     /**

@@ -17,6 +17,7 @@ Alerts are queued. Run a queue worker, or they are never sent: `queue.default` s
 | `limit.tripped` | wrong answers spent one of the account's [failed-attempt counts](rate-limiting.md#locking-an-accounts-owner-out), once per count and window; a spent request limit alerts nobody |
 | `recovery_code.used` | a [recovery code](challenge.md#recovery-codes) answered the challenge; the mail says how many codes the account has left |
 | `recovery_codes.generated` | a new set of recovery codes replaced the account's codes; a first set alerts nobody |
+| `session.revoked` | the user [revoked one of their sessions](security-settings.md#revoking-one-session); the mail names the IP address, location and device of the session that was signed out |
 | `sessions.revoked_others` | the user [signed out their other sessions](security-settings.md#signing-out-other-sessions) |
 | `sessions.terminated` | an operator ended every session of the account, unless they passed `--no-alert` (see [Operator commands](operator-commands.md#ending-sessions)); ending every account's sessions with `--all` alerts nobody |
 | `signed_in` | the account signed in from a browser that isn't one of its [known devices](#new-devices) |
@@ -116,7 +117,7 @@ Two ports tell Keystone more about a request than its raw IP address and user ag
 
 ### IP location
 
-`ClaudioDekker\Keystone\IpLocation::locate(string $ipAddress): ?string` names where an IP address is. The default alert looks it up on your queue worker when it builds the mail, so no request waits on it and a slow lookup can't tell anyone whether an account exists.
+`ClaudioDekker\Keystone\IpLocation::locate(string $ipAddress): ?string` names where an IP address is. The default alert looks it up on your queue worker when it builds the mail, so no request waits on it and a slow lookup can't tell anyone whether an account exists. The [sessions list](security-settings.md#sessions) is the exception: it looks up each distinct IP address of the signed-in user's own sessions while it renders the security page.
 
 Without anything installed, the port knows nothing. With [`stevebauman/location`](https://github.com/stevebauman/location) installed, Keystone uses its configured driver and fallbacks and names the city and country. It skips every driver that would send your users' IP addresses over plain `http`, such as that package's default `IpApi`, and tries the next; set `keystone.ip_location.allow_plaintext_driver` to `true` to use them anyway.
 

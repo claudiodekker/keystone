@@ -69,6 +69,12 @@ return [
                 'what' => 'A new set of recovery codes was saved for your account. Your old codes no longer work.',
             ],
         ],
+        'session' => [
+            'revoked' => [
+                'subject' => 'One of your sessions was signed out',
+                'what' => 'One session of your account was signed out from your security settings. The details below are of the session that was signed out. Your other sessions stay signed in.',
+            ],
+        ],
         'sessions' => [
             'revoked_others' => [
                 'subject' => 'Your other sessions were signed out',

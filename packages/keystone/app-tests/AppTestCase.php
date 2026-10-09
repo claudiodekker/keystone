@@ -5,8 +5,10 @@ namespace ClaudioDekker\Keystone\AppTests;
 use Carbon\CarbonInterval;
 use ClaudioDekker\Keystone\AccountChange;
 use ClaudioDekker\Keystone\AccountChanges;
+use ClaudioDekker\Keystone\AccountSessions;
 use ClaudioDekker\Keystone\AppTests\Support\CredentialTypeSupport;
 use ClaudioDekker\Keystone\CredentialAttempt;
+use ClaudioDekker\Keystone\Hmac;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\KeystoneUser;
 use ClaudioDekker\Keystone\KnownDevices;
@@ -69,9 +71,9 @@ abstract class AppTestCase extends TestCase
     ];
 
     /**
-     * The session and cookies of each other browser the test visited from, by name.
+     * The session, cookies, headers and server variables of each other browser the test visited from, by name.
      *
-     * @var array<string, array{session: ?string, cookies: array<string, string>, unencryptedCookies: array<string, string>}>
+     * @var array<string, array{session: ?string, cookies: array<string, string>, unencryptedCookies: array<string, string>, headers: array<string, string>, server: array<string, mixed>}>
      */
     protected array $browsers = [];
 
@@ -187,7 +189,9 @@ abstract class AppTestCase extends TestCase
     }
 
     /**
-     * Run the visit from the named browser, with its own session and cookies, then come back to the browser the test was on.
+     * Run the visit from the named browser, with its own session, cookies, headers and server variables, then come back to the browser the test was on.
+     *
+     * A browser's first visit starts with the headers and server variables of the browser the test was on.
      *
      * @template TResult
      *
@@ -198,7 +202,7 @@ abstract class AppTestCase extends TestCase
     {
         $current = $this->leaveBrowser();
 
-        $this->enterBrowser($this->browsers[$name] ?? ['session' => null, 'cookies' => [], 'unencryptedCookies' => []]);
+        $this->enterBrowser($this->browsers[$name] ?? [...$current, 'session' => null, 'cookies' => [], 'unencryptedCookies' => []]);
 
         try {
             return $visit();
@@ -210,9 +214,9 @@ abstract class AppTestCase extends TestCase
     }
 
     /**
-     * Get the session id and cookies of the browser the test is on.
+     * Get the session id, cookies, headers and server variables of the browser the test is on.
      *
-     * @return array{session: ?string, cookies: array<string, string>, unencryptedCookies: array<string, string>}
+     * @return array{session: ?string, cookies: array<string, string>, unencryptedCookies: array<string, string>, headers: array<string, string>, server: array<string, mixed>}
      */
     protected function leaveBrowser(): array
     {
@@ -220,13 +224,15 @@ abstract class AppTestCase extends TestCase
             'session' => $this->app['session.store']->getId(),
             'cookies' => $this->defaultCookies,
             'unencryptedCookies' => $this->unencryptedCookies,
+            'headers' => $this->defaultHeaders,
+            'server' => $this->serverVariables,
         ];
     }
 
     /**
      * Switch to the browser, holding only what its session driver kept of its session.
      *
-     * @param  array{session: ?string, cookies: array<string, string>, unencryptedCookies: array<string, string>}  $browser
+     * @param  array{session: ?string, cookies: array<string, string>, unencryptedCookies: array<string, string>, headers: array<string, string>, server: array<string, mixed>}  $browser
      */
     protected function enterBrowser(array $browser): void
     {
@@ -242,8 +248,18 @@ abstract class AppTestCase extends TestCase
 
         $this->defaultCookies = $browser['cookies'];
         $this->unencryptedCookies = $browser['unencryptedCookies'];
+        $this->defaultHeaders = $browser['headers'];
+        $this->serverVariables = $browser['server'];
 
         Auth::forgetGuards();
+    }
+
+    /**
+     * Get the handle the sessions list names the session with the id by.
+     */
+    public function handleOfSession(string $id): string
+    {
+        return Hmac::make(AccountSessions::HANDLE_PURPOSE, $id);
     }
 
     /**

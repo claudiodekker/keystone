@@ -128,7 +128,7 @@ function unpairedSudoActions(string $controller): array
 test('app tests check responses only through their overridable assertion traits', function () {
     $files = packageFiles('app-tests');
     $appTests = preg_grep('/Test\.php$/', $files);
-    $responseAssertion = '/->assert(Ok|Status|Successful|Redirect|Location|Json|Session|Header|Cookie|See|View|Inertia|Created|NoContent|Unauthorized|Forbidden|NotFound|TooManyRequests|Unprocessable|Gone|Valid|Invalid)\w*\(/';
+    $responseAssertion = '/->assert(Ok|Status|Successful|Redirect|Location|Json|Session(Has|Missing|Doesnt)|Header|Cookie|See|View|Inertia|Created|NoContent|Unauthorized|Forbidden|NotFound|TooManyRequests|Unprocessable|Gone|Valid|Invalid)\w*\(/';
     $offenders = filesContaining($appTests, $responseAssertion);
 
     expect($offenders)->toBe([]);
