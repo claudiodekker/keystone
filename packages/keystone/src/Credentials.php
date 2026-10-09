@@ -180,7 +180,10 @@ class Credentials
      */
     public function stampLastUse(int $credentialId, string $type): bool
     {
-        return $this->usable($type)->where('id', $credentialId)->update(['last_used_at' => now()]) === 1;
+        $credential = $this->usable($type)->where('id', $credentialId);
+
+        // MySQL counts the rows an update changed, and a second use within the same second changes none.
+        return $credential->clone()->update(['last_used_at' => now()]) === 1 || $credential->exists();
     }
 
     /**
