@@ -9,7 +9,9 @@ use Illuminate\Auth\EloquentUserProvider;
 use Illuminate\Auth\SessionGuard;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Session\DatabaseSessionHandler;
 use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Facades\DB;
 use LogicException;
 
 /**
@@ -241,6 +243,18 @@ class KeystoneGuard extends SessionGuard
     public function slots(): CeremonySlots
     {
         return new CeremonySlots($this->session, $this->phaseEndsAt());
+    }
+
+    /**
+     * Get the account's sessions as the session driver stores them, or null when the driver keeps no table of them.
+     */
+    public function sessions(Model&KeystoneUser $account): ?AccountSessions
+    {
+        if (! $this->session->getHandler() instanceof DatabaseSessionHandler) {
+            return null;
+        }
+
+        return new AccountSessions(DB::connection(config('session.connection')), config()->string('session.table'), $this->session, $account);
     }
 
     /**

@@ -69,6 +69,13 @@ abstract class AppTestCase extends TestCase
     ];
 
     /**
+     * The session and cookies of each other browser the test visited from, by name.
+     *
+     * @var array<string, array{session: ?string, cookies: array<string, string>, unencryptedCookies: array<string, string>}>
+     */
+    protected array $browsers = [];
+
+    /**
      * Set up the test environment, relaxing the timing floor and sending a same-origin browser's headers.
      */
     protected function setUp(): void
@@ -108,6 +115,9 @@ abstract class AppTestCase extends TestCase
     {
         Auth::forgetGuards();
         Cookie::flushQueuedCookies();
+
+        // The database session handler stores the user id of the auth.driver singleton.
+        $this->app->forgetInstance('auth.driver');
 
         return parent::call($method, $uri, $parameters, $cookies, $files, $server, $content);
     }
@@ -162,6 +172,78 @@ abstract class AppTestCase extends TestCase
     public function rememberCookieOf(TestResponse $response): ?string
     {
         return $response->getCookie(RememberTokens::COOKIE, decrypt: false)?->getValue();
+    }
+
+    /**
+     * Keep sessions in the session driver from here on, as an app configured with it does.
+     */
+    public function useSessionDriver(string $driver): void
+    {
+        config(['session.driver' => $driver]);
+
+        $this->app['session']->forgetDrivers();
+        $this->app->forgetInstance('session.store');
+        Auth::forgetGuards();
+    }
+
+    /**
+     * Run the visit from the named browser, with its own session and cookies, then come back to the browser the test was on.
+     *
+     * @template TResult
+     *
+     * @param  Closure(): TResult  $visit
+     * @return TResult
+     */
+    public function inBrowser(string $name, Closure $visit): mixed
+    {
+        $current = $this->leaveBrowser();
+
+        $this->enterBrowser($this->browsers[$name] ?? ['session' => null, 'cookies' => [], 'unencryptedCookies' => []]);
+
+        try {
+            return $visit();
+        } finally {
+            $this->browsers[$name] = $this->leaveBrowser();
+
+            $this->enterBrowser($current);
+        }
+    }
+
+    /**
+     * Get the session id and cookies of the browser the test is on.
+     *
+     * @return array{session: ?string, cookies: array<string, string>, unencryptedCookies: array<string, string>}
+     */
+    protected function leaveBrowser(): array
+    {
+        return [
+            'session' => $this->app['session.store']->getId(),
+            'cookies' => $this->defaultCookies,
+            'unencryptedCookies' => $this->unencryptedCookies,
+        ];
+    }
+
+    /**
+     * Switch to the browser, holding only what its session driver kept of its session.
+     *
+     * @param  array{session: ?string, cookies: array<string, string>, unencryptedCookies: array<string, string>}  $browser
+     */
+    protected function enterBrowser(array $browser): void
+    {
+        $session = $this->app['session.store'];
+
+        // Store::start() merges the stored session into what it holds,
+        // and the database handler recalls the last row it read, so
+        // each browser starts on an empty store and a fresh read.
+        $session->flush();
+        $session->setExists(false);
+        $session->setId($browser['session']);
+        $session->start();
+
+        $this->defaultCookies = $browser['cookies'];
+        $this->unencryptedCookies = $browser['unencryptedCookies'];
+
+        Auth::forgetGuards();
     }
 
     /**

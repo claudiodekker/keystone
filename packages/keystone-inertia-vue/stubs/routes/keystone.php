@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\ChallengeController;
 use App\Http\Controllers\Auth\CredentialEnrollmentController;
 use App\Http\Controllers\Auth\CredentialRemovalController;
 use App\Http\Controllers\Auth\EnrollmentController;
+use App\Http\Controllers\Auth\OtherSessionsController;
 use App\Http\Controllers\Auth\RecoveryCodesController;
 use App\Http\Controllers\Auth\SecurityController;
 use App\Http\Controllers\Auth\SignInController;
@@ -55,4 +56,7 @@ Route::prefix('settings/security')->group(function () {
 
     Route::get('credentials/{credential}/remove', [CredentialRemovalController::class, 'show'])->name('security.credentials.remove');
     Route::delete('credentials/{credential}', [CredentialRemovalController::class, 'destroy'])->name('security.credentials.remove.submit');
+
+    Route::get('sessions/others/revoke', [OtherSessionsController::class, 'show'])->name('security.sessions.others.revoke');
+    Route::delete('sessions/others', [OtherSessionsController::class, 'destroy'])->name('security.sessions.others.revoke.submit');
 });

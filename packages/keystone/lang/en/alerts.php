@@ -70,6 +70,10 @@ return [
             ],
         ],
         'sessions' => [
+            'revoked_others' => [
+                'subject' => 'Your other sessions were signed out',
+                'what' => 'Every other session of your account was signed out from your security settings. The device that did it stays signed in.',
+            ],
             'terminated' => [
                 'subject' => 'Your account was signed out everywhere',
                 'what' => 'An administrator ended every session of your account, so it is now signed out on every device.',

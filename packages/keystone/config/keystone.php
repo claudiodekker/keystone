@@ -162,6 +162,7 @@ return [
         'limit.tripped' => SecurityAlert::class,
         'recovery_code.used' => SecurityAlert::class,
         'recovery_codes.generated' => SecurityAlert::class,
+        'sessions.revoked_others' => SecurityAlert::class,
         'sessions.terminated' => SecurityAlert::class,
         'signed_in' => SecurityAlert::class,
         'sudo.failed' => SecurityAlert::class,

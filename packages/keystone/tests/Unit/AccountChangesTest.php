@@ -77,6 +77,7 @@ test('the credential epoch moves only for a change that removes, replaces or end
     'an advance' => [fn (AccountChange $change, StoredCredential $credential) => $change->advance($credential, type: 'form', secret: 'next-step'), false],
     'spending a recovery code' => [fn (AccountChange $change) => $change->spendRecoveryCode('NO-SUCH-CODE', flow: Flow::CHALLENGE, keepLast: false), false],
     'ending sessions' => [fn (AccountChange $change) => $change->endSessions(), true],
+    'signing out the other sessions' => [fn (AccountChange $change) => $change->signOutOthers(), true],
     'removing a credential' => [function (AccountChange $change, StoredCredential $credential) {
         $change->addCredential(new FormType, identifier: null, secret: 'spare');
 
