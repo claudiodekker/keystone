@@ -92,6 +92,15 @@ describe('request limit', function () {
         expect(retryAfter(fn () => limiter()->hitRequest(StepKind::CHANGE)))->toBeNull();
     });
 
+    it('keeps the key it counts under the same across releases, so counts survive a deploy', function () {
+        config(['app.key' => 'base64:'.base64_encode(str_repeat('k', 32))]);
+        app()->forgetInstance('encrypter');
+
+        limiter('203.0.113.5')->hitRequest(StepKind::VIEW);
+
+        expect(app(CacheRateLimiter::class)->attempts('keystone:eafc3bc39700a3d0d8cf46bbc745b95aad90274a112d922dc6f42a5494e9cb0e'))->toBe(1);
+    });
+
     it('counts each address separately', function () {
         hitTimes(limiter('203.0.113.5'), StepKind::SUBMIT, 10);
 
