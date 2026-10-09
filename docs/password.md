@@ -41,7 +41,7 @@ Each minimum counts characters, not bytes, and must be a whole number of at leas
 
 ## Context words
 
-A new password may not contain a word of your app's name (`app.name`), of the host of your app's URL (`app.url`), of a `context_words` entry, or of the part before the `@` of any email address the user holds, verified or not. Each of these is split into words on anything but letters and digits, and only words of at least 4 characters count. Case is ignored. For an app named "Acme Payroll" at `https://portal.acme.test`, a user `jane.doe@example.com` can't choose `Payroll2026!`, `my-portal-pass` or `JaneLovesCats`.
+A new password may not contain a word of your app's name (`app.name`), of the host of your app's URL (`app.url`), of a `context_words` entry, or of the part before the `@` of any email address the user holds, verified or not. At [registration](registration.md#finishing), where the user holds no address yet, that is the address the registration proved. Each of these is split into words on anything but letters and digits, and only words of at least 4 characters count. Case is ignored. For an app named "Acme Payroll" at `https://portal.acme.test`, a user `jane.doe@example.com` can't choose `Payroll2026!`, `my-portal-pass` or `JaneLovesCats`.
 
 The domain of an email address never counts, so `jane@gmail.com` may still choose a password containing `gmail`. `context_words` must be a list of strings, or your app refuses to boot.
 
