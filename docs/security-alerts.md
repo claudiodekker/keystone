@@ -17,7 +17,7 @@ Alerts are queued. Run a queue worker, or they are never sent: `queue.default` s
 | `device_cookie.reused` | a browser signed in with a [device cookie](#new-devices) that a later sign-in had already replaced, so two browsers held the same cookie |
 | `limit.tripped` | wrong answers spent one of the account's [failed-attempt counts](rate-limiting.md#locking-an-accounts-owner-out), once per count and window; a spent request limit alerts nobody |
 | `recovery_code.used` | a [recovery code](challenge.md#recovery-codes) answered the challenge; the mail says how many codes the account has left |
-| `recovery_codes.generated` | a new set of recovery codes replaced the account's codes; a first set alerts nobody |
+| `recovery_codes.generated` | a new set of recovery codes replaced the account's codes, as when the user [regenerated them](security-settings.md#regenerating-recovery-codes), and the account's other sessions were signed out; a first set alerts nobody |
 | `session.revoked` | the user [revoked one of their sessions](security-settings.md#revoking-one-session); the mail names the IP address, location and device of the session that was signed out |
 | `sessions.revoked_others` | the user [signed out their other sessions](security-settings.md#signing-out-other-sessions) |
 | `sessions.terminated` | an operator ended every session of the account, unless they passed `--no-alert` (see [Operator commands](operator-commands.md#ending-sessions)); ending every account's sessions with `--all` alerts nobody |

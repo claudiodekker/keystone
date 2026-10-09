@@ -24,7 +24,7 @@ The password section says whether the account has a password it can sign in with
 
 Credentials of a type that `keystone.methods` no longer lists, or that no installed package registers, are shown apart as leftovers. They don't count as a way to sign in or as a second factor, and Keystone keeps them stored so they count again if you list the type again.
 
-The page also shows how many unspent [recovery codes](challenge.md#recovery-codes) the account holds. It warns that the account is running low at three or fewer, and says it has none at zero.
+The page also shows how many unspent [recovery codes](challenge.md#recovery-codes) the account holds. It warns that the account is running low at three or fewer, and says it has none at zero. A Regenerate link opens [the step that replaces them](#regenerating-recovery-codes).
 
 When the session has sudo that the [gate](sudo.md#gating-a-route) would accept from the user's current network, the page shows when it ends, with a button that [ends it](sudo.md#ending-it). Otherwise it says the next change will ask the user to confirm who they are.
 
@@ -189,6 +189,48 @@ protected function sendRemovalPage(Request $request, CredentialRemovalPage $page
 
 `sendCredentialRemoved()` and `sendCredentialNotFound()` answer the other two outcomes. The published controller sends both to the security page, which shows the flashed status.
 
+## Regenerating recovery codes
+
+The recovery codes section has a Regenerate link, for a user whose codes may have leaked or run low. The link opens `GET /settings/security/recovery-codes/regenerate`, named `security.recovery-codes.regenerate`, which stages a new set in the user's session and shows it. The user confirms they saved it with `POST /settings/security/recovery-codes/regenerate`, named `security.recovery-codes.regenerate.confirm`, and can walk away with `DELETE /settings/security/recovery-codes/regenerate`, named `security.recovery-codes.regenerate.cancel`.
+
+The show step and the confirm need [sudo](sudo.md#gating-a-route). A session without it is sent to confirm who the user is, and then back to the step. The discard needs none, because it only forgets what the session staged. The show step counts against the `start` [request limit](rate-limiting.md), the confirm against `submit` and the discard against `change`, and the responses carry the [hardening headers](hardening.md#headers), so the browser stores no code.
+
+The staged set lives in the session, not in the account. Reloading the page shows the same set until the user saves it or discards it, or for 15 minutes. It never outlives the session's sudo grant: once sudo ends, the set is gone and the next visit stages a new one. Keystone flashes no code, so a refused answer never puts a code back into the form.
+
+The user types one of the staged codes back to show they saved it. Keystone compares it without dashes, spaces or case, and replaces the account's recovery codes with the whole staged set in one change, so the old codes stop working. A first set doesn't move the epoch. Replacing a live set signs out every other session of the account, which moves its credential epoch. The user's own session stays signed in, gets a new session id and keeps its sudo. Keystone records `recovery_codes.generated` with the flow `settings`, which [alerts](security-alerts.md) the account's owner only when the set replaced a live one, and sends the user to the security page with the `recovery-codes-regenerated` status. Submitting a set that is already stored changes and records nothing more.
+
+A code that isn't in the staged set is refused with "The recovery code you entered is incorrect." through `sendRecoveryCodeRegenerationRefused()`, and keeps the set. It records `proof.rejected` with the reason `recovery-code.mismatch` and the flow `settings`, and counts against the account's `failed_attempts_per_hour` [limit](rate-limiting.md#locking-an-accounts-owner-out) like any wrong answer in settings. Past it the confirm answers with a 429. A right code gives its attempt back. A mismatch alerts nobody and records no `recovery_code.used`, because nothing was spent.
+
+Keystone sends the user back to the step for a fresh set, through `sendRecoveryCodeRegenerationExpired()`, with the `recovery-codes-expired` status, when:
+
+- a code arrives with nothing staged, which isn't counted as a failed attempt;
+- the staged set was made on a credential epoch the account has since left, such as after another tab signed out its other sessions. Keystone discards the set and stores nothing.
+
+If saving fails, Keystone discards the staged set and keeps the account's old codes.
+
+`RecoveryCodeRegenerationController::sendRecoveryCodeRegenerationPage()` receives a `RecoveryCodeRegenerationPage` and renders it:
+
+| Field | Value |
+|---|---|
+| `codes` | the staged set, shown until it is saved or discarded |
+| `replaces` | whether saving replaces codes the account still holds, which also signs out its other sessions |
+| `status` | the flashed status label, such as the `recovery-codes-expired` one, or `null` |
+
+```php
+protected function sendRecoveryCodeRegenerationPage(Request $request, RecoveryCodeRegenerationPage $page): Response
+{
+    Inertia::encryptHistory();
+
+    return Inertia::render('settings/RegenerateRecoveryCodes', [
+        'codes' => $page->codes,
+        'replaces' => $page->replaces,
+        'status' => $page->status,
+    ]);
+}
+```
+
+`sendRecoveryCodeRegenerationRefused()`, `sendRecoveryCodeRegenerationExpired()`, `sendRecoveryCodesRegenerated()` and `sendRecoveryCodeRegenerationCancelled()` answer the other outcomes. The published controller sends the refusal and the expiry back to the step, and the other two to the security page, which shows the flashed status.
+
 ## Sessions
 
 On the `database` session driver, the page lists every session signed in to the account. This device comes first, then the others, the most recently active first, up to 50 in all. Each row shows:
@@ -284,6 +326,8 @@ Keystone's AppTests sign in, give the account's credential a name, add another a
 The enrollment AppTests enroll a credential of the first type an account can enroll as a second factor. They also answer wrongly, answer with no ceremony running, cancel, try without sudo and try a type whose ceremony can't start. They check your responses through `Tests\Keystone\Assertions\CredentialEnrollmentAssertions`, which has an assertion named after each hook, and `assertCredentialEnrollmentRestarted()` for the form that shows the `enrollment-expired` status.
 
 The removal AppTests remove a credential, try another account's and try without sudo. They also try to remove the account's only way to sign in, and its last second factor while one is required. They check your responses through `Tests\Keystone\Assertions\CredentialRemovalAssertions`: `assertRemovalPage()` receives the name the confirm step must show, `assertRemovalRefused()` the credential's id and the message, and `assertCredentialRemoved()` and `assertCredentialNotFound()` check the other outcomes.
+
+The regeneration AppTests stage a set, reload it, type a code back and check that the account holds the new set. They also type a wrong code, type one with nothing staged, try without sudo and discard the set. They check your responses through `Tests\Keystone\Assertions\RecoveryCodeRegenerationAssertions`, which has an assertion named after each hook: `assertRecoveryCodeRegenerationPage()` receives the staged codes.
 
 The sign-out AppTests sign in from a second browser, sign out the other sessions and check that the second browser is signed out. They also run on the `database` session driver and check that only the user's own row is left, and try without sudo. They check your responses through `Tests\Keystone\Assertions\OtherSessionsAssertions`: `assertSignOutOthersPage()` and `assertOtherSessionsRevoked()`, one for each hook.
 
