@@ -2,16 +2,19 @@
 
 namespace ClaudioDekker\Keystone\Password;
 
+use ClaudioDekker\Keystone\Addresses;
+use ClaudioDekker\Keystone\Keystone;
+use ClaudioDekker\Keystone\KeystoneUser;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\InitiateShape;
 use ClaudioDekker\Keystone\Methods\Initiation;
 use ClaudioDekker\Keystone\Methods\Proof;
 use ClaudioDekker\Keystone\Methods\Surface;
 use Closure;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rules\Password;
 use LogicException;
 
 /**
@@ -33,6 +36,11 @@ class PasswordType implements CredentialType
      * The most characters of a typed password at sign-in, and of a new one under any other driver than bcrypt.
      */
     public const int MAX_CHARACTERS = 1024;
+
+    /**
+     * The fewest characters an app may ask a new password to have.
+     */
+    public const int MIN_LENGTH_FLOOR = 8;
 
     /**
      * Get the type's name.
@@ -71,21 +79,37 @@ class PasswordType implements CredentialType
     }
 
     /**
-     * Get what is wrong with the type's configuration, which has nothing to go wrong yet.
+     * Get what is wrong with the type's configuration: a minimum length under the floor, or context words that aren't a list of words.
      */
     public function configFailures(): array
     {
-        return [];
+        $failures = [];
+
+        foreach (['second_factor_required', 'second_factor_optional'] as $mandate) {
+            $minLength = config("keystone-password.min_length.{$mandate}");
+
+            if (! is_int($minLength) || $minLength < self::MIN_LENGTH_FLOOR) {
+                $failures[] = "keystone-password.min_length.{$mandate} must be a whole number of at least ".self::MIN_LENGTH_FLOOR.'.';
+            }
+        }
+
+        $words = config('keystone-password.context_words');
+
+        if (! is_array($words) || ! array_is_list($words) || array_filter($words, is_string(...)) !== $words) {
+            $failures[] = 'keystone-password.context_words must be a list of words.';
+        }
+
+        return $failures;
     }
 
     /**
-     * Get the rules for the typed password, asking a new one to be confirmed, to meet the app's password defaults and to fit what the hashing driver takes, and keeping any typed one short enough to refuse before it is hashed.
+     * Get the rules for the typed password, asking a new one to be confirmed, to fit what the hashing driver takes and to be strong enough, and keeping any typed one short enough to refuse before it is hashed.
      */
     public function rules(Surface $surface): array
     {
         return match ($surface) {
             Surface::SIGN_IN => [self::FIELD => ['required', 'string', 'max:'.self::MAX_CHARACTERS]],
-            default => [self::FIELD => ['required', 'string', 'confirmed', Password::default(), $this->lengthCap()]],
+            default => [self::FIELD => ['bail', 'required', 'string', 'confirmed', $this->lengthCap(), ...$this->strengthRules()]],
         };
     }
 
@@ -137,6 +161,59 @@ class PasswordType implements CredentialType
                 $fail('validation.max.string')->translate(['max' => $maxBytes]);
             }
         };
+    }
+
+    /**
+     * Get the rules that decide whether a new password is strong enough: the app's own when it set them, else Keystone's minimum length and blocklist.
+     *
+     * @return list<mixed>
+     */
+    protected function strengthRules(): array
+    {
+        return PasswordRules::resolve() ?? ['min:'.$this->minLength(), new Blocklist($this->context(), app(BreachedPasswords::class))];
+    }
+
+    /**
+     * Get the fewest characters a new password may have, which is more when a password may be an account's only factor.
+     */
+    protected function minLength(): int
+    {
+        $mandate = config('keystone.require_second_factor') ? 'second_factor_required' : 'second_factor_optional';
+
+        return config()->integer("keystone-password.min_length.{$mandate}");
+    }
+
+    /**
+     * Get the names a new password may not borrow a word from: the app's name and host, the configured context words, and every address the signed-in account holds.
+     *
+     * @return list<string>
+     */
+    protected function context(): array
+    {
+        /** @var (Model&KeystoneUser)|null $account */
+        $account = Keystone::guard()->user();
+        $url = config('app.url');
+
+        $names = [
+            config('app.name'),
+            is_string($url) ? parse_url($url, PHP_URL_HOST) : null,
+            ...config()->array('keystone-password.context_words'),
+            ...($account === null ? [] : $this->localParts($account)),
+        ];
+
+        return array_values(array_filter($names, is_string(...)));
+    }
+
+    /**
+     * Get the part before the @ of every address the account holds, verified or not.
+     *
+     * @return list<string>
+     */
+    protected function localParts(Model&KeystoneUser $account): array
+    {
+        $addresses = (new Addresses($account))->heldBy($account);
+
+        return array_map(fn (string $address) => Str::beforeLast($address, '@'), $addresses);
     }
 
     /**

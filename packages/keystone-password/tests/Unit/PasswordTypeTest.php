@@ -1,5 +1,8 @@
 <?php
 
+use ClaudioDekker\Keystone\BootChecks;
+use ClaudioDekker\Keystone\Exceptions\Misconfigured;
+use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\InitiateShape;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
 use ClaudioDekker\Keystone\Methods\Surface;
@@ -7,7 +10,6 @@ use ClaudioDekker\Keystone\Password\PasswordType;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rules\Password;
 use Mockery\MockInterface;
 
 function passwordCredential(string $secret, int $id = 1): StoredCredential
@@ -21,6 +23,17 @@ function spyOnHash(): MockInterface
     Hash::swap($hash);
 
     return $hash;
+}
+
+function passwordBootFailures(): array
+{
+    try {
+        (new BootChecks(app(CredentialTypes::class)))->check();
+    } catch (Misconfigured $e) {
+        return $e->failures;
+    }
+
+    return [];
 }
 
 function passwordRulesPass(Surface $surface, mixed $password, mixed $confirmation = null): bool
@@ -40,6 +53,41 @@ test('the type serves sign-in, registration and enrollment with a form, and is n
             'enrollment' => InitiateShape::FORM,
         ])
         ->and($type->representsMultipleFactors())->toBeFalse();
+});
+
+describe('boot checks', function () {
+    it('boots with minimum lengths of at least 8', function (string $key, int $minLength) {
+        config(["keystone-password.min_length.{$key}" => $minLength]);
+
+        expect(passwordBootFailures())->toBe([]);
+    })->with(['second_factor_required', 'second_factor_optional'])->with(['the floor' => 8, 'a long one' => 64]);
+
+    it('refuses to boot with a minimum length under 8 or not a whole number', function (string $key, mixed $minLength) {
+        config(["keystone-password.min_length.{$key}" => $minLength]);
+
+        expect(passwordBootFailures())->toBe(["keystone-password.min_length.{$key} must be a whole number of at least 8."]);
+    })->with(['second_factor_required', 'second_factor_optional'])->with(['7' => 7, 'a fraction' => 8.5, 'a string' => '8', 'null' => null]);
+
+    it('refuses to boot with one minimum length for both mandates', function () {
+        config(['keystone-password.min_length' => 12]);
+
+        expect(passwordBootFailures())->toBe([
+            'keystone-password.min_length.second_factor_required must be a whole number of at least 8.',
+            'keystone-password.min_length.second_factor_optional must be a whole number of at least 8.',
+        ]);
+    });
+
+    it('boots with context words that are a list of words', function (array $words) {
+        config(['keystone-password.context_words' => $words]);
+
+        expect(passwordBootFailures())->toBe([]);
+    })->with(['none' => [[]], 'some' => [['acme', 'payroll']]]);
+
+    it('refuses to boot with context words that aren\'t a list of words', function (mixed $words) {
+        config(['keystone-password.context_words' => $words]);
+
+        expect(passwordBootFailures())->toBe(['keystone-password.context_words must be a list of words.']);
+    })->with(['a string' => 'acme', 'a map' => [['brand' => 'acme']], 'a number in the list' => [['acme', 12]], 'null' => null]);
 });
 
 describe('new password rules', function () {
@@ -65,24 +113,14 @@ describe('new password rules', function () {
     ]);
 
     it('asks for at least 8 characters by default', function (Surface $surface, string $password, bool $passes) {
-        $passed = passwordRulesPass($surface, $password);
-
-        expect($passed)->toBe($passes);
-    })->with([Surface::REGISTRATION, Surface::ENROLLMENT])->with([
-        '7 characters' => [str_repeat('a', 7), false],
-        '8 characters' => [str_repeat('a', 8), true],
-    ]);
-
-    it('applies the app\'s own password defaults', function (Surface $surface, string $password, bool $passes) {
-        Password::defaults(fn () => Password::min(10));
-        $this->beforeApplicationDestroyed(fn () => Password::defaults(fn () => Password::min(8)));
+        config(['keystone.require_second_factor' => true]);
 
         $passed = passwordRulesPass($surface, $password);
 
         expect($passed)->toBe($passes);
     })->with([Surface::REGISTRATION, Surface::ENROLLMENT])->with([
-        '9 characters' => [str_repeat('é', 9), false],
-        '10 characters' => [str_repeat('é', 10), true],
+        '7 characters' => ['tq8#vbn', false],
+        '8 characters' => ['tq8#vbnz', true],
     ]);
 
     it('caps a new password at 72 bytes under bcrypt', function (Surface $surface, string $password, bool $passes) {

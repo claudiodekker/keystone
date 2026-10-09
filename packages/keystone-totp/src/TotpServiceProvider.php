@@ -2,6 +2,7 @@
 
 namespace ClaudioDekker\Keystone\Totp;
 
+use ClaudioDekker\Keystone\MergesConfigRecursively;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use Illuminate\Support\ServiceProvider;
 
@@ -10,12 +11,14 @@ use Illuminate\Support\ServiceProvider;
  */
 class TotpServiceProvider extends ServiceProvider
 {
+    use MergesConfigRecursively;
+
     /**
      * Register the package services.
      */
     public function register(): void
     {
-        $this->mergeConfigFrom(__DIR__.'/../config/keystone-totp.php', 'keystone-totp');
+        $this->mergeConfigRecursivelyFrom(__DIR__.'/../config/keystone-totp.php', 'keystone-totp');
     }
 
     /**
