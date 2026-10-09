@@ -10,6 +10,7 @@ use ClaudioDekker\Keystone\AppTests\Assertions\RegistrationFinishAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\RegistrationLinkAssertions;
 use ClaudioDekker\Keystone\AppTests\Support\CredentialTypeSupport;
 use ClaudioDekker\Keystone\Keystone;
+use ClaudioDekker\Keystone\Methods\RecoveryCodeType;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Notifications\EmailedLinkMail;
 use ClaudioDekker\Keystone\Notifications\SecurityAlert;
@@ -271,6 +272,22 @@ it('signs out at the enrollment a new account owes, keeping the account', functi
     expect(Keystone::guard()->check())->toBeFalse()
         ->and(Keystone::guard()->pending())->toBeNull();
     $this->assertDatabaseHas('user_emails', ['address' => 'new@example.com']);
+});
+
+it('records enrollment.completed once a new account has enrolled what it owes, and signs it in without a new-device alert', function () {
+    $this->withMandates();
+    $this->registerAddress();
+    $this->finishRegistration($this->supportsFor(Surface::REGISTRATION)[0]);
+    $this->enrollSecondFactor($this->enrollmentSupports()[0]);
+    $this->get(route('login.recovery-codes'));
+
+    $response = $this->post(route('login.recovery-codes.submit'), [RecoveryCodeType::FIELD => $this->stagedRecoveryCodes()[0]]);
+
+    $this->assertRecoveryCodesSaved($response, '/');
+    $account = Keystone::guard()->user();
+    expect($account)->not->toBeNull();
+    $this->assertDatabaseHas('user_security_events', ['type' => 'enrollment.completed', 'user_id' => $account->getKey(), 'flow' => 'enrollment']);
+    Notification::assertNotSentTo(new AnonymousNotifiable, SecurityAlert::class, fn (SecurityAlert $alert) => $alert->type === SecurityEventType::SIGNED_IN);
 });
 
 it('sends a signed-in user away from the finish, creating nothing', function () {

@@ -70,7 +70,7 @@ class RecoveryCodeSetup
 
         $this->guard->slots()->forget(CredentialTypes::RECOVERY_CODE, Surface::ENROLLMENT->value);
 
-        return $this->accepted->conclude(new EnrollmentEntry($this->guard), $pending->account, Flow::ENROLLMENT, CredentialTypes::RECOVERY_CODE) ?? Demand::REFUSE;
+        return $this->accepted->conclude(new EnrollmentEntry($this->guard, $this->recorder), $pending->account, Flow::ENROLLMENT, CredentialTypes::RECOVERY_CODE) ?? Demand::REFUSE;
     }
 
     /**

@@ -11,6 +11,7 @@ use ClaudioDekker\Keystone\Password\AppTests\Support\PasswordTypeSupport;
 use ClaudioDekker\Keystone\PendingOrigin;
 use ClaudioDekker\Keystone\PendingStage;
 use ClaudioDekker\Keystone\Registering;
+use ClaudioDekker\Keystone\SecurityEventType;
 use ClaudioDekker\Keystone\Status;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormTypeSupport;
 use ClaudioDekker\Keystone\Tests\Fixtures\User;
@@ -469,6 +470,52 @@ describe('cancelling', function () {
 
     it('asks to sign in again to finish setting up the account, whatever it owes', function () {
         expect(Status::ENROLLMENT_OWED->label())->toBe('Please sign in again to finish setting up your account.');
+    });
+});
+
+describe('completing the owed enrollment', function () {
+    it('records enrollment.completed once the new account owes nothing more, and signs it in without a new-device alert', function () {
+        $this->withMandates();
+        $this->registerAddress();
+        $this->finishRegistration(new PasswordTypeSupport);
+        $this->enrollSecondFactor(new FormTypeSupport('code'))->assertRedirectToRoute('login.recovery-codes');
+        $this->assertDatabaseMissing('user_security_events', ['type' => 'enrollment.completed']);
+        $codes = $this->get(route('login.recovery-codes'))->json('codes');
+
+        $response = $this->post(route('login.recovery-codes.submit'), ['code' => $codes[0]]);
+
+        $response->assertRedirect('/');
+        $account = User::sole();
+        $this->assertAuthenticatedAs($account);
+        $this->assertDatabaseHas('user_security_events', ['type' => 'enrollment.completed', 'user_id' => $account->getKey(), 'flow' => 'enrollment']);
+        expect(DB::table('user_security_events')->where('type', 'enrollment.completed')->count())->toBe(1);
+        $this->assertDatabaseHas('user_security_events', ['type' => 'signed_in', 'user_id' => $account->getKey(), 'flow' => 'enrollment', 'known_device' => false]);
+        Notification::assertNotSentTo(new AnonymousNotifiable, SecurityAlert::class, fn (SecurityAlert $alert) => $alert->type === SecurityEventType::SIGNED_IN);
+        Notification::assertSentOnDemand(SecurityAlert::class, fn (SecurityAlert $alert, $channels, $notifiable) => $alert->type === SecurityEventType::CREDENTIAL_ADDED && $notifiable->routes['mail'] === 'new@example.com');
+    });
+
+    it('records it when the second factor is all the new account owes', function () {
+        $this->withMandates();
+        config(['keystone.require_recovery_codes' => false]);
+        $this->registerAddress();
+        $this->finishRegistration(new PasswordTypeSupport);
+
+        $this->enrollSecondFactor(new FormTypeSupport('code'))->assertRedirect('/');
+
+        $this->assertDatabaseHas('user_security_events', ['type' => 'enrollment.completed', 'flow' => 'enrollment']);
+        Notification::assertNotSentTo(new AnonymousNotifiable, SecurityAlert::class, fn (SecurityAlert $alert) => $alert->type === SecurityEventType::SIGNED_IN);
+    });
+
+    it('records nothing of the kind for an enrollment a sign-in owed', function () {
+        $this->withMandates();
+        config(['keystone.require_recovery_codes' => false]);
+        $this->createFirstFactorAccount();
+        $this->passFirstFactor();
+
+        $this->enrollSecondFactor(new FormTypeSupport('code'))->assertRedirect('/');
+
+        $this->assertDatabaseMissing('user_security_events', ['type' => 'enrollment.completed']);
+        Notification::assertSentOnDemand(SecurityAlert::class, fn (SecurityAlert $alert) => $alert->type === SecurityEventType::SIGNED_IN);
     });
 });
 

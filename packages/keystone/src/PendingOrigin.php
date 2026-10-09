@@ -28,4 +28,12 @@ enum PendingOrigin: string
     {
         return $this === self::LOGIN;
     }
+
+    /**
+     * Determine if finishing the enrollment a pending sign-in of this origin owes records enrollment.completed.
+     */
+    public function recordsCompletedEnrollment(): bool
+    {
+        return $this === self::REGISTRATION;
+    }
 }

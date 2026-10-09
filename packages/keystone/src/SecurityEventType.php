@@ -10,6 +10,7 @@ enum SecurityEventType: string
     case SIGNED_IN = 'signed_in';
     case SIGN_IN_HELD = 'sign_in.held';
     case SIGN_IN_VOIDED = 'sign_in.voided';
+    case ENROLLMENT_COMPLETED = 'enrollment.completed';
     case PROOF_REJECTED = 'proof.rejected';
     case CHALLENGE_ABANDONED = 'challenge.abandoned';
     case SIGNED_OUT = 'signed_out';
