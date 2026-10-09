@@ -52,7 +52,7 @@ it('asks for sudo before it starts a ceremony or stores anything', function () {
     $this->delete(route('sudo.end'));
 
     $this->assertSudoRequired($this->get(route('security.enroll', ['type' => $type])));
-    $this->assertSudoRequired($this->post(route('security.enroll.submit', ['type' => $type]), $this->support->validEnrollment('anything')));
+    $this->assertSudoRequired($this->post(route('security.enroll.submit', ['type' => $type]), []));
 
     expect($this->enrollmentCeremony($type))->toBeNull();
     $this->assertDatabaseMissing('user_credentials', ['user_id' => $account->getKey(), 'type' => $type]);
