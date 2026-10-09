@@ -76,11 +76,11 @@ class RememberTokens
     }
 
     /**
-     * Forget the token.
+     * Forget the account's token.
      */
-    public function forget(int $id): void
+    public function forget(int|string $accountId, int $id): void
     {
-        $this->query()->where('id', $id)->delete();
+        $this->query()->where('id', $id)->where('user_id', $accountId)->delete();
     }
 
     /**

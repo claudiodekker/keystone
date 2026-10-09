@@ -60,7 +60,19 @@ export type SecurityPage = {
     recoveryCodesLow: boolean;
     sudoEndsAt: string | null;
     status: string | null;
+    sessions: SessionRow[];
+    sessionsStatus: string | null;
     offersSignOutOthers: boolean;
+};
+
+export type SessionRow = {
+    handle: string;
+    platform: string | null;
+    browser: string | null;
+    ipAddress: string | null;
+    location: string | null;
+    lastActiveAt: string;
+    current: boolean;
 };
 
 export type CredentialRemovalPage = {

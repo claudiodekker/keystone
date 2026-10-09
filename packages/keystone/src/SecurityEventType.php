@@ -15,6 +15,7 @@ enum SecurityEventType: string
     case SIGNED_OUT = 'signed_out';
     case SESSION_ENDED = 'session.ended';
     case SESSIONS_TERMINATED = 'sessions.terminated';
+    case SESSION_REVOKED = 'session.revoked';
     case SESSIONS_REVOKED_OTHERS = 'sessions.revoked_others';
     case LIMIT_TRIPPED = 'limit.tripped';
     case DEVICE_COOKIE_REUSED = 'device_cookie.reused';

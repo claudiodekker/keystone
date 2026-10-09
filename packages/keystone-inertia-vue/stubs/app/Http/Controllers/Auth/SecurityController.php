@@ -24,6 +24,8 @@ class SecurityController extends Controller
             'recoveryCodesLow' => $page->recoveryCodesLow,
             'sudoEndsAt' => $page->sudoEndsAt,
             'status' => $page->status,
+            'sessions' => $page->sessions,
+            'sessionsStatus' => $page->sessionsStatus,
             'offersSignOutOthers' => $page->offersSignOutOthers,
         ]);
     }

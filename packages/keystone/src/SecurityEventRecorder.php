@@ -56,6 +56,7 @@ class SecurityEventRecorder
         ?array $recipients = null,
         bool $alert = true,
         ?bool $knownDevice = null,
+        ?RequestContext $context = null,
     ): void {
         if (! $this->enabled()) {
             return;
@@ -72,7 +73,7 @@ class SecurityEventRecorder
                 reason: $reason,
                 operator: $operator,
                 knownDevice: $knownDevice,
-                context: $this->context(),
+                context: $context ?? $this->context(),
             );
         } catch (Throwable $e) {
             report($e);

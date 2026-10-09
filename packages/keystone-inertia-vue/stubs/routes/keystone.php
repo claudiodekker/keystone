@@ -7,6 +7,7 @@ use App\Http\Controllers\Auth\EnrollmentController;
 use App\Http\Controllers\Auth\OtherSessionsController;
 use App\Http\Controllers\Auth\RecoveryCodesController;
 use App\Http\Controllers\Auth\SecurityController;
+use App\Http\Controllers\Auth\SessionRevocationController;
 use App\Http\Controllers\Auth\SignInController;
 use App\Http\Controllers\Auth\SignOutController;
 use App\Http\Controllers\Auth\SudoController;
@@ -59,4 +60,7 @@ Route::prefix('settings/security')->group(function () {
 
     Route::get('sessions/others/revoke', [OtherSessionsController::class, 'show'])->name('security.sessions.others.revoke');
     Route::delete('sessions/others', [OtherSessionsController::class, 'destroy'])->name('security.sessions.others.revoke.submit');
+
+    Route::get('sessions/{session}/revoke', [SessionRevocationController::class, 'show'])->name('security.sessions.revoke');
+    Route::delete('sessions/{session}', [SessionRevocationController::class, 'destroy'])->name('security.sessions.revoke.submit');
 });

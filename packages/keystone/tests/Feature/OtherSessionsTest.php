@@ -225,4 +225,19 @@ describe('the offer after an enrollment', function () {
         $this->assertDatabaseCount('sessions', 2);
         $this->get(route('security'))->assertJsonPath('offersSignOutOthers', false);
     });
+
+    it('offers nothing on the database driver for a session idle past the session lifetime', function () {
+        config(['session.lifetime' => 5]);
+        $this->useSessionDriver('database');
+        $this->signInAccount(new FormTypeSupport);
+        signInFromBrowser($this, 'phone');
+        $this->travel(4)->minutes();
+        $this->get(route('security.enroll', ['type' => 'code']));
+        $this->travel(2)->minutes();
+
+        $this->post(route('security.enroll.submit', ['type' => 'code']), ['secret' => $this->enrollmentCeremony('code')]);
+
+        $this->assertDatabaseCount('sessions', 2);
+        $this->get(route('security'))->assertJsonPath('status', __('keystone::messages.status.enrolled'))->assertJsonPath('offersSignOutOthers', false);
+    });
 });

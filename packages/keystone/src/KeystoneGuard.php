@@ -10,6 +10,7 @@ use Illuminate\Auth\SessionGuard;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Session\DatabaseSessionHandler;
+use Illuminate\Session\Store;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use LogicException;
@@ -250,11 +251,21 @@ class KeystoneGuard extends SessionGuard
      */
     public function sessions(Model&KeystoneUser $account): ?AccountSessions
     {
-        if (! $this->session->getHandler() instanceof DatabaseSessionHandler) {
+        if (! $this->session instanceof Store || ! $this->session->getHandler() instanceof DatabaseSessionHandler) {
             return null;
         }
 
-        return new AccountSessions(DB::connection(config('session.connection')), config()->string('session.table'), $this->session, $account);
+        return new AccountSessions(
+            connection: DB::connection(config('session.connection')),
+            table: config()->string('session.table'),
+            lifetimeMinutes: config()->integer('session.lifetime'),
+            session: $this->session,
+            context: $this->context(),
+            account: $account,
+            loginKey: $this->getName(),
+            epochKey: $this->epochKey(),
+            rememberKey: $this->rememberKey(),
+        );
     }
 
     /**
@@ -614,7 +625,7 @@ class KeystoneGuard extends SessionGuard
         $this->dropRememberCookie();
 
         if (! is_null($token)) {
-            (new RememberTokens($this->userModel()))->forget($token->id);
+            (new RememberTokens($this->userModel()))->forget($token->accountId, $token->id);
         }
 
         (new SecurityEventRecorder)->record(
@@ -781,7 +792,7 @@ class KeystoneGuard extends SessionGuard
         $id = $this->session->get($this->rememberKey());
 
         if (is_int($id)) {
-            (new RememberTokens($this->userModel()))->forget($id);
+            (new RememberTokens($this->userModel()))->forget($this->session->get($this->getName()), $id);
         }
 
         $this->dropRememberCookie();
