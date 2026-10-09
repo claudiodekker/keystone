@@ -3,11 +3,21 @@
 use ClaudioDekker\Keystone\AppTests\AppTestCase;
 use ClaudioDekker\Keystone\KeystoneUser;
 use ClaudioDekker\Keystone\Methods\Surface;
+use ClaudioDekker\Keystone\Password\BreachedPasswords;
+use ClaudioDekker\Keystone\Password\FakeBreachedPasswords;
+use ClaudioDekker\Keystone\Password\HibpBreachedPasswords;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormTypeSupport;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Client\Request;
+use Illuminate\Http\Client\StrayRequestException;
 use Illuminate\Support\Facades\Exceptions;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Testing\TestResponse;
 use Illuminate\Validation\Rules\Password;
+use Monolog\Handler\TestHandler;
+use Monolog\Level;
+use Monolog\LogRecord;
 
 pest()->extend(AppTestCase::class);
 
@@ -36,11 +46,41 @@ function signInWithoutSecondFactor(AppTestCase $test, string $address = 'jane.do
     return $account;
 }
 
-function submitNewPassword(AppTestCase $test, string $password): TestResponse
+function submitNewPassword(AppTestCase $test, string $password, ?string $confirmation = null): TestResponse
 {
     $test->get(route('security.enroll', ['type' => 'password']));
 
-    return $test->post(route('security.enroll.submit', ['type' => 'password']), ['password' => $password, 'password_confirmation' => $password]);
+    return $test->post(route('security.enroll.submit', ['type' => 'password']), ['password' => $password, 'password_confirmation' => $confirmation ?? $password]);
+}
+
+function fakeBreaches(array $breached = []): FakeBreachedPasswords
+{
+    return app()->instance(BreachedPasswords::class, new FakeBreachedPasswords($breached));
+}
+
+function captureWarnings(): void
+{
+    config([
+        'logging.channels.keystone-test' => ['driver' => 'monolog', 'handler' => TestHandler::class],
+        'keystone.log_channel' => 'keystone-test',
+    ]);
+}
+
+function rangeUrl(string $password): string
+{
+    return 'https://api.pwnedpasswords.com/range/'.substr(strtoupper(hash('sha1', $password)), 0, 5);
+}
+
+function rangeSuffix(string $password): string
+{
+    return substr(strtoupper(hash('sha1', $password)), 5);
+}
+
+function loggedWarnings(): array
+{
+    $records = Log::channel('keystone-test')->getLogger()->getHandlers()[0]->getRecords();
+
+    return array_values(array_filter($records, fn (LogRecord $record) => $record->level === Level::Warning));
 }
 
 function assertReachedVerification(TestResponse $response): void
@@ -160,4 +200,114 @@ describe('the common-password list', function () {
         '12345678' => ['12345678'],
         'ILOVEYOU' => ['ILOVEYOU'],
     ]);
+});
+
+describe('the breach check', function () {
+    it('refuses a password the breach check reports, once the local rules pass', function () {
+        $breaches = fakeBreaches(['Tr0ub4dor&3xyz']);
+        signInRequiringSecondFactor($this);
+
+        $response = submitNewPassword($this, 'Tr0ub4dor&3xyz');
+
+        $response->assertSessionHasErrors(['password' => __('validation.password.uncompromised', ['attribute' => 'password'])]);
+        expect($breaches->asked)->toBe(['Tr0ub4dor&3xyz']);
+    });
+
+    it('never asks the breach check about a password an earlier rule refused', function (string $password, ?string $confirmation) {
+        $breaches = fakeBreaches();
+        signInRequiringSecondFactor($this);
+
+        $response = submitNewPassword($this, $password, $confirmation);
+
+        $response->assertSessionHasErrors('password');
+        expect($breaches->asked)->toBe([]);
+    })->with([
+        'unconfirmed' => ['tq8#vbnz', 'tq8#vbnx'],
+        'too short' => ['tq8#vbn', null],
+        'a context word' => ['jane-2026-rocks', null],
+        'common' => ['iloveyou', null],
+    ]);
+
+    it('asks Pwned Passwords by the first 5 characters of the SHA-1 hash, with padding, and refuses a password it lists', function () {
+        captureWarnings();
+        Http::fake([rangeUrl('Tr0ub4dor&3xyz') => Http::response('0018A45C4D1DEF81644B54AB7F969B88D65:0'."\r\n".rangeSuffix('Tr0ub4dor&3xyz').':3'."\r\n")]);
+        signInRequiringSecondFactor($this);
+
+        $response = submitNewPassword($this, 'Tr0ub4dor&3xyz');
+
+        $response->assertSessionHasErrors(['password' => __('validation.password.uncompromised', ['attribute' => 'password'])]);
+        Http::assertSentCount(1);
+        Http::assertSent(fn (Request $request) => $request->url() === rangeUrl('Tr0ub4dor&3xyz') && $request->header('Add-Padding') === ['true']);
+    });
+
+    it('counts a suffix listed only as padding as not breached', function () {
+        captureWarnings();
+        Http::fake([rangeUrl('Tr0ub4dor&3xyz') => Http::response(rangeSuffix('Tr0ub4dor&3xyz').":0\r\n")]);
+        signInRequiringSecondFactor($this);
+
+        $response = submitNewPassword($this, 'Tr0ub4dor&3xyz');
+
+        assertReachedVerification($response);
+    });
+
+    it('gives Pwned Passwords 5 seconds and follows no redirect', function () {
+        captureWarnings();
+        $sent = [];
+        Http::fake(function (Request $request, array $options) use (&$sent) {
+            $sent = $options;
+
+            return Http::response('');
+        });
+        signInRequiringSecondFactor($this);
+
+        submitNewPassword($this, 'Tr0ub4dor&3xyz');
+
+        expect($sent['timeout'])->toBe(5)
+            ->and($sent['connect_timeout'])->toBe(5)
+            ->and($sent['allow_redirects'])->toBeFalse();
+    });
+
+    it('accepts the password and logs a warning when Pwned Passwords can\'t answer', function (Closure $answer) {
+        captureWarnings();
+        Http::fake([rangeUrl('Tr0ub4dor&3xyz') => $answer]);
+        signInRequiringSecondFactor($this);
+
+        $response = submitNewPassword($this, 'Tr0ub4dor&3xyz');
+
+        assertReachedVerification($response);
+        Http::assertSentCount(1);
+        $warnings = loggedWarnings();
+        expect($warnings)->toHaveCount(1)
+            ->and($warnings[0]->message)->toBe(HibpBreachedPasswords::UNAVAILABLE_MESSAGE)
+            ->and(json_encode($warnings[0]->context))->not->toContain('Tr0ub4dor')->not->toContain(substr(strtoupper(hash('sha1', 'Tr0ub4dor&3xyz')), 0, 5));
+    })->with([
+        'a failed connection' => [fn () => fn () => Http::failedConnection()],
+        'a server error' => [fn () => fn () => Http::response('', 503)],
+        'a redirect' => [fn () => fn () => Http::response('', 301, ['Location' => 'https://example.com/range'])],
+    ]);
+
+    it('still refuses a common password while Pwned Passwords is down', function () {
+        captureWarnings();
+        Http::fake(['https://api.pwnedpasswords.com/*' => Http::failedConnection()]);
+        signInRequiringSecondFactor($this);
+
+        $response = submitNewPassword($this, 'iloveyou');
+
+        $response->assertSessionHasErrors(['password' => __('keystone-password::messages.common', ['attribute' => 'password'])]);
+        Http::assertNothingSent();
+    });
+
+    it('accepts the password with a warning when a test prevents stray requests and fakes nothing, and still refuses a common one', function () {
+        captureWarnings();
+        signInRequiringSecondFactor($this);
+
+        submitNewPassword($this, 'iloveyou')->assertSessionHasErrors(['password' => __('keystone-password::messages.common', ['attribute' => 'password'])]);
+        $response = submitNewPassword($this, 'Tr0ub4dor&3xyz');
+
+        assertReachedVerification($response);
+        $warnings = loggedWarnings();
+        expect($warnings)->toHaveCount(1)
+            ->and($warnings[0]->message)->toBe(HibpBreachedPasswords::UNAVAILABLE_MESSAGE)
+            ->and($warnings[0]->context)->toBe(['reason' => StrayRequestException::class]);
+    });
 });

@@ -29,12 +29,13 @@ class Blocklist implements ValidationRule
      */
     public function __construct(
         protected array $context,
+        protected BreachedPasswords $breaches,
     ) {
         //
     }
 
     /**
-     * Refuse a password that contains a context word or is a common password.
+     * Refuse a password that contains a context word, is a common password or has appeared in a breach.
      */
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
@@ -50,6 +51,12 @@ class Blocklist implements ValidationRule
 
         if ($this->isCommon($value)) {
             $fail('keystone-password::messages.common')->translate();
+
+            return;
+        }
+
+        if ($this->breaches->isBreached($value)) {
+            $fail('validation.password.uncompromised')->translate();
         }
     }
 

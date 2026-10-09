@@ -109,7 +109,7 @@ class PasswordType implements CredentialType
     {
         return match ($surface) {
             Surface::SIGN_IN => [self::FIELD => ['required', 'string', 'max:'.self::MAX_CHARACTERS]],
-            default => [self::FIELD => ['bail', 'required', 'string', 'confirmed', $this->lengthCap(), 'min:'.$this->minLength(), new Blocklist($this->context())]],
+            default => [self::FIELD => ['bail', 'required', 'string', 'confirmed', $this->lengthCap(), 'min:'.$this->minLength(), new Blocklist($this->context(), app(BreachedPasswords::class))]],
         };
     }
 

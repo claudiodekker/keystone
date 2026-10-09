@@ -25,6 +25,8 @@ class PasswordServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigRecursivelyFrom(__DIR__.'/../config/keystone-password.php', 'keystone-password');
+
+        $this->app->bindIf(BreachedPasswords::class, HibpBreachedPasswords::class);
     }
 
     /**
