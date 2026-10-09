@@ -35,7 +35,7 @@ export function totp(base32Key, at = Date.now()) {
     return String((hmac.readUInt32BE(offset) & 0x7fffffff) % 1_000_000).padStart(6, '0');
 }
 
-export async function open(run, name) {
+export async function open(run, name, context = {}) {
     const url = readFileSync(join(root, '.verify/runs', run, 'url'), 'utf8').trim();
     const dir = join(root, '.verify/evidence', run, name);
     mkdirSync(dir, { recursive: true });
@@ -43,8 +43,7 @@ export async function open(run, name) {
     writeFileSync(join(dir, 'network.log'), '');
 
     const browser = await chromium.launch();
-    const context = await browser.newContext({ baseURL: url });
-    const page = await context.newPage();
+    const page = await (await browser.newContext({ baseURL: url, ...context })).newPage();
     let count = 0;
     let pending = 0;
     let lastActivity = Date.now();
