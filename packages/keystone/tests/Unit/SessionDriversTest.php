@@ -121,7 +121,7 @@ it('keeps a running enrollment ceremony across requests, in a session small enou
     $browser = [];
     visit($driver, $browser, fn (KeystoneGuard $guard) => $guard->signIn($user));
 
-    $started = visit($driver, $browser, fn (KeystoneGuard $guard) => (new EnrollmentCeremonies($guard))->start($type, $user));
+    $started = visit($driver, $browser, fn (KeystoneGuard $guard) => (new EnrollmentCeremonies($guard))->resolve($type, $user));
     $stored = strlen(serialize(session()->all()));
     $running = visit($driver, $browser, fn (KeystoneGuard $guard) => (new EnrollmentCeremonies($guard))->running($type));
 

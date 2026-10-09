@@ -88,7 +88,7 @@ abstract class EnrollmentController extends Controller
         }
 
         try {
-            $running = (new EnrollmentCeremonies(Keystone::guard()))->start($credentialType, $pending->account);
+            $running = (new EnrollmentCeremonies(Keystone::guard()))->resolve($credentialType, $pending->account);
         } catch (Throwable $e) {
             report($e);
 

@@ -16,36 +16,23 @@ use LogicException;
 class SettingsEnrollmentAttempt extends CredentialAttempt
 {
     /**
-     * Verify the answer to the named type's enrollment ceremony and store the new credential on the signed-in account, refusing a wrong answer inside the timing floor.
-     *
-     * The type is found by name on the enrollment surface and its ceremony read from the session, so a caller passes neither the type nor the ceremony.
+     * Verify the answer to the type's running enrollment ceremony and store the new credential on the signed-in account, refusing a wrong answer inside the timing floor.
      *
      * @param  array<string, mixed>  $input
      *
      * @throws Throttled
      */
-    public function attempt(string $type, #[\SensitiveParameter] array $input): SettingsEnrollmentResult
+    public function attempt(CredentialType $type, #[\SensitiveParameter] array $input, RunningCeremony $running): SettingsEnrollmentResult
     {
         /** @var (Model&KeystoneUser)|null $account */
         $account = $this->guard->user();
-        $credentialType = app(CredentialTypes::class)->find($type, Surface::ENROLLMENT);
 
         if ($account === null) {
             return SettingsEnrollmentResult::SUDO_ENDED;
         }
 
-        if ($credentialType === null) {
-            return SettingsEnrollmentResult::REFUSED;
-        }
-
-        $running = (new EnrollmentCeremonies($this->guard))->running($credentialType);
-
-        if ($running === null) {
-            return SettingsEnrollmentResult::EXPIRED;
-        }
-
         return $this->timebox->call(
-            fn () => $this->answer($account, $credentialType, $input, $running),
+            fn () => $this->answer($account, $type, $input, $running),
             self::TIMING_FLOOR_MICROSECONDS,
         );
     }

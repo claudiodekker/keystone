@@ -26,13 +26,6 @@ beforeEach(function () {
     $this->withoutMandates();
 });
 
-function startSettingsEnrollment(AppTestCase $test, string $type = 'code'): mixed
-{
-    $test->get(route('security.enroll', ['type' => $type]));
-
-    return Keystone::guard()->slots()->get($type, Surface::ENROLLMENT->value)['ceremony'] ?? null;
-}
-
 function whileTheAnswerIsChecked(Closure $step): void
 {
     app()->make(CredentialTypes::class)->register(new RogueType(function () use ($step) {
@@ -152,7 +145,7 @@ describe('the ceremony and the sudo it was opened under', function () {
         $this->freezeSecond();
         $account = $this->signInAccount(new FormTypeSupport);
         $this->travel(5)->minutes();
-        startSettingsEnrollment($this);
+        $this->get(route('security.enroll', ['type' => 'code']));
         $this->travel(599)->seconds();
         expect(Keystone::guard()->slots()->get('code', Surface::ENROLLMENT->value))->not->toBeNull();
 
@@ -165,7 +158,8 @@ describe('the ceremony and the sudo it was opened under', function () {
     it('shows a new ceremony under the next grant, never the one the last grant opened', function (Closure $lose) {
         $this->freezeSecond();
         $this->signInAccount(new FormTypeSupport);
-        $first = startSettingsEnrollment($this);
+        $this->get(route('security.enroll', ['type' => 'code']));
+        $first = $this->enrollmentCeremony('code');
         $lose($this);
         $this->get(route('security.enroll', ['type' => 'code']))->assertRedirectToRoute('sudo');
         $this->post(route('sudo.submit', ['type' => 'form']), (new FormTypeSupport)->validProof(Surface::SIGN_IN));
@@ -186,7 +180,8 @@ describe('the ceremony and the sudo it was opened under', function () {
 describe('the answer', function () {
     it('stores the credential, records credential.added in the settings flow, alerts the owner and says so on the security page', function () {
         $account = $this->signInAccount(new FormTypeSupport);
-        $ceremony = startSettingsEnrollment($this);
+        $this->get(route('security.enroll', ['type' => 'code']));
+        $ceremony = $this->enrollmentCeremony('code');
         Notification::fake();
 
         $response = $this->post(route('security.enroll.submit', ['type' => 'code']), ['secret' => $ceremony]);
@@ -209,7 +204,8 @@ describe('the answer', function () {
     it('moves no epoch for a credential it adds, rotates the session id, keeps its sudo and closes the ceremony', function () {
         $this->freezeSecond();
         $account = $this->signInAccount(new FormTypeSupport);
-        $ceremony = startSettingsEnrollment($this);
+        $this->get(route('security.enroll', ['type' => 'code']));
+        $ceremony = $this->enrollmentCeremony('code');
         $sessionId = session()->getId();
 
         $this->post(route('security.enroll.submit', ['type' => 'code']), ['secret' => $ceremony]);
@@ -224,7 +220,8 @@ describe('the answer', function () {
     it('adds beside the credentials of the type the account holds, unless the type replaces', function () {
         $account = $this->signInAccount(new FormTypeSupport);
         $held = DB::table('user_credentials')->insertGetId(['user_id' => $account->getKey(), 'type' => 'code', 'secret' => Crypt::encryptString('held')]);
-        $ceremony = startSettingsEnrollment($this);
+        $this->get(route('security.enroll', ['type' => 'code']));
+        $ceremony = $this->enrollmentCeremony('code');
 
         $this->post(route('security.enroll.submit', ['type' => 'code']), ['secret' => $ceremony])->assertRedirectToRoute('security');
 
@@ -241,7 +238,8 @@ describe('the answer', function () {
             ['user_id' => $account->getKey(), 'type' => 'single', 'secret' => Crypt::encryptString('held'), 'disabled_at' => null],
             ['user_id' => $account->getKey(), 'type' => 'single', 'secret' => Crypt::encryptString('disabled'), 'disabled_at' => now()],
         ]);
-        $ceremony = startSettingsEnrollment($this, 'single');
+        $this->get(route('security.enroll', ['type' => 'single']));
+        $ceremony = $this->enrollmentCeremony('single');
         $sessionId = session()->getId();
 
         $response = $this->post(route('security.enroll.submit', ['type' => 'single']), ['secret' => $ceremony]);
@@ -255,12 +253,61 @@ describe('the answer', function () {
         $this->get(route('security'))->assertOk()
             ->assertJsonPath('sudoEndsAt', now()->addMinutes(15)->toIso8601String())
             ->assertJsonPath('status', __('keystone::messages.status.enrolled'));
+        $this->assertDatabaseHas('user_credentials', ['user_id' => $account->getKey(), 'type' => 'form']);
         $this->assertAuthenticatedAs($account);
     });
 
-    it('refuses a wrong answer, stores nothing, keeps the ceremony and records the rejection in the settings flow', function () {
+    it('leaves another account\'s credentials of a replacing type alone', function () {
+        $this->app->make(CredentialTypes::class)->register(new FormType(name: 'single', surfaces: ['challenge', 'enrollment'], replacesExisting: true));
+        $stranger = DB::table('user_credentials')->insertGetId(['user_id' => $this->createAccount('john@example.com')->getKey(), 'type' => 'single', 'secret' => Crypt::encryptString('held')]);
+        $this->signInAccount(new FormTypeSupport);
+        $this->get(route('security.enroll', ['type' => 'single']));
+
+        $this->post(route('security.enroll.submit', ['type' => 'single']), ['secret' => $this->enrollmentCeremony('single')]);
+
+        $this->assertDatabaseHas('user_credentials', ['id' => $stranger]);
+    });
+
+    it('adds beside a held credential with the same secret when the type doesn\'t replace', function () {
         $account = $this->signInAccount(new FormTypeSupport);
-        $ceremony = startSettingsEnrollment($this);
+        $this->get(route('security.enroll', ['type' => 'code']));
+        $ceremony = $this->enrollmentCeremony('code');
+        DB::table('user_credentials')->insert(['user_id' => $account->getKey(), 'type' => 'code', 'secret' => Crypt::encryptString(FormType::hash($ceremony))]);
+
+        $this->post(route('security.enroll.submit', ['type' => 'code']), ['secret' => $ceremony]);
+
+        expect(DB::table('user_credentials')->where('user_id', $account->getKey())->where('type', 'code')->count())->toBe(2);
+    });
+
+    it('stores the label the type gives the credential and records it on credential.added', function () {
+        $this->app->make(CredentialTypes::class)->register(new RogueType(fn () => Proof::enrolled(new EnrolledCredential(identifier: null, secret: 'rogue-secret', label: 'Phone')), surfaces: ['challenge', 'enrollment']));
+        $account = $this->signInAccount(new FormTypeSupport);
+        $this->get(route('security.enroll', ['type' => 'rogue']));
+
+        $this->post(route('security.enroll.submit', ['type' => 'rogue']));
+
+        $stored = DB::table('user_credentials')->where('user_id', $account->getKey())->where('type', 'rogue')->sole();
+        expect(Crypt::decryptString($stored->secret))->toBe('rogue-secret')
+            ->and($stored->label)->toBe('Phone');
+        $this->assertDatabaseHas('user_security_events', ['type' => 'credential.added', 'credential_id' => $stored->id, 'credential_label' => 'Phone']);
+    });
+
+    it('keeps another type\'s running ceremony after an enrollment', function () {
+        $this->app->make(CredentialTypes::class)->register(new FormType(name: 'other', surfaces: ['challenge', 'enrollment']));
+        $this->signInAccount(new FormTypeSupport);
+        $this->get(route('security.enroll', ['type' => 'other']));
+        $other = $this->enrollmentCeremony('other');
+        $this->get(route('security.enroll', ['type' => 'code']));
+
+        $this->post(route('security.enroll.submit', ['type' => 'code']), ['secret' => $this->enrollmentCeremony('code')]);
+
+        expect($this->enrollmentCeremony('other'))->toBe($other);
+    });
+
+    it('refuses a wrong answer, stores nothing and records the rejection in the settings flow', function () {
+        $account = $this->signInAccount(new FormTypeSupport);
+        $this->get(route('security.enroll', ['type' => 'code']));
+        $ceremony = $this->enrollmentCeremony('code');
 
         $response = $this->post(route('security.enroll.submit', ['type' => 'code']), ['secret' => 'wrong '.$ceremony]);
 
@@ -268,23 +315,35 @@ describe('the answer', function () {
             ->assertSessionHasErrors(['code' => __('keystone::messages.invalid_credential')]);
         $this->assertDatabaseMissing('user_credentials', ['type' => 'code']);
         $this->assertDatabaseHas('user_security_events', ['type' => 'proof.rejected', 'user_id' => $account->getKey(), 'flow' => 'settings', 'credential_type' => 'code', 'reason' => 'code.mismatch']);
-        expect($this->get(route('security.enroll', ['type' => 'code']))->json('ceremony.code'))->toBe($ceremony)
+    });
+
+    it('shows the same ceremony again after a wrong answer, with nothing typed flashed back', function () {
+        $this->signInAccount(new FormTypeSupport);
+        $this->get(route('security.enroll', ['type' => 'code']));
+        $ceremony = $this->enrollmentCeremony('code');
+        $this->post(route('security.enroll.submit', ['type' => 'code']), ['secret' => 'wrong '.$ceremony]);
+
+        $response = $this->get(route('security.enroll', ['type' => 'code']));
+
+        expect($response->json('ceremony.code'))->toBe($ceremony)
             ->and(session()->getOldInput())->toBe([]);
     });
 
     it('waits out the timing floor on a wrong answer', function () {
         $this->signInAccount(new FormTypeSupport);
-        $ceremony = startSettingsEnrollment($this);
+        $this->get(route('security.enroll', ['type' => 'code']));
+        $ceremony = $this->enrollmentCeremony('code');
 
         $response = $this->assertWaitsOutTimingFloor(fn () => $this->post(route('security.enroll.submit', ['type' => 'code']), ['secret' => 'wrong '.$ceremony]));
 
         $response->assertRedirectToRoute('security.enroll', ['type' => 'code']);
     });
 
-    it('counts wrong answers in the settings flow, apart from the challenge and sudo', function () {
+    it('counts wrong answers in the settings flow', function () {
         config(['keystone.rate_limits.failed_attempts_per_hour' => 1]);
         $account = $this->signInAccount(new FormTypeSupport);
-        $ceremony = startSettingsEnrollment($this);
+        $this->get(route('security.enroll', ['type' => 'code']));
+        $ceremony = $this->enrollmentCeremony('code');
         $this->post(route('security.enroll.submit', ['type' => 'code']), ['secret' => 'wrong '.$ceremony]);
 
         $response = $this->post(route('security.enroll.submit', ['type' => 'code']), ['secret' => $ceremony]);
@@ -292,9 +351,19 @@ describe('the answer', function () {
         $response->assertTooManyRequests();
         $this->assertDatabaseMissing('user_credentials', ['type' => 'code']);
         $this->assertDatabaseHas('user_security_events', ['type' => 'limit.tripped', 'user_id' => $account->getKey(), 'flow' => 'settings', 'credential_type' => 'code']);
+    });
+
+    it('leaves sudo\'s count alone after wrong answers in the settings flow', function () {
+        config(['keystone.rate_limits.failed_attempts_per_hour' => 1]);
+        $this->signInAccount(new FormTypeSupport);
+        $this->get(route('security.enroll', ['type' => 'code']));
+        $this->post(route('security.enroll.submit', ['type' => 'code']), ['secret' => 'wrong '.$this->enrollmentCeremony('code')]);
         $this->delete(route('sudo.end'));
         $this->get(route('security.enroll', ['type' => 'code']));
-        $this->post(route('sudo.submit', ['type' => 'form']), (new FormTypeSupport)->validProof(Surface::SIGN_IN))->assertRedirect(route('security.enroll', ['type' => 'code'], absolute: false));
+
+        $response = $this->post(route('sudo.submit', ['type' => 'form']), (new FormTypeSupport)->validProof(Surface::SIGN_IN));
+
+        $response->assertRedirect(route('security.enroll', ['type' => 'code'], absolute: false));
     });
 
     it('gives a right answer\'s attempt back', function () {
@@ -302,24 +371,33 @@ describe('the answer', function () {
         $this->signInAccount(new FormTypeSupport);
 
         foreach (range(1, 3) as $ignored) {
-            $ceremony = startSettingsEnrollment($this);
+            $this->get(route('security.enroll', ['type' => 'code']));
 
-            $this->post(route('security.enroll.submit', ['type' => 'code']), ['secret' => $ceremony])->assertRedirectToRoute('security');
+            $this->post(route('security.enroll.submit', ['type' => 'code']), ['secret' => $this->enrollmentCeremony('code')])->assertRedirectToRoute('security');
         }
 
         expect(DB::table('user_credentials')->where('type', 'code')->count())->toBe(3);
     });
 
-    it('returns input the type\'s rules refuse to the step with its errors, taking no failed attempt', function () {
-        config(['keystone.rate_limits.failed_attempts_per_hour' => 1]);
+    it('returns input the type\'s rules refuse to the step with its errors', function () {
         $this->signInAccount(new FormTypeSupport);
-        $ceremony = startSettingsEnrollment($this);
+        $this->get(route('security.enroll', ['type' => 'code']));
 
         $response = $this->post(route('security.enroll.submit', ['type' => 'code']), []);
 
         $response->assertRedirectToRoute('security.enroll', ['type' => 'code'])->assertSessionHasErrors(['secret']);
         $this->assertDatabaseMissing('user_security_events', ['type' => 'proof.rejected']);
-        $this->post(route('security.enroll.submit', ['type' => 'code']), ['secret' => $ceremony])->assertRedirectToRoute('security');
+    });
+
+    it('takes no failed attempt for input the type\'s rules refuse', function () {
+        config(['keystone.rate_limits.failed_attempts_per_hour' => 1]);
+        $this->signInAccount(new FormTypeSupport);
+        $this->get(route('security.enroll', ['type' => 'code']));
+        $this->post(route('security.enroll.submit', ['type' => 'code']), []);
+
+        $response = $this->post(route('security.enroll.submit', ['type' => 'code']), ['secret' => $this->enrollmentCeremony('code')]);
+
+        $response->assertRedirectToRoute('security');
     });
 
     it('sends an answer with no live ceremony back to the type\'s step with enrollment-expired, before it looks at the input', function (array $input) {
@@ -337,7 +415,8 @@ describe('the answer', function () {
 
     it('asks for sudo first, storing nothing and keeping no answer to replay', function () {
         $this->signInAccount(new FormTypeSupport);
-        $ceremony = startSettingsEnrollment($this);
+        $this->get(route('security.enroll', ['type' => 'code']));
+        $ceremony = $this->enrollmentCeremony('code');
         $this->delete(route('sudo.end'));
 
         $response = $this->post(route('security.enroll.submit', ['type' => 'code']), ['secret' => $ceremony]);
@@ -368,7 +447,7 @@ describe('what changed between the gate and the write', function () {
         $this->freezeSecond();
         whileTheAnswerIsChecked(fn () => $this->outliveSudo());
         $this->signInAccount(new FormTypeSupport);
-        startSettingsEnrollment($this, 'rogue');
+        $this->get(route('security.enroll', ['type' => 'rogue']));
 
         $response = $this->from(route('security.enroll', ['type' => 'rogue']))->post(route('security.enroll.submit', ['type' => 'rogue']));
 
@@ -383,7 +462,7 @@ describe('what changed between the gate and the write', function () {
     it('stores nothing for a type taken off enrollment while the answer was checked', function () {
         whileTheAnswerIsChecked(fn () => config(['keystone.methods' => ['form', 'rogue' => ['challenge']]]));
         $account = $this->signInAccount(new FormTypeSupport);
-        startSettingsEnrollment($this, 'rogue');
+        $this->get(route('security.enroll', ['type' => 'rogue']));
 
         $response = $this->post(route('security.enroll.submit', ['type' => 'rogue']));
 
@@ -397,7 +476,7 @@ describe('what changed between the gate and the write', function () {
         whileTheAnswerIsChecked(fn () => SuspendAccount::dispatchSync($account));
         $this->arrangeCredential($account, new FormTypeSupport, Surface::SIGN_IN);
         $this->submitSignIn(new FormTypeSupport, 'jane@example.com', (new FormTypeSupport)->validProof(Surface::SIGN_IN));
-        startSettingsEnrollment($this, 'rogue');
+        $this->get(route('security.enroll', ['type' => 'rogue']));
 
         $this->post(route('security.enroll.submit', ['type' => 'rogue']));
 
@@ -406,25 +485,40 @@ describe('what changed between the gate and the write', function () {
         $this->assertDatabaseHas('user_security_events', ['type' => 'proof.rejected', 'user_id' => $account->getKey(), 'flow' => 'settings', 'reason' => 'keystone.barred']);
     });
 
-    it('stores nothing and records nothing when the write fails, and stores one credential on the next answer', function () {
+    it('stores nothing and records nothing when the write fails', function () {
+        Exceptions::fake();
+        $this->signInAccount(new FormTypeSupport);
+        $this->get(route('security.enroll', ['type' => 'code']));
+        DB::connection()->beforeExecuting(function (string $query) {
+            if (str_starts_with($query, 'insert') && str_contains($query, 'user_credentials')) {
+                throw new RuntimeException('The write failed.');
+            }
+        });
+
+        $response = $this->post(route('security.enroll.submit', ['type' => 'code']), ['secret' => $this->enrollmentCeremony('code')]);
+
+        $response->assertServerError();
+        $this->assertDatabaseMissing('user_credentials', ['type' => 'code']);
+        $this->assertDatabaseMissing('user_security_events', ['type' => 'credential.added']);
+    });
+
+    it('stores one credential when the answer is sent again after a failed write', function () {
         Exceptions::fake();
         $account = $this->signInAccount(new FormTypeSupport);
-        $ceremony = startSettingsEnrollment($this);
+        $this->get(route('security.enroll', ['type' => 'code']));
+        $ceremony = $this->enrollmentCeremony('code');
         $fails = true;
         DB::connection()->beforeExecuting(function (string $query) use (&$fails) {
             if ($fails && str_starts_with($query, 'insert') && str_contains($query, 'user_credentials')) {
                 throw new RuntimeException('The write failed.');
             }
         });
-
         $this->post(route('security.enroll.submit', ['type' => 'code']), ['secret' => $ceremony])->assertServerError();
-
-        $this->assertDatabaseMissing('user_credentials', ['type' => 'code']);
-        $this->assertDatabaseMissing('user_security_events', ['type' => 'credential.added']);
         $fails = false;
 
-        $this->post(route('security.enroll.submit', ['type' => 'code']), ['secret' => $ceremony])->assertRedirectToRoute('security');
+        $response = $this->post(route('security.enroll.submit', ['type' => 'code']), ['secret' => $ceremony]);
 
+        $response->assertRedirectToRoute('security');
         expect(DB::table('user_credentials')->where('user_id', $account->getKey())->where('type', 'code')->count())->toBe(1);
     });
 });
@@ -433,7 +527,8 @@ describe('the same answer sent twice at once', function () {
     it('stores a first credential of a replacing type once: one row, no epoch move, one event and one alert', function () {
         $this->app->make(CredentialTypes::class)->register(new FormType(name: 'single', surfaces: ['challenge', 'enrollment'], replacesExisting: true));
         $account = $this->signInAccount(new FormTypeSupport);
-        $ceremony = startSettingsEnrollment($this, 'single');
+        $this->get(route('security.enroll', ['type' => 'single']));
+        $ceremony = $this->enrollmentCeremony('single');
         $readByBoth = Keystone::guard()->slots()->get('single', Surface::ENROLLMENT->value);
         Notification::fake();
         $this->post(route('security.enroll.submit', ['type' => 'single']), ['secret' => $ceremony])->assertRedirectToRoute('security');
@@ -461,7 +556,8 @@ describe('a replacement whose write fails', function () {
         $this->app->make(CredentialTypes::class)->register(new FormType(name: 'single', surfaces: ['challenge', 'enrollment'], replacesExisting: true));
         $account = $this->signInAccount(new FormTypeSupport);
         $held = DB::table('user_credentials')->insertGetId(['user_id' => $account->getKey(), 'type' => 'single', 'secret' => Crypt::encryptString('held')]);
-        $ceremony = startSettingsEnrollment($this, 'single');
+        $this->get(route('security.enroll', ['type' => 'single']));
+        $ceremony = $this->enrollmentCeremony('single');
         DB::connection()->beforeExecuting(function (string $query) {
             if (str_starts_with($query, 'insert') && str_contains($query, 'user_credentials')) {
                 throw new RuntimeException('The write failed.');
@@ -479,15 +575,25 @@ describe('a replacement whose write fails', function () {
 });
 
 describe('cancelling', function () {
-    it('closes the ceremony and sends the user to the security page, so the next visit starts another', function () {
+    it('closes the ceremony and sends the user to the security page', function () {
         $this->signInAccount(new FormTypeSupport);
-        $first = startSettingsEnrollment($this);
+        $this->get(route('security.enroll', ['type' => 'code']));
 
         $response = $this->delete(route('security.enroll.cancel', ['type' => 'code']));
 
         $response->assertRedirectToRoute('security');
-        expect(Keystone::guard()->slots()->get('code', Surface::ENROLLMENT->value))->toBeNull()
-            ->and(startSettingsEnrollment($this))->not->toBe($first);
+        expect($this->enrollmentCeremony('code'))->toBeNull();
+    });
+
+    it('starts another ceremony on the next visit', function () {
+        $this->signInAccount(new FormTypeSupport);
+        $this->get(route('security.enroll', ['type' => 'code']));
+        $first = $this->enrollmentCeremony('code');
+        $this->delete(route('security.enroll.cancel', ['type' => 'code']));
+
+        $this->get(route('security.enroll', ['type' => 'code']));
+
+        expect($this->enrollmentCeremony('code'))->not->toBe($first);
     });
 
     it('needs no sudo', function () {

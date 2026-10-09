@@ -77,17 +77,25 @@ it('shows the new key as a QR code on the form a sign-in is held at', function (
         ->and(base64_decode(substr($page['qr'], 26)))->toContain('<svg');
 });
 
-it('keeps the key and the URI of a held sign-in\'s enrollment in the session, and never the QR code, and shows the same QR code on a refresh', function () {
+it('keeps the key and the URI of a held sign-in\'s enrollment in the session, and never the QR code', function () {
     $this->createFirstFactorAccount();
     $this->passFirstFactor();
 
     $page = $this->get(route('login.enrollment.start', ['type' => 'totp']))->json('ceremony');
-    $again = $this->get(route('login.enrollment.start', ['type' => 'totp']))->json('ceremony');
 
     $kept = Keystone::guard()->slots()->get('totp', Surface::ENROLLMENT->value);
     expect($kept['page'])->toBe(['key' => $page['key'], 'uri' => $page['uri']])
-        ->and(strlen(Crypt::encrypt($kept)))->toBeLessThan(1024)
-        ->and($again)->toBe($page);
+        ->and(strlen(Crypt::encrypt($kept)))->toBeLessThan(1024);
+});
+
+it('shows the same key and QR code on a refresh of a held sign-in\'s enrollment', function () {
+    $this->createFirstFactorAccount();
+    $this->passFirstFactor();
+
+    $first = $this->get(route('login.enrollment.start', ['type' => 'totp']));
+    $second = $this->get(route('login.enrollment.start', ['type' => 'totp']));
+
+    expect($second->json('ceremony'))->toBe($first->json('ceremony'));
 });
 
 it('replaces nothing when a held sign-in enrolls: a disabled TOTP credential stays beside the new one', function () {

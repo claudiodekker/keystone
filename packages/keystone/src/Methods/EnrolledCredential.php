@@ -20,4 +20,12 @@ readonly class EnrolledCredential
     ) {
         //
     }
+
+    /**
+     * Create an enrolled credential that takes the place of every credential of its type the account holds.
+     */
+    public static function replacing(?string $identifier, #[\SensitiveParameter] ?string $secret, ?string $label = null): self
+    {
+        return new self($identifier, $secret, $label, replacesExisting: true);
+    }
 }

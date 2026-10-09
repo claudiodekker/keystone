@@ -48,8 +48,9 @@ abstract class SecurityController extends Controller
         /** @var Model&KeystoneUser $account */
         $account = $guard->user();
         $held = collect((new Credentials($account))->ofAccount($account->getKey()));
-        $listed = array_map(fn (CredentialType $type) => $type->name(), app(CredentialTypes::class)->listed());
-        $enrollable = array_map(fn (CredentialType $type) => $type->name(), app(CredentialTypes::class)->serving(Surface::ENROLLMENT));
+        $credentialTypes = app(CredentialTypes::class);
+        $listed = array_map(fn (CredentialType $type) => $type->name(), $credentialTypes->listed());
+        $enrollable = array_map(fn (CredentialType $type) => $type->name(), $credentialTypes->serving(Surface::ENROLLMENT));
         $recoveryCodes = (new RecoveryCodes($account))->remaining($account->getKey());
 
         $types = array_map(fn (string $type) => [

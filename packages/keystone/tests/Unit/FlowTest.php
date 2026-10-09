@@ -4,7 +4,6 @@ use ClaudioDekker\Keystone\Flow;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\PendingStage;
-use ClaudioDekker\Keystone\SecurityEventType;
 use ClaudioDekker\Keystone\Tests\Fixtures\User;
 
 it('derives the sign-in flow for a guest on the sign-in surface', function () {
@@ -35,11 +34,6 @@ it('derives the settings flow for a signed-in session on the enrollment surface'
     Keystone::guard()->setUser(User::factory()->create());
 
     expect(Flow::of(Keystone::guard(), Surface::ENROLLMENT))->toBe(Flow::SETTINGS);
-});
-
-it('keeps the settings flow apart from the counts a first factor guards', function () {
-    expect(Flow::SETTINGS->sharesFailedAttempts())->toBeFalse()
-        ->and(Flow::SETTINGS->rejectionType())->toBe(SecurityEventType::PROOF_REJECTED);
 });
 
 it('derives the sudo flow for a signed-in session owing its first step on the sign-in surface', function () {
@@ -90,4 +84,5 @@ test('only the flows behind a first factor share a guessable type\'s failures', 
     'challenge' => [Flow::CHALLENGE, true],
     'enrollment' => [Flow::ENROLLMENT, false],
     'sudo' => [Flow::SUDO, true],
+    'settings' => [Flow::SETTINGS, false],
 ]);

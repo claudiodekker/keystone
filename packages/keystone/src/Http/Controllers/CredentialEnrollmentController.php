@@ -58,7 +58,7 @@ abstract class CredentialEnrollmentController extends Controller
         }
 
         try {
-            $running = (new EnrollmentCeremonies(Keystone::guard()))->start($credentialType, $account);
+            $running = (new EnrollmentCeremonies(Keystone::guard()))->resolve($credentialType, $account);
         } catch (Throwable $e) {
             report($e);
 
@@ -88,7 +88,9 @@ abstract class CredentialEnrollmentController extends Controller
             return $this->refuseUnofferedType();
         }
 
-        if ((new EnrollmentCeremonies(Keystone::guard()))->running($credentialType) === null) {
+        $running = (new EnrollmentCeremonies(Keystone::guard()))->running($credentialType);
+
+        if ($running === null) {
             return $this->refuseExpiredCeremony($request, $credentialType->name());
         }
 
@@ -99,12 +101,11 @@ abstract class CredentialEnrollmentController extends Controller
         }
 
         $result = (new SettingsEnrollmentAttempt(Keystone::guard(), new RateLimiter($request, app(RequestContext::class), Keystone::guard())))
-            ->attempt($credentialType->name(), $validator->validated());
+            ->attempt($credentialType, $validator->validated(), $running);
 
         return match ($result) {
             SettingsEnrollmentResult::ENROLLED => $this->enrolled($request),
             SettingsEnrollmentResult::REFUSED => $this->sendCredentialEnrollmentRefused($request, $credentialType->name(), __('keystone::messages.invalid_credential')),
-            SettingsEnrollmentResult::EXPIRED => $this->refuseExpiredCeremony($request, $credentialType->name()),
             SettingsEnrollmentResult::SUDO_ENDED => $this->refuseWithoutSudo($request, $credentialType->name()),
         };
     }
@@ -168,7 +169,7 @@ abstract class CredentialEnrollmentController extends Controller
     }
 
     /**
-     * Send a request for a type the user can't set up back to the security page.
+     * Send a request for a type the user can't enroll back to the security page.
      */
     protected function refuseUnofferedType(): RedirectResponse
     {

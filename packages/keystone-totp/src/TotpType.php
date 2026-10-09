@@ -186,11 +186,7 @@ class TotpType implements CredentialType, PresentsCeremony
             return Proof::rejected('totp.mismatch');
         }
 
-        return Proof::enrolled(new EnrolledCredential(
-            identifier: null,
-            secret: $secret->acceptedAt(max($matched))->toStored(),
-            replacesExisting: true,
-        ));
+        return Proof::enrolled(EnrolledCredential::replacing(identifier: null, secret: $secret->acceptedAt(max($matched))->toStored()));
     }
 
     /**

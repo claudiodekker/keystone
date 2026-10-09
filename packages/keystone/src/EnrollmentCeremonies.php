@@ -17,7 +17,7 @@ class EnrollmentCeremonies
      *
      * Its slot ends sooner when the pending sign-in it was opened under does, or a signed-in session's sudo or absolute lifetime.
      */
-    public const int CAP_SECONDS = 900;
+    protected const int CAP_SECONDS = 900;
 
     /**
      * Create a new enrollment ceremonies instance.
@@ -29,9 +29,9 @@ class EnrollmentCeremonies
     }
 
     /**
-     * Get the type's running enrollment ceremony, starting one for the account when there is none.
+     * Resolve the type's running enrollment ceremony, starting one for the account when there is none.
      */
-    public function start(CredentialType $type, Model&KeystoneUser $account): RunningCeremony
+    public function resolve(CredentialType $type, Model&KeystoneUser $account): RunningCeremony
     {
         $running = $this->running($type);
 
@@ -71,7 +71,7 @@ class EnrollmentCeremonies
     }
 
     /**
-     * Get the ceremony the session keeps as its form shows it, with what the type draws from the kept page on every request and the session never holds.
+     * Get the kept ceremony with its page as the form shows it, letting the type add what it draws on each request.
      *
      * @param  array{ceremony: mixed, page: array<string, string>}  $kept
      */

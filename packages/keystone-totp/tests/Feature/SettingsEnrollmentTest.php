@@ -42,32 +42,19 @@ function signInWithTotp(AppTestCase $test): Model&KeystoneUser
     return $account;
 }
 
-function settingsTotpKey(AppTestCase $test): string
-{
-    $test->get(route('security.enroll', ['type' => 'totp']));
-
-    return TotpSecret::fromStored(Keystone::guard()->slots()->get('totp', Surface::ENROLLMENT->value)['ceremony'])->key;
-}
-
-function settingsTotpCode(string $key, int $offset = 0): string
-{
-    $totp = new Totp;
-
-    return $totp->code($key, $totp->stepAt(now()->getTimestamp()) + $offset);
-}
-
 it('shows a new 160-bit key as Base32, as its otpauth URI and as a QR code of that URI', function () {
     signInWithoutTotp($this);
 
     $response = $this->get(route('security.enroll', ['type' => 'totp']));
 
-    $key = TotpSecret::fromStored(Keystone::guard()->slots()->get('totp', Surface::ENROLLMENT->value)['ceremony'])->key;
+    $key = TotpSecret::fromStored($this->enrollmentCeremony('totp'))->key;
     $page = $response->assertOk()->json('ceremony');
     $svg = (new Writer(new ImageRenderer(new RendererStyle(192), new SvgImageBackEnd)))->writeString($page['uri']);
     expect(strlen($key))->toBe(20)
         ->and($page['key'])->toBe(Base32::encodeUpperUnpadded($key))
         ->and($page['uri'])->toStartWith('otpauth://totp/')->toContain("secret={$page['key']}")
-        ->and($page['qr'])->toBe('data:image/svg+xml;base64,'.base64_encode($svg));
+        ->and($page['qr'])->toBe('data:image/svg+xml;base64,'.base64_encode($svg))
+        ->and(base64_decode(substr($page['qr'], strlen('data:image/svg+xml;base64,'))))->not->toContain($page['key']);
 });
 
 it('keeps the key and the URI in the session, and never the QR code, so the ceremony fits a cookie session', function () {
@@ -91,25 +78,35 @@ it('shows the same key and QR code on a refresh, and stores neither in the brows
     $this->assertHardeningFloor($second);
 });
 
-it('enrolls the key once a code it makes is typed back, and sends the user to the security page with the enrolled status', function () {
+it('enrolls the key once a code it makes is typed back, and sends the user to the security page', function () {
     $account = signInWithoutTotp($this);
-    $key = settingsTotpKey($this);
+    $this->get(route('security.enroll', ['type' => 'totp']));
+    $key = TotpSecret::fromStored($this->enrollmentCeremony('totp'))->key;
     $now = (new Totp)->stepAt(now()->getTimestamp());
 
-    $response = $this->post(route('security.enroll.submit', ['type' => 'totp']), ['code' => settingsTotpCode($key)]);
+    $response = $this->post(route('security.enroll.submit', ['type' => 'totp']), (new TotpTypeSupport)->validEnrollment($this->enrollmentCeremony('totp')));
 
     $response->assertRedirectToRoute('security');
     $stored = DB::table('user_credentials')->where('user_id', $account->getKey())->where('type', 'totp')->sole();
     expect(TotpSecret::fromStored(Crypt::decryptString($stored->secret)))->toEqual(new TotpSecret($key, lastStep: $now));
     $this->assertDatabaseHas('user_security_events', ['type' => 'credential.added', 'user_id' => $account->getKey(), 'flow' => 'settings', 'credential_type' => 'totp', 'credential_id' => $stored->id]);
-    $this->get(route('security'))->assertJsonPath('status', __('keystone::messages.status.enrolled'));
+});
+
+it('shows the enrolled status on the security page once the key is enrolled', function () {
+    signInWithoutTotp($this);
+    $this->get(route('security.enroll', ['type' => 'totp']));
+    $this->post(route('security.enroll.submit', ['type' => 'totp']), (new TotpTypeSupport)->validEnrollment($this->enrollmentCeremony('totp')));
+
+    $response = $this->get(route('security'));
+
+    $response->assertJsonPath('status', __('keystone::messages.status.enrolled'));
 });
 
 it('moves no epoch for an account\'s first TOTP credential', function () {
     $account = signInWithoutTotp($this);
-    $key = settingsTotpKey($this);
+    $this->get(route('security.enroll', ['type' => 'totp']));
 
-    $this->post(route('security.enroll.submit', ['type' => 'totp']), ['code' => settingsTotpCode($key)]);
+    $this->post(route('security.enroll.submit', ['type' => 'totp']), (new TotpTypeSupport)->validEnrollment($this->enrollmentCeremony('totp')));
 
     $this->assertDatabaseHas('users', ['id' => $account->getKey(), 'credential_epoch' => 0]);
     $this->assertAuthenticatedAs($account);
@@ -118,9 +115,10 @@ it('moves no epoch for an account\'s first TOTP credential', function () {
 it('replaces the TOTP credentials the account holds, disabled ones included, and moves the epoch', function () {
     $account = signInWithTotp($this);
     DB::table('user_credentials')->insert(['user_id' => $account->getKey(), 'type' => 'totp', 'secret' => Crypt::encryptString((new TotpSecret('09876543210987654321', lastStep: null))->toStored()), 'disabled_at' => now()]);
-    $key = settingsTotpKey($this);
+    $this->get(route('security.enroll', ['type' => 'totp']));
+    $key = TotpSecret::fromStored($this->enrollmentCeremony('totp'))->key;
 
-    $response = $this->post(route('security.enroll.submit', ['type' => 'totp']), ['code' => settingsTotpCode($key)]);
+    $response = $this->post(route('security.enroll.submit', ['type' => 'totp']), (new TotpTypeSupport)->validEnrollment($this->enrollmentCeremony('totp')));
 
     $response->assertRedirectToRoute('security');
     $stored = DB::table('user_credentials')->where('user_id', $account->getKey())->where('type', 'totp')->sole();
@@ -133,13 +131,14 @@ it('replaces the TOTP credentials the account holds, disabled ones included, and
 
 it('enrolls a first key once when the same code arrives twice at once, moving no epoch', function () {
     $account = signInWithoutTotp($this);
-    $key = settingsTotpKey($this);
+    $this->get(route('security.enroll', ['type' => 'totp']));
     $readByBoth = Keystone::guard()->slots()->get('totp', Surface::ENROLLMENT->value);
-    $this->post(route('security.enroll.submit', ['type' => 'totp']), ['code' => settingsTotpCode($key)])->assertRedirectToRoute('security');
+    $code = (new TotpTypeSupport)->validEnrollment($this->enrollmentCeremony('totp'));
+    $this->post(route('security.enroll.submit', ['type' => 'totp']), $code)->assertRedirectToRoute('security');
     Keystone::guard()->slots()->put('totp', Surface::ENROLLMENT->value, $readByBoth, capSeconds: 900);
     session()->save();
 
-    $response = $this->post(route('security.enroll.submit', ['type' => 'totp']), ['code' => settingsTotpCode($key)]);
+    $response = $this->post(route('security.enroll.submit', ['type' => 'totp']), $code);
 
     $response->assertRedirectToRoute('security');
     $this->assertDatabaseHas('users', ['id' => $account->getKey(), 'credential_epoch' => 0]);
@@ -147,48 +146,103 @@ it('enrolls a first key once when the same code arrives twice at once, moving no
         ->and(SecurityEvent::query()->where('type', 'credential.added')->count())->toBe(1);
 });
 
-it('answers the next challenge with the new key only, once it replaced the old one', function () {
+it('refuses the old key at the next challenge once a new one replaced it', function () {
     signInWithTotp($this);
-    $key = settingsTotpKey($this);
-    $this->post(route('security.enroll.submit', ['type' => 'totp']), ['code' => settingsTotpCode($key)]);
+    $this->get(route('security.enroll', ['type' => 'totp']));
+    $this->post(route('security.enroll.submit', ['type' => 'totp']), (new TotpTypeSupport)->validEnrollment($this->enrollmentCeremony('totp')));
     $this->post(route('logout'));
     $this->passFirstFactor();
 
-    $this->post(route('login.challenge.submit', ['type' => 'totp']), (new TotpTypeSupport)->validProofOfEnrolled((new TotpSecret('12345678901234567890', lastStep: null))->toStored()))->assertSessionHasErrors('totp');
+    $response = $this->post(route('login.challenge.submit', ['type' => 'totp']), (new TotpTypeSupport)->validProofOfEnrolled((new TotpSecret('12345678901234567890', lastStep: null))->toStored()));
+
+    $response->assertSessionHasErrors('totp');
     $this->assertGuest();
     $this->assertDatabaseHas('user_security_events', ['type' => 'proof.rejected', 'flow' => 'challenge', 'reason' => 'totp.mismatch']);
-    $this->post(route('login.challenge.submit', ['type' => 'totp']), ['code' => settingsTotpCode($key)])->assertSessionHasErrors('totp');
-    $this->assertDatabaseHas('user_security_events', ['type' => 'proof.rejected', 'flow' => 'challenge', 'reason' => 'totp.replayed']);
+});
 
-    $this->post(route('login.challenge.submit', ['type' => 'totp']), ['code' => settingsTotpCode($key, offset: 1)]);
+it('refuses the code that enrolled the new key at the next challenge', function () {
+    signInWithTotp($this);
+    $this->get(route('security.enroll', ['type' => 'totp']));
+    $enrolling = (new TotpTypeSupport)->validEnrollment($this->enrollmentCeremony('totp'));
+    $this->post(route('security.enroll.submit', ['type' => 'totp']), $enrolling);
+    $this->post(route('logout'));
+    $this->passFirstFactor();
+
+    $response = $this->post(route('login.challenge.submit', ['type' => 'totp']), $enrolling);
+
+    $response->assertSessionHasErrors('totp');
+    $this->assertGuest();
+    $this->assertDatabaseHas('user_security_events', ['type' => 'proof.rejected', 'flow' => 'challenge', 'reason' => 'totp.replayed']);
+});
+
+it('answers the next challenge with the new key once it replaced the old one', function () {
+    signInWithTotp($this);
+    $this->get(route('security.enroll', ['type' => 'totp']));
+    $ceremony = $this->enrollmentCeremony('totp');
+    $this->post(route('security.enroll.submit', ['type' => 'totp']), (new TotpTypeSupport)->validEnrollment($ceremony));
+    $this->post(route('logout'));
+    $this->passFirstFactor();
+
+    $this->post(route('login.challenge.submit', ['type' => 'totp']), (new TotpTypeSupport)->validProofOfEnrolled($ceremony));
 
     $this->assertAuthenticated();
 });
 
-it('refuses a wrong code, keeps the key and counts it in the settings flow only', function () {
-    config(['keystone.rate_limits.failed_attempts_per_hour' => 1]);
+it('refuses a wrong code in the settings flow, leaving the credentials and the epoch as they were', function () {
     $account = signInWithTotp($this);
-    $key = settingsTotpKey($this);
+    $this->get(route('security.enroll', ['type' => 'totp']));
 
-    $response = $this->post(route('security.enroll.submit', ['type' => 'totp']), (new TotpTypeSupport)->rejectedEnrollment((new TotpSecret($key, lastStep: null))->toStored()));
+    $response = $this->post(route('security.enroll.submit', ['type' => 'totp']), (new TotpTypeSupport)->rejectedEnrollment($this->enrollmentCeremony('totp')));
 
     $response->assertRedirectToRoute('security.enroll', ['type' => 'totp'])->assertSessionHasErrors(['totp' => __('keystone::messages.invalid_credential')]);
     $this->assertDatabaseHas('user_security_events', ['type' => 'proof.rejected', 'user_id' => $account->getKey(), 'flow' => 'settings', 'credential_type' => 'totp', 'reason' => 'totp.mismatch']);
     $this->assertDatabaseHas('users', ['id' => $account->getKey(), 'credential_epoch' => 0]);
-    expect(settingsTotpKey($this))->toBe($key)
-        ->and(DB::table('user_credentials')->where('user_id', $account->getKey())->where('type', 'totp')->count())->toBe(1);
-    $this->post(route('security.enroll.submit', ['type' => 'totp']), ['code' => settingsTotpCode($key)])->assertTooManyRequests();
+    expect(DB::table('user_credentials')->where('user_id', $account->getKey())->where('type', 'totp')->count())->toBe(1);
+});
+
+it('shows the same key again after a wrong code', function () {
+    signInWithTotp($this);
+    $this->get(route('security.enroll', ['type' => 'totp']));
+    $ceremony = $this->enrollmentCeremony('totp');
+    $this->post(route('security.enroll.submit', ['type' => 'totp']), (new TotpTypeSupport)->rejectedEnrollment($ceremony));
+
+    $this->get(route('security.enroll', ['type' => 'totp']));
+
+    expect($this->enrollmentCeremony('totp'))->toBe($ceremony);
+});
+
+it('counts a wrong code toward the settings limit', function () {
+    config(['keystone.rate_limits.failed_attempts_per_hour' => 1]);
+    signInWithTotp($this);
+    $this->get(route('security.enroll', ['type' => 'totp']));
+    $ceremony = $this->enrollmentCeremony('totp');
+    $this->post(route('security.enroll.submit', ['type' => 'totp']), (new TotpTypeSupport)->rejectedEnrollment($ceremony));
+
+    $response = $this->post(route('security.enroll.submit', ['type' => 'totp']), (new TotpTypeSupport)->validEnrollment($ceremony));
+
+    $response->assertTooManyRequests();
+});
+
+it('leaves the challenge\'s count alone after a wrong code in the settings flow', function () {
+    config(['keystone.rate_limits.failed_attempts_per_hour' => 1]);
+    $account = signInWithTotp($this);
+    $this->get(route('security.enroll', ['type' => 'totp']));
+    $this->post(route('security.enroll.submit', ['type' => 'totp']), (new TotpTypeSupport)->rejectedEnrollment($this->enrollmentCeremony('totp')));
     $this->post(route('logout'));
     $this->passFirstFactor();
+
     $this->post(route('login.challenge.submit', ['type' => 'totp']), (new TotpTypeSupport)->validProofOfEnrolled((new TotpSecret('12345678901234567890', lastStep: null))->toStored()));
+
     $this->assertAuthenticatedAs($account);
 });
 
 it('makes a new key once the enrollment is cancelled', function () {
     signInWithoutTotp($this);
-    $key = settingsTotpKey($this);
+    $this->get(route('security.enroll', ['type' => 'totp']));
+    $ceremony = $this->enrollmentCeremony('totp');
+    $this->delete(route('security.enroll.cancel', ['type' => 'totp']));
 
-    $this->delete(route('security.enroll.cancel', ['type' => 'totp']))->assertRedirectToRoute('security');
+    $this->get(route('security.enroll', ['type' => 'totp']));
 
-    expect(settingsTotpKey($this))->not->toBe($key);
+    expect(TotpSecret::fromStored($this->enrollmentCeremony('totp'))->key)->not->toBe(TotpSecret::fromStored($ceremony)->key);
 });

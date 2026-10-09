@@ -77,9 +77,13 @@ class FormType implements CredentialType
     public function verify(Surface $surface, array $input, array $credentials, mixed $ceremony = null): Proof
     {
         if ($surface === Surface::ENROLLMENT) {
-            return is_string($ceremony) && hash_equals($ceremony, (string) $input['secret'])
-                ? Proof::enrolled(new EnrolledCredential(identifier: null, secret: static::hash($ceremony), replacesExisting: $this->replacesExisting))
-                : Proof::rejected("{$this->name}.mismatch");
+            if (! is_string($ceremony) || ! hash_equals($ceremony, (string) $input['secret'])) {
+                return Proof::rejected("{$this->name}.mismatch");
+            }
+
+            return Proof::enrolled($this->replacesExisting
+                ? EnrolledCredential::replacing(identifier: null, secret: static::hash($ceremony))
+                : new EnrolledCredential(identifier: null, secret: static::hash($ceremony)));
         }
 
         $typed = static::hash($input['secret']);

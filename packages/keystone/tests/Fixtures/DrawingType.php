@@ -17,6 +17,9 @@ class DrawingType extends FormType implements PresentsCeremony
         parent::__construct(name: 'drawn', surfaces: ['challenge', 'enrollment']);
     }
 
+    /**
+     * Add a drawing of the code to the page, made again on every visit.
+     */
     public function present(array $page): array
     {
         return [...$page, 'drawing' => str_repeat($page['code'], 1024)];

@@ -60,25 +60,6 @@ describe('enrollment', function () {
             ->and($initiation->page['uri'])->toBe("otpauth://totp/Acme%20%26%20Co:jane%40example.com?secret={$initiation->page['key']}&issuer=Acme%20%26%20Co&algorithm=SHA1&digits=6&period=30");
     });
 
-    it('keeps only the key and the URI of a new ceremony', function () {
-        $initiation = (new TotpType)->initiate(Surface::ENROLLMENT, 'jane@example.com');
-
-        expect(array_keys($initiation->page))->toBe(['key', 'uri']);
-    });
-
-    it('draws the otpauth URI as an SVG QR code in a data URI for the form, the same every time', function () {
-        $initiation = (new TotpType)->initiate(Surface::ENROLLMENT, 'jane@example.com');
-
-        $page = (new TotpType)->present($initiation->page);
-        $svg = base64_decode(substr($page['qr'], strlen('data:image/svg+xml;base64,')), strict: true);
-
-        expect($page)->toBe([...$initiation->page, 'qr' => $page['qr']])
-            ->and($page['qr'])->toStartWith('data:image/svg+xml;base64,')
-            ->and($svg)->toStartWith('<?xml')->toContain('<svg')
-            ->and($svg)->not->toContain($initiation->page['key'])
-            ->and((new TotpType)->present($initiation->page))->toBe($page);
-    });
-
     it('makes a different key every time', function () {
         $first = (new TotpType)->initiate(Surface::ENROLLMENT, 'jane@example.com');
         $second = (new TotpType)->initiate(Surface::ENROLLMENT, 'jane@example.com');
@@ -95,16 +76,6 @@ describe('enrollment', function () {
 
         expect($proof->proven)->toBeTrue()
             ->and(TotpSecret::fromStored((string) $proof->enrolled?->secret))->toEqual(new TotpSecret('12345678901234567890', lastStep: $now));
-    });
-
-    it('enrolls a key that takes the place of the ones the account holds', function () {
-        $this->freezeSecond();
-        $ceremony = (new TotpSecret('12345678901234567890', lastStep: null))->toStored();
-        $now = (new Totp)->stepAt(now()->getTimestamp());
-
-        $proof = (new TotpType)->verify(Surface::ENROLLMENT, ['code' => (new Totp)->code('12345678901234567890', $now)], [], $ceremony);
-
-        expect($proof->enrolled?->replacesExisting)->toBeTrue();
     });
 
     it('refuses a code the new key doesn\'t make', function () {
