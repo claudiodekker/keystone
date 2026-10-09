@@ -8,7 +8,7 @@ import { revoke } from '@/routes/security/sessions';
 import { revoke as revokeOthersStep } from '@/routes/security/sessions/others';
 import { submit as revokeOthers } from '@/routes/security/sessions/others/revoke';
 import { end } from '@/routes/sudo';
-import type { SecurityPage } from '@/types/auth';
+import type { HeldCredential, SecurityPage } from '@/types/auth';
 
 defineProps<SecurityPage>();
 
@@ -17,6 +17,10 @@ const page = usePage<{ errors: Partial<Record<string, string>> }>();
 const date = (value: string | null) => (value === null ? 'never' : new Date(value).toLocaleString());
 
 const time = (value: string) => new Date(value).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+const passwordSet = (credentials: HeldCredential[]) => credentials.some((credential) => !credential.disabled);
+
+const enrollLabel = (group: SecurityPage['types'][number]) => (group.type === 'password' && passwordSet(group.credentials) ? 'Change' : 'Set up');
 </script>
 
 <template>
@@ -39,7 +43,7 @@ const time = (value: string) => new Date(value).toLocaleTimeString([], { hour: '
                 <h2 class="font-medium text-gray-900">{{ typeName(group.type) }}</h2>
 
                 <template v-if="group.type === 'password'">
-                    <p class="text-sm text-gray-600">{{ group.credentials.some((credential) => !credential.disabled) ? 'Set' : 'Not set' }}</p>
+                    <p class="text-sm text-gray-600">{{ passwordSet(group.credentials) ? 'Set' : 'Not set' }}</p>
                     <p v-for="credential in group.credentials" :key="credential.id" class="text-sm text-gray-600">
                         Added {{ date(credential.addedAt) }}, last used {{ date(credential.lastUsedAt) }}
                         <span v-if="credential.disabled" class="font-medium text-red-600">Disabled</span>
@@ -68,9 +72,9 @@ const time = (value: string) => new Date(value).toLocaleTimeString([], { hour: '
                 <Link
                     v-if="group.enrollable"
                     :href="enroll(group.type)"
-                    :aria-label="`Set up ${typeName(group.type)}`"
+                    :aria-label="`${enrollLabel(group)} ${typeName(group.type)}`"
                     class="text-sm font-medium text-gray-900 underline"
-                    >Set up</Link
+                    >{{ enrollLabel(group) }}</Link
                 >
             </section>
 

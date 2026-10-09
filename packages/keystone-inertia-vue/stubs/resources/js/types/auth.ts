@@ -4,10 +4,17 @@ export type Surface = 'sign-in' | 'challenge' | 'enrollment';
 
 export type Purpose = 'sudo' | 'settings';
 
+export type RemovableCredential = {
+    id: number;
+    label: string | null;
+    removable: boolean;
+};
+
 export type CredentialTypeOption = {
     type: string;
     shape: InitiateShape;
     ceremony?: Record<string, string>;
+    held?: RemovableCredential[];
 };
 
 export type SignInPage = {
@@ -33,6 +40,7 @@ export type EnrollmentFormPage = {
     shape: InitiateShape;
     ceremony: Record<string, string>;
     status: string | null;
+    held: RemovableCredential[];
 };
 
 export type RecoveryCodesPage = {

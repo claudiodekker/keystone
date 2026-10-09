@@ -23,6 +23,7 @@ class CredentialEnrollmentController extends Controller
             'shape' => $page->shape,
             'ceremony' => $page->ceremony,
             'status' => $page->status,
+            'held' => $page->held,
         ]);
     }
 
@@ -35,11 +36,13 @@ class CredentialEnrollmentController extends Controller
     }
 
     /**
-     * Respond to a refused enrollment answer, with the message for the credential type's field.
+     * Respond to a refused enrollment answer, with the message for the credential type's field, or for the current password of a password change.
      */
     protected function sendCredentialEnrollmentRefused(Request $request, string $type, string $message): RedirectResponse
     {
-        return to_route('security.enroll', ['type' => $type])->withErrors([$type => $message]);
+        $field = $type === 'password' ? 'current_password' : $type;
+
+        return to_route('security.enroll', ['type' => $type])->withErrors([$field => $message]);
     }
 
     /**
