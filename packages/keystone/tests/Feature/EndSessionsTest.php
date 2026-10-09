@@ -8,6 +8,7 @@ use ClaudioDekker\Keystone\SecurityEventType;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormTypeSupport;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
+use Laravel\Prompts\Prompt;
 
 pest()->extend(AppTestCase::class);
 
@@ -67,6 +68,8 @@ describe('keystone:end-sessions', function () {
     it('asks before ending every account\'s sessions in production', function () {
         $this->createAccount();
         $this->app->detectEnvironment(fn () => 'production');
+        // Out of the testing environment the command asks through a terminal, which a test has none of.
+        Prompt::fallbackWhen(true);
 
         $this->artisan('keystone:end-sessions', ['--all' => true])
             ->expectsConfirmation('Are you sure you want to run this command?', 'no')
