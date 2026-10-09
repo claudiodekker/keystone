@@ -12,7 +12,7 @@ A signed-in user opens the security page from home. It lists the password and th
 - `security-remove-refused-second-factor` removing the `Authenticator app` while it is Jane's only second factor shows `You cannot remove your last two-factor credential while two-factor authentication is required.` on the confirm step.
 - `security-remove-refused-sign-in` removing the `Password`, Jane's only way to sign in, shows `You cannot remove your only way to sign in.` on the confirm step.
 - `security-remove-sudo` the Remove link of a session without sudo goes to `/auth/sudo` and back to the confirm step once sudo is granted.
-- `security-enroll-qr` `Set up Authenticator app` opens `/settings/security/enroll/totp` with a QR code that scans to the `otpauth://` link, the Base32 key and the line `this one replaces it`. A reload shows the same key.
+- `security-enroll-qr` `Set up Authenticator app` opens `/settings/security/enroll/totp` with a QR code that scans to the `otpauth://` link, the Base32 key and the line `the new key replaces the old one`. A reload shows the same key.
 - `security-enroll-refused` a code the shown key doesn't make shows `The provided credential is invalid.` and keeps the key.
 - `security-enroll` a code from the shown key lands on `/settings/security` with `The new credential was added.`, one entry under `Authenticator app`, sudo kept and the credential epoch moved by one.
 - `security-enroll-cancel` `Cancel` goes back to the page, and the next `Set up Authenticator app` shows another key.

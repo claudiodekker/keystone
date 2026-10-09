@@ -144,7 +144,7 @@ A setting that requires every account to hold something: a second factor (`requi
 _Avoid_: requirement, policy
 
 **Enrollment**:
-Adding a credential to an account through its type's ceremony. An account that doesn't hold what a mandate requires, a second factor or a set of recovery codes, owes it at sign-in, after the first factor and the challenge. A signed-in user starts one from the security settings, behind sudo, in the `settings` flow.
+Adding a credential to an account through its type's ceremony. An account that lacks what a mandate requires (a second factor or a set of recovery codes) owes it at sign-in, after the first factor and the challenge. A signed-in user starts one from the security settings, behind sudo, in the `settings` flow.
 _Avoid_: setup, onboarding
 
 **Leftover credential**:

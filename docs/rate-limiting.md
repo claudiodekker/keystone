@@ -34,7 +34,7 @@ The first trip of each count in a window mails the account's owner a `limit.trip
 
 ## Sharing an IP address
 
-The request limit counts per IP address, so everyone behind one address shares it, such as an office or a school behind one NAT address. Sign-ins, challenge answers, recovery-code saves, enrollment answers, at sign-in and in the security settings, and sudo answers all count as submissions. With the default of 10 a minute and a second factor required, one address completes at most five sign-ins a minute. An IPv6 address counts as its /64 network. If your users sit behind shared addresses, raise `rate_limits.requests_per_minute.submit`. That also gives a scripted client more submissions from each address.
+The request limit counts per IP address, so everyone behind one address shares it, such as an office or a school behind one NAT address. Sign-ins, challenge answers, recovery-code saves, sudo answers and every enrollment answer, at sign-in or in the security settings, count as submissions. With the default of 10 a minute and a second factor required, one address completes at most five sign-ins a minute. An IPv6 address counts as its /64 network. If your users sit behind shared addresses, raise `rate_limits.requests_per_minute.submit`. That also gives a scripted client more submissions from each address.
 
 ## The store
 

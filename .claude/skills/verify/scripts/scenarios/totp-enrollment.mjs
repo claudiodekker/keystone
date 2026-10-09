@@ -49,7 +49,7 @@ try {
     const uri = await page.getByRole('link', { name: 'Open in authenticator app' }).getAttribute('href');
     assert.match(key, /^[A-Z2-7]{32}$/, 'the key is 160 bits in Base32');
     assert.ok(uri.startsWith('otpauth://totp/') && uri.includes(`secret=${key}`), 'the link carries the shown key');
-    await page.getByText('this one replaces it').waitFor();
+    await page.getByText('the new key replaces the old one').waitFor();
 
     const scanned = await qr.evaluate(async (image) => ('BarcodeDetector' in window ? (await new BarcodeDetector({ formats: ['qr_code'] }).detect(image))[0]?.rawValue : null));
     if (scanned === null) {
