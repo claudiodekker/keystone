@@ -156,3 +156,21 @@ describe('the page', function () {
         $this->get(route('security'))->assertTooManyRequests();
     });
 });
+
+describe('the change-password URL', function () {
+    it('sends a guest to the security page, whose own gate sends them on to sign in', function () {
+        $response = $this->get('/.well-known/change-password');
+
+        $response->assertRedirect(route('security'));
+        $this->get(route('security'))->assertRedirectToRoute('login');
+        expect(route('well-known.change-password', absolute: false))->toBe('/.well-known/change-password');
+    });
+
+    it('sends a signed-in user to the security page', function () {
+        $this->signInAccount(new FormTypeSupport);
+
+        $response = $this->get('/.well-known/change-password');
+
+        $response->assertRedirect(route('security'));
+    });
+});

@@ -57,3 +57,13 @@ it('encrypts the security page in the browser\'s history', function () {
 it('sends a guest to the sign-in page', function () {
     $this->assertGuestSentAwayFromSecurity($this->get(route('security')));
 });
+
+it('sends /.well-known/change-password to the security page for a guest and a signed-in user', function () {
+    $this->get('/.well-known/change-password')->assertRedirect(route('security'));
+    $this->signInAccount(new PasswordTypeSupport);
+
+    $response = $this->get('/.well-known/change-password');
+
+    $response->assertRedirect(route('security'));
+    expect(route('well-known.change-password', absolute: false))->toBe('/.well-known/change-password');
+});

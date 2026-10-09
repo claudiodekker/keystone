@@ -64,3 +64,5 @@ Route::prefix('settings/security')->group(function () {
     Route::get('sessions/{session}/revoke', [SessionRevocationController::class, 'show'])->name('security.sessions.revoke');
     Route::delete('sessions/{session}', [SessionRevocationController::class, 'destroy'])->name('security.sessions.revoke.submit');
 });
+
+Route::get('.well-known/change-password', fn () => to_route('security'))->name('well-known.change-password');
