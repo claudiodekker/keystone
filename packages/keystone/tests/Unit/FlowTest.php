@@ -30,6 +30,12 @@ it('derives no flow for a surface no flow uses yet', function (Surface $surface)
     Flow::of(Keystone::guard(), $surface);
 })->throws(LogicException::class)->with([Surface::REGISTRATION, Surface::ENROLLMENT]);
 
+it('derives the settings flow for a signed-in session on the enrollment surface', function () {
+    Keystone::guard()->setUser(User::factory()->create());
+
+    expect(Flow::of(Keystone::guard(), Surface::ENROLLMENT))->toBe(Flow::SETTINGS);
+});
+
 it('derives the sudo flow for a signed-in session owing its first step on the sign-in surface', function () {
     Keystone::guard()->setUser(User::factory()->create());
     Keystone::guard()->beginSudo('/settings');
@@ -78,4 +84,5 @@ test('only the flows behind a first factor share a guessable type\'s failures', 
     'challenge' => [Flow::CHALLENGE, true],
     'enrollment' => [Flow::ENROLLMENT, false],
     'sudo' => [Flow::SUDO, true],
+    'settings' => [Flow::SETTINGS, false],
 ]);

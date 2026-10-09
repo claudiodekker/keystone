@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Form, Head, Link } from '@inertiajs/vue3';
 import { typeName } from '@/lib/credentialTypes';
+import { enroll } from '@/routes/security';
 import { remove } from '@/routes/security/credentials';
 import { end } from '@/routes/sudo';
 import type { SecurityPage } from '@/types/auth';
@@ -50,6 +51,14 @@ const time = (value: string) => new Date(value).toLocaleTimeString([], { hour: '
                 </ul>
 
                 <p v-else class="text-sm text-gray-600">None added.</p>
+
+                <Link
+                    v-if="group.enrollable"
+                    :href="enroll(group.type)"
+                    :aria-label="`Set up ${typeName(group.type)}`"
+                    class="text-sm font-medium text-gray-900 underline"
+                    >Set up</Link
+                >
             </section>
 
             <section v-if="leftovers.length" class="flex flex-col gap-2 rounded-lg bg-white p-6 shadow-sm ring-1 ring-gray-200">

@@ -4,6 +4,8 @@
     "license": "MIT",
     "require": {
         "php": "^8.4",
+        "ext-xmlwriter": "*",
+        "bacon/bacon-qr-code": "^3.0",
         "claudiodekker/keystone": "self.version",
         "illuminate/support": "^13.0",
         "paragonie/constant_time_encoding": "^3.1"

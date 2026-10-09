@@ -144,7 +144,7 @@ A setting that requires every account to hold something: a second factor (`requi
 _Avoid_: requirement, policy
 
 **Enrollment**:
-Adding to an account what a mandate requires and it doesn't hold: a second factor, or a set of recovery codes. Owed at sign-in, after the first factor and the challenge, and never while signed in.
+Adding a credential to an account through its type's ceremony. An account that lacks what a mandate requires (a second factor or a set of recovery codes) owes it at sign-in, after the first factor and the challenge. A signed-in user starts one from the security settings, behind sudo, in the `settings` flow.
 _Avoid_: setup, onboarding
 
 **Leftover credential**:
@@ -165,7 +165,7 @@ A per-account counter that moves whenever the account's other sessions must end,
 One locked write to an account's credentials, addresses or credential epoch. It moves the epoch whenever it removes, replaces or ends something, and records its events only once it commits.
 
 **Ceremony slot**:
-A method's in-flight data for one step, such as a WebAuthn challenge or a TOTP secret being enrolled. It never outlives the state that owns it.
+A method's in-flight data for one step, such as a WebAuthn challenge or a TOTP secret being enrolled. It never outlives the state that owns it: the pending sign-in, or the sudo a signed-in session holds.
 
 ### Rate limiting
 

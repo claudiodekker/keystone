@@ -4,12 +4,13 @@ namespace ClaudioDekker\Keystone\Http\Controllers;
 
 use ClaudioDekker\Keystone\Demand;
 use ClaudioDekker\Keystone\EnrollmentAttempt;
+use ClaudioDekker\Keystone\EnrollmentCeremonies;
 use ClaudioDekker\Keystone\Http\Concerns\ResolvesEnrollmentSignIn;
-use ClaudioDekker\Keystone\Http\Concerns\StartsEnrollmentCeremonies;
 use ClaudioDekker\Keystone\Http\PageValues\EnrollmentFormPage;
 use ClaudioDekker\Keystone\Http\PageValues\EnrollmentPage;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\CredentialType;
+use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\PendingSignIn;
 use ClaudioDekker\Keystone\RateLimiter;
@@ -18,6 +19,7 @@ use ClaudioDekker\Keystone\SignInDecision;
 use ClaudioDekker\Keystone\Status;
 use ClaudioDekker\Keystone\StepKind;
 use Illuminate\Contracts\Support\Responsable;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\Response;
@@ -29,7 +31,6 @@ use Throwable;
 abstract class EnrollmentController extends Controller
 {
     use ResolvesEnrollmentSignIn;
-    use StartsEnrollmentCeremonies;
 
     /**
      * Get the middleware that runs before the controller's actions.
@@ -87,7 +88,7 @@ abstract class EnrollmentController extends Controller
         }
 
         try {
-            $ceremony = $this->ceremony($pending, $credentialType);
+            $running = (new EnrollmentCeremonies(Keystone::guard()))->resolve($credentialType, $pending->account);
         } catch (Throwable $e) {
             report($e);
 
@@ -97,7 +98,7 @@ abstract class EnrollmentController extends Controller
         $page = new EnrollmentFormPage(
             type: $credentialType->name(),
             shape: $credentialType->surfaces()[Surface::ENROLLMENT->value]->value,
-            ceremony: $ceremony['page'],
+            ceremony: $running->page,
             status: Status::flashed($request)?->label(),
         );
 
@@ -121,9 +122,9 @@ abstract class EnrollmentController extends Controller
             return $this->refuseUnofferedType();
         }
 
-        $ceremony = Keystone::guard()->slots()->get($credentialType->name(), Surface::ENROLLMENT->value);
+        $running = (new EnrollmentCeremonies(Keystone::guard()))->running($credentialType);
 
-        if (! is_array($ceremony)) {
+        if ($running === null) {
             Status::ENROLLMENT_EXPIRED->flash($request);
 
             return $this->sendEnrollmentExpired($request, $credentialType->name());
@@ -136,7 +137,7 @@ abstract class EnrollmentController extends Controller
         }
 
         $attempt = new EnrollmentAttempt(Keystone::guard(), new RateLimiter($request, app(RequestContext::class), Keystone::guard()));
-        $demand = $attempt->attempt($pending, $credentialType, $validator->validated(), $ceremony['ceremony']);
+        $demand = $attempt->attempt($pending, $credentialType, $validator->validated(), $running->ceremony);
 
         return match ($demand) {
             Demand::REFUSE => $this->sendEnrollmentRefused($request, $credentialType->name(), __('keystone::messages.invalid_credential')),
@@ -232,5 +233,33 @@ abstract class EnrollmentController extends Controller
         }
 
         return $decision->owesSecondFactor($pending->account) ? null : $this->sendRecoveryCodesOwed($request);
+    }
+
+    /**
+     * Get the types the account can enroll as its second factor.
+     *
+     * @return list<CredentialType>
+     */
+    protected function offer(): array
+    {
+        return (new SignInDecision)->enrollmentOffer(app(CredentialTypes::class));
+    }
+
+    /**
+     * Get the offered type with the name.
+     */
+    protected function offered(string $name): ?CredentialType
+    {
+        $named = array_filter($this->offer(), fn (CredentialType $type) => $type->name() === $name);
+
+        return array_values($named)[0] ?? null;
+    }
+
+    /**
+     * Send a request for a type the account can't enroll back to the types it can.
+     */
+    protected function refuseUnofferedType(): RedirectResponse
+    {
+        return redirect()->route('login.enrollment');
     }
 }

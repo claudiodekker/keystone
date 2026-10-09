@@ -5,6 +5,7 @@ use ClaudioDekker\Keystone\AccountChanges;
 use ClaudioDekker\Keystone\Actor;
 use ClaudioDekker\Keystone\Flow;
 use ClaudioDekker\Keystone\KeystoneGuard;
+use ClaudioDekker\Keystone\Methods\EnrolledCredential;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
 use ClaudioDekker\Keystone\Notifications\SecurityAlert;
 use ClaudioDekker\Keystone\RecoveryCodes;
@@ -89,6 +90,10 @@ test('the credential epoch moves only for a change that removes, replaces or end
 
         $change->commitRecoveryCodes(['BBBBB-BBBBB'], flow: Flow::ENROLLMENT);
     }, true],
+    'enrolling a credential beside the ones held' => [fn (AccountChange $change) => $change->enroll(new FormType, new EnrolledCredential(identifier: null, secret: 'new'), Flow::SETTINGS), false],
+    'enrolling a first credential that replaces its type' => [fn (AccountChange $change) => $change->enroll(new FormType('code'), EnrolledCredential::replacing(identifier: null, secret: 'new'), Flow::SETTINGS), false],
+    'enrolling a credential that replaces the one held' => [fn (AccountChange $change) => $change->enroll(new FormType, EnrolledCredential::replacing(identifier: null, secret: 'new'), Flow::SETTINGS), true],
+    'enrolling again the replacing credential already held' => [fn (AccountChange $change) => $change->enroll(new FormType, EnrolledCredential::replacing(identifier: null, secret: 'old-hash'), Flow::SETTINGS), false],
 ]);
 
 it('records a first set of recovery codes without alerting, and a replacing set with an alert', function (bool $held, bool $alerts) {
@@ -290,6 +295,17 @@ describe('the mover\'s own session', function () {
         $before = session()->getId();
 
         changes()->change($user, fn (AccountChange $change) => $change->addCredential(new FormType, identifier: null, secret: 'new'));
+
+        expect(session()->getId())->toBe($before);
+    });
+
+    it('leaves a session signed in as another account on its id after an enrollment', function () {
+        $admin = User::factory()->create();
+        $user = User::factory()->create();
+        guard()->signIn($admin);
+        $before = session()->getId();
+
+        changes()->change($user, fn (AccountChange $change) => $change->enroll(new FormType, new EnrolledCredential(identifier: null, secret: 'new'), Flow::SETTINGS));
 
         expect(session()->getId())->toBe($before);
     });

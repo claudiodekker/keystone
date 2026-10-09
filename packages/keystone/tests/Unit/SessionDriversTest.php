@@ -4,7 +4,9 @@ namespace ClaudioDekker\Keystone\Tests\Unit;
 
 use ClaudioDekker\Keystone\AccountChange;
 use ClaudioDekker\Keystone\AccountChanges;
+use ClaudioDekker\Keystone\EnrollmentCeremonies;
 use ClaudioDekker\Keystone\KeystoneGuard;
+use ClaudioDekker\Keystone\Tests\Fixtures\DrawingType;
 use ClaudioDekker\Keystone\Tests\Fixtures\User;
 use Closure;
 use Illuminate\Http\Request;
@@ -111,4 +113,19 @@ it('ends every account\'s sessions', function (string $driver) {
 
     expect(visit($driver, $laptop, fn (KeystoneGuard $guard) => $guard->user()))->toBeNull()
         ->and(visit($driver, $phone, fn (KeystoneGuard $guard) => $guard->user()))->toBeNull();
+})->with(['file', 'redis', 'cookie']);
+
+it('keeps a running enrollment ceremony across requests, in a session small enough for a cookie, whatever its type draws for the form', function (string $driver) {
+    $user = User::factory()->create();
+    $type = new DrawingType;
+    $browser = [];
+    visit($driver, $browser, fn (KeystoneGuard $guard) => $guard->signIn($user));
+
+    $started = visit($driver, $browser, fn (KeystoneGuard $guard) => (new EnrollmentCeremonies($guard))->resolve($type, $user));
+    $stored = strlen(serialize(session()->all()));
+    $running = visit($driver, $browser, fn (KeystoneGuard $guard) => (new EnrollmentCeremonies($guard))->running($type));
+
+    expect(strlen($started->page['drawing']))->toBe(16384)
+        ->and($running)->toEqual($started)
+        ->and($stored)->toBeLessThan(2048);
 })->with(['file', 'redis', 'cookie']);

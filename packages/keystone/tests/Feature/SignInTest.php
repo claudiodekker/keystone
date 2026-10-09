@@ -185,6 +185,18 @@ describe('last use', function () {
             ->and($lastUse('code'))->toBeNull();
     });
 
+    it('signs in again with a credential last used within the same second', function () {
+        $this->freezeSecond();
+        $account = $this->createAccount();
+        $this->arrangeCredential($account, new FormTypeSupport, Surface::SIGN_IN);
+        $this->submitSignIn(new FormTypeSupport, 'jane@example.com', (new FormTypeSupport)->validProof(Surface::SIGN_IN));
+        $this->post(route('logout'));
+
+        $this->submitSignIn(new FormTypeSupport, 'jane@example.com', (new FormTypeSupport)->validProof(Surface::SIGN_IN));
+
+        $this->assertAuthenticatedAs($account);
+    });
+
     it('stamps nothing for a refused proof', function () {
         $account = $this->createAccount();
         $this->arrangeCredential($account, new FormTypeSupport, Surface::SIGN_IN);

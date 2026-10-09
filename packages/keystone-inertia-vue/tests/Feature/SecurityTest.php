@@ -24,8 +24,8 @@ it('renders the security page with the page value\'s fields', function () {
     $response->assertInertia(fn (AssertableInertia $page) => $page
         ->component('settings/Security')
         ->where('types', [
-            ['type' => 'password', 'credentials' => [['id' => $password, 'label' => null, 'addedAt' => now()->toIso8601String(), 'lastUsedAt' => now()->toIso8601String(), 'disabled' => false]]],
-            ['type' => 'totp', 'credentials' => []],
+            ['type' => 'password', 'enrollable' => true, 'credentials' => [['id' => $password, 'label' => null, 'addedAt' => now()->toIso8601String(), 'lastUsedAt' => now()->toIso8601String(), 'disabled' => false]]],
+            ['type' => 'totp', 'enrollable' => true, 'credentials' => []],
         ])
         ->where('leftovers', [['id' => $leftover, 'type' => 'uninstalled', 'label' => 'Old key', 'addedAt' => now()->toIso8601String(), 'lastUsedAt' => null, 'disabled' => false]])
         ->where('recoveryCodes', 0)

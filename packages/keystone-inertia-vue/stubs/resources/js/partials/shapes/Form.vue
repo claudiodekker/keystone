@@ -4,6 +4,7 @@ import { computed } from 'vue';
 import { submit } from '@/routes/login';
 import { submit as submitChallenge } from '@/routes/login/challenge';
 import { submit as submitEnrollment } from '@/routes/login/enrollment';
+import { submit as submitSettings } from '@/routes/security/enroll';
 import { submit as submitSudo } from '@/routes/sudo';
 import type { CredentialTypeOption, Purpose, SignInPage, Surface } from '@/types/auth';
 
@@ -17,7 +18,9 @@ const page = usePage<Partial<SignInPage>>();
 
 const routes = { 'sign-in': submit, challenge: submitChallenge, enrollment: submitEnrollment };
 
-const action = computed(() => (props.purpose === 'sudo' ? submitSudo : routes[props.surface]).form({ type: props.option.type }));
+const purposes = { sudo: submitSudo, settings: submitSettings };
+
+const action = computed(() => (props.purpose ? purposes[props.purpose] : routes[props.surface]).form({ type: props.option.type }));
 
 const namesAccount = computed(() => props.surface === 'sign-in' && props.purpose !== 'sudo');
 

@@ -9,6 +9,7 @@ use ClaudioDekker\Keystone\Exceptions\LastSignInCredential;
 use ClaudioDekker\Keystone\Exceptions\NotSuspended;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
+use ClaudioDekker\Keystone\Methods\EnrolledCredential;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
 use ClaudioDekker\Keystone\Methods\Surface;
 use Closure;
@@ -24,6 +25,11 @@ class AccountChange
      * Whether the change removed, replaced or ended something, so the account's other sessions must end.
      */
     protected bool $movesEpoch = false;
+
+    /**
+     * Whether the mover's own session must take a new id once the change commits.
+     */
+    protected bool $rotatesSession = false;
 
     /**
      * The events to record once the change commits.
@@ -62,6 +68,35 @@ class AccountChange
             identifier: $identifier,
             secret: $secret,
             label: $label,
+        );
+    }
+
+    /**
+     * Store the enrolled credential on the account and record it in the flow.
+     *
+     * A credential that replaces its type takes the place of every credential of the type the account holds, disabled or not, and ends the account's other sessions when it held one.
+     *
+     * A replacing credential the account already holds was stored by the same answer arriving twice, so it is not stored, recorded or replaced again.
+     */
+    public function enroll(CredentialType $type, EnrolledCredential $enrolled, Flow $flow): void
+    {
+        if ($enrolled->replacesExisting && $this->holds($type, $enrolled)) {
+            return;
+        }
+
+        if ($enrolled->replacesExisting && $this->credentials->deleteOfType($this->account->getKey(), $type->name()) > 0) {
+            $this->endSessions();
+        }
+
+        $id = $this->addCredential($type, identifier: $enrolled->identifier, secret: $enrolled->secret, label: $enrolled->label);
+
+        $this->rotatesSession = true;
+
+        $this->record(
+            SecurityEventType::CREDENTIAL_ADDED,
+            flow: $flow->value,
+            credentialType: $type->name(),
+            credential: new StoredCredential($id, identifier: null, secret: null, label: $enrolled->label),
         );
     }
 
@@ -274,6 +309,28 @@ class AccountChange
     public function movesEpoch(): bool
     {
         return $this->movesEpoch;
+    }
+
+    /**
+     * Determine if the account holds a usable credential of the type with the secret of the enrolled one.
+     */
+    protected function holds(CredentialType $type, EnrolledCredential $enrolled): bool
+    {
+        if ($enrolled->secret === null) {
+            return false;
+        }
+
+        $held = $this->credentials->ofType($this->account->getKey(), $type->name());
+
+        return array_any($held, fn (StoredCredential $credential) => $credential->secret !== null && hash_equals($credential->secret, $enrolled->secret));
+    }
+
+    /**
+     * Determine if the mover's own session must take a new id once the change commits.
+     */
+    public function rotatesSession(): bool
+    {
+        return $this->rotatesSession;
     }
 
     /**

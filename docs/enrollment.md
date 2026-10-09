@@ -23,7 +23,9 @@ If the account gains a second factor elsewhere before this one is enrolled, even
 
 The enrollment page (`login.enrollment`) lists every listed type that serves `enrollment` and answers the challenge, with its shape. A password is never offered: it is a first factor only.
 
-Choosing a type (`login.enrollment.start`) starts its ceremony, such as TOTP making a new key, and shows what the user needs, such as the key and the link that adds it to an authenticator app. Reloading shows the same ceremony. The ceremony lasts as long as the held sign-in.
+Choosing a type (`login.enrollment.start`) starts its ceremony, such as TOTP making a new key, and shows what the user needs, such as the QR code and the key that add it to an authenticator app. Reloading shows the same ceremony. The ceremony lasts as long as the held sign-in.
+
+A signed-in user adds a credential from the [security settings](security-settings.md#adding-a-credential) instead, through the same ceremony and the same form.
 
 ## Answering
 
@@ -62,4 +64,4 @@ The adapter's `EnrollmentController` has one hook per outcome: `sendEnrollmentPa
 
 ## Credential types
 
-A type serves enrollment by listing the `enrollment` surface and implementing `initiate()`, which returns an `Initiation`: what core keeps of the ceremony in the session, and the strings the page shows. A type with no ceremony returns `null`. `verify()` on `enrollment` gets that ceremony back and returns `Proof::enrolled()` with the credential to store, or a rejected proof. Its test support's `validEnrollment()` and `rejectedEnrollment()` answer a ceremony for the AppTests, and `validProofOfEnrolled()` answers the next challenge with the credential that ceremony enrolled.
+A type serves enrollment by listing the `enrollment` surface and implementing `initiate()`, which returns an `Initiation`: what core keeps of the ceremony in the session, and the strings the page shows. A type with no ceremony returns `null`. The page's strings are kept in the session, so keep them small. A type whose form shows something large that it can draw from those strings, as TOTP draws its QR code from the link, also implements `PresentsCeremony`: `present()` receives the kept page on every request and returns the page the form shows. `verify()` on `enrollment` gets that ceremony back and returns `Proof::enrolled()` with the credential to store, or a rejected proof. Its test support's `validEnrollment()` and `rejectedEnrollment()` answer a ceremony for the AppTests, and `validProofOfEnrolled()` answers the next challenge with the credential that ceremony enrolled.
