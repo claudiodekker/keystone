@@ -169,7 +169,11 @@ case "$cmd" in
     # testbench serve copies .env.example into the skeleton and only removes it on a clean exit; left behind, it leaks into the Pest suite.
     skeleton=vendor/orchestra/testbench-core/laravel
     sleep 0.5
-    if cmp -s "$skeleton/.env" "$skeleton/.env.example" && ! pgrep -f 'testbench serve' >/dev/null; then
+    others=0
+    for other in "$runs"/*/; do
+      [ -d "$other" ] && [ "$(basename "$other")" != "$run" ] && alive "$(basename "$other")" && others=1
+    done
+    if cmp -s "$skeleton/.env" "$skeleton/.env.example" && [ "$others" = 0 ]; then
       rm "$skeleton/.env"
     fi
     mkdir -p "$evidence/$run"
