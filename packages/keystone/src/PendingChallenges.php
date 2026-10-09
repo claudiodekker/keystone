@@ -71,15 +71,22 @@ class PendingChallenges
         $abandoned = $this->query()
             ->where('created_at', '<=', Date::now()->subSeconds(self::ABANDONED_AFTER_SECONDS))
             ->orderBy('id')
-            ->get();
+            ->get(['id', 'user_id', 'ip_address', 'user_agent', 'created_at'])
+            ->map(fn (stdClass $row) => new StoredChallenge(
+                id: (int) $row->id,
+                accountId: $row->user_id,
+                ipAddress: $this->decrypt(is_null($row->ip_address) ? null : (string) $row->ip_address),
+                userAgent: $this->decrypt(is_null($row->user_agent) ? null : (string) $row->user_agent),
+                heldAt: CarbonImmutable::parse($row->created_at),
+            ));
 
         if ($abandoned->isEmpty()) {
             return;
         }
 
-        $accounts = $this->accounts($abandoned->pluck('user_id')->unique()->all());
+        $accounts = $this->accounts($abandoned->pluck('accountId')->unique()->all());
 
-        foreach ($abandoned->groupBy('user_id') as $accountId => $challenges) {
+        foreach ($abandoned->groupBy('accountId') as $accountId => $challenges) {
             if (isset($accounts[$accountId])) {
                 (new SecurityEventRecorder)->recordEach(SecurityEventType::CHALLENGE_ABANDONED, $accounts[$accountId], $this->contextsOf($challenges), actor: Actor::SYSTEM);
             }
@@ -93,15 +100,15 @@ class PendingChallenges
     /**
      * Get the context of the request that held each challenge, dated by the hold.
      *
-     * @param  Collection<int, stdClass>  $challenges
+     * @param  Collection<int, StoredChallenge>  $challenges
      * @return Collection<int, RequestContext>
      */
     protected function contextsOf(Collection $challenges): Collection
     {
-        return $challenges->map(fn (stdClass $challenge) => new RequestContext(
-            ipAddress: $this->decrypt($challenge->ip_address),
-            userAgent: $this->decrypt($challenge->user_agent),
-            occurredAt: CarbonImmutable::parse($challenge->created_at),
+        return $challenges->map(fn (StoredChallenge $challenge) => new RequestContext(
+            ipAddress: $challenge->ipAddress,
+            userAgent: $challenge->userAgent,
+            occurredAt: $challenge->heldAt,
         ));
     }
 
