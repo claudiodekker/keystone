@@ -22,7 +22,9 @@ The page also shows how many unspent [recovery codes](challenge.md#recovery-code
 
 When the session has sudo that the [gate](sudo.md#gating-a-route) would accept from the user's current network, the page shows when it ends, with a button that [ends it](sudo.md#ending-it). Otherwise it says the next change will ask the user to confirm who they are.
 
-The page shows only the signed-in account's own credentials and codes. A credential Keystone disabled, such as a security key it caught being cloned, is still listed and marked disabled. It no longer counts as a way to sign in or as a second factor.
+On the `database` session driver, the page lists the account's [sessions](#sessions). On other drivers it says they can't be listed.
+
+The page shows only the signed-in account's own credentials, codes and sessions. A credential Keystone disabled, such as a security key it caught being cloned, is still listed and marked disabled. It no longer counts as a way to sign in or as a second factor.
 
 ## The page value
 
@@ -36,6 +38,8 @@ The page shows only the signed-in account's own credentials and codes. A credent
 | `recoveryCodesLow` | whether that is three or fewer |
 | `sudoEndsAt` | when the session's sudo ends, or `null` |
 | `status` | the translated status a previous request flashed, such as the one for `sudo-revoked`, or `null` |
+| `sessions` | the account's [live sessions](#sessions), this device first, each a `SessionRow`; empty on a driver that can't list them |
+| `sessionsStatus` | the translated `sessions-unavailable` status on a driver that can't list sessions, or `null` |
 | `offersSignOutOthers` | whether to offer [signing out the other sessions](#signing-out-other-sessions) next to the status, after an enrollment from this page |
 
 Times are ISO 8601 strings in UTC, which the published page formats in the browser's locale.
@@ -52,6 +56,8 @@ protected function sendSecurityPage(Request $request, SecurityPage $page): Respo
         'recoveryCodesLow' => $page->recoveryCodesLow,
         'sudoEndsAt' => $page->sudoEndsAt,
         'status' => $page->status,
+        'sessions' => $page->sessions,
+        'sessionsStatus' => $page->sessionsStatus,
         'offersSignOutOthers' => $page->offersSignOutOthers,
     ]);
 }
@@ -154,6 +160,69 @@ protected function sendRemovalPage(Request $request, CredentialRemovalPage $page
 
 `sendCredentialRemoved()` and `sendCredentialNotFound()` answer the other two outcomes. The published controller sends both to the security page, which shows the flashed status.
 
+## Sessions
+
+On the `database` session driver, the page lists every session signed in to the account. This device comes first, then the others, the most recently active first, up to 50 in all. Each row shows:
+
+- the platform and the browser, read from the user agent of the session's last request;
+- the IP address of that request, or "Unknown IP address" when the session stored none;
+- where that address is, when the [IP location port](security-alerts.md#ip-location) can tell;
+- when the session was last active;
+- whether it is this device.
+
+Keystone lists a session only while it is live. It is signed in as the account, it made a request within `session.lifetime`, and the account's credential epoch hasn't moved since. A session that an epoch move ended, such as [signing out other sessions](#signing-out-other-sessions) or [removing a credential](#removing-a-credential), is hidden even while its row is still in the table.
+
+Only the `database` driver keeps a table Keystone can list sessions from. On the `file`, `cookie`, `redis` and other drivers, `sessions` is empty and `sessionsStatus` says the sessions can't be listed. Keystone still boots, and signing out the other sessions still works. [ADR 0025](adr/0025-sessions-are-listed-only-on-the-database-driver.md) records why.
+
+Each `SessionRow` has these fields:
+
+| Field | Value |
+|---|---|
+| `handle` | the opaque name of the session, which the revoke routes take; never its session id |
+| `platform` | the platform, such as "Windows", or `null` |
+| `browser` | the browser, such as "Firefox", or `null` |
+| `ipAddress` | the IP address of the session's last request, or `null` when it stored none |
+| `location` | where that address is, such as "Amsterdam, Netherlands", or `null` |
+| `lastActiveAt` | when the session was last active |
+| `current` | whether it is the session viewing the page |
+
+The handle is an HMAC of the session id under its own subkey of the app key. It changes whenever the session gets a new id. The session id never reaches the browser, so a page that shows the list can't leak another device's session.
+
+### Revoking one session
+
+Each other session on the list has a Sign out link. It opens a confirm step at `GET /settings/security/sessions/{session}/revoke`, named `security.sessions.revoke`, which shows the session. The user confirms with `DELETE /settings/security/sessions/{session}`, named `security.sessions.revoke.submit`.
+
+Both routes need [sudo](sudo.md#gating-a-route), and count against the same request limits as [signing out other sessions](#signing-out-other-sessions).
+
+Revoking a session deletes its row and the remember-me token it stored, so that browser is signed out on its next request and its remember-me cookie no longer signs it back in. Every other session, this one included, stays signed in, and the credential epoch doesn't move. Keystone records `session.revoked` with the revoked session's IP address and user agent, which [alerts](security-alerts.md) the account's owner with that device's details, and sends the user to the security page with the `session-revoked` status.
+
+The routes refuse three cases:
+
+- This device's own session is refused with "You cannot revoke your current session; sign out instead." through `sendRevocationRefused()`, from the confirm step and the revoke alike. The user ends it by signing out.
+- A handle that names none of the account's live sessions, such as one already revoked or another account's, revokes nothing and records nothing. The user is sent to the security page with the `session-not-found` status.
+- On a driver that can't list sessions, nothing is revoked. The user is sent to the security page with the `sessions-unavailable` status.
+
+`SessionRevocationController::sendRevocationPage()` receives the session's `SessionRow` and renders it:
+
+```php
+protected function sendRevocationPage(Request $request, SessionRow $session): Response
+{
+    Inertia::encryptHistory();
+
+    return Inertia::render('settings/SessionRevocation', [
+        'handle' => $session->handle,
+        'platform' => $session->platform,
+        'browser' => $session->browser,
+        'ipAddress' => $session->ipAddress,
+        'location' => $session->location,
+        'lastActiveAt' => $session->lastActiveAt,
+        'current' => $session->current,
+    ]);
+}
+```
+
+`sendSessionRevoked()`, `sendSessionNotFound()` and `sendSessionsUnavailable()` answer the other outcomes. The published controller sends each to the security page, which shows the flashed status. It sends a refusal there too, with the message on the `session` error, which the page shows in its Sessions section.
+
 ## Signing out other sessions
 
 The page links to a confirm step at `GET /settings/security/sessions/others/revoke`, named `security.sessions.others.revoke`. The user confirms with `DELETE /settings/security/sessions/others`, named `security.sessions.others.revoke.submit`.
@@ -188,3 +257,5 @@ The enrollment AppTests enroll a credential of the first type an account can enr
 The removal AppTests remove a credential, try another account's and try without sudo. They also try to remove the account's only way to sign in, and its last second factor while one is required. They check your responses through `Tests\Keystone\Assertions\CredentialRemovalAssertions`: `assertRemovalPage()` receives the name the confirm step must show, `assertRemovalRefused()` the credential's id and the message, and `assertCredentialRemoved()` and `assertCredentialNotFound()` check the other outcomes.
 
 The sign-out AppTests sign in from a second browser, sign out the other sessions and check that the second browser is signed out. They also run on the `database` session driver and check that only the user's own row is left, and try without sudo. They check your responses through `Tests\Keystone\Assertions\OtherSessionsAssertions`: `assertSignOutOthersPage()` and `assertOtherSessionsRevoked()`, one for each hook.
+
+The revoke AppTests run on the `database` session driver. They sign in from a second browser, revoke its session and check that it is signed out while this one stays signed in. They also try this device's own session, another account's session and a revoke without sudo, and try a revoke on the `file` driver. They check your responses through `Tests\Keystone\Assertions\SessionRevocationAssertions`, which has an assertion named after each hook: `assertRevocationRefused()` receives the message.

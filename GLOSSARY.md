@@ -168,6 +168,9 @@ _Avoid_: downgrade, forced logout
 **Credential epoch**:
 A per-account counter that moves whenever the account's other sessions must end, such as on a password change, credential removal, recovery, suspension or "sign out others". A session or remember-me cookie from an older epoch is dead.
 
+**Session handle**:
+The opaque name a listed session goes by outside Keystone: an HMAC of its session id under its own subkey of the app key. It changes whenever the session gets a new id, and the session id itself never leaves Keystone.
+
 **Account change**:
 One locked write to an account's credentials, addresses or credential epoch. It moves the epoch whenever it removes, replaces or ends something, and records its events only once it commits.
 
