@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
+import CredentialTypeForm from '@/components/CredentialTypeForm.vue';
 import AuthLayout from '@/layouts/AuthLayout.vue';
 import type { RegisterFinishPage } from '@/types/auth';
 
@@ -18,4 +19,6 @@ defineProps<RegisterFinishPage>();
     <p class="text-sm text-gray-600">
         You confirmed <span class="font-medium text-gray-900">{{ address }}</span> is yours.
     </p>
+
+    <CredentialTypeForm v-for="option in types" :key="option.type" :option="option" surface="registration" />
 </template>

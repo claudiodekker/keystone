@@ -4,9 +4,10 @@ import { computed } from 'vue';
 import { submit } from '@/routes/login';
 import { submit as submitChallenge } from '@/routes/login/challenge';
 import { submit as submitEnrollment } from '@/routes/login/enrollment';
+import { submit as submitRegistration } from '@/routes/register/finish';
 import { submit as submitSettings } from '@/routes/security/enroll';
 import { submit as submitSudo } from '@/routes/sudo';
-import type { CredentialTypeOption, Purpose, SignInPage, Surface } from '@/types/auth';
+import type { CredentialTypeOption, Purpose, RegisterFinishPage, SignInPage, Surface } from '@/types/auth';
 
 const props = defineProps<{ option: CredentialTypeOption; surface: Surface; purpose?: Purpose; fields?: string[]; submitLabel?: string }>();
 
@@ -14,9 +15,9 @@ defineSlots<{
     default(props: { errors: Partial<Record<string, string>>; processing: boolean }): unknown;
 }>();
 
-const page = usePage<Partial<SignInPage>>();
+const page = usePage<Partial<SignInPage & RegisterFinishPage>>();
 
-const routes = { 'sign-in': submit, challenge: submitChallenge, enrollment: submitEnrollment };
+const routes = { 'sign-in': submit, challenge: submitChallenge, registration: submitRegistration, enrollment: submitEnrollment };
 
 const purposes = { sudo: submitSudo, settings: submitSettings };
 
@@ -24,11 +25,13 @@ const action = computed(() => (props.purpose ? purposes[props.purpose] : routes[
 
 const namesAccount = computed(() => props.surface === 'sign-in' && props.purpose !== 'sudo');
 
+const namesNewAccount = computed(() => props.surface === 'registration');
+
 const secretFields = ['password', 'current_password', 'password_confirmation', 'code'];
 
 const shownByField = computed(() => (props.fields ?? []).includes(props.option.type));
 
-const labels = { 'sign-in': 'Sign in', challenge: 'Verify', enrollment: 'Set up' };
+const labels = { 'sign-in': 'Sign in', challenge: 'Verify', registration: 'Create account', enrollment: 'Set up' };
 
 const label = computed(() => props.submitLabel ?? (props.purpose === 'sudo' ? 'Confirm' : labels[props.surface]));
 </script>
@@ -47,6 +50,20 @@ const label = computed(() => props.submitLabel ?? (props.purpose === 'sudo' ? 'C
                 class="rounded-md border border-gray-300 px-3 py-2 text-sm"
             />
             <p v-if="errors.identifier" class="text-sm text-red-600">{{ errors.identifier }}</p>
+        </div>
+
+        <div v-if="namesNewAccount" class="flex flex-col gap-2">
+            <label :for="`${option.type}-name`" class="text-sm font-medium text-gray-900">Name</label>
+            <input
+                :id="`${option.type}-name`"
+                name="name"
+                type="text"
+                autocomplete="name"
+                :defaultValue="page.props.name ?? ''"
+                required
+                class="rounded-md border border-gray-300 px-3 py-2 text-sm"
+            />
+            <p v-if="errors.name" class="text-sm text-red-600">{{ errors.name }}</p>
         </div>
 
         <slot :errors="errors" :processing="processing" />

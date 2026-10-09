@@ -12,7 +12,7 @@ use Inertia\Response;
 class RegistrationFinishController extends Controller
 {
     /**
-     * Respond with the page that finishes the registration, kept encrypted in the browser's history.
+     * Respond with the page that finishes the registration, filled with the name a refused attempt flashed back and kept encrypted in the browser's history.
      */
     protected function sendRegistrationFinishPage(Request $request, RegistrationFinishPage $page): Response
     {
@@ -22,6 +22,7 @@ class RegistrationFinishController extends Controller
             'address' => $page->address,
             'types' => $page->types,
             'status' => $page->status,
+            'name' => $request->old('name'),
         ]);
     }
 
