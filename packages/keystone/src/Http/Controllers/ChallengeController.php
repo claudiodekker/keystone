@@ -9,7 +9,6 @@ use ClaudioDekker\Keystone\Exceptions\LastRecoveryCode;
 use ClaudioDekker\Keystone\Http\Concerns\RefusesSignedInUsers;
 use ClaudioDekker\Keystone\Http\PageValues\ChallengePage;
 use ClaudioDekker\Keystone\Keystone;
-use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\PendingSignIn;
@@ -164,10 +163,7 @@ abstract class ChallengeController extends Controller
             return $this->refuseWithoutChallenge();
         }
 
-        $types = array_map(fn (CredentialType $type) => [
-            'type' => $type->name(),
-            'shape' => $type->surfaces()[Surface::CHALLENGE->value]->value,
-        ], $offer);
+        $types = $this->typeOptions($offer, Surface::CHALLENGE);
 
         $page = new ChallengePage(
             types: $types,

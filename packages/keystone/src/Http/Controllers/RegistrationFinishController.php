@@ -5,7 +5,6 @@ namespace ClaudioDekker\Keystone\Http\Controllers;
 use ClaudioDekker\Keystone\Http\Concerns\RefusesSignedInUsers;
 use ClaudioDekker\Keystone\Http\PageValues\RegistrationFinishPage;
 use ClaudioDekker\Keystone\Keystone;
-use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Status;
@@ -48,14 +47,9 @@ abstract class RegistrationFinishController extends Controller
             return $this->refuseWithoutRegistration();
         }
 
-        $types = array_map(fn (CredentialType $type) => [
-            'type' => $type->name(),
-            'shape' => $type->surfaces()[Surface::REGISTRATION->value]->value,
-        ], app(CredentialTypes::class)->serving(Surface::REGISTRATION));
-
         return $this->sendRegistrationFinishPage($request, new RegistrationFinishPage(
             address: $registration->address,
-            types: $types,
+            types: $this->typeOptions($this->types()->serving(Surface::REGISTRATION), Surface::REGISTRATION),
             status: Status::flashed($request)?->label(),
         ));
     }
@@ -71,5 +65,13 @@ abstract class RegistrationFinishController extends Controller
     protected function refuseWithoutRegistration(): RedirectResponse
     {
         return redirect()->route('register');
+    }
+
+    /**
+     * Get the registered credential types.
+     */
+    protected function types(): CredentialTypes
+    {
+        return app(CredentialTypes::class);
     }
 }

@@ -56,10 +56,7 @@ abstract class EnrollmentController extends Controller
             return $pending;
         }
 
-        $types = array_map(fn (CredentialType $type) => [
-            'type' => $type->name(),
-            'shape' => $type->surfaces()[Surface::ENROLLMENT->value]->value,
-        ], $this->offer());
+        $types = $this->typeOptions($this->offer(), Surface::ENROLLMENT);
 
         $page = new EnrollmentPage(
             types: $types,
