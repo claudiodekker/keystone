@@ -70,7 +70,7 @@ function whilePasswordIsChecked(Closure $change): void
     $armed = true;
 
     DB::listen(function (QueryExecuted $query) use (&$armed, $change) {
-        if (! $armed || ! str_starts_with($query->sql, 'select') || ! str_contains($query->sql, '"type" = ?') || ! in_array('password', $query->bindings, true)) {
+        if (! $armed || ! str_starts_with($query->sql, 'select') || ! str_contains($query->sql, DB::getQueryGrammar()->wrap('type').' = ?') || ! in_array('password', $query->bindings, true)) {
             return;
         }
 

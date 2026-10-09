@@ -693,7 +693,7 @@ describe('the same replacing answer sent twice at once', function () {
         $ceremony = $this->enrollmentCeremony('single');
         $armed = true;
         DB::listen(function (QueryExecuted $query) use (&$armed, $account, $held, $ceremony) {
-            if (! $armed || ! str_starts_with($query->sql, 'select') || ! str_contains($query->sql, '"type" = ?') || ! in_array('single', $query->bindings, true)) {
+            if (! $armed || ! str_starts_with($query->sql, 'select') || ! str_contains($query->sql, DB::getQueryGrammar()->wrap('type').' = ?') || ! in_array('single', $query->bindings, true)) {
                 return;
             }
 
