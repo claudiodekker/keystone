@@ -2,6 +2,7 @@
 
 namespace ClaudioDekker\Keystone;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder;
@@ -52,7 +53,12 @@ class AccountSessions
             ->orderByDesc('last_activity')
             ->limit(self::LISTED - 1)
             ->get(['id', 'ip_address', 'user_agent', 'last_activity'])
-            ->map(fn (stdClass $row) => $this->listed($row))
+            ->map(fn (stdClass $row) => $this->listed(new StoredSession(
+                id: (string) $row->id,
+                ipAddress: is_null($row->ip_address) ? null : (string) $row->ip_address,
+                userAgent: is_null($row->user_agent) ? null : (string) $row->user_agent,
+                lastActiveAt: CarbonImmutable::createFromTimestamp((int) $row->last_activity),
+            )))
             ->filter()
             ->values()
             ->all();
@@ -127,11 +133,11 @@ class AccountSessions
     }
 
     /**
-     * Get the other session the row stores, or null when it is not signed in as the account on the account's credential epoch.
+     * Get the other stored session as listed, or null when it is not signed in as the account on the account's credential epoch.
      */
-    protected function listed(stdClass $row): ?ListedSession
+    protected function listed(StoredSession $session): ?ListedSession
     {
-        $stored = $this->read($row->id);
+        $stored = $this->read($session->id);
         $signedInAs = $stored->get($this->loginKey);
 
         if (is_null($signedInAs) || (string) $signedInAs !== (string) $this->account->getAuthIdentifier()) {
@@ -145,10 +151,10 @@ class AccountSessions
         $rememberTokenId = $stored->get($this->rememberKey);
 
         return new ListedSession(
-            handle: $this->handleOf($row->id),
-            ipAddress: $row->ip_address,
-            userAgent: $row->user_agent,
-            lastActiveAt: Date::createFromTimestamp($row->last_activity),
+            handle: $this->handleOf($session->id),
+            ipAddress: $session->ipAddress,
+            userAgent: $session->userAgent,
+            lastActiveAt: $session->lastActiveAt,
             current: false,
             rememberTokenId: is_int($rememberTokenId) ? $rememberTokenId : null,
         );
