@@ -42,4 +42,9 @@ class RegistrationFinishController extends Controller
     {
         return to_route('login')->withErrors(['identifier' => $message]);
     }
+
+    protected function sendRegistrationCancelled(Request $request): RedirectResponse
+    {
+        return to_route('register');
+    }
 }

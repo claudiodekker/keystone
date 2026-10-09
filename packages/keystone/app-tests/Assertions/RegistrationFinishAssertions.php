@@ -33,6 +33,28 @@ trait RegistrationFinishAssertions
     }
 
     /**
+     * Assert the response sends a finish whose session holds no proven address back to register, saying the registration expired.
+     *
+     * @param  TestResponse<Response>  $response
+     */
+    public function assertRegistrationExpired(TestResponse $response): void
+    {
+        $response->assertRedirectToRoute('register')
+            ->assertSessionHas(Status::SESSION_KEY, Status::REGISTRATION_EXPIRED->value);
+    }
+
+    /**
+     * Assert the response refuses an account created barred from signing in as a refused sign-in, on the sign-in page.
+     *
+     * @param  TestResponse<Response>  $response
+     */
+    public function assertRegistrationBarred(TestResponse $response): void
+    {
+        $response->assertRedirectToRoute('login')
+            ->assertSessionHasErrors([SignInController::IDENTIFIER => __('keystone::messages.failed')]);
+    }
+
+    /**
      * Assert the response sends the new, signed-in account on to the intended URL.
      *
      * @param  TestResponse<Response>  $response
@@ -75,6 +97,17 @@ trait RegistrationFinishAssertions
     }
 
     /**
+     * Assert the response confirms the cancelled registration on the register page.
+     *
+     * @param  TestResponse<Response>  $response
+     */
+    public function assertRegistrationCancelled(TestResponse $response): void
+    {
+        $response->assertRedirectToRoute('register')
+            ->assertSessionHas(Status::SESSION_KEY, Status::REGISTRATION_CANCELLED->value);
+    }
+
+    /**
      * Assert the response sends the user to sign in, saying the address is already registered.
      *
      * @param  TestResponse<Response>  $response
@@ -83,16 +116,5 @@ trait RegistrationFinishAssertions
     {
         $response->assertRedirectToRoute('login')
             ->assertSessionHas(Status::SESSION_KEY, Status::ADDRESS_ALREADY_REGISTERED->value);
-    }
-
-    /**
-     * Assert the response refuses an account created barred from signing in as a refused sign-in, on the sign-in page.
-     *
-     * @param  TestResponse<Response>  $response
-     */
-    public function assertRegistrationBarred(TestResponse $response): void
-    {
-        $response->assertRedirectToRoute('login')
-            ->assertSessionHasErrors([SignInController::IDENTIFIER => __('keystone::messages.failed')]);
     }
 }

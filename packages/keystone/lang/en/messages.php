@@ -27,7 +27,7 @@ return [
         'sign-in-cancelled' => 'Sign-in cancelled. You were not logged in.',
         'enrollment-cancelled' => 'Two-factor setup cancelled. You were not logged in.',
         'enrollment-expired' => 'Your enrollment session expired. Please start again.',
-        'enrollment-owed' => 'Please sign in again to finish setting up two-factor authentication.',
+        'enrollment-owed' => 'Please sign in again to finish setting up your account.',
         'sudo-revoked' => 'Sudo has ended. You will be asked to prove your identity again before your next sensitive change.',
         'credential-removed' => 'The credential was removed. Your other sessions were signed out.',
         'credential-replaced' => 'The credential was replaced. Your other sessions were signed out.',
@@ -41,5 +41,8 @@ return [
         'sessions-unavailable' => 'Your sessions cannot be listed in this app.',
         'registration-unavailable' => 'Registration is not available.',
         'address-already-registered' => 'That email address is already registered. Please sign in instead.',
+        'registration-cancelled' => 'Registration cancelled. No account was created.',
+        'registration-expired' => 'Your registration expired. Ask for a new link.',
+        'registration-enrollment-cancelled' => 'Your account was created. Sign in to finish setting it up.',
     ],
 ];

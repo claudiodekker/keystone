@@ -53,6 +53,7 @@ Route::prefix('auth')->group(function () {
         Route::prefix('finish')->group(function () {
             Route::get('/', [RegistrationFinishController::class, 'show'])->name('register.finish');
             Route::post('{type}', [RegistrationFinishController::class, 'store'])->name('register.finish.submit');
+            Route::delete('/', [RegistrationFinishController::class, 'destroy'])->name('register.finish.cancel');
         });
     });
 

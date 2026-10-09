@@ -4,6 +4,7 @@ use ClaudioDekker\Keystone\Actions\CreateAccount;
 use ClaudioDekker\Keystone\AppTests\AppTestCase;
 use ClaudioDekker\Keystone\Credentials;
 use ClaudioDekker\Keystone\Keystone;
+use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Notifications\SecurityAlert;
 use ClaudioDekker\Keystone\Notifications\Welcome;
 use ClaudioDekker\Keystone\Password\AppTests\Support\PasswordTypeSupport;
@@ -340,6 +341,134 @@ describe('refusing', function () {
         }
 
         $this->finishRegistration(new PasswordTypeSupport)->assertTooManyRequests();
+    });
+});
+
+describe('a registration that is no longer live', function () {
+    it('tells the register page the registration expired when the finish is posted', function (Closure $arrange) {
+        $arrange->call($this);
+
+        $response = $this->finishRegistration(new PasswordTypeSupport);
+
+        $response->assertRedirectToRoute('register')->assertSessionHas(Status::SESSION_KEY, Status::REGISTRATION_EXPIRED->value);
+        $this->assertDatabaseCount('users', 0);
+    })->with([
+        'never registering' => [fn () => null],
+        'past the window' => [function () {
+            $this->registerAddress();
+            $this->travel(Registering::WINDOW_SECONDS)->seconds();
+        }],
+        'past the window while the password is checked' => [function () {
+            $this->registerAddress();
+            $this->travel(Registering::WINDOW_SECONDS - 1)->seconds();
+            $hasher = Hash::getFacadeRoot();
+            Hash::shouldReceive('make')->andReturnUsing(function (string $password) use ($hasher) {
+                $this->travel(1)->second();
+
+                return $hasher->make($password);
+            });
+        }],
+    ]);
+
+    it('sends the finish page back to register without a word', function (Closure $arrange) {
+        $arrange->call($this);
+
+        $response = $this->get(route('register.finish'));
+
+        $response->assertRedirectToRoute('register')->assertSessionMissing(Status::SESSION_KEY);
+    })->with([
+        'never registering' => [fn () => null],
+        'past the window' => [function () {
+            $this->registerAddress();
+            $this->travel(Registering::WINDOW_SECONDS)->seconds();
+        }],
+    ]);
+
+    it('says the registration expired', function () {
+        expect(Status::REGISTRATION_EXPIRED->label())->toBe('Your registration expired. Ask for a new link.');
+    });
+
+    it('cancels without saying it expired', function () {
+        $this->delete(route('register.finish.cancel'))->assertSessionHas(Status::SESSION_KEY, Status::REGISTRATION_CANCELLED->value);
+    });
+});
+
+describe('cancelling', function () {
+    it('ends the registration before the account exists, dropping every ceremony slot and creating nothing', function () {
+        $this->registerAddress();
+        Keystone::guard()->slots()->put('password', 'registration', 'bytes', capSeconds: 300);
+
+        $response = $this->delete(route('register.finish.cancel'));
+
+        $response->assertRedirectToRoute('register')->assertSessionHas(Status::SESSION_KEY, Status::REGISTRATION_CANCELLED->value);
+        expect(Keystone::guard()->registration())->toBeNull()
+            ->and(Keystone::guard()->slots()->get('password', 'registration'))->toBeNull();
+        $this->assertDatabaseCount('users', 0);
+        $this->finishRegistration(new PasswordTypeSupport)->assertRedirectToRoute('register');
+    });
+
+    it('says the registration was cancelled', function () {
+        expect(Status::REGISTRATION_CANCELLED->label())->toBe('Registration cancelled. No account was created.');
+    });
+
+    it('answers the same for a session that registers nothing', function () {
+        $response = $this->delete(route('register.finish.cancel'));
+
+        $response->assertRedirectToRoute('register')->assertSessionHas(Status::SESSION_KEY, Status::REGISTRATION_CANCELLED->value);
+    });
+
+    it('sends a signed-in user away', function () {
+        $this->signInAccount(new FormTypeSupport, 'jane@example.com');
+
+        $this->delete(route('register.finish.cancel'))->assertRedirect('/');
+
+        expect(Keystone::guard()->check())->toBeTrue();
+    });
+
+    it('leaves the ceremony of an enrollment a new account owes alone when nothing is being registered', function () {
+        $this->withMandates();
+        $this->registerAddress();
+        $this->finishRegistration(new PasswordTypeSupport);
+        $this->get(route('login.enrollment.start', ['type' => 'code']));
+        $ceremony = $this->enrollmentCeremony('code');
+
+        $response = $this->delete(route('register.finish.cancel'));
+
+        $response->assertRedirectToRoute('register')->assertSessionHas(Status::SESSION_KEY, Status::REGISTRATION_CANCELLED->value);
+        expect($ceremony)->not->toBeNull()
+            ->and($this->enrollmentCeremony('code'))->toBe($ceremony)
+            ->and(Keystone::guard()->pending()?->origin)->toBe(PendingOrigin::REGISTRATION);
+    });
+
+    it('takes the change limit', function () {
+        foreach (range(1, config()->integer('keystone.rate_limits.requests_per_minute.change')) as $ignored) {
+            $this->delete(route('register.finish.cancel'))->assertRedirectToRoute('register');
+        }
+
+        $this->delete(route('register.finish.cancel'))->assertTooManyRequests();
+    });
+
+    it('signs out at the enrollment a new account owes, keeping the account, which owes it again at its next sign-in', function () {
+        $this->withMandates();
+        $this->registerAddress();
+        $this->finishRegistration(new PasswordTypeSupport);
+
+        $response = $this->delete(route('login.enrollment.cancel'));
+
+        $response->assertRedirectToRoute('login')->assertSessionHas(Status::SESSION_KEY, Status::REGISTRATION_ENROLLMENT_CANCELLED->value);
+        expect(Keystone::guard()->check())->toBeFalse()
+            ->and(Keystone::guard()->pending())->toBeNull();
+        $this->assertDatabaseCount('users', 1);
+        $this->submitSignIn(new PasswordTypeSupport, 'new@example.com', (new PasswordTypeSupport)->validProof(Surface::SIGN_IN))->assertRedirectToRoute('login.enrollment');
+        expect(Keystone::guard()->pending()?->origin)->toBe(PendingOrigin::LOGIN);
+    });
+
+    it('says the account was kept when its owed enrollment is cancelled', function () {
+        expect(Status::REGISTRATION_ENROLLMENT_CANCELLED->label())->toBe('Your account was created. Sign in to finish setting it up.');
+    });
+
+    it('asks to sign in again to finish setting up the account, whatever it owes', function () {
+        expect(Status::ENROLLMENT_OWED->label())->toBe('Please sign in again to finish setting up your account.');
     });
 });
 

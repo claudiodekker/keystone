@@ -3,6 +3,8 @@
 use ClaudioDekker\Keystone\Actions\CreateAccount;
 use ClaudioDekker\Keystone\Addresses;
 use ClaudioDekker\Keystone\AppTests\AppTestCase;
+use ClaudioDekker\Keystone\AppTests\Assertions\EnrollmentAssertions;
+use ClaudioDekker\Keystone\AppTests\Assertions\RecoveryCodesAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\RegistrationAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\RegistrationFinishAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\RegistrationLinkAssertions;
@@ -20,6 +22,8 @@ use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Support\Facades\Notification;
 
 pest()->extend(AppTestCase::class)->use(
+    AppTestCase::assertions(EnrollmentAssertions::class),
+    AppTestCase::assertions(RecoveryCodesAssertions::class),
     AppTestCase::assertions(RegistrationAssertions::class),
     AppTestCase::assertions(RegistrationLinkAssertions::class),
     AppTestCase::assertions(RegistrationFinishAssertions::class),
@@ -216,25 +220,7 @@ it('creates nothing once the registration\'s window has ended', function () {
     $this->registerAddress();
     $this->travel(Registering::WINDOW_SECONDS)->seconds();
 
-    $this->assertSentBackToRegister($this->finishRegistration($support));
-    $this->assertDatabaseMissing('user_emails', ['address' => 'new@example.com']);
-});
-
-it('refuses to finish while registration is closed, creating nothing', function () {
-    $support = $this->supportsFor(Surface::REGISTRATION)[0];
-    $this->registerAddress();
-    config(['keystone.methods' => []]);
-
-    $this->assertRegistrationUnavailable($this->finishRegistration($support));
-    $this->assertDatabaseMissing('user_emails', ['address' => 'new@example.com']);
-});
-
-it('sends a signed-in user away from the finish, creating nothing', function () {
-    $support = $this->supportsFor(Surface::REGISTRATION)[0];
-    $this->registerAddress();
-    $this->signInAccount($this->supportsFor(Surface::SIGN_IN)[0], 'jane@example.com');
-
-    $this->assertSentAwayFromRegistration($this->finishRegistration($support));
+    $this->assertRegistrationExpired($this->finishRegistration($support));
     $this->assertDatabaseMissing('user_emails', ['address' => 'new@example.com']);
 });
 
@@ -252,4 +238,46 @@ it('refuses an account the app\'s CreateAccount created barred as a refused sign
     $this->assertRegistrationBarred($this->finishRegistration($support));
     expect(Keystone::guard()->check())->toBeFalse()
         ->and(Keystone::guard()->registration())->toBeNull();
+});
+
+it('refuses to finish while registration is closed, creating nothing', function () {
+    $support = $this->supportsFor(Surface::REGISTRATION)[0];
+    $this->registerAddress();
+    config(['keystone.methods' => []]);
+
+    $this->assertRegistrationUnavailable($this->finishRegistration($support));
+    $this->assertDatabaseMissing('user_emails', ['address' => 'new@example.com']);
+});
+
+it('cancels a registration before the account exists, creating nothing', function () {
+    $support = $this->supportsFor(Surface::REGISTRATION)[0];
+    $this->registerAddress();
+
+    $this->assertRegistrationCancelled($this->delete(route('register.finish.cancel')));
+
+    expect(Keystone::guard()->registration())->toBeNull();
+    $this->assertSentBackToRegister($this->finishRegistration($support));
+    $this->assertDatabaseMissing('user_emails', ['address' => 'new@example.com']);
+});
+
+it('signs out at the enrollment a new account owes, keeping the account', function () {
+    $this->withMandates();
+    $support = $this->supportsFor(Surface::REGISTRATION)[0];
+    $this->registerAddress();
+    $this->finishRegistration($support);
+
+    $this->assertRegistrationEnrollmentCancelled($this->delete(route('login.enrollment.cancel')));
+
+    expect(Keystone::guard()->check())->toBeFalse()
+        ->and(Keystone::guard()->pending())->toBeNull();
+    $this->assertDatabaseHas('user_emails', ['address' => 'new@example.com']);
+});
+
+it('sends a signed-in user away from the finish, creating nothing', function () {
+    $support = $this->supportsFor(Surface::REGISTRATION)[0];
+    $this->registerAddress();
+    $this->signInAccount($this->supportsFor(Surface::SIGN_IN)[0], 'jane@example.com');
+
+    $this->assertSentAwayFromRegistration($this->finishRegistration($support));
+    $this->assertDatabaseMissing('user_emails', ['address' => 'new@example.com']);
 });

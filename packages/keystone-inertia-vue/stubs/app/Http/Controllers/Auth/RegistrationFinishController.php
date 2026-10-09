@@ -65,4 +65,12 @@ class RegistrationFinishController extends Controller
     {
         return to_route('login')->withErrors([SignInController::IDENTIFIER => $message]);
     }
+
+    /**
+     * Respond to a cancelled registration on the register page.
+     */
+    protected function sendRegistrationCancelled(Request $request): RedirectResponse
+    {
+        return to_route('register');
+    }
 }

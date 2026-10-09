@@ -36,6 +36,7 @@ abstract class RegistrationFinishController extends Controller
         return [
             static::throttle(StepKind::VIEW, 'show'),
             static::throttle(StepKind::SUBMIT, 'store'),
+            static::throttle(StepKind::CHANGE, 'destroy'),
             static::openRegistration(),
         ];
     }
@@ -72,7 +73,7 @@ abstract class RegistrationFinishController extends Controller
         }
 
         if (Keystone::guard()->registration() === null) {
-            return $this->refuseWithoutRegistration();
+            return $this->refuseExpiredRegistration($request);
         }
 
         $credentialType = $this->types()->find($type, Surface::REGISTRATION);
@@ -109,8 +110,26 @@ abstract class RegistrationFinishController extends Controller
             RegistrationResult::REFUSED => $this->refuseCredential($request, $profileFields, $credentialType->name()),
             RegistrationResult::ADDRESS_TAKEN => $this->refuseTakenAddress($request),
             RegistrationResult::BARRED => $this->sendRegistrationBarred($request, __('keystone::messages.failed')),
-            RegistrationResult::EXPIRED => $this->refuseWithoutRegistration(),
+            RegistrationResult::EXPIRED => $this->refuseExpiredRegistration($request),
         };
+    }
+
+    /**
+     * Cancel the registration before the account exists, forgetting the proven address and closing every ceremony slot.
+     */
+    public function destroy(Request $request): Response|Responsable
+    {
+        if (Keystone::guard()->check()) {
+            return $this->refuseSignedIn();
+        }
+
+        if (Keystone::guard()->registration() !== null) {
+            Keystone::guard()->endRegistration();
+        }
+
+        Status::REGISTRATION_CANCELLED->flash($request);
+
+        return $this->sendRegistrationCancelled($request);
     }
 
     /**
@@ -144,11 +163,26 @@ abstract class RegistrationFinishController extends Controller
     abstract protected function sendRegistrationBarred(Request $request, string $message): Response|Responsable;
 
     /**
+     * Respond to a cancelled registration.
+     */
+    abstract protected function sendRegistrationCancelled(Request $request): Response|Responsable;
+
+    /**
      * Send a session that proved no address, or whose window ended, back to register.
      */
     protected function refuseWithoutRegistration(): RedirectResponse
     {
         return redirect()->route('register');
+    }
+
+    /**
+     * Send a finish whose session proved no address, or whose window ended, back to register, saying the registration expired.
+     */
+    protected function refuseExpiredRegistration(Request $request): RedirectResponse
+    {
+        Status::REGISTRATION_EXPIRED->flash($request);
+
+        return $this->refuseWithoutRegistration();
     }
 
     /**

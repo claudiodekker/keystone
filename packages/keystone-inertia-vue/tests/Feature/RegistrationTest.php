@@ -1,6 +1,7 @@
 <?php
 
 use ClaudioDekker\Keystone\Actions\CreateAccount;
+use ClaudioDekker\Keystone\InertiaVue\AppTests\Assertions\EnrollmentAssertions;
 use ClaudioDekker\Keystone\InertiaVue\AppTests\Assertions\RegistrationAssertions;
 use ClaudioDekker\Keystone\InertiaVue\AppTests\Assertions\RegistrationFinishAssertions;
 use ClaudioDekker\Keystone\InertiaVue\AppTests\Assertions\RegistrationLinkAssertions;
@@ -8,13 +9,14 @@ use ClaudioDekker\Keystone\InertiaVue\AppTests\Assertions\SignInAssertions;
 use ClaudioDekker\Keystone\InertiaVue\Tests\StubsTestCase;
 use ClaudioDekker\Keystone\Password\AppTests\Support\PasswordTypeSupport;
 use ClaudioDekker\Keystone\Status;
+use ClaudioDekker\Keystone\Totp\AppTests\Support\TotpTypeSupport;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Uri;
 use Inertia\Testing\AssertableInertia;
 
-pest()->extend(StubsTestCase::class)->use(RegistrationAssertions::class, RegistrationLinkAssertions::class, RegistrationFinishAssertions::class, SignInAssertions::class);
+pest()->extend(StubsTestCase::class)->use(EnrollmentAssertions::class, RegistrationAssertions::class, RegistrationLinkAssertions::class, RegistrationFinishAssertions::class, SignInAssertions::class);
 
 beforeEach(function () {
     config(['keystone.methods' => ['password', 'totp']]);
@@ -121,6 +123,33 @@ it('shows the enrollment a new account owes with origin registration', function 
     $response->assertInertia(fn (AssertableInertia $page) => $page->component('auth/Enrollment')->where('origin', 'registration'));
 });
 
+it('tells the enrollment form and the recovery-codes page that a registration owes them, so their cancel signs out', function () {
+    $this->withMandates();
+    $this->registerAddress();
+    $this->finishRegistration(new PasswordTypeSupport);
+
+    $form = $this->get(route('login.enrollment.start', ['type' => 'totp']));
+    $this->enrollSecondFactor(new TotpTypeSupport);
+    $codes = $this->get(route('login.recovery-codes'));
+
+    $form->assertInertia(fn (AssertableInertia $page) => $page->component('auth/EnrollmentForm')->where('origin', 'registration'));
+    $codes->assertInertia(fn (AssertableInertia $page) => $page->component('auth/RecoveryCodes')->where('origin', 'registration'));
+});
+
+it('tells them a sign-in owes them otherwise', function () {
+    $this->withMandates();
+    config(['keystone.methods' => ['form', 'totp']]);
+    $this->createFirstFactorAccount();
+    $this->passFirstFactor();
+
+    $form = $this->get(route('login.enrollment.start', ['type' => 'totp']));
+    $this->enrollSecondFactor(new TotpTypeSupport);
+    $codes = $this->get(route('login.recovery-codes'));
+
+    $form->assertInertia(fn (AssertableInertia $page) => $page->component('auth/EnrollmentForm')->where('origin', 'login'));
+    $codes->assertInertia(fn (AssertableInertia $page) => $page->component('auth/RecoveryCodes')->where('origin', 'login'));
+});
+
 it('refuses an account created barred on the sign-in page, as a refused sign-in', function () {
     $this->withoutMandates();
     $this->app->bind(CreateAccount::class, fn () => new class extends CreateAccount
@@ -151,6 +180,32 @@ it('refuses a credential the type couldn\'t make with the message on its field',
     Hash::shouldReceive('make')->andThrow(new RuntimeException('Hasher down.'));
 
     $this->assertRegistrationRefused($this->finishRegistration(new PasswordTypeSupport), 'password');
+});
+
+it('says on the register page that a registration expired when its finish found none live', function () {
+    $this->assertRegistrationExpired($this->finishRegistration(new PasswordTypeSupport));
+
+    $this->get(route('register'))->assertInertia(fn (AssertableInertia $page) => $page->component('auth/Register')->where('status', Status::REGISTRATION_EXPIRED->label()));
+});
+
+it('says on the register page that a cancelled registration created nothing', function () {
+    $this->registerAddress();
+
+    $response = $this->delete(route('register.finish.cancel'));
+
+    $this->assertRegistrationCancelled($response);
+    $this->get(route('register'))->assertInertia(fn (AssertableInertia $page) => $page->component('auth/Register')->where('status', Status::REGISTRATION_CANCELLED->label()));
+});
+
+it('says on the sign-in page that cancelling a new account\'s owed enrollment kept the account', function () {
+    $this->withMandates();
+    $this->registerAddress();
+    $this->finishRegistration(new PasswordTypeSupport);
+
+    $response = $this->delete(route('login.enrollment.cancel'));
+
+    $this->assertRegistrationEnrollmentCancelled($response);
+    $this->assertSignInPage($this->get(route('login')), Status::REGISTRATION_ENROLLMENT_CANCELLED->label());
 });
 
 it('sends a link that no longer works on to the link-expired page', function () {

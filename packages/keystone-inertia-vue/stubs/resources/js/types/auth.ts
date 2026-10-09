@@ -58,10 +58,12 @@ export type EnrollmentFormPage = {
     ceremony: Record<string, string>;
     status: string | null;
     held: RemovableCredential[];
+    origin?: string | null;
 };
 
 export type RecoveryCodesPage = {
     codes: string[];
+    origin: string;
 };
 
 export type RegenerateRecoveryCodesPage = {

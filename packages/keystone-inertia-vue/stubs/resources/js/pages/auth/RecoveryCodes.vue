@@ -45,6 +45,6 @@ defineProps<RecoveryCodesPage>();
     </Form>
 
     <Form v-bind="cancel.form()">
-        <button type="submit" class="text-sm text-gray-600 underline">Cancel sign-in</button>
+        <button type="submit" class="text-sm text-gray-600 underline">{{ origin === 'registration' ? 'Sign out' : 'Cancel sign-in' }}</button>
     </Form>
 </template>
