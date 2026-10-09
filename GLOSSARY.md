@@ -120,6 +120,10 @@ The headers core puts on every response from a Keystone route, over any value th
 **Keystone route**:
 A route whose controller is one of core's controllers or the application's subclass of one. Core hardens its responses and refuses cross-site changes to it.
 
+**Emailed link**:
+A single-use link Keystone mails to prove its reader holds an inbox, built on `app.url` and working for 10 minutes. Opening it shows a page with one button and changes nothing; only that button's POST spends it.
+_Avoid_: magic link (for the kind in general), signed URL
+
 **Security event**:
 A record that something security-relevant happened, of one type from a closed list.
 
@@ -138,6 +142,10 @@ _Avoid_: alert switch
 
 **Signed in**:
 A session that has proven who it is and owes nothing more. A session that comes to owe something stops being signed in.
+
+**Registering**:
+A guest session holding the address a spent registration link proved, for 30 minutes, until the account is created or the registration ends. Every auth-level change ends it.
+_Avoid_: pending registration, claimed address
 
 **Pending sign-in**:
 A session that has named an account but still owes a challenge, an enrollment or a recovery before it is signed in. At most one per session.

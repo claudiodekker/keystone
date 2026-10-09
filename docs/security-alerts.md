@@ -2,7 +2,7 @@
 
 Keystone mails an account's owner when something happens to their account that they should know about, such as an operator ending every session of it. Each alert is about one [security event](security-events.md), or about an account's [abandoned challenges](#abandoned-challenges) together, sent by the recorder that records it, so nothing in your app needs to be wired up.
 
-Alerts are queued. Run a queue worker, or they are never sent: `queue.default` set to `sync` sends them inside the request, and production refuses to boot on the `null` queue (see [Configuration](configuration.md#boot-checks)).
+Alerts are queued. Run a queue worker, or they are never sent: `queue.default` set to `sync` sends them inside the request, and production refuses to boot on the `null` queue (see [Configuration](configuration.md#boot-checks)). Sending inside the request also makes it slower when it alerts, which can tell anyone watching the response time that an alert went out, such as when [registration](registration.md#asking-for-a-link) is asked for an address that already has an account.
 
 ## Types that alert
 
@@ -10,6 +10,7 @@ Alerts are queued. Run a queue worker, or they are never sent: `queue.default` s
 |---|---|
 | `account.suspended` | an operator suspended the account (see [Operator commands](operator-commands.md#suspending-accounts)) |
 | `account.unsuspended` | an operator lifted the account's suspension |
+| `address.claim_attempted` | someone tried to [register](registration.md#asking-for-a-link) with an address the account holds, or spent a registration link for it; the mail says the account wasn't changed, and names no address |
 | `challenge.abandoned` | a sign-in from a browser that isn't one of the account's [known devices](#new-devices) passed its first factor and hasn't passed the [challenge](challenge.md) 7 minutes later (see [Abandoned challenges](#abandoned-challenges)) |
 | `credential.added` | a credential was added to the account, at [enrollment](enrollment.md) or from the [security settings](security-settings.md#adding-a-credential) |
 | `credential.replaced` | a credential set up from the [security settings](security-settings.md#adding-a-credential) replaced the one of its type the account held, such as a changed [password](security-settings.md#passwords) or a new TOTP key |

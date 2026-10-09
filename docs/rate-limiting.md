@@ -1,6 +1,6 @@
 # Rate limiting
 
-Keystone rate limits its own endpoints. Nothing in your routes, middleware or controllers needs to be wired up, and a spent limit always refuses the same way: a `429 Too Many Requests` response with a `Retry-After` header, reading "Too many attempts. Please try again in :seconds seconds." Laravel never reports the refusal, so spending a limit adds nothing to your logs or error tracker.
+Keystone rate limits its own endpoints. Nothing in your routes, middleware or controllers needs to be wired up, and a spent limit refuses the same way: a `429 Too Many Requests` response with a `Retry-After` header, reading "Too many attempts. Please try again in :seconds seconds." The one exception is a spent [delivery limit](#the-delivery-limit) before anyone signed in, which answers as if the mail went out. Laravel never reports the refusal, so spending a limit adds nothing to your logs or error tracker.
 
 ## Limits
 
@@ -9,6 +9,7 @@ Keystone rate limits its own endpoints. Nothing in your routes, middleware or co
 | Request limit | IP address, and separately the account the session names (signed in, or held at the challenge or enrollment), per kind of step | 60 page views, 10 submissions or sign-outs a minute |
 | Failed-attempt limit | account and credential type in each flow, from any IP address; each of the account's known devices counts apart from every other browser | 20 wrong answers an hour |
 | Shared TOTP limit | account, for TOTP codes in the challenge and the [sudo replay](sudo.md#the-replay) together; each known device counts apart | 20 wrong codes an hour, and at most 100 in 24 hours |
+| Delivery limit | address or account a mail goes to, per kind of mail and flow; each of the account's known devices counts apart | 3 mails in 10 minutes |
 
 Change the allowances in `keystone.rate_limits` (see [Configuration](configuration.md)). Each must be a whole number of at least 1: no value turns a limit off. Keystone's AppTests read the same allowances, so they check the limits you set.
 
@@ -19,6 +20,12 @@ The request limit is checked before anything else, so even invalid input or an u
 A successful sign-in doesn't count, but nothing ever resets a count: counts only expire at the end of their window.
 
 The first refusal in each window records a `limit.tripped` [security event](security-events.md), about the account when one is named, and dispatches Laravel's `Illuminate\Auth\Events\Lockout` with the request, as Fortify does. Listen for either to react to lockouts. Unlike Fortify, `Lockout` fires once per window, not on every throttled request. A failed-attempt trip also [alerts the account's owner](security-alerts.md), once per count and window; a request-limit trip never alerts.
+
+## The delivery limit
+
+The delivery limit keeps Keystone from flooding an inbox. It counts the mails one kind of step sends, such as a [registration](registration.md#the-delivery-limit) link, before any is sent. A step that runs before anyone has proven who they are, such as asking for a registration link, counts the typed address, hashed, whether or not an account holds it, so a made-up address is limited exactly like a real one. Once its allowance is spent, such a step sends nothing and answers exactly as it does when it sends, not with a `429`, so the refusal can't tell anyone whether the address has an account. The first refusal in each window records `limit.tripped` with the reason `keystone.delivery_limit`.
+
+The count is taken whatever the step sends: a registration for a taken address alerts the account's owner rather than mailing a link, and counts all the same. While the store is down, every step under the delivery limit sends nothing.
 
 ## Locking an account's owner out
 
