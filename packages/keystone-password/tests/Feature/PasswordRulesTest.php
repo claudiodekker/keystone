@@ -109,3 +109,55 @@ describe('the minimum length', function () {
         assertReachedVerification($response);
     });
 });
+
+describe('context words', function () {
+    it('refuses a password containing a context word, whatever its case', function (string $password) {
+        config(['app.name' => 'Acme Payroll', 'app.url' => 'https://portal.example.test', 'keystone-password.context_words' => ['Keystone']]);
+        $account = signInRequiringSecondFactor($this, 'jane.doe@example.com');
+        $this->holdAddress($account, 'jdoe.work@example.org');
+        $this->holdAddress($account, 'mallory@example.org', verified: false);
+
+        $response = submitNewPassword($this, $password);
+
+        $response->assertSessionHasErrors(['password' => __('keystone-password::messages.context_word', ['attribute' => 'password'])]);
+    })->with([
+        'a word of the app\'s name' => ['my PAYROLL 2026!'],
+        'a word of the app\'s host' => ['portal-is-mine-2026'],
+        'a word of the email\'s local part' => ['Jane rules 2026!'],
+        'a word of another address the account holds' => ['jdoe-2026-rocks'],
+        'a word of an unverified address' => ['MALLORY-2026!'],
+        'a configured context word' => ['ilovekeystone99'],
+    ]);
+
+    it('lets a password contain a context word shorter than 4 characters', function () {
+        config(['app.name' => 'Hub']);
+        signInRequiringSecondFactor($this, 'al@example.com');
+
+        $response = submitNewPassword($this, 'hub al rocks 2026');
+
+        assertReachedVerification($response);
+    });
+
+    it('never counts the email\'s domain as a context word', function () {
+        signInRequiringSecondFactor($this, 'jane@gmail.com');
+
+        $response = submitNewPassword($this, 'gmailgmail99');
+
+        assertReachedVerification($response);
+    });
+});
+
+describe('the common-password list', function () {
+    it('refuses a password on the bundled list, whatever its case', function (string $password) {
+        signInRequiringSecondFactor($this);
+
+        $response = submitNewPassword($this, $password);
+
+        $response->assertSessionHasErrors(['password' => __('keystone-password::messages.common', ['attribute' => 'password'])]);
+    })->with([
+        'password' => ['password'],
+        'PassWord' => ['PassWord'],
+        '12345678' => ['12345678'],
+        'ILOVEYOU' => ['ILOVEYOU'],
+    ]);
+});

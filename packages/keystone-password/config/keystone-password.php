@@ -18,4 +18,17 @@ return [
         'second_factor_optional' => 15,
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Context Words
+    |--------------------------------------------------------------------------
+    |
+    | Words a new password may not contain, on top of your app's name, the
+    | host of your app's URL and the local part of each email address of
+    | the user setting it, ignoring case and words under 4 characters.
+    |
+    */
+
+    'context_words' => [],
+
 ];

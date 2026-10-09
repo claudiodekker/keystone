@@ -2,12 +2,16 @@
 
 namespace ClaudioDekker\Keystone\Password;
 
+use ClaudioDekker\Keystone\Addresses;
+use ClaudioDekker\Keystone\Keystone;
+use ClaudioDekker\Keystone\KeystoneUser;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\InitiateShape;
 use ClaudioDekker\Keystone\Methods\Initiation;
 use ClaudioDekker\Keystone\Methods\Proof;
 use ClaudioDekker\Keystone\Methods\Surface;
 use Closure;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -75,7 +79,7 @@ class PasswordType implements CredentialType
     }
 
     /**
-     * Get what is wrong with the type's configuration: a minimum length that isn't a whole number of at least the floor.
+     * Get what is wrong with the type's configuration: a minimum length under the floor, or context words that aren't a list of words.
      */
     public function configFailures(): array
     {
@@ -89,17 +93,23 @@ class PasswordType implements CredentialType
             }
         }
 
+        $words = config('keystone-password.context_words');
+
+        if (! is_array($words) || ! array_is_list($words) || array_filter($words, is_string(...)) !== $words) {
+            $failures[] = 'keystone-password.context_words must be a list of words.';
+        }
+
         return $failures;
     }
 
     /**
-     * Get the rules for the typed password, asking a new one to be confirmed, to fit what the hashing driver takes and to be long enough, and keeping any typed one short enough to refuse before it is hashed.
+     * Get the rules for the typed password, asking a new one to be confirmed, to fit what the hashing driver takes, to be long enough and to stay off the blocklist, and keeping any typed one short enough to refuse before it is hashed.
      */
     public function rules(Surface $surface): array
     {
         return match ($surface) {
             Surface::SIGN_IN => [self::FIELD => ['required', 'string', 'max:'.self::MAX_CHARACTERS]],
-            default => [self::FIELD => ['bail', 'required', 'string', 'confirmed', $this->lengthCap(), 'min:'.$this->minLength()]],
+            default => [self::FIELD => ['bail', 'required', 'string', 'confirmed', $this->lengthCap(), 'min:'.$this->minLength(), new Blocklist($this->context())]],
         };
     }
 
@@ -161,6 +171,39 @@ class PasswordType implements CredentialType
         $mandate = config('keystone.require_second_factor') ? 'second_factor_required' : 'second_factor_optional';
 
         return config()->integer("keystone-password.min_length.{$mandate}");
+    }
+
+    /**
+     * Get the names a new password may not borrow a word from: the app's name and host, the configured context words, and every address the signed-in account holds.
+     *
+     * @return list<string>
+     */
+    protected function context(): array
+    {
+        /** @var (Model&KeystoneUser)|null $account */
+        $account = Keystone::guard()->user();
+        $url = config('app.url');
+
+        $names = [
+            config('app.name'),
+            is_string($url) ? parse_url($url, PHP_URL_HOST) : null,
+            ...config()->array('keystone-password.context_words'),
+            ...($account === null ? [] : $this->localParts($account)),
+        ];
+
+        return array_values(array_filter($names, is_string(...)));
+    }
+
+    /**
+     * Get the part before the @ of every address the account holds, verified or not.
+     *
+     * @return list<string>
+     */
+    protected function localParts(Model&KeystoneUser $account): array
+    {
+        $addresses = (new Addresses($account))->heldBy($account);
+
+        return array_map(fn (string $address) => Str::beforeLast($address, '@'), $addresses);
     }
 
     /**

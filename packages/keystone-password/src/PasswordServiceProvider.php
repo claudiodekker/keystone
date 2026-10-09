@@ -36,6 +36,8 @@ class PasswordServiceProvider extends ServiceProvider
 
         TrimStrings::except(self::PASSWORD_FIELDS);
 
+        $this->loadTranslationsFrom(__DIR__.'/../lang', 'keystone-password');
+
         $this->publishes([__DIR__.'/../config/keystone-password.php' => config_path('keystone-password.php')], 'keystone-password-config');
     }
 }

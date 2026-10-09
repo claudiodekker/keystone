@@ -76,6 +76,18 @@ describe('boot checks', function () {
             'keystone-password.min_length.second_factor_optional must be a whole number of at least 8.',
         ]);
     });
+
+    it('boots with context words that are a list of words', function (array $words) {
+        config(['keystone-password.context_words' => $words]);
+
+        expect(passwordBootFailures())->toBe([]);
+    })->with(['none' => [[]], 'some' => [['acme', 'payroll']]]);
+
+    it('refuses to boot with context words that aren\'t a list of words', function (mixed $words) {
+        config(['keystone-password.context_words' => $words]);
+
+        expect(passwordBootFailures())->toBe(['keystone-password.context_words must be a list of words.']);
+    })->with(['a string' => 'acme', 'a map' => [['brand' => 'acme']], 'a number in the list' => [['acme', 12]], 'null' => null]);
 });
 
 describe('new password rules', function () {

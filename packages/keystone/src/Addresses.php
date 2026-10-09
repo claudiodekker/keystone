@@ -73,6 +73,21 @@ class Addresses
     }
 
     /**
+     * Get every address the account holds, verified or not.
+     *
+     * @return list<string>
+     */
+    public function heldBy(Model&KeystoneUser $account): array
+    {
+        /** @var list<string> */
+        return $this->users->getConnection()->table('user_emails')
+            ->where('user_id', $account->getKey())
+            ->orderBy('id')
+            ->pluck('address')
+            ->all();
+    }
+
+    /**
      * Get the addresses the account's alerts go to: every verified one, or the unverified ones when none is verified.
      *
      * @return list<string>

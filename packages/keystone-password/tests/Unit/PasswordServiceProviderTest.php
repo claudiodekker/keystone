@@ -10,7 +10,8 @@ it('keeps the other minimum length when the app publishes only one', function ()
 
     (new PasswordServiceProvider(app()))->register();
 
-    expect(config('keystone-password.min_length'))->toBe(['second_factor_required' => 8, 'second_factor_optional' => 20]);
+    expect(config('keystone-password.min_length'))->toBe(['second_factor_required' => 8, 'second_factor_optional' => 20])
+        ->and(config('keystone-password.context_words'))->toBe([]);
 });
 
 it('never trims the password fields, even when the app trims every other field', function () {
