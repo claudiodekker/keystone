@@ -47,6 +47,12 @@ export type RecoveryCodesPage = {
     codes: string[];
 };
 
+export type RegenerateRecoveryCodesPage = {
+    codes: string[];
+    replaces: boolean;
+    status: string | null;
+};
+
 export type SudoPage = {
     types: CredentialTypeOption[];
     preselect: string | null;

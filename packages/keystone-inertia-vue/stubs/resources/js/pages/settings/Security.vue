@@ -4,6 +4,7 @@ import { typeName } from '@/lib/credentialTypes';
 import { sessionName } from '@/lib/sessions';
 import { enroll } from '@/routes/security';
 import { remove } from '@/routes/security/credentials';
+import { regenerate } from '@/routes/security/recovery-codes';
 import { revoke } from '@/routes/security/sessions';
 import { revoke as revokeOthersStep } from '@/routes/security/sessions/others';
 import { submit as revokeOthers } from '@/routes/security/sessions/others/revoke';
@@ -105,6 +106,7 @@ const enrollLabel = (group: SecurityPage['types'][number]) => (group.type === 'p
                     <p class="text-sm text-gray-600">{{ recoveryCodes === 1 ? '1 code left' : `${recoveryCodes} codes left` }}</p>
                     <p v-if="recoveryCodesLow" class="text-sm font-medium text-amber-700">You're running low on recovery codes.</p>
                 </template>
+                <Link :href="regenerate()" class="text-sm font-medium text-gray-900 underline">Regenerate</Link>
             </section>
 
             <section class="flex flex-col gap-2 rounded-lg bg-white p-6 shadow-sm ring-1 ring-gray-200">

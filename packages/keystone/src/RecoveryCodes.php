@@ -120,6 +120,23 @@ class RecoveryCodes
     }
 
     /**
+     * Determine if the typed code is one of the codes, comparing every one so the time taken doesn't tell which matched.
+     *
+     * @param  array<array-key, mixed>  $codes
+     */
+    public static function contains(#[\SensitiveParameter] array $codes, #[\SensitiveParameter] string $typed): bool
+    {
+        $normalized = static::normalize($typed);
+        $matched = false;
+
+        foreach ($codes as $code) {
+            $matched = hash_equals(static::normalize((string) $code), $normalized) || $matched;
+        }
+
+        return $matched;
+    }
+
+    /**
      * Normalize a typed code: dashes and whitespace removed, then uppercased.
      */
     public static function normalize(#[\SensitiveParameter] string $typed): string

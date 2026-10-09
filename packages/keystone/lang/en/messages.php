@@ -33,6 +33,8 @@ return [
         'credential-replaced' => 'The credential was replaced. Your other sessions were signed out.',
         'credential-not-found' => 'That credential was not found. It may already have been removed.',
         'enrolled' => 'The new credential was added.',
+        'recovery-codes-regenerated' => 'Your recovery codes were regenerated.',
+        'recovery-codes-expired' => 'Those recovery codes expired before they were saved. Save this new set instead.',
         'other-sessions-revoked' => 'Your other sessions were signed out.',
         'session-revoked' => 'The session was signed out.',
         'session-not-found' => 'That session was not found. It may already have been signed out.',

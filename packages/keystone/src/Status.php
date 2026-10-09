@@ -24,6 +24,8 @@ enum Status: string
     case SESSION_NOT_FOUND = 'session-not-found';
     case SESSIONS_UNAVAILABLE = 'sessions-unavailable';
     case ENROLLED = 'enrolled';
+    case RECOVERY_CODES_REGENERATED = 'recovery-codes-regenerated';
+    case RECOVERY_CODES_EXPIRED = 'recovery-codes-expired';
 
     /**
      * The session key the status is flashed under.

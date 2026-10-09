@@ -5,6 +5,7 @@ use App\Http\Controllers\Auth\CredentialEnrollmentController;
 use App\Http\Controllers\Auth\CredentialRemovalController;
 use App\Http\Controllers\Auth\EnrollmentController;
 use App\Http\Controllers\Auth\OtherSessionsController;
+use App\Http\Controllers\Auth\RecoveryCodeRegenerationController;
 use App\Http\Controllers\Auth\RecoveryCodesController;
 use App\Http\Controllers\Auth\SecurityController;
 use App\Http\Controllers\Auth\SessionRevocationController;
@@ -57,6 +58,12 @@ Route::prefix('settings/security')->group(function () {
 
     Route::get('credentials/{credential}/remove', [CredentialRemovalController::class, 'show'])->name('security.credentials.remove');
     Route::delete('credentials/{credential}', [CredentialRemovalController::class, 'destroy'])->name('security.credentials.remove.submit');
+
+    Route::prefix('recovery-codes/regenerate')->group(function () {
+        Route::get('/', [RecoveryCodeRegenerationController::class, 'create'])->name('security.recovery-codes.regenerate');
+        Route::post('/', [RecoveryCodeRegenerationController::class, 'store'])->name('security.recovery-codes.regenerate.confirm');
+        Route::delete('/', [RecoveryCodeRegenerationController::class, 'destroy'])->name('security.recovery-codes.regenerate.cancel');
+    });
 
     Route::get('sessions/others/revoke', [OtherSessionsController::class, 'show'])->name('security.sessions.others.revoke');
     Route::delete('sessions/others', [OtherSessionsController::class, 'destroy'])->name('security.sessions.others.revoke.submit');
