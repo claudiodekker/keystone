@@ -132,14 +132,14 @@ class PasswordType implements CredentialType, RefusesEnrollment
     }
 
     /**
-     * Check the typed password against the subject's password at sign-in, or set the account's new password from the security settings.
+     * Check the typed password against the subject's password at sign-in, or set the account's first password at registration or its new one from the security settings.
      */
     public function verify(Surface $surface, array $input, array $credentials, mixed $ceremony = null): Proof
     {
         return match ($surface) {
             Surface::SIGN_IN => $this->signIn($input[self::FIELD], $credentials),
-            Surface::ENROLLMENT => $this->enroll($input, $credentials),
-            default => throw new LogicException("Verifying a password on {$surface->value} isn't built yet."),
+            Surface::REGISTRATION, Surface::ENROLLMENT => $this->enroll($input, $credentials),
+            default => throw new LogicException("A password can't be verified on {$surface->value}."),
         };
     }
 

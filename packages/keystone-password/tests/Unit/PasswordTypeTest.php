@@ -189,7 +189,14 @@ describe('verify', function () {
         (new PasswordType)->verify(Surface::SIGN_IN, ['password' => 'correct horse'], [$credential]);
     });
 
-    it('refuses to verify on a surface it has no flow for yet', function (Surface $surface) {
-        (new PasswordType)->verify($surface, ['password' => Str::random()], []);
-    })->with([Surface::REGISTRATION])->throws(LogicException::class);
+    it('sets a first password at registration, hashed with the app\'s hasher', function () {
+        $proof = (new PasswordType)->verify(Surface::REGISTRATION, ['password' => 'correct horse battery staple'], []);
+
+        expect($proof->enrolled?->identifier)->toBeNull()
+            ->and(Hash::check('correct horse battery staple', (string) $proof->enrolled?->secret))->toBeTrue();
+    });
+
+    it('refuses to verify on a surface it doesn\'t serve', function () {
+        (new PasswordType)->verify(Surface::CHALLENGE, ['password' => Str::random()], []);
+    })->throws(LogicException::class);
 });
