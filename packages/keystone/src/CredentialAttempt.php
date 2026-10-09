@@ -42,11 +42,11 @@ abstract class CredentialAttempt
     /**
      * Let the type verify the input on the surface against the subject's usable credentials and its ceremony, if any, turning any failure into a rejection.
      *
-     * The proof comes back with the subject's credential it names, if any. A failure gives the taken attempt back.
+     * The proof comes back with the subject's credential it names, if any, and the usable credentials it was verified against. A failure gives the taken attempt back.
      *
      * @param  (Model&KeystoneUser)|null  $account
      * @param  array<string, mixed>  $input
-     * @return array{Proof, ?StoredCredential}
+     * @return array{Proof, ?StoredCredential, list<StoredCredential>}
      */
     protected function prove(
         Surface $surface,
@@ -68,12 +68,12 @@ abstract class CredentialAttempt
                 $this->limiter->giveBack($taken);
             }
 
-            return [Proof::rejected('keystone.verify_failed'), null];
+            return [Proof::rejected('keystone.verify_failed'), null, []];
         }
 
         $named = array_filter($usable, fn (StoredCredential $credential) => $credential->id === $proof->credentialId);
 
-        return [$proof, array_values($named)[0] ?? null];
+        return [$proof, array_values($named)[0] ?? null, $usable];
     }
 
     /**

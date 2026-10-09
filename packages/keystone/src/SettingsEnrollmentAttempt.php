@@ -2,10 +2,12 @@
 
 namespace ClaudioDekker\Keystone;
 
+use ClaudioDekker\Keystone\Exceptions\Superseded;
 use ClaudioDekker\Keystone\Exceptions\Throttled;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\EnrolledCredential;
+use ClaudioDekker\Keystone\Methods\StoredCredential;
 use ClaudioDekker\Keystone\Methods\Surface;
 use Illuminate\Database\Eloquent\Model;
 use LogicException;
@@ -53,7 +55,7 @@ class SettingsEnrollmentAttempt extends CredentialAttempt
         }
 
         $taken = $this->limiter->takeFailedAttempt($flow, $type, $account, identifier: '');
-        [$proof] = $this->prove(Surface::ENROLLMENT, $type, $account, $input, $taken, ceremony: $running->ceremony);
+        [$proof, , $provedAgainst] = $this->prove(Surface::ENROLLMENT, $type, $account, $input, $taken, ceremony: $running->ceremony);
 
         if ($proof->enrolled === null) {
             $this->recordRejected($account, $flow, $type, credential: null, reason: $proof->reason ?? 'keystone.not_enrolled');
@@ -61,7 +63,7 @@ class SettingsEnrollmentAttempt extends CredentialAttempt
             return SettingsEnrollmentResult::REFUSED;
         }
 
-        $outcome = $this->store($account, $type, $proof->enrolled, $flow);
+        $outcome = $this->store($account, $type, $proof->enrolled, $flow, $provedAgainst);
 
         if (is_string($outcome)) {
             $this->recordRejected($account, $flow, $type, credential: null, reason: $outcome);
@@ -83,15 +85,16 @@ class SettingsEnrollmentAttempt extends CredentialAttempt
     }
 
     /**
-     * Store the enrolled credential and record it once the account is locked, or give why it is refused there: barred, or a type no longer listed on enrollment.
+     * Store the enrolled credential and record it once the account is locked, or give why it is refused there.
      *
      * Nothing is stored for a session whose sudo ended while the answer was checked.
      *
+     * @param  list<StoredCredential>  $provedAgainst
      * @return SettingsEnrollmentResult|string the result, or the reason of a refusal
      */
-    protected function store(Model&KeystoneUser $account, CredentialType $type, EnrolledCredential $enrolled, Flow $flow): SettingsEnrollmentResult|string
+    protected function store(Model&KeystoneUser $account, CredentialType $type, EnrolledCredential $enrolled, Flow $flow, array $provedAgainst): SettingsEnrollmentResult|string
     {
-        return (new AccountChanges($this->guard, $this->recorder))->change($account, function (AccountChange $change) use ($type, $enrolled, $flow) {
+        return (new AccountChanges($this->guard, $this->recorder))->change($account, function (AccountChange $change) use ($type, $enrolled, $flow, $provedAgainst) {
             if ((new SignInDecision)->isBarred($change->account)) {
                 return 'keystone.barred';
             }
@@ -104,7 +107,11 @@ class SettingsEnrollmentAttempt extends CredentialAttempt
                 return SettingsEnrollmentResult::SUDO_ENDED;
             }
 
-            return $change->enroll($type, $enrolled, $flow);
+            try {
+                return $change->enroll($type, $enrolled, $flow, $provedAgainst);
+            } catch (Superseded) {
+                return 'keystone.superseded';
+            }
         });
     }
 }

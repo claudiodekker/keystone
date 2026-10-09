@@ -8,6 +8,7 @@ use ClaudioDekker\Keystone\Exceptions\LastRecoveryCode;
 use ClaudioDekker\Keystone\Exceptions\LastSecondFactor;
 use ClaudioDekker\Keystone\Exceptions\LastSignInCredential;
 use ClaudioDekker\Keystone\Exceptions\NotSuspended;
+use ClaudioDekker\Keystone\Exceptions\Superseded;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\EnrolledCredential;
@@ -88,17 +89,33 @@ class AccountChange
     /**
      * Store the enrolled credential on the account and record in the flow whether it was added or replaced what the account held.
      *
-     * A credential that replaces its type takes the place of every credential of the type the account holds, disabled or not, and ends the account's other sessions when it held one.
+     * A credential that replaces its type takes the place of every credential of the type the account holds, disabled or not.
      *
      * A replacing credential the account already holds was stored by the same answer arriving twice, so it is not stored, recorded or replaced again.
+     *
+     * @param  list<StoredCredential>  $provedAgainst
+     *
+     * @throws Superseded
      */
-    public function enroll(CredentialType $type, EnrolledCredential $enrolled, Flow $flow): SettingsEnrollmentResult
+    public function enroll(CredentialType $type, EnrolledCredential $enrolled, Flow $flow, array $provedAgainst): SettingsEnrollmentResult
     {
-        if ($enrolled->replacesExisting && $this->holds($type, $enrolled)) {
-            return SettingsEnrollmentResult::ADDED;
+        $stored = $enrolled->replacesExisting ? $this->storedBySameAnswer($type, $enrolled) : null;
+
+        if ($stored !== null) {
+            $others = array_filter($provedAgainst, fn (StoredCredential $credential) => $credential->id !== $stored->id);
+
+            return $others === [] ? SettingsEnrollmentResult::ADDED : SettingsEnrollmentResult::REPLACED;
         }
 
-        $replaced = $enrolled->replacesExisting && $this->credentials->deleteOfType($this->account->getKey(), $type->name()) > 0;
+        if ($enrolled->replacesExisting && ! $this->stillHolds($type, $provedAgainst)) {
+            throw new Superseded;
+        }
+
+        if ($enrolled->replacesExisting) {
+            $this->credentials->deleteOfType($this->account->getKey(), $type->name());
+        }
+
+        $replaced = $enrolled->replacesExisting && $provedAgainst !== [];
 
         if ($replaced) {
             $this->endSessions();
@@ -390,17 +407,29 @@ class AccountChange
     }
 
     /**
-     * Determine if the account holds a usable credential of the type with the secret of the enrolled one.
+     * Get the account's usable credential of the type holding the enrolled one's secret, which the same answer stored when it arrived before.
      */
-    protected function holds(CredentialType $type, EnrolledCredential $enrolled): bool
+    protected function storedBySameAnswer(CredentialType $type, EnrolledCredential $enrolled): ?StoredCredential
     {
         if ($enrolled->secret === null) {
-            return false;
+            return null;
         }
 
         $held = $this->credentials->ofType($this->account->getKey(), $type->name());
 
-        return array_any($held, fn (StoredCredential $credential) => $credential->secret !== null && hash_equals($credential->secret, $enrolled->secret));
+        return array_find($held, fn (StoredCredential $credential) => $credential->secret !== null && hash_equals($credential->secret, $enrolled->secret));
+    }
+
+    /**
+     * Determine if the account's usable credentials of the type are still exactly the ones listed.
+     *
+     * @param  list<StoredCredential>  $credentials
+     */
+    protected function stillHolds(CredentialType $type, array $credentials): bool
+    {
+        $held = $this->credentials->ofType($this->account->getKey(), $type->name());
+
+        return array_column($held, 'id') === array_column($credentials, 'id');
     }
 
     /**

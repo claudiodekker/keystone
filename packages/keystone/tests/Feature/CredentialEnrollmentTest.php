@@ -15,6 +15,7 @@ use ClaudioDekker\Keystone\Tests\Fixtures\DrawingType;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormType;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormTypeSupport;
 use ClaudioDekker\Keystone\Tests\Fixtures\RogueType;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
@@ -286,6 +287,22 @@ describe('the answer', function () {
         $this->get(route('security'))->assertJsonPath('status', __('keystone::messages.status.enrolled'));
     });
 
+    it('adds over a replacing type\'s disabled credential: deletes it, records credential.added and moves no epoch', function () {
+        $this->app->make(CredentialTypes::class)->register(new FormType(name: 'single', surfaces: ['challenge', 'enrollment'], replacesExisting: true));
+        $account = $this->signInAccount(new FormTypeSupport);
+        $disabled = DB::table('user_credentials')->insertGetId(['user_id' => $account->getKey(), 'type' => 'single', 'secret' => Crypt::encryptString('disabled'), 'disabled_at' => now()]);
+        $this->get(route('security.enroll', ['type' => 'single']));
+
+        $this->post(route('security.enroll.submit', ['type' => 'single']), ['secret' => $this->enrollmentCeremony('single')]);
+
+        $this->assertDatabaseMissing('user_credentials', ['id' => $disabled]);
+        expect(DB::table('user_credentials')->where('user_id', $account->getKey())->where('type', 'single')->count())->toBe(1);
+        $this->assertDatabaseHas('user_security_events', ['type' => 'credential.added', 'user_id' => $account->getKey(), 'credential_type' => 'single']);
+        $this->assertDatabaseMissing('user_security_events', ['type' => 'credential.replaced']);
+        $this->assertDatabaseHas('users', ['id' => $account->getKey(), 'credential_epoch' => 0]);
+        $this->get(route('security'))->assertJsonPath('status', __('keystone::messages.status.enrolled'));
+    });
+
     it('leaves another account\'s credentials of a replacing type alone', function () {
         $this->app->make(CredentialTypes::class)->register(new FormType(name: 'single', surfaces: ['challenge', 'enrollment'], replacesExisting: true));
         $stranger = DB::table('user_credentials')->insertGetId(['user_id' => $this->createAccount('john@example.com')->getKey(), 'type' => 'single', 'secret' => Crypt::encryptString('held')]);
@@ -514,6 +531,28 @@ describe('what changed between the gate and the write', function () {
         $this->assertDatabaseHas('user_security_events', ['type' => 'proof.rejected', 'user_id' => $account->getKey(), 'flow' => 'settings', 'reason' => 'keystone.barred']);
     });
 
+    it('refuses a replacing answer as superseded when the credentials it was checked against changed meanwhile, writing nothing', function () {
+        $this->freezeSecond();
+        $account = $this->signInAccount(new FormTypeSupport);
+        $held = DB::table('user_credentials')->insertGetId(['user_id' => $account->getKey(), 'type' => 'rogue', 'secret' => Crypt::encryptString('held')]);
+        $this->app->make(CredentialTypes::class)->register(new RogueType(function () use ($account, $held) {
+            DB::table('user_credentials')->where('id', $held)->delete();
+            DB::table('user_credentials')->insert(['user_id' => $account->getKey(), 'type' => 'rogue', 'secret' => Crypt::encryptString('changed meanwhile')]);
+
+            return Proof::enrolled(EnrolledCredential::replacing(identifier: null, secret: 'rogue-secret'));
+        }, surfaces: ['challenge', 'enrollment']));
+        $this->get(route('security.enroll', ['type' => 'rogue']));
+
+        $response = $this->post(route('security.enroll.submit', ['type' => 'rogue']));
+
+        $response->assertRedirectToRoute('security.enroll', ['type' => 'rogue'])->assertSessionHasErrors(['rogue' => __('keystone::messages.invalid_credential')]);
+        $left = DB::table('user_credentials')->where('user_id', $account->getKey())->where('type', 'rogue')->sole();
+        expect(Crypt::decryptString($left->secret))->toBe('changed meanwhile');
+        $this->assertDatabaseHas('user_security_events', ['type' => 'proof.rejected', 'user_id' => $account->getKey(), 'flow' => 'settings', 'credential_type' => 'rogue', 'reason' => 'keystone.superseded']);
+        $this->assertDatabaseMissing('user_security_events', ['type' => 'credential.replaced']);
+        $this->assertDatabaseHas('users', ['id' => $account->getKey(), 'credential_epoch' => 0]);
+    });
+
     it('stores nothing and records nothing when the write fails', function () {
         Exceptions::fake();
         $this->signInAccount(new FormTypeSupport);
@@ -576,6 +615,34 @@ describe('the same answer sent twice at once', function () {
             ->and(session()->getId())->toBe($sessionId)
             ->and(Keystone::guard()->slots()->get('single', Surface::ENROLLMENT->value))->toBeNull();
         Notification::assertSentOnDemandTimes(SecurityAlert::class, 1);
+    });
+});
+
+describe('the same replacing answer sent twice at once', function () {
+    it('says the second one replaced the held credential too, storing one credential and recording one event', function () {
+        $this->app->make(CredentialTypes::class)->register(new FormType(name: 'single', surfaces: ['challenge', 'enrollment'], replacesExisting: true));
+        $account = $this->signInAccount(new FormTypeSupport);
+        $held = DB::table('user_credentials')->insertGetId(['user_id' => $account->getKey(), 'type' => 'single', 'secret' => Crypt::encryptString('held')]);
+        $this->get(route('security.enroll', ['type' => 'single']));
+        $ceremony = $this->enrollmentCeremony('single');
+        $armed = true;
+        DB::listen(function (QueryExecuted $query) use (&$armed, $account, $held, $ceremony) {
+            if (! $armed || ! str_starts_with($query->sql, 'select') || ! str_contains($query->sql, '"type" = ?') || ! in_array('single', $query->bindings, true)) {
+                return;
+            }
+
+            $armed = false;
+            DB::table('user_credentials')->where('id', $held)->delete();
+            DB::table('user_credentials')->insert(['user_id' => $account->getKey(), 'type' => 'single', 'secret' => Crypt::encryptString(FormType::hash($ceremony))]);
+        });
+
+        $response = $this->post(route('security.enroll.submit', ['type' => 'single']), ['secret' => $ceremony]);
+
+        $response->assertRedirectToRoute('security');
+        $this->get(route('security'))->assertJsonPath('status', __('keystone::messages.status.credential-replaced'));
+        expect(DB::table('user_credentials')->where('user_id', $account->getKey())->where('type', 'single')->count())->toBe(1);
+        $this->assertDatabaseMissing('user_security_events', ['type' => 'credential.replaced']);
+        $this->assertDatabaseMissing('user_security_events', ['type' => 'proof.rejected']);
     });
 });
 
