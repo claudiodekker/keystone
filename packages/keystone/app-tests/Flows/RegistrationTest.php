@@ -1,15 +1,21 @@
 <?php
 
+use ClaudioDekker\Keystone\Actions\CreateAccount;
+use ClaudioDekker\Keystone\Addresses;
 use ClaudioDekker\Keystone\AppTests\AppTestCase;
 use ClaudioDekker\Keystone\AppTests\Assertions\RegistrationAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\RegistrationFinishAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\RegistrationLinkAssertions;
+use ClaudioDekker\Keystone\AppTests\Support\CredentialTypeSupport;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Notifications\EmailedLinkMail;
 use ClaudioDekker\Keystone\Notifications\SecurityAlert;
+use ClaudioDekker\Keystone\Notifications\Welcome;
+use ClaudioDekker\Keystone\PendingStage;
 use ClaudioDekker\Keystone\Registering;
 use ClaudioDekker\Keystone\SecurityEventType;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Support\Facades\Notification;
 
@@ -148,4 +154,102 @@ it('sends a signed-in user away from every registration step', function () {
     $this->assertSentAwayFromRegistration($this->post(route('register.submit'), ['email' => 'new@example.com']));
     $this->assertSentAwayFromRegistration($this->get(route('register.finish')));
     Notification::assertNotSentTo(new AnonymousNotifiable, EmailedLinkMail::class);
+});
+
+it('creates the account when the registration finishes with each type serving it, and signs it in', function () {
+    $this->eachSupportFor(Surface::REGISTRATION, function (CredentialTypeSupport $support) {
+        $address = "new-{$support->type()}@example.com";
+        $this->registerAddress($address);
+
+        $response = $this->finishRegistration($support);
+
+        $this->assertRegistered($response, '/');
+        $account = Keystone::guard()->user();
+        expect($account)->not->toBeNull()
+            ->and((new Addresses($account))->recipientsOf($account))->toBe([$address])
+            ->and(Keystone::guard()->registration())->toBeNull();
+        $this->assertDatabaseHas('user_security_events', ['type' => 'account.registered', 'user_id' => $account->getKey(), 'flow' => 'registration', 'credential_type' => $support->type()]);
+        Notification::assertSentOnDemand(Welcome::class, fn (Welcome $mail, $channels, $notifiable) => $notifiable->routes['mail'] === $address);
+        Notification::assertNotSentTo(new AnonymousNotifiable, SecurityAlert::class);
+    });
+});
+
+it('holds a new account that owes enrollment for it', function () {
+    $this->withMandates();
+    $support = $this->supportsFor(Surface::REGISTRATION)[0];
+    $this->registerAddress();
+
+    $response = $this->finishRegistration($support);
+
+    $this->assertRegistrationEnrollmentOwed($response);
+    expect(Keystone::guard()->check())->toBeFalse()
+        ->and(Keystone::guard()->pending()?->stage)->toBe(PendingStage::ENROLLMENT);
+});
+
+it('refuses an invalid finish, creating nothing and keeping the registration', function () {
+    $support = $this->supportsFor(Surface::REGISTRATION)[0];
+    $this->registerAddress();
+
+    $response = $this->post(route('register.finish.submit', ['type' => $support->type()]), $support->validEnrollment(null));
+
+    $this->assertRegistrationFinishInvalid($response, ['name']);
+    expect(Keystone::guard()->registration())->not->toBeNull();
+    $this->assertDatabaseMissing('user_emails', ['address' => 'new@example.com']);
+});
+
+it('creates nothing for an address an active account came to hold since its link was spent, and ends the registration', function () {
+    $support = $this->supportsFor(Surface::REGISTRATION)[0];
+    $this->registerAddress();
+    $owner = $this->createAccount('new@example.com');
+
+    $response = $this->finishRegistration($support);
+
+    $this->assertAddressTaken($response);
+    expect(Keystone::guard()->registration())->toBeNull()
+        ->and(Keystone::guard()->check())->toBeFalse()
+        ->and((new Addresses($owner))->heldBy($owner))->toBe(['new@example.com']);
+    $this->assertDatabaseMissing('user_security_events', ['type' => 'account.registered']);
+});
+
+it('creates nothing once the registration\'s window has ended', function () {
+    $support = $this->supportsFor(Surface::REGISTRATION)[0];
+    $this->registerAddress();
+    $this->travel(Registering::WINDOW_SECONDS)->seconds();
+
+    $this->assertSentBackToRegister($this->finishRegistration($support));
+    $this->assertDatabaseMissing('user_emails', ['address' => 'new@example.com']);
+});
+
+it('refuses to finish while registration is closed, creating nothing', function () {
+    $support = $this->supportsFor(Surface::REGISTRATION)[0];
+    $this->registerAddress();
+    config(['keystone.methods' => []]);
+
+    $this->assertRegistrationUnavailable($this->finishRegistration($support));
+    $this->assertDatabaseMissing('user_emails', ['address' => 'new@example.com']);
+});
+
+it('sends a signed-in user away from the finish, creating nothing', function () {
+    $support = $this->supportsFor(Surface::REGISTRATION)[0];
+    $this->registerAddress();
+    $this->signInAccount($this->supportsFor(Surface::SIGN_IN)[0], 'jane@example.com');
+
+    $this->assertSentAwayFromRegistration($this->finishRegistration($support));
+    $this->assertDatabaseMissing('user_emails', ['address' => 'new@example.com']);
+});
+
+it('refuses an account the app\'s CreateAccount created barred as a refused sign-in, ending the registration', function () {
+    $support = $this->supportsFor(Surface::REGISTRATION)[0];
+    $this->app->bind(CreateAccount::class, fn () => new class extends CreateAccount
+    {
+        public function handle(array $profile): Model
+        {
+            return tap(parent::handle($profile), fn (Model $account) => $account->forceFill(['suspended_at' => now()])->save());
+        }
+    });
+    $this->registerAddress();
+
+    $this->assertRegistrationBarred($this->finishRegistration($support));
+    expect(Keystone::guard()->check())->toBeFalse()
+        ->and(Keystone::guard()->registration())->toBeNull();
 });

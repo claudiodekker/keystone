@@ -40,5 +40,6 @@ return [
         'session-not-found' => 'That session was not found. It may already have been signed out.',
         'sessions-unavailable' => 'Your sessions cannot be listed in this app.',
         'registration-unavailable' => 'Registration is not available.',
+        'address-already-registered' => 'That email address is already registered. Please sign in instead.',
     ],
 ];

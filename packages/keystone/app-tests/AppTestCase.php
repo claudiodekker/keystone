@@ -415,6 +415,29 @@ abstract class AppTestCase extends TestCase
     }
 
     /**
+     * Ask for a registration link for the address and spend it while notifications are faked, so the session registers the address.
+     */
+    public function registerAddress(string $address = 'new@example.com'): void
+    {
+        $this->post(route('register.submit'), ['email' => $address]);
+
+        $this->post($this->mailedLinkTo($address));
+    }
+
+    /**
+     * Finish the session's registration with the supported type, naming the new account.
+     *
+     * @return TestResponse<Response>
+     */
+    public function finishRegistration(CredentialTypeSupport $support, string $name = 'Jane Doe'): TestResponse
+    {
+        return $this->post(route('register.finish.submit', ['type' => $support->type()]), [
+            'name' => $name,
+            ...$support->validEnrollment(null),
+        ]);
+    }
+
+    /**
      * Submit the proof of the supported type for the identifier to the sign-in.
      *
      * @param  array<string, mixed>  $proof

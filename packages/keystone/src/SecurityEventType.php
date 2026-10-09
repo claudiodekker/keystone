@@ -22,6 +22,7 @@ enum SecurityEventType: string
     case REQUEST_REJECTED = 'request.rejected';
     case ACCOUNT_SUSPENDED = 'account.suspended';
     case ACCOUNT_UNSUSPENDED = 'account.unsuspended';
+    case ACCOUNT_REGISTERED = 'account.registered';
     case ADDRESS_CLAIM_ATTEMPTED = 'address.claim_attempted';
     case RECOVERY_CODE_USED = 'recovery_code.used';
     case RECOVERY_CODES_GENERATED = 'recovery_codes.generated';

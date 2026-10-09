@@ -119,16 +119,22 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Hold the account's sign-in until it passes the stage, keeping whether it asked to be remembered and replacing any pending one.
+     * Hold the account's sign-in until it passes the stage, keeping whether it asked to be remembered and what opened it, and replacing any pending one.
      */
-    public function hold(Model&KeystoneUser $account, string $firstFactor, PendingStage $stage, string $intendedUrl, RememberMe $rememberMe = RememberMe::NOT_ASKED): void
-    {
+    public function hold(
+        Model&KeystoneUser $account,
+        string $firstFactor,
+        PendingStage $stage,
+        string $intendedUrl,
+        RememberMe $rememberMe = RememberMe::NOT_ASKED,
+        PendingOrigin $origin = PendingOrigin::LOGIN,
+    ): void {
         $this->changeAuthLevel();
 
         $this->session->put($this->pendingKey(), [
             'account' => $account->getAuthIdentifier(),
             'first_factor' => $firstFactor,
-            'origin' => PendingOrigin::LOGIN->value,
+            'origin' => $origin->value,
             'stage' => $stage->value,
             'intended_url' => $intendedUrl,
             'epoch' => $this->epochOf($account),

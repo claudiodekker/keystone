@@ -1,6 +1,7 @@
 <?php
 
 use ClaudioDekker\Keystone\Notifications\SecurityAlert;
+use ClaudioDekker\Keystone\Notifications\Welcome;
 
 return [
 
@@ -154,6 +155,7 @@ return [
     */
 
     'notifications' => [
+        'account.registered' => Welcome::class,
         'account.suspended' => SecurityAlert::class,
         'account.unsuspended' => SecurityAlert::class,
         'address.claim_attempted' => SecurityAlert::class,

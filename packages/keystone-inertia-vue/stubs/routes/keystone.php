@@ -50,7 +50,10 @@ Route::prefix('auth')->group(function () {
         Route::post('verify', [RegistrationLinkController::class, 'store'])->name('register.verify.consume');
         Route::get('link-expired', [RegistrationLinkController::class, 'expired'])->name('register.link-expired');
 
-        Route::get('finish', [RegistrationFinishController::class, 'show'])->name('register.finish');
+        Route::prefix('finish')->group(function () {
+            Route::get('/', [RegistrationFinishController::class, 'show'])->name('register.finish');
+            Route::post('{type}', [RegistrationFinishController::class, 'store'])->name('register.finish.submit');
+        });
     });
 
     Route::post('logout', SignOutController::class)->name('logout');
