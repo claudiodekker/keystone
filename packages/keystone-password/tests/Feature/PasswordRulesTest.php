@@ -6,11 +6,15 @@ use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Password\BreachedPasswords;
 use ClaudioDekker\Keystone\Password\FakeBreachedPasswords;
 use ClaudioDekker\Keystone\Password\HibpBreachedPasswords;
+use ClaudioDekker\Keystone\Password\PasswordRules;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormTypeSupport;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Client\Request;
 use Illuminate\Http\Client\StrayRequestException;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Testing\TestResponse;
@@ -309,5 +313,67 @@ describe('the breach check', function () {
         expect($warnings)->toHaveCount(1)
             ->and($warnings[0]->message)->toBe(HibpBreachedPasswords::UNAVAILABLE_MESSAGE)
             ->and($warnings[0]->context)->toBe(['reason' => StrayRequestException::class]);
+    });
+});
+
+describe('the app\'s own rules', function () {
+    beforeEach(function () {
+        $this->beforeApplicationDestroyed(fn () => PasswordRules::defaults(null));
+    });
+
+    it('takes the app\'s rules in place of Keystone\'s length and blocklist', function (Closure $rules) {
+        PasswordRules::defaults($rules());
+        $breaches = fakeBreaches(['password']);
+        signInRequiringSecondFactor($this);
+
+        $response = submitNewPassword($this, 'password');
+
+        assertReachedVerification($response);
+        expect($breaches->asked)->toBe([]);
+    })->with([
+        'a callback returning a rule' => [fn () => fn () => fn () => Password::min(1)],
+        'a rule' => [fn () => fn () => Password::min(1)],
+        'a list of rules' => [fn () => fn () => ['min:1']],
+    ]);
+
+    it('keeps Keystone\'s rules when the app\'s callback returns null', function () {
+        PasswordRules::defaults(fn () => null);
+        signInRequiringSecondFactor($this);
+
+        $response = submitNewPassword($this, 'password');
+
+        $response->assertSessionHasErrors(['password' => __('keystone-password::messages.common', ['attribute' => 'password'])]);
+    });
+
+    it('asks for more when the app\'s rules are stricter', function () {
+        PasswordRules::defaults(fn () => Password::min(20));
+        signInRequiringSecondFactor($this);
+
+        $response = submitNewPassword($this, 'tq8#vbnz-wx4!kp');
+
+        $response->assertSessionHasErrors(['password' => __('validation.min.string', ['attribute' => 'password', 'min' => 20])]);
+    });
+
+    it('still asks for a confirmed password that fits the hashing driver', function (string $password, ?string $confirmation, string $message) {
+        config(['hashing.driver' => 'bcrypt']);
+        PasswordRules::defaults(fn () => Password::min(1));
+        signInRequiringSecondFactor($this);
+
+        $response = submitNewPassword($this, $password, $confirmation);
+
+        $response->assertSessionHasErrors(['password' => __($message, ['attribute' => 'password', 'max' => 72])]);
+    })->with([
+        'unconfirmed' => ['password', 'passwort', 'validation.confirmed'],
+        'over 72 bytes' => [str_repeat('a', 73), null, 'validation.max.string'],
+    ]);
+
+    it('never reads the app\'s rules at sign-in', function () {
+        PasswordRules::defaults(fn () => Password::min(2000));
+        $account = $this->createAccount();
+        DB::table('user_credentials')->insert(['user_id' => $account->getKey(), 'type' => 'password', 'secret' => Crypt::encryptString(Hash::make('password'))]);
+
+        $this->post(route('login.submit', ['type' => 'password']), ['identifier' => 'jane@example.com', 'password' => 'password']);
+
+        $this->assertAuthenticatedAs($account);
     });
 });

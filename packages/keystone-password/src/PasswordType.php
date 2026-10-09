@@ -103,13 +103,13 @@ class PasswordType implements CredentialType
     }
 
     /**
-     * Get the rules for the typed password, asking a new one to be confirmed, to fit what the hashing driver takes, to be long enough and to stay off the blocklist, and keeping any typed one short enough to refuse before it is hashed.
+     * Get the rules for the typed password, asking a new one to be confirmed, to fit what the hashing driver takes and to be strong enough, and keeping any typed one short enough to refuse before it is hashed.
      */
     public function rules(Surface $surface): array
     {
         return match ($surface) {
             Surface::SIGN_IN => [self::FIELD => ['required', 'string', 'max:'.self::MAX_CHARACTERS]],
-            default => [self::FIELD => ['bail', 'required', 'string', 'confirmed', $this->lengthCap(), 'min:'.$this->minLength(), new Blocklist($this->context(), app(BreachedPasswords::class))]],
+            default => [self::FIELD => ['bail', 'required', 'string', 'confirmed', $this->lengthCap(), ...$this->strengthRules()]],
         };
     }
 
@@ -161,6 +161,16 @@ class PasswordType implements CredentialType
                 $fail('validation.max.string')->translate(['max' => $maxBytes]);
             }
         };
+    }
+
+    /**
+     * Get the rules that decide whether a new password is strong enough: the app's own when it set them, else Keystone's minimum length and blocklist.
+     *
+     * @return list<mixed>
+     */
+    protected function strengthRules(): array
+    {
+        return PasswordRules::resolve() ?? ['min:'.$this->minLength(), new Blocklist($this->context(), app(BreachedPasswords::class))];
     }
 
     /**
