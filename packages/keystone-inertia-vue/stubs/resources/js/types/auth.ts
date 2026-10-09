@@ -60,6 +60,7 @@ export type SecurityPage = {
     recoveryCodesLow: boolean;
     sudoEndsAt: string | null;
     status: string | null;
+    offersSignOutOthers: boolean;
 };
 
 export type CredentialRemovalPage = {

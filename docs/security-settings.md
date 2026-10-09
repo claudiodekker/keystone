@@ -36,6 +36,7 @@ The page shows only the signed-in account's own credentials and codes. A credent
 | `recoveryCodesLow` | whether that is three or fewer |
 | `sudoEndsAt` | when the session's sudo ends, or `null` |
 | `status` | the translated status a previous request flashed, such as the one for `sudo-revoked`, or `null` |
+| `offersSignOutOthers` | whether to offer [signing out the other sessions](#signing-out-other-sessions) next to the status, after an enrollment from this page |
 
 Times are ISO 8601 strings in UTC, which the published page formats in the browser's locale.
 
@@ -51,6 +52,7 @@ protected function sendSecurityPage(Request $request, SecurityPage $page): Respo
         'recoveryCodesLow' => $page->recoveryCodesLow,
         'sudoEndsAt' => $page->sudoEndsAt,
         'status' => $page->status,
+        'offersSignOutOthers' => $page->offersSignOutOthers,
     ]);
 }
 ```
@@ -65,7 +67,7 @@ The step and the answer need [sudo](sudo.md#gating-a-route). A session without i
 
 A ceremony lasts 15 minutes at most, and never longer than the sudo it was started under. The ceremony also ends with its sudo: when the sudo runs out, when the user ends it, or when the user's network changes. A later sudo never finishes an enrollment that an earlier one started. An answer that arrives with no ceremony running sends the user back to the type's step with the `enrollment-expired` status, where a new ceremony starts.
 
-A correct answer stores the credential and records `credential.added` with flow `settings` in one change, which [alerts](security-alerts.md) the account's owner. The user's session gets a new session id and keeps its sudo, and the user is sent to the security page with the `enrolled` status. Adding a credential signs out no other session. The exception is a type whose new credential replaces the one the account holds, as a [TOTP key](totp.md#enrolling) does: the old credential is deleted in the same change, and every other session of the account is signed out.
+A correct answer stores the credential and records `credential.added` with flow `settings` in one change, which [alerts](security-alerts.md) the account's owner. The user's session gets a new session id and keeps its sudo, and the user is sent to the security page with the `enrolled` status, which [offers to sign out the other sessions](#after-an-enrollment). Adding a credential signs out no other session. The exception is a type whose new credential replaces the one the account holds, as a [TOTP key](totp.md#enrolling) does: the old credential is deleted in the same change, and every other session of the account is signed out.
 
 A wrong answer stores nothing and keeps the ceremony. It is refused with "The provided credential is invalid." on the type's field, and nothing typed is flashed back. It records `proof.rejected` with flow `settings` and counts as a failed attempt in the `settings` flow, apart from the counts that sign-in, the challenge and the sudo replay keep.
 
@@ -152,6 +154,31 @@ protected function sendRemovalPage(Request $request, CredentialRemovalPage $page
 
 `sendCredentialRemoved()` and `sendCredentialNotFound()` answer the other two outcomes. The published controller sends both to the security page, which shows the flashed status.
 
+## Signing out other sessions
+
+The page links to a confirm step at `GET /settings/security/sessions/others/revoke`, named `security.sessions.others.revoke`. The user confirms with `DELETE /settings/security/sessions/others`, named `security.sessions.others.revoke.submit`.
+
+Both routes need [sudo](sudo.md#gating-a-route). A session without it is sent to confirm who the user is, and then back to the confirm step. The confirm step counts against the `view` [request limit](rate-limiting.md) and the sign-out against the `change` limit, 10 a minute by default.
+
+Signing out the other sessions moves the account's credential epoch, so every other browser signed in to the account is signed out on its next request, and a remember-me cookie from before no longer signs it back in. This works on every session driver. On the `database` driver, Keystone also deletes the other sessions' rows from `session.table`. The user's own session stays signed in, gets a new session id and keeps its sudo. Keystone records `sessions.revoked_others`, which [alerts](security-alerts.md) the account's owner, and sends the user to the security page with the `other-sessions-revoked` status.
+
+The confirm step shows nothing about the account, so `sendSignOutOthersPage()` receives only the request:
+
+```php
+protected function sendSignOutOthersPage(Request $request): Response
+{
+    return Inertia::render('settings/SignOutOthers');
+}
+```
+
+`sendOtherSessionsRevoked()` answers the sign-out. The published controller sends the user to the security page, which shows the flashed status.
+
+### After an enrollment
+
+A credential added from this page is a good moment to sign out a browser the user doesn't recognise. After an [enrollment](#adding-a-credential), `offersSignOutOthers` is `true` and the published page shows a "Sign out your other sessions" button next to the `enrolled` status. The button sends `DELETE /settings/security/sessions/others` straight away, without the confirm step, because clicking it is the confirmation. The enrollment kept the session's sudo, so the sign-out passes the gate.
+
+On the `database` driver, Keystone first checks `session.table` and offers the sign-out only when the account has another session that has made a request since its credential epoch last moved. On other drivers Keystone can't tell, so it always offers it.
+
 ## Testing
 
 Keystone's AppTests sign in, give the account's credential a name, add another account's credential and open the page. They check your response through `Tests\Keystone\Assertions\SecurityAssertions`: `assertSecurityPage()` receives the names the page must list in order, and `assertSecurityPageOmits()` a name it must not list. A guest's redirect goes through `assertGuestSentAwayFromSecurity()`. If you change what `sendSecurityPage()` returns, redefine the assertion there.
@@ -159,3 +186,5 @@ Keystone's AppTests sign in, give the account's credential a name, add another a
 The enrollment AppTests enroll a credential of the first type an account can enroll as a second factor. They also answer wrongly, answer with no ceremony running, cancel, try without sudo and try a type whose ceremony can't start. They check your responses through `Tests\Keystone\Assertions\CredentialEnrollmentAssertions`, which has an assertion named after each hook, and `assertCredentialEnrollmentRestarted()` for the form that shows the `enrollment-expired` status.
 
 The removal AppTests remove a credential, try another account's and try without sudo. They also try to remove the account's only way to sign in, and its last second factor while one is required. They check your responses through `Tests\Keystone\Assertions\CredentialRemovalAssertions`: `assertRemovalPage()` receives the name the confirm step must show, `assertRemovalRefused()` the credential's id and the message, and `assertCredentialRemoved()` and `assertCredentialNotFound()` check the other outcomes.
+
+The sign-out AppTests sign in from a second browser, sign out the other sessions and check that the second browser is signed out. They also run on the `database` session driver and check that only the user's own row is left, and try without sudo. They check your responses through `Tests\Keystone\Assertions\OtherSessionsAssertions`: `assertSignOutOthersPage()` and `assertOtherSessionsRevoked()`, one for each hook.

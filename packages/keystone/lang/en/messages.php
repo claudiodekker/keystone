@@ -30,5 +30,6 @@ return [
         'credential-removed' => 'The credential was removed. Your other sessions were signed out.',
         'credential-not-found' => 'That credential was not found. It may already have been removed.',
         'enrolled' => 'The new credential was added.',
+        'other-sessions-revoked' => 'Your other sessions were signed out.',
     ],
 ];

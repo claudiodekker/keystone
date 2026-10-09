@@ -17,6 +17,7 @@ Alerts are queued. Run a queue worker, or they are never sent: `queue.default` s
 | `limit.tripped` | wrong answers spent one of the account's [failed-attempt counts](rate-limiting.md#locking-an-accounts-owner-out), once per count and window; a spent request limit alerts nobody |
 | `recovery_code.used` | a [recovery code](challenge.md#recovery-codes) answered the challenge; the mail says how many codes the account has left |
 | `recovery_codes.generated` | a new set of recovery codes replaced the account's codes; a first set alerts nobody |
+| `sessions.revoked_others` | the user [signed out their other sessions](security-settings.md#signing-out-other-sessions) |
 | `sessions.terminated` | an operator ended every session of the account, unless they passed `--no-alert` (see [Operator commands](operator-commands.md#ending-sessions)); ending every account's sessions with `--all` alerts nobody |
 | `signed_in` | the account signed in from a browser that isn't one of its [known devices](#new-devices) |
 | `sudo.failed` | a signed-in session gave a wrong answer when asked to prove it's the owner before a sensitive change (see [Sudo](sudo.md#the-replay)); a known device alerts too, because whoever answered holds the session |

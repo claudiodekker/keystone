@@ -32,6 +32,11 @@ class AccountChange
     protected bool $rotatesSession = false;
 
     /**
+     * Whether the rows of the account's other sessions must be deleted once the mover's own session carries its new id.
+     */
+    protected bool $dropsSessions = false;
+
+    /**
      * The events to record once the change commits.
      *
      * @var list<Closure(SecurityEventRecorder): void>
@@ -49,6 +54,7 @@ class AccountChange
         protected Credentials $credentials,
         protected RecoveryCodes $recoveryCodes,
         protected KnownDevices $knownDevices,
+        protected ?AccountSessions $sessions,
     ) {
         //
     }
@@ -214,6 +220,28 @@ class AccountChange
     public function endSessions(): void
     {
         $this->movesEpoch = true;
+    }
+
+    /**
+     * End every session of the account but the mover's own, deleting their rows where the session driver keeps them, and record it.
+     */
+    public function signOutOthers(): void
+    {
+        $this->endSessions();
+
+        $this->dropsSessions = true;
+
+        $this->record(SecurityEventType::SESSIONS_REVOKED_OTHERS);
+    }
+
+    /**
+     * Delete the rows of the sessions the change signed out, once the mover's own session carries the id it will be stored under.
+     */
+    public function dropSessions(): void
+    {
+        if ($this->dropsSessions) {
+            $this->sessions?->deleteOthers();
+        }
     }
 
     /**

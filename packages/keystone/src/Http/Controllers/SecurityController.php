@@ -52,6 +52,7 @@ abstract class SecurityController extends Controller
         $listed = array_map(fn (CredentialType $type) => $type->name(), $credentialTypes->listed());
         $enrollable = array_map(fn (CredentialType $type) => $type->name(), $credentialTypes->serving(Surface::ENROLLMENT));
         $recoveryCodes = (new RecoveryCodes($account))->remaining($account->getKey());
+        $status = Status::flashed($request);
 
         $types = array_map(fn (string $type) => [
             'type' => $type,
@@ -71,7 +72,8 @@ abstract class SecurityController extends Controller
             recoveryCodes: $recoveryCodes,
             recoveryCodesLow: $recoveryCodes <= RecoveryCodes::RUNNING_LOW,
             sudoEndsAt: (new SudoGate($guard))->liveGrant()?->endsAt->toIso8601String(),
-            status: Status::flashed($request)?->label(),
+            status: $status?->label(),
+            offersSignOutOthers: $status === Status::ENROLLED && ($guard->sessions($account)?->mayHaveOthers() ?? true),
         );
 
         return $this->sendSecurityPage($request, $page);

@@ -37,7 +37,7 @@ class AccountChanges
             $locked = $this->lock($account);
             $addresses = new Addresses($locked);
             $recipients = $addresses->recipientsOf($locked);
-            $change = new AccountChange($locked, $recipients, new Credentials($locked), new RecoveryCodes($locked), new KnownDevices($locked));
+            $change = new AccountChange($locked, $recipients, new Credentials($locked), new RecoveryCodes($locked), new KnownDevices($locked), $this->guard->sessions($locked));
             $result = $apply($change);
             $movedFrom = $change->movesEpoch() ? $this->moveEpoch($locked) : null;
 
@@ -97,7 +97,7 @@ class AccountChanges
     }
 
     /**
-     * Carry the mover's own session over the epoch move, or give it a new id when the change asks for one, and record the change's events.
+     * Carry the mover's own session over the epoch move, or give it a new id when the change asks for one, then drop the sessions it signed out and record its events.
      */
     protected function committed(AccountChange $change, ?int $movedFrom): void
     {
@@ -106,6 +106,8 @@ class AccountChanges
         } elseif ($change->rotatesSession()) {
             $this->guard->rotateFor($change->account);
         }
+
+        $change->dropSessions();
 
         foreach ($change->events() as $record) {
             $record($this->recorder);

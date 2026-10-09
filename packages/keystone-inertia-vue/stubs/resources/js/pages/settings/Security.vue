@@ -3,6 +3,8 @@ import { Form, Head, Link } from '@inertiajs/vue3';
 import { typeName } from '@/lib/credentialTypes';
 import { enroll } from '@/routes/security';
 import { remove } from '@/routes/security/credentials';
+import { revoke } from '@/routes/security/sessions/others';
+import { submit as revokeOthers } from '@/routes/security/sessions/others/revoke';
 import { end } from '@/routes/sudo';
 import type { SecurityPage } from '@/types/auth';
 
@@ -20,7 +22,14 @@ const time = (value: string) => new Date(value).toLocaleTimeString([], { hour: '
         <main class="flex w-full max-w-2xl flex-col gap-8">
             <h1 class="text-xl font-semibold text-gray-900">Security settings</h1>
 
-            <p v-if="status" class="text-sm font-medium text-green-600">{{ status }}</p>
+            <div v-if="status" class="flex flex-col gap-2">
+                <p class="text-sm font-medium text-green-600">{{ status }}</p>
+                <Form v-if="offersSignOutOthers" v-bind="revokeOthers.form()" v-slot="{ processing }">
+                    <button type="submit" :disabled="processing" class="text-sm font-medium text-gray-900 underline">
+                        Sign out your other sessions
+                    </button>
+                </Form>
+            </div>
 
             <section v-for="group in types" :key="group.type" class="flex flex-col gap-2 rounded-lg bg-white p-6 shadow-sm ring-1 ring-gray-200">
                 <h2 class="font-medium text-gray-900">{{ typeName(group.type) }}</h2>
@@ -88,6 +97,12 @@ const time = (value: string) => new Date(value).toLocaleTimeString([], { hour: '
                     <p class="text-sm text-gray-600">{{ recoveryCodes === 1 ? '1 code left' : `${recoveryCodes} codes left` }}</p>
                     <p v-if="recoveryCodesLow" class="text-sm font-medium text-amber-700">You're running low on recovery codes.</p>
                 </template>
+            </section>
+
+            <section class="flex flex-col gap-2 rounded-lg bg-white p-6 shadow-sm ring-1 ring-gray-200">
+                <h2 class="font-medium text-gray-900">Sessions</h2>
+                <p class="text-sm text-gray-600">Signed in somewhere you don't recognise, or on a device you no longer use?</p>
+                <Link :href="revoke()" class="text-sm font-medium text-gray-900 underline">Sign out other sessions</Link>
             </section>
 
             <section class="flex flex-col gap-2 rounded-lg bg-white p-6 shadow-sm ring-1 ring-gray-200">
