@@ -2,6 +2,8 @@
 
 namespace ClaudioDekker\Keystone;
 
+use ClaudioDekker\Keystone\Exceptions\Barred;
+use ClaudioDekker\Keystone\Exceptions\Superseded;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\EnrolledCredential;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
@@ -48,29 +50,27 @@ class EnrollmentAttempt extends CredentialAttempt
     {
         $changes = new AccountChanges($this->guard, $this->recorder);
 
-        return $changes->change($pending->account, function (AccountChange $change) use ($pending, $type, $enrolled) {
-            if ((new SignInDecision)->isBarred($change->account)) {
-                return 'keystone.barred';
-            }
+        try {
+            return $changes->change($pending->account, function (AccountChange $change) use ($type, $enrolled) {
+                if ((new Credentials($change->account))->holdsSecondFactor($change->account->getKey())) {
+                    return 'keystone.second_factor_held';
+                }
 
-            if (! $change->isOnEpoch($pending->epoch)) {
-                return 'keystone.superseded';
-            }
+                $id = $change->addCredential($type, identifier: $enrolled->identifier, secret: $enrolled->secret, label: $enrolled->label);
 
-            if ((new Credentials($change->account))->holdsSecondFactor($change->account->getKey())) {
-                return 'keystone.second_factor_held';
-            }
+                $change->record(
+                    SecurityEventType::CREDENTIAL_ADDED,
+                    flow: Flow::ENROLLMENT->value,
+                    credentialType: $type->name(),
+                    credential: new StoredCredential($id, identifier: null, secret: null, label: $enrolled->label),
+                );
 
-            $id = $change->addCredential($type, identifier: $enrolled->identifier, secret: $enrolled->secret, label: $enrolled->label);
-
-            $change->record(
-                SecurityEventType::CREDENTIAL_ADDED,
-                flow: Flow::ENROLLMENT->value,
-                credentialType: $type->name(),
-                credential: new StoredCredential($id, identifier: null, secret: null, label: $enrolled->label),
-            );
-
-            return null;
-        });
+                return null;
+            }, $pending);
+        } catch (Barred) {
+            return 'keystone.barred';
+        } catch (Superseded) {
+            return 'keystone.superseded';
+        }
     }
 }

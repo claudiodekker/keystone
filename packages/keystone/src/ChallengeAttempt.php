@@ -54,7 +54,7 @@ class ChallengeAttempt extends CredentialAttempt
      */
     protected function answerWithRecoveryCode(PendingSignIn $pending, Flow $flow, RecoveryCodeType $type, #[\SensitiveParameter] string $typed, TakenAttempt $taken): Demand
     {
-        if (! $this->spendRecoveryCode($pending->account, $flow, $type, $typed, keepLast: config()->boolean('keystone.require_recovery_codes'))) {
+        if (! $this->spendRecoveryCode($pending->account, $flow, $type, $typed, keepLast: config()->boolean('keystone.require_recovery_codes'), writer: $pending)) {
             return Demand::REFUSE;
         }
 

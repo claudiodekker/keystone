@@ -2,9 +2,13 @@
 
 namespace ClaudioDekker\Keystone;
 
+use ClaudioDekker\Keystone\Exceptions\Barred;
+use ClaudioDekker\Keystone\Exceptions\SudoRequired;
+use ClaudioDekker\Keystone\Exceptions\Superseded;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Date;
+use Throwable;
 
 /**
  * @internal
@@ -28,13 +32,23 @@ class AccountChanges
      *
      * @param  Closure(AccountChange): TResult  $apply
      * @return TResult
+     *
+     * @throws Barred
+     * @throws Superseded
+     * @throws SudoRequired
      */
-    public function change(Model&KeystoneUser $account, Closure $apply): mixed
+    public function change(Model&KeystoneUser $account, Closure $apply, PendingSignIn|SudoGrant|SudoInProgress|null $writer = null): mixed
     {
         $connection = $account->getConnection();
 
-        [$change, $result, $movedFrom] = $connection->transaction(function () use ($account, $apply) {
+        $outcome = $connection->transaction(function () use ($account, $apply, $writer) {
             $locked = $this->lock($account);
+            $refusal = $writer === null ? null : $this->refusalFor($locked, $writer);
+
+            if ($refusal !== null) {
+                return $refusal;
+            }
+
             $addresses = new Addresses($locked);
             $recipients = $addresses->recipientsOf($locked);
             $change = new AccountChange($locked, $recipients, new Credentials($locked), new RecoveryCodes($locked), new KnownDevices($locked), $this->guard->sessions($locked));
@@ -43,6 +57,12 @@ class AccountChanges
 
             return [$change, $result, $movedFrom];
         });
+
+        if ($outcome instanceof Throwable) {
+            throw $outcome;
+        }
+
+        [$change, $result, $movedFrom] = $outcome;
 
         $connection->afterCommit(function () use ($change, $movedFrom) {
             $this->committed($change, $movedFrom);
@@ -79,6 +99,26 @@ class AccountChanges
     {
         /** @var Model&KeystoneUser */
         return $account->newQueryWithoutScopes()->whereKey($account->getKey())->lockForUpdate()->firstOrFail();
+    }
+
+    /**
+     * Get why the locked account refuses the session writing it, if it does.
+     */
+    protected function refusalFor(Model&KeystoneUser $locked, PendingSignIn|SudoGrant|SudoInProgress $writer): Barred|Superseded|SudoRequired|null
+    {
+        if ((new SignInDecision)->isBarred($locked)) {
+            return Barred::inactive();
+        }
+
+        if ($writer instanceof PendingSignIn && (int) $locked->getRawOriginal('credential_epoch') !== $writer->epoch) {
+            return new Superseded;
+        }
+
+        if ($writer instanceof SudoGrant && (new SudoGate($this->guard))->liveGrant() === null) {
+            return new SudoRequired;
+        }
+
+        return null;
     }
 
     /**

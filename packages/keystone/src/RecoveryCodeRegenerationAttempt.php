@@ -2,6 +2,8 @@
 
 namespace ClaudioDekker\Keystone;
 
+use ClaudioDekker\Keystone\Exceptions\Barred;
+use ClaudioDekker\Keystone\Exceptions\SudoRequired;
 use ClaudioDekker\Keystone\Exceptions\Throttled;
 use ClaudioDekker\Keystone\Methods\RecoveryCodeType;
 use ClaudioDekker\Keystone\Methods\Surface;
@@ -102,26 +104,30 @@ class RecoveryCodeRegenerationAttempt extends CredentialAttempt
      */
     protected function store(Model&KeystoneUser $account, StagedRecoveryCodes $staged, #[\SensitiveParameter] string $typed): RecoveryCodeRegenerationResult|string
     {
-        return (new AccountChanges($this->guard, $this->recorder))->change($account, function (AccountChange $change) use ($staged, $typed) {
-            if ((new SignInDecision)->isBarred($change->account)) {
-                return 'keystone.barred';
-            }
+        $grant = (new SudoGate($this->guard))->liveGrant();
 
-            if ((new SudoGate($this->guard))->liveGrant() === null) {
-                return RecoveryCodeRegenerationResult::SUDO_ENDED;
-            }
+        if ($grant === null) {
+            return RecoveryCodeRegenerationResult::SUDO_ENDED;
+        }
 
-            if ((new RecoveryCodes($change->account))->find($change->account->getKey(), $typed) !== null) {
+        try {
+            return (new AccountChanges($this->guard, $this->recorder))->change($account, function (AccountChange $change) use ($staged, $typed) {
+                if ((new RecoveryCodes($change->account))->find($change->account->getKey(), $typed) !== null) {
+                    return RecoveryCodeRegenerationResult::REGENERATED;
+                }
+
+                if (! $change->isOnEpoch($staged->epoch)) {
+                    return RecoveryCodeRegenerationResult::EXPIRED;
+                }
+
+                $change->commitRecoveryCodes($staged->codes, flow: Flow::SETTINGS);
+
                 return RecoveryCodeRegenerationResult::REGENERATED;
-            }
-
-            if (! $change->isOnEpoch($staged->epoch)) {
-                return RecoveryCodeRegenerationResult::EXPIRED;
-            }
-
-            $change->commitRecoveryCodes($staged->codes, flow: Flow::SETTINGS);
-
-            return RecoveryCodeRegenerationResult::REGENERATED;
-        });
+            }, $grant);
+        } catch (Barred) {
+            return 'keystone.barred';
+        } catch (SudoRequired) {
+            return RecoveryCodeRegenerationResult::SUDO_ENDED;
+        }
     }
 }

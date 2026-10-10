@@ -2,6 +2,8 @@
 
 namespace ClaudioDekker\Keystone;
 
+use ClaudioDekker\Keystone\Exceptions\Barred;
+use ClaudioDekker\Keystone\Exceptions\Superseded;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
 
@@ -83,23 +85,21 @@ class RecoveryCodeSetup
         $changes = new AccountChanges($this->guard, $this->recorder);
         $codes = array_values(array_map(strval(...), $staged));
 
-        return $changes->change($pending->account, function (AccountChange $change) use ($pending, $codes) {
-            if ((new SignInDecision)->isBarred($change->account)) {
-                return 'keystone.barred';
-            }
+        try {
+            return $changes->change($pending->account, function (AccountChange $change) use ($codes) {
+                if ((new RecoveryCodes($change->account))->hasRemaining($change->account->getKey())) {
+                    return 'keystone.recovery_codes_held';
+                }
 
-            if (! $change->isOnEpoch($pending->epoch)) {
-                return 'keystone.superseded';
-            }
+                $change->commitRecoveryCodes($codes, flow: Flow::ENROLLMENT);
 
-            if ((new RecoveryCodes($change->account))->hasRemaining($change->account->getKey())) {
-                return 'keystone.recovery_codes_held';
-            }
-
-            $change->commitRecoveryCodes($codes, flow: Flow::ENROLLMENT);
-
-            return null;
-        });
+                return null;
+            }, $pending);
+        } catch (Barred) {
+            return 'keystone.barred';
+        } catch (Superseded) {
+            return 'keystone.superseded';
+        }
     }
 
     /**

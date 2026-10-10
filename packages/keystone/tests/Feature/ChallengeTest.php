@@ -10,12 +10,26 @@ use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormType;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormTypeSupport;
 use ClaudioDekker\Keystone\Tests\Fixtures\RogueType;
+use Illuminate\Database\Connection;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Sleep;
 
 pest()->extend(AppTestCase::class);
+
+function raceInsideTheChallengeChange(Closure $race): void
+{
+    $raced = false;
+    $outerLevel = DB::transactionLevel();
+
+    DB::beforeExecuting(function (string $query, array $bindings, Connection $connection) use (&$raced, $outerLevel, $race) {
+        if (! $raced && $connection->transactionLevel() > $outerLevel && str_contains($query, 'users')) {
+            $raced = true;
+            $race();
+        }
+    });
+}
 
 describe('the hold', function () {
     it('signs in a type that represents multiple factors without a challenge', function () {
@@ -332,4 +346,19 @@ describe('rate limits', function () {
         $this->post(route('login.challenge.submit', ['type' => 'otp']), (new FormTypeSupport('otp'))->validProof(Surface::CHALLENGE))->assertTooManyRequests();
         $this->assertGuest();
     });
+});
+
+it('keeps the recovery code of a pending sign-in whose sessions were ended while it answers', function () {
+    $account = $this->createChallengedAccount(new FormTypeSupport('code'));
+    [$code] = $this->arrangeRecoveryCodes($account);
+    $this->passFirstFactor();
+    raceInsideTheChallengeChange(fn () => DB::table('users')->where('id', $account->getKey())->increment('credential_epoch'));
+
+    $response = $this->post(route('login.challenge.submit', ['type' => CredentialTypes::RECOVERY_CODE]), ['code' => $code]);
+
+    $response->assertSessionHasErrors([CredentialTypes::RECOVERY_CODE => __('keystone::messages.invalid_credential')]);
+    $this->assertGuest();
+    $this->assertDatabaseCount('user_recovery_codes', 8);
+    $this->assertDatabaseHas('user_security_events', ['type' => 'proof.rejected', 'user_id' => $account->getKey(), 'flow' => 'challenge', 'credential_type' => CredentialTypes::RECOVERY_CODE, 'reason' => 'keystone.superseded']);
+    $this->assertDatabaseMissing('user_security_events', ['type' => 'recovery_code.used']);
 });
