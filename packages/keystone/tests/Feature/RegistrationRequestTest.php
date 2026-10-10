@@ -2,6 +2,7 @@
 
 use ClaudioDekker\Keystone\AppTests\AppTestCase;
 use ClaudioDekker\Keystone\EmailedLinks;
+use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Notifications\EmailedLinkMail;
 use ClaudioDekker\Keystone\Notifications\SecurityAlert;
 use ClaudioDekker\Keystone\RateLimiter;
@@ -47,7 +48,7 @@ describe('the register page', function () {
     it('shows the register page to a guest', function () {
         $response = $this->get(route('register'));
 
-        $response->assertOk()->assertExactJson(['page' => 'register', 'status' => null]);
+        $response->assertOk()->assertExactJson(['page' => 'register', 'status' => null, 'mailsLink' => true]);
         $this->assertHardeningFloor($response);
     });
 
@@ -56,6 +57,14 @@ describe('the register page', function () {
 
         $this->get(route('register'))->assertRedirect('/');
     });
+
+    it('says whether a link will be mailed', function (bool $required) {
+        config(['keystone.email_verification.required' => $required]);
+
+        $response = $this->get(route('register'));
+
+        $response->assertOk()->assertExactJson(['page' => 'register', 'status' => null, 'mailsLink' => $required]);
+    })->with(['required' => true, 'not required' => false]);
 
     it('shows the link-sent page to a guest', function () {
         $this->get(route('register.link-sent'))->assertOk()->assertExactJson(['page' => 'register-link-sent']);
@@ -214,7 +223,7 @@ describe('the email submission', function () {
         expect(linksMailedTo('jane@example.com'))->toHaveCount(3);
     });
 
-    it('leaves the session untouched', function () {
+    it('leaves the session untouched while it mails a link', function () {
         $this->get(route('register'));
         $sessionId = session()->getId();
         $before = session()->all();
@@ -339,5 +348,128 @@ describe('the delivery limit', function () {
         $response->assertRedirectToRoute('register.link-sent');
         Notification::assertNothingSent();
         Exceptions::assertReported(fn (RuntimeException $e) => $e->getMessage() === 'Store down.');
+    });
+});
+
+describe('the email submission without email verification', function () {
+    beforeEach(function () {
+        config(['keystone.email_verification.required' => false]);
+    });
+
+    it('starts registering a free address unverified and sends the user on to finish, mailing nothing', function () {
+        $response = $this->post(route('register.submit'), ['email' => ' New@EXAMPLE.com ']);
+
+        $response->assertRedirectToRoute('register.finish');
+        expect(Keystone::guard()->registration())->address->toBe('new@example.com')->verified->toBeFalse();
+        Notification::assertNothingSent();
+    });
+
+    it('starts the registration on a new session id', function () {
+        $this->get(route('register'));
+        $before = session()->getId();
+
+        $this->post(route('register.submit'), ['email' => 'new@example.com']);
+
+        expect(session()->getId())->not->toBe($before);
+    });
+
+    it('starts registering a taken address, records address.claim_attempted on its owner and alerts them, mailing the typed address no link', function (Closure $arrange) {
+        $owner = $arrange->call($this);
+
+        $response = $this->post(route('register.submit'), ['email' => 'jane@example.com']);
+
+        $response->assertRedirectToRoute('register.finish');
+        expect(Keystone::guard()->registration())->address->toBe('jane@example.com')->verified->toBeFalse()
+            ->and(linksMailedTo('jane@example.com'))->toBe([])
+            ->and(alertsMailedTo('jane@example.com', SecurityEventType::ADDRESS_CLAIM_ATTEMPTED))->toHaveCount(1);
+        Notification::assertNotSentTo(new AnonymousNotifiable, EmailedLinkMail::class);
+        $this->assertDatabaseHas('user_security_events', ['user_id' => $owner->getKey(), 'type' => 'address.claim_attempted', 'flow' => 'registration']);
+    })->with([
+        'held verified' => fn () => $this->createAccount('jane@example.com'),
+        'counted as verified, the account holding no verified address' => fn () => $this->createAccount('jane@example.com', verified: false),
+        'held by a suspended account' => fn () => tap($this->createAccount('jane@example.com'), fn ($account) => DB::table('users')->where('id', $account->getKey())->update(['suspended_at' => now()])),
+    ]);
+
+    it('alerts every active account the address counts as verified for', function () {
+        $this->createAccount('jane@example.com', verified: false);
+        $this->createAccount('jane@example.com', verified: false);
+
+        $this->post(route('register.submit'), ['email' => 'jane@example.com']);
+
+        expect(alertsMailedTo('jane@example.com', SecurityEventType::ADDRESS_CLAIM_ATTEMPTED))->toHaveCount(2);
+    });
+
+    it('alerts no one for an address a disabled account holds, starting the registration all the same', function (string $column) {
+        $account = $this->createAccount('jane@example.com');
+        DB::table('users')->where('id', $account->getKey())->update([$column => now()]);
+
+        $response = $this->post(route('register.submit'), ['email' => 'jane@example.com']);
+
+        $response->assertRedirectToRoute('register.finish');
+        expect(Keystone::guard()->registration())->address->toBe('jane@example.com');
+        Notification::assertNothingSent();
+        $this->assertDatabaseMissing('user_security_events', ['type' => 'address.claim_attempted']);
+    })->with(['deleted' => 'deleted_at', 'invalidated' => 'invalidated_at']);
+
+    it('starts the registration once the address spent its deliveries, alerting its owner no more', function () {
+        $this->createAccount('jane@example.com');
+
+        foreach (range(1, config()->integer('keystone.rate_limits.deliveries_per_ten_minutes')) as $ignored) {
+            $this->post(route('register.submit'), ['email' => 'jane@example.com']);
+        }
+
+        Keystone::guard()->endRegistration();
+        $response = $this->post(route('register.submit'), ['email' => 'jane@example.com']);
+
+        $response->assertRedirectToRoute('register.finish');
+        expect(Keystone::guard()->registration())->address->toBe('jane@example.com')
+            ->and(alertsMailedTo('jane@example.com', SecurityEventType::ADDRESS_CLAIM_ATTEMPTED))->toHaveCount(3);
+    });
+
+    it('answers a taken address and a spent delivery limit exactly like a free one', function () {
+        $this->createAccount('jane@example.com');
+        foreach (range(1, config()->integer('keystone.rate_limits.deliveries_per_ten_minutes')) as $ignored) {
+            $this->post(route('register.submit'), ['email' => 'spent@example.com']);
+        }
+
+        $this->assertIndistinguishable(
+            fn () => $this->post(route('register.submit'), ['email' => 'jane@example.com']),
+            fn () => $this->post(route('register.submit'), ['email' => 'new@example.com']),
+        );
+        $this->assertIndistinguishable(
+            fn () => $this->post(route('register.submit'), ['email' => 'spent@example.com']),
+            fn () => $this->post(route('register.submit'), ['email' => 'other@example.com']),
+        );
+    });
+
+    it('waits out the timing floor', function (Closure $arrange) {
+        $arrange->call($this);
+
+        $response = $this->assertWaitsOutTimingFloor(fn () => $this->post(route('register.submit'), ['email' => 'jane@example.com']));
+
+        $response->assertRedirectToRoute('register.finish');
+    })->with([
+        'a free address' => fn () => null,
+        'a taken address' => fn () => $this->createAccount('jane@example.com'),
+        'a spent delivery limit' => function () {
+            foreach (range(1, config()->integer('keystone.rate_limits.deliveries_per_ten_minutes')) as $ignored) {
+                $this->post(route('register.submit'), ['email' => 'jane@example.com']);
+            }
+        },
+    ]);
+
+    it('still refuses an invalid address without starting a registration', function () {
+        $response = $this->post(route('register.submit'), ['email' => 'not-an-address']);
+
+        $response->assertRedirectToRoute('register')->assertSessionHasErrors(['email']);
+        expect(Keystone::guard()->registration())->toBeNull();
+    });
+
+    it('sends a signed-in user away without starting a registration', function () {
+        $this->signInAccount(new FormTypeSupport);
+
+        $this->post(route('register.submit'), ['email' => 'new@example.com'])->assertRedirect('/');
+
+        expect(Keystone::guard()->registration())->toBeNull();
     });
 });

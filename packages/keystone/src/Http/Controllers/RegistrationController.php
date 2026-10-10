@@ -51,11 +51,13 @@ abstract class RegistrationController extends Controller
             return $this->refuseSignedIn();
         }
 
-        return $this->sendRegistrationPage($request, new RegisterPage(status: Status::flashed($request)?->label()));
+        return $this->sendRegistrationPage($request, new RegisterPage(status: Status::flashed($request)?->label(), mailsLink: config('keystone.email_verification.required') === true));
     }
 
     /**
      * Mail a registration link to the typed address, or alert the accounts holding it, and send the user on to "link sent" either way.
+     *
+     * An app that doesn't require email verification mails nothing, and sends the user on to finish registering.
      */
     public function store(Request $request): Response|Responsable
     {
@@ -73,9 +75,17 @@ abstract class RegistrationController extends Controller
 
         $attempt = new RegistrationRequestAttempt(Keystone::guard(), new RateLimiter($request, app(RequestContext::class), Keystone::guard()), new EmailedLinks(Keystone::guard()));
 
-        $attempt->attempt($validator->validated()[self::EMAIL]);
+        $typed = $validator->validated()[self::EMAIL];
 
-        return $this->sendRegistrationLinkSent($request);
+        if (config('keystone.email_verification.required') === true) {
+            $attempt->requestLink($typed);
+
+            return $this->sendRegistrationLinkSent($request);
+        }
+
+        $attempt->startUnverified($typed);
+
+        return $this->sendRegistrationStarted($request);
     }
 
     /**
@@ -99,6 +109,11 @@ abstract class RegistrationController extends Controller
      * Respond to a handled email address, the same whether it was free, taken or spent its deliveries, sending the user on to "link sent".
      */
     abstract protected function sendRegistrationLinkSent(Request $request): Response|Responsable;
+
+    /**
+     * Respond to a registration started without a link, the same whether it was free, taken or spent its deliveries, sending the user on to finish registering.
+     */
+    abstract protected function sendRegistrationStarted(Request $request): Response|Responsable;
 
     /**
      * Respond with the step telling the user to check their inbox.

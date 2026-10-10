@@ -112,13 +112,13 @@ class BootChecks
     }
 
     /**
-     * Check the switches that require a second factor and recovery codes.
+     * Check the switches that require a second factor, recovery codes and a verified address.
      *
      * @return list<string>
      */
     protected function mandateFailures(): array
     {
-        $keys = ['keystone.require_second_factor', 'keystone.require_recovery_codes'];
+        $keys = ['keystone.require_second_factor', 'keystone.require_recovery_codes', 'keystone.email_verification.required'];
         $invalid = array_filter($keys, fn (string $key) => ! is_bool(config($key)));
 
         return array_values(array_map(fn (string $key) => "{$key} must be true or false.", $invalid));

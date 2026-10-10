@@ -37,8 +37,26 @@ it('offers to create an account on the sign-in page only while registration is o
 it('renders the register page, kept encrypted in the browser\'s history', function () {
     $response = $this->get(route('register'));
 
-    $response->assertInertia(fn (AssertableInertia $page) => $page->component('auth/Register')->where('status', null)->where('email', null));
+    $response->assertInertia(fn (AssertableInertia $page) => $page->component('auth/Register')->where('status', null)->where('email', null)->where('mailsLink', true));
     expect($response->inertiaPage())->toHaveKey('encryptHistory', true);
+});
+
+it('tells the register page no link will be mailed when email verification is off', function () {
+    config(['keystone.email_verification.required' => false]);
+
+    $response = $this->get(route('register'));
+
+    $response->assertInertia(fn (AssertableInertia $page) => $page->component('auth/Register')->where('mailsLink', false));
+});
+
+it('sends an address submitted without a link on to the finish page, which shows it', function () {
+    config(['keystone.email_verification.required' => false]);
+
+    $response = $this->post(route('register.submit'), ['email' => 'new@example.com']);
+
+    $this->assertRegistrationStarted($response);
+    $this->get(route('register.finish'))->assertInertia(fn (AssertableInertia $page) => $page->component('auth/RegisterFinish')->where('address', 'new@example.com'));
+    Notification::assertNothingSent();
 });
 
 it('fills the register page with the address invalid input flashed back', function () {

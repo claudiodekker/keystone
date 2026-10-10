@@ -46,6 +46,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Email Verification
+    |--------------------------------------------------------------------------
+    |
+    | Whether registration mails the address a link before the account
+    | is created. Turning it off lets anyone register an address they
+    | can't read, and answers "already registered" at the last step.
+    |
+    */
+
+    'email_verification' => [
+        'required' => true,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Session Lifetime
     |--------------------------------------------------------------------------
     |

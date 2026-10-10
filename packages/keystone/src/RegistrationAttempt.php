@@ -26,7 +26,7 @@ class RegistrationAttempt
     }
 
     /**
-     * Let the type make the account's first credential from the input, create the account holding the address the session registers, then sign it in or hold it for the enrollment it owes.
+     * Let the type make the account's first credential from the input, create the account holding the address the session registers, verified only when it was proven, then sign it in or hold it for the enrollment it owes.
      *
      * @param  array<string, mixed>  $profile
      * @param  array<string, mixed>  $input
@@ -46,7 +46,7 @@ class RegistrationAttempt
         }
 
         try {
-            $account = (new AccountCreation($this->guard, $this->createAccount, $this->recorder))->create($profile, $registration->address, $type, $proof->enrolled);
+            $account = (new AccountCreation($this->guard, $this->createAccount, $this->recorder))->create($profile, $registration, $type, $proof->enrolled);
         } catch (AddressTaken) {
             $this->guard->endRegistration();
 

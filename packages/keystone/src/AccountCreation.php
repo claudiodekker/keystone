@@ -26,30 +26,39 @@ class AccountCreation
     }
 
     /**
-     * Create the account in one transaction, holding the address as its verified primary one and the enrolled credential, and record account.registered once it commits.
+     * Create the account in one transaction, holding the registration's address as its primary one and the enrolled credential, and record account.registered once it commits.
+     *
+     * The address is stored verified only when the registration proved it.
      *
      * @param  array<string, mixed>  $profile
      * @return Model&KeystoneUser
      *
      * @throws AddressTaken
      */
-    public function create(array $profile, string $address, CredentialType $type, EnrolledCredential $credential): Model
+    public function create(array $profile, Registering $registration, CredentialType $type, EnrolledCredential $credential): Model
     {
         $users = $this->guard->userModel();
+        $address = $registration->address;
 
-        return $users->getConnection()->transaction(function () use ($users, $profile, $address, $type, $credential) {
+        return $users->getConnection()->transaction(function () use ($users, $profile, $registration, $address, $type, $credential) {
             if ((new Addresses($users))->claimants($address) !== []) {
                 throw new AddressTaken;
             }
 
-            (new AddressClaims($this->guard, $this->recorder))->settle($address);
+            if ($registration->verified) {
+                (new AddressClaims($this->guard, $this->recorder))->settle($address);
+            }
 
             $account = $this->createAccount->handle($profile);
 
             $changes = new AccountChanges($this->guard, $this->recorder);
 
-            return $changes->change($account, function (AccountChange $change) use ($address, $type, $credential) {
-                $change->addVerifiedAddress($address);
+            return $changes->change($account, function (AccountChange $change) use ($registration, $address, $type, $credential) {
+                if ($registration->verified) {
+                    $change->addVerifiedAddress($address);
+                } else {
+                    $change->addUnverifiedAddress($address);
+                }
 
                 $id = $change->addCredential($type, identifier: $credential->identifier, secret: $credential->secret, label: $credential->label);
 

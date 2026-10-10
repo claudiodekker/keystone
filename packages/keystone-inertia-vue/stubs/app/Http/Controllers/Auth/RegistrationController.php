@@ -20,6 +20,7 @@ class RegistrationController extends Controller
 
         return Inertia::render('auth/Register', [
             'status' => $page->status,
+            'mailsLink' => $page->mailsLink,
             'email' => $request->old(self::EMAIL),
         ]);
     }
@@ -30,6 +31,14 @@ class RegistrationController extends Controller
     protected function sendRegistrationLinkSent(Request $request): RedirectResponse
     {
         return to_route('register.link-sent');
+    }
+
+    /**
+     * Respond to a registration started without a link, sending the user on to finish registering.
+     */
+    protected function sendRegistrationStarted(Request $request): RedirectResponse
+    {
+        return to_route('register.finish');
     }
 
     /**
