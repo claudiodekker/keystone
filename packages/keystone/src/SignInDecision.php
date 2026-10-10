@@ -14,13 +14,6 @@ use Illuminate\Database\Eloquent\Model;
 class SignInDecision
 {
     /**
-     * The columns, besides the soft-delete column, that bar an account from signing in when set.
-     *
-     * @var list<string>
-     */
-    protected const array BARRING_COLUMNS = ['invalidated_at', 'suspended_at'];
-
-    /**
      * Decide what an account proven by a credential of the type gets: refused, held for a challenge or an enrollment, or signed in.
      */
     public function demand(Model&KeystoneUser $account, CredentialType $proven): Demand
@@ -155,15 +148,15 @@ class SignInDecision
      */
     public function isBarred(Model&KeystoneUser $account): bool
     {
-        $columns = [...self::BARRING_COLUMNS, $account->getDeletedAtColumn()];
+        return $this->isDisabled($account) || ! is_null($account->getRawOriginal('suspended_at'));
+    }
 
-        foreach ($columns as $column) {
-            if (! is_null($account->getRawOriginal($column))) {
-                return true;
-            }
-        }
-
-        return false;
+    /**
+     * Determine if the account, as read from its row, is deleted or invalidated.
+     */
+    public function isDisabled(Model&KeystoneUser $account): bool
+    {
+        return ! is_null($account->getRawOriginal($account->getDeletedAtColumn())) || ! is_null($account->getRawOriginal('invalidated_at'));
     }
 
     /**
