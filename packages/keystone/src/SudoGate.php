@@ -4,7 +4,6 @@ namespace ClaudioDekker\Keystone;
 
 use ClaudioDekker\Keystone\Exceptions\SudoRequired;
 use Illuminate\Auth\AuthenticationException;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 
 /**
@@ -22,7 +21,6 @@ class SudoGate
      */
     public function __construct(
         protected KeystoneGuard $guard,
-        protected SecurityEventRecorder $recorder = new SecurityEventRecorder,
     ) {
         //
     }
@@ -43,10 +41,7 @@ class SudoGate
      */
     public function enforce(Request $request): void
     {
-        /** @var (Model&KeystoneUser)|null $account */
-        $account = $this->guard->user();
-
-        if ($account === null) {
+        if ($this->guard->user() === null) {
             $request->attributes->set(self::REFUSED, true);
 
             throw new AuthenticationException;
@@ -56,11 +51,7 @@ class SudoGate
             return;
         }
 
-        if ($this->guard->sudoGrant() !== null) {
-            $this->guard->endSudo();
-
-            $this->recorder->record(SecurityEventType::SUDO_NETWORK_CHANGED, account: $account);
-        }
+        $this->guard->endSudoOnNetworkChange();
 
         $this->guard->beginSudo($this->intendedUrl($request));
 

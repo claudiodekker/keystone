@@ -4,7 +4,6 @@ use ClaudioDekker\Keystone\AppTests\AppTestCase;
 use ClaudioDekker\Keystone\EmailedLinks;
 use ClaudioDekker\Keystone\Hmac;
 use ClaudioDekker\Keystone\Keystone;
-use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Notifications\EmailedLinkMail;
 use ClaudioDekker\Keystone\Notifications\SecurityAlert;
 use ClaudioDekker\Keystone\Registering;
@@ -201,21 +200,23 @@ describe('spending a link', function () {
             ->endsAt->toEqual(now()->addSeconds(Registering::WINDOW_SECONDS)->toImmutable());
     });
 
-    it('drops a pending sign-in, a stale sudo and every ceremony slot', function () {
+    it('drops a pending sign-in, a stale sudo and every ceremony slot', function (Closure $hold) {
         $url = mailedRegistrationLink($this);
-        $account = $this->createAccount('jane@example.com');
-        $this->arrangeCredential($account, new FormTypeSupport, Surface::SIGN_IN);
-        $this->arrangeCredential($account, new FormTypeSupport('code'), Surface::CHALLENGE);
-        $this->passFirstFactor();
+        $hold($this);
         Keystone::guard()->slots()->put('form', 'challenge', 'bytes', capSeconds: 300);
-        session()->put('keystone_sudo_web', ['granted_at' => now()->getTimestamp(), 'subnet' => '127.0.0.0/24']);
 
         $this->post($url)->assertRedirectToRoute('register.finish');
 
         expect(Keystone::guard()->pending())->toBeNull()
             ->and(Keystone::guard()->sudoGrant())->toBeNull()
             ->and(Keystone::guard()->slots()->get('form', 'challenge'))->toBeNull();
-    });
+    })->with([
+        'a pending sign-in' => [function (AppTestCase $test) {
+            $test->createChallengedAccount(new FormTypeSupport('code'));
+            $test->passFirstFactor();
+        }],
+        'a stale sudo' => [fn (AppTestCase $test) => session()->put('keystone_phase_web', ['phase' => 'sudo_granted', 'granted_at' => now()->getTimestamp(), 'subnet' => '127.0.0.0/24'])],
+    ]);
 
     it('works once; a replay gets the generic outcome and records request.rejected', function () {
         Event::fake([SecurityEventRecorded::class]);

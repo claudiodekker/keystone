@@ -111,7 +111,7 @@ describe('the doors', function () {
     it('refuses a guest whose session Laravel\'s own logout left the sudo value in', function () {
         $this->signInAccount(new FormTypeSupport);
         $this->post('base-logout');
-        expect(session()->has('keystone_sudo_web'))->toBeTrue();
+        expect(session()->has('keystone_phase_web'))->toBeTrue();
 
         $response = $this->get('probe');
 
@@ -338,6 +338,7 @@ describe('the subnet binding', function () {
         $changed = SecurityEvent::query()->where('type', 'sudo.network_changed')->sole();
         expect($changed->user_id)->toEqual($account->getKey())
             ->and($changed->known_device)->toBeNull();
+        $this->assertDatabaseMissing('user_security_events', ['type' => 'sudo.revoked']);
         Notification::assertSentOnDemand(SecurityAlert::class, fn (SecurityAlert $alert, array $channels, object $notifiable) => $alert->type->value === 'sudo.network_changed' && $notifiable->routes['mail'] === 'jane@example.com');
     })->with([
         'another /24' => ['203.0.113.77', '203.0.114.77'],

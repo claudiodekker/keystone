@@ -2,7 +2,6 @@
 
 namespace ClaudioDekker\Keystone;
 
-use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use ClaudioDekker\Keystone\Exceptions\Barred;
 use Illuminate\Auth\EloquentUserProvider;
@@ -129,20 +128,22 @@ class KeystoneGuard extends SessionGuard
         RememberMe $rememberMe = RememberMe::NOT_ASKED,
         PendingOrigin $origin = PendingOrigin::LOGIN,
     ): void {
+        $replaced = $this->replacedPendingChallengeId($account);
+
         $this->changeAuthLevel();
 
-        $this->session->put($this->pendingKey(), [
-            'account' => $account->getAuthIdentifier(),
-            'first_factor' => $firstFactor,
-            'origin' => $origin->value,
-            'stage' => $stage->value,
-            'intended_url' => $intendedUrl,
-            'epoch' => $this->epochOf($account),
-            'held_at' => Date::now()->getTimestamp(),
-            'second_factor_passed' => false,
-            'pending_challenge_id' => $stage === PendingStage::CHALLENGE ? $this->openPendingChallenge($account) : null,
-            'remember_me' => $rememberMe->value,
-        ]);
+        $this->phase()->put(new HeldSignIn(
+            accountId: $account->getAuthIdentifier(),
+            firstFactor: $firstFactor,
+            origin: $origin,
+            stage: $stage,
+            intendedUrl: $intendedUrl,
+            heldAt: Date::now()->toImmutable(),
+            epoch: $this->epochOf($account),
+            secondFactorPassed: false,
+            pendingChallengeId: $stage === PendingStage::CHALLENGE ? $this->openPendingChallenge($account, $replaced) : null,
+            rememberMe: $rememberMe,
+        ));
     }
 
     /**
@@ -152,13 +153,13 @@ class KeystoneGuard extends SessionGuard
      */
     public function passSecondFactor(): void
     {
-        $held = $this->session->get($this->pendingKey());
+        $held = $this->phase()->held();
 
-        if (! is_array($held)) {
+        if (! $held instanceof HeldSignIn) {
             throw new LogicException('The session holds no pending sign-in to move on.');
         }
 
-        $account = $this->retrieveAccount($held['account'] ?? null);
+        $account = $this->retrieveAccount($held->accountId);
 
         if (is_null($account)) {
             throw Barred::missing();
@@ -170,11 +171,7 @@ class KeystoneGuard extends SessionGuard
 
         $this->changeAuthLevel();
 
-        $this->session->put($this->pendingKey(), [
-            ...$held,
-            'stage' => PendingStage::ENROLLMENT->value,
-            'second_factor_passed' => true,
-        ]);
+        $this->phase()->put($held->passSecondFactor());
     }
 
     /**
@@ -182,40 +179,27 @@ class KeystoneGuard extends SessionGuard
      */
     public function pending(): ?PendingSignIn
     {
-        $held = $this->session->get($this->pendingKey());
-
-        if (! is_array($held)) {
+        if (! $this->phase()->held() instanceof HeldSignIn) {
             return null;
         }
 
-        $heldAt = CarbonImmutable::createFromTimestamp($held['held_at']);
+        $live = $this->phase()->live(HeldSignIn::class);
 
-        if ($heldAt->isFuture() || $heldAt->addSeconds(PendingSignIn::LIFETIME_SECONDS)->lessThanOrEqualTo(Date::now())) {
+        if ($live === null) {
             $this->forgetPending();
 
             return null;
         }
 
-        $account = $this->retrieveAccount($held['account']);
+        $account = $this->retrieveAccount($live->accountId);
 
-        if (is_null($account) || ! $this->isActive($account) || $this->epochOf($account) !== $held['epoch']) {
+        if (is_null($account) || ! $this->isActive($account) || $this->epochOf($account) !== $live->epoch) {
             $this->voidPending($account);
 
             return null;
         }
 
-        return new PendingSignIn(
-            account: $account,
-            firstFactor: $held['first_factor'],
-            origin: PendingOrigin::from($held['origin']),
-            stage: PendingStage::from($held['stage']),
-            intendedUrl: $held['intended_url'],
-            heldAt: $heldAt,
-            epoch: $held['epoch'],
-            secondFactorPassed: $held['second_factor_passed'],
-            pendingChallengeId: $held['pending_challenge_id'],
-            rememberMe: RememberMe::from($held['remember_me']),
-        );
+        return $live->toPendingSignIn($account);
     }
 
     /**
@@ -223,7 +207,9 @@ class KeystoneGuard extends SessionGuard
      */
     public function isPendingAt(PendingStage $stage): bool
     {
-        return ($this->session->get($this->pendingKey())['stage'] ?? null) === $stage->value;
+        $held = $this->phase()->held();
+
+        return $held instanceof HeldSignIn && $held->stage === $stage;
     }
 
     /**
@@ -231,7 +217,9 @@ class KeystoneGuard extends SessionGuard
      */
     public function namedAccountId(): int|string|null
     {
-        return $this->id() ?? $this->session->get($this->pendingKey())['account'] ?? null;
+        $held = $this->phase()->held();
+
+        return $this->id() ?? ($held instanceof HeldSignIn ? $held->accountId : null);
     }
 
     /**
@@ -240,8 +228,6 @@ class KeystoneGuard extends SessionGuard
     public function forgetPending(): void
     {
         $this->changeAuthLevel();
-
-        $this->session->forget($this->pendingKey());
     }
 
     /**
@@ -249,13 +235,9 @@ class KeystoneGuard extends SessionGuard
      */
     public function startRegistration(string $address): void
     {
-        $this->leaveForRegistration();
+        $this->changeAuthLevel();
 
-        $this->session->put($this->registrationKey(), [
-            'address' => $address,
-            'started_at' => Date::now()->getTimestamp(),
-            'verified' => true,
-        ]);
+        $this->phase()->put(new Registering($address, Date::now()->toImmutable(), verified: true));
     }
 
     /**
@@ -263,23 +245,9 @@ class KeystoneGuard extends SessionGuard
      */
     public function startUnverifiedRegistration(string $address): void
     {
-        $this->leaveForRegistration();
-
-        $this->session->put($this->registrationKey(), [
-            'address' => $address,
-            'started_at' => Date::now()->getTimestamp(),
-            'verified' => false,
-        ]);
-    }
-
-    /**
-     * Move to a new session id and drop the pending sign-in, as a registration that starts does.
-     */
-    protected function leaveForRegistration(): void
-    {
         $this->changeAuthLevel();
 
-        $this->session->forget($this->pendingKey());
+        $this->phase()->put(new Registering($address, Date::now()->toImmutable(), verified: false));
     }
 
     /**
@@ -287,22 +255,7 @@ class KeystoneGuard extends SessionGuard
      */
     public function registration(): ?Registering
     {
-        $held = $this->session->get($this->registrationKey());
-
-        if (! is_array($held) || ! is_string($held['address'] ?? null) || ! is_int($held['started_at'] ?? null) || ! is_bool($held['verified'] ?? null)) {
-            return null;
-        }
-
-        $startedAt = CarbonImmutable::createFromTimestamp($held['started_at']);
-        $endsAt = $startedAt->addSeconds(Registering::WINDOW_SECONDS);
-
-        if ($startedAt->isFuture() || $endsAt->lessThanOrEqualTo(Date::now())) {
-            $this->session->forget($this->registrationKey());
-
-            return null;
-        }
-
-        return new Registering($held['address'], $endsAt, $held['verified']);
+        return $this->phase()->live(Registering::class);
     }
 
     /**
@@ -310,7 +263,9 @@ class KeystoneGuard extends SessionGuard
      */
     public function endRegistration(): void
     {
-        $this->session->forget($this->registrationKey());
+        if ($this->phase()->held() instanceof Registering) {
+            $this->phase()->forget();
+        }
 
         $this->slots()->flush();
     }
@@ -320,7 +275,7 @@ class KeystoneGuard extends SessionGuard
      */
     public function slots(): CeremonySlots
     {
-        return new CeremonySlots($this->session, $this->phaseEndsAt());
+        return new CeremonySlots($this->session, fn () => $this->phaseEndsAt());
     }
 
     /**
@@ -406,9 +361,7 @@ class KeystoneGuard extends SessionGuard
      */
     public function sudoGrant(): ?SudoGrant
     {
-        $held = $this->heldSudo();
-
-        return $held instanceof SudoGrant ? $held : null;
+        return $this->phase()->live(SudoGrant::class);
     }
 
     /**
@@ -416,9 +369,7 @@ class KeystoneGuard extends SessionGuard
      */
     public function sudoInProgress(): ?SudoInProgress
     {
-        $held = $this->heldSudo();
-
-        return $held instanceof SudoInProgress ? $held : null;
+        return $this->phase()->live(SudoInProgress::class);
     }
 
     /**
@@ -428,11 +379,11 @@ class KeystoneGuard extends SessionGuard
     {
         $progress = $this->sudoInProgress();
 
-        $this->session->put($this->sudoKey(), [
-            'started_at' => ($progress->startedAt ?? Date::now())->getTimestamp(),
-            'intended_url' => $intendedUrl,
-            'first_factor' => $progress?->firstFactor,
-        ]);
+        $this->phase()->put(new SudoInProgress(
+            intendedUrl: $intendedUrl,
+            startedAt: $progress->startedAt ?? Date::now()->toImmutable(),
+            firstFactor: $progress?->firstFactor,
+        ));
     }
 
     /**
@@ -442,17 +393,13 @@ class KeystoneGuard extends SessionGuard
      */
     public function passSudoFirstFactor(SudoInProgress $progress, string $firstFactor): void
     {
-        if (! $this->holdsSudoInProgress() || $progress->firstFactor !== null) {
+        if (! $this->phase()->held() instanceof SudoInProgress || $progress->firstFactor !== null) {
             throw new LogicException('The session holds no sudo-in-progress owing its first step.');
         }
 
         $this->changeAuthLevel();
 
-        $this->session->put($this->sudoKey(), [
-            'started_at' => $progress->startedAt->getTimestamp(),
-            'intended_url' => $progress->intendedUrl,
-            'first_factor' => $firstFactor,
-        ]);
+        $this->phase()->put(new SudoInProgress($progress->intendedUrl, $progress->startedAt, $firstFactor));
     }
 
     /**
@@ -462,7 +409,7 @@ class KeystoneGuard extends SessionGuard
      */
     public function grantSudo(Subnet $subnet): void
     {
-        if (! $this->holdsSudoInProgress()) {
+        if (! $this->phase()->held() instanceof SudoInProgress) {
             throw new LogicException('The session holds no sudo-in-progress to grant.');
         }
 
@@ -472,11 +419,40 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * End sudo, dropping the session's grant and any sudo-in-progress on a new session id.
+     * End sudo, dropping the session's grant and any sudo-in-progress on a new session id, and record the revocation when a live grant was ended.
      */
     public function endSudo(): void
     {
+        $grant = $this->sudoGrant();
+        $account = $this->signedInAccount();
+
         $this->changeAuthLevel();
+
+        if ($grant === null || $account === null) {
+            return;
+        }
+
+        (new SecurityEventRecorder)->record(
+            SecurityEventType::SUDO_REVOKED,
+            account: $account,
+        );
+    }
+
+    /**
+     * End the session's sudo grant on a new session id because the request comes from another subnet than the one it is bound to, and record the network change.
+     */
+    public function endSudoOnNetworkChange(): void
+    {
+        if ($this->sudoGrant() === null) {
+            return;
+        }
+
+        $this->changeAuthLevel();
+
+        (new SecurityEventRecorder)->record(
+            SecurityEventType::SUDO_NETWORK_CHANGED,
+            account: $this->signedInAccount(),
+        );
     }
 
     /**
@@ -747,7 +723,6 @@ class KeystoneGuard extends SessionGuard
     {
         $this->changeAuthLevel();
 
-        $this->session->forget($this->pendingKey());
         $this->session->put($this->getName(), $account->getAuthIdentifier());
         $this->session->put($this->epochKey(), $this->epochOf($account));
         $this->session->put($this->signedInAtKey(), Date::now()->getTimestamp());
@@ -779,68 +754,9 @@ class KeystoneGuard extends SessionGuard
      */
     protected function stampSudo(Subnet $subnet): void
     {
-        $this->session->put($this->sudoKey(), [
-            'granted_at' => Date::now()->getTimestamp(),
-            'subnet' => $subnet->cidr,
-        ]);
-    }
+        $grantedAt = Date::now()->toImmutable();
 
-    /**
-     * Get the live sudo grant or sudo-in-progress the session holds, forgetting one that ran out or has no believable time to count from.
-     */
-    protected function heldSudo(): SudoGrant|SudoInProgress|null
-    {
-        $held = $this->parseSudo($this->session->get($this->sudoKey()));
-
-        if ($held === null) {
-            return null;
-        }
-
-        [$from, $until] = $held instanceof SudoGrant ? [$held->grantedAt, $held->endsAt] : [$held->startedAt, $held->endsAt()];
-
-        if ($from->isFuture() || $until->lessThanOrEqualTo(Date::now())) {
-            $this->session->forget($this->sudoKey());
-
-            return null;
-        }
-
-        return $held;
-    }
-
-    /**
-     * Determine if the session holds a sudo-in-progress, run out or not.
-     */
-    protected function holdsSudoInProgress(): bool
-    {
-        return $this->parseSudo($this->session->get($this->sudoKey())) instanceof SudoInProgress;
-    }
-
-    /**
-     * Parse the sudo session value into the grant or the sudo-in-progress it holds, or null for anything else.
-     */
-    protected function parseSudo(mixed $held): SudoGrant|SudoInProgress|null
-    {
-        if (! is_array($held)) {
-            return null;
-        }
-
-        if (is_int($held['granted_at'] ?? null) && is_string($held['subnet'] ?? null)) {
-            $grantedAt = CarbonImmutable::createFromTimestamp($held['granted_at']);
-
-            return new SudoGrant($grantedAt, $grantedAt->addSeconds(config()->integer('keystone.sudo.lifetime_seconds')), new Subnet($held['subnet']));
-        }
-
-        if (is_int($held['started_at'] ?? null) && is_string($held['intended_url'] ?? null)) {
-            $firstFactor = $held['first_factor'] ?? null;
-
-            return new SudoInProgress(
-                intendedUrl: $held['intended_url'],
-                startedAt: CarbonImmutable::createFromTimestamp($held['started_at']),
-                firstFactor: is_string($firstFactor) ? $firstFactor : null,
-            );
-        }
-
-        return null;
+        $this->phase()->put(new SudoGrant($grantedAt, $grantedAt->addSeconds($this->sudoLifetimeSeconds()), $subnet));
     }
 
     /**
@@ -894,7 +810,7 @@ class KeystoneGuard extends SessionGuard
     /**
      * Get the id of the pending challenge the hold of the account keeps: the one the sign-in it replaces opened, a new one, or none for a known device or when opening it fails.
      */
-    protected function openPendingChallenge(Model&KeystoneUser $account): ?int
+    protected function openPendingChallenge(Model&KeystoneUser $account, ?int $replaced): ?int
     {
         $request = $this->getRequest();
 
@@ -903,9 +819,8 @@ class KeystoneGuard extends SessionGuard
         }
 
         // Postgres aborts the whole transaction a failed query ran in, so the queries get a savepoint of their own to fail in.
-        return rescue(fn () => $account->getConnection()->transaction(function () use ($account) {
+        return rescue(fn () => $account->getConnection()->transaction(function () use ($account, $replaced) {
             $challenges = new PendingChallenges($account);
-            $replaced = $this->replacedPendingChallengeId($account);
 
             if ($replaced !== null && $challenges->has($replaced)) {
                 return $replaced;
@@ -920,13 +835,13 @@ class KeystoneGuard extends SessionGuard
      */
     protected function replacedPendingChallengeId(Model&KeystoneUser $account): ?int
     {
-        $replaced = $this->session->get($this->pendingKey());
+        $replaced = $this->phase()->held();
 
-        if (! is_array($replaced) || (string) $replaced['account'] !== (string) $account->getAuthIdentifier()) {
+        if (! $replaced instanceof HeldSignIn || (string) $replaced->accountId !== (string) $account->getAuthIdentifier()) {
             return null;
         }
 
-        return $replaced['pending_challenge_id'];
+        return $replaced->pendingChallengeId;
     }
 
     /**
@@ -1044,35 +959,20 @@ class KeystoneGuard extends SessionGuard
      */
     protected function phaseEndsAt(): ?CarbonInterface
     {
-        $heldAt = $this->session->get($this->pendingKey())['held_at'] ?? null;
+        $phaseEndsAt = $this->phase()->endsAt();
 
-        return match (true) {
-            $this->session->has($this->getName()) => $this->signedInPhaseEndsAt(),
-            is_int($heldAt) => Date::createFromTimestamp($heldAt)->addSeconds(PendingSignIn::LIFETIME_SECONDS),
-            default => $this->registration()?->endsAt,
-        };
-    }
+        if (! $this->session->has($this->getName())) {
+            return $phaseEndsAt;
+        }
 
-    /**
-     * Get the time a signed-in session's phase ends: the end of its sudo, granted or in progress, or its absolute lifetime, whichever comes first, or never.
-     */
-    protected function signedInPhaseEndsAt(): ?CarbonInterface
-    {
         $lifetimeSeconds = config('keystone.session.absolute_lifetime_seconds');
         $signedInEndsAt = is_int($lifetimeSeconds) ? $this->signedInAt()?->addSeconds($lifetimeSeconds) : null;
-        $sudo = $this->heldSudo();
 
-        $sudoEndsAt = match (true) {
-            $sudo instanceof SudoGrant => $sudo->endsAt,
-            $sudo instanceof SudoInProgress => $sudo->endsAt(),
-            default => null,
-        };
-
-        if ($sudoEndsAt === null) {
+        if ($phaseEndsAt === null) {
             return $signedInEndsAt;
         }
 
-        return $signedInEndsAt?->lessThan($sudoEndsAt) ? $signedInEndsAt : $sudoEndsAt;
+        return $signedInEndsAt?->lessThan($phaseEndsAt) ? $signedInEndsAt : $phaseEndsAt;
     }
 
     /**
@@ -1096,7 +996,7 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Rotate the session id, close every ceremony slot, drop sudo and forget any registration, as every change of auth level does.
+     * Rotate the session id, close every ceremony slot and forget the session's phase, as every change of auth level does.
      */
     protected function changeAuthLevel(): void
     {
@@ -1104,8 +1004,7 @@ class KeystoneGuard extends SessionGuard
 
         $this->slots()->flush();
 
-        $this->session->forget($this->sudoKey());
-        $this->session->forget($this->registrationKey());
+        $this->phase()->forget();
     }
 
     /**
@@ -1122,14 +1021,6 @@ class KeystoneGuard extends SessionGuard
     protected function epochKey(): string
     {
         return 'keystone_epoch_'.$this->name;
-    }
-
-    /**
-     * Get the session key holding the pending sign-in.
-     */
-    protected function pendingKey(): string
-    {
-        return 'keystone_pending_'.$this->name;
     }
 
     /**
@@ -1157,18 +1048,29 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Get the session key holding the sudo grant or the sudo-in-progress, never both.
+     * Get the session's phase: its pending sign-in, its registration or its sudo, never more than one.
      */
-    protected function sudoKey(): string
+    protected function phase(): SessionPhase
     {
-        return 'keystone_sudo_'.$this->name;
+        return new SessionPhase($this->session, 'keystone_phase_'.$this->name, $this->sudoLifetimeSeconds());
     }
 
     /**
-     * Get the session key holding the address a registration proved and the time it was proven.
+     * Get how long a sudo grant lasts, read each time so a lowered setting shortens grants already held.
      */
-    protected function registrationKey(): string
+    protected function sudoLifetimeSeconds(): int
     {
-        return 'keystone_registration_'.$this->name;
+        return config()->integer('keystone.sudo.lifetime_seconds');
+    }
+
+    /**
+     * Get the account the session is signed in as.
+     *
+     * @return (Model&KeystoneUser)|null
+     */
+    protected function signedInAccount(): ?Model
+    {
+        /** @var (Model&KeystoneUser)|null */
+        return $this->user();
     }
 }

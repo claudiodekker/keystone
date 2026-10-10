@@ -15,13 +15,18 @@ readonly class Registering
     public const int WINDOW_SECONDS = 1800;
 
     /**
+     * The time the registration's window ends.
+     */
+    public CarbonImmutable $endsAt;
+
+    /**
      * Create a new registering instance.
      */
     public function __construct(
         public string $address,
-        public CarbonImmutable $endsAt,
+        public CarbonImmutable $startedAt,
         public bool $verified,
     ) {
-        //
+        $this->endsAt = $startedAt->addSeconds(self::WINDOW_SECONDS);
     }
 }

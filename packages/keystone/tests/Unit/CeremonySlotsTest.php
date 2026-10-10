@@ -34,6 +34,24 @@ it('ends a slot with the pending sign-in that opened it, when that comes first',
     expect($slots->get('form', 'challenge'))->toBeNull();
 });
 
+it('ends a slot with the pending sign-in held after the slots were got', function () {
+    $slots = Keystone::guard()->slots();
+    Keystone::guard()->hold(User::factory()->create(), 'form', PendingStage::CHALLENGE, '/');
+    $this->travel(14)->minutes();
+    $slots->put('form', 'challenge', 'bytes', capSeconds: 300);
+
+    $this->travel(1)->minute();
+    expect($slots->get('form', 'challenge'))->toBeNull();
+});
+
+it('ends a slot at once when the pending sign-in that opens it ran out', function () {
+    Keystone::guard()->hold(User::factory()->create(), 'form', PendingStage::CHALLENGE, '/');
+    $this->travel(16)->minutes();
+    Keystone::guard()->slots()->put('form', 'challenge', 'bytes', capSeconds: 300);
+
+    expect(Keystone::guard()->slots()->get('form', 'challenge'))->toBeNull();
+});
+
 it('ends a slot with the registration that opened it, when that comes first', function () {
     Keystone::guard()->startRegistration('new@example.com');
     $this->travel(Registering::WINDOW_SECONDS - 60)->seconds();
