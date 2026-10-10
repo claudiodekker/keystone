@@ -135,8 +135,8 @@ describe('finishing', function () {
 
     it('grants the new session a fresh sudo, never one the registering session held', function () {
         $this->withoutMandates();
+        session()->put('keystone_phase_web', ['phase' => 'sudo_granted', 'granted_at' => now()->subMinutes(5)->getTimestamp(), 'subnet' => '10.0.0.0/24']);
         $this->registerAddress();
-        session()->put('keystone_sudo_web', ['granted_at' => now()->subMinutes(5)->getTimestamp(), 'subnet' => '10.0.0.0/24']);
 
         $this->finishRegistration(new PasswordTypeSupport);
 

@@ -2,7 +2,6 @@
 
 namespace ClaudioDekker\Keystone;
 
-use Carbon\CarbonInterface;
 use Illuminate\Contracts\Session\Session;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Date;
@@ -22,7 +21,7 @@ class CeremonySlots
      */
     public function __construct(
         protected Session $session,
-        protected ?CarbonInterface $ownerEndsAt,
+        protected KeystoneGuard $guard,
     ) {
         //
     }
@@ -33,7 +32,8 @@ class CeremonySlots
     public function put(string $method, string $purpose, #[\SensitiveParameter] mixed $value, int $capSeconds): void
     {
         $capEndsAt = Date::now()->addSeconds($capSeconds);
-        $endsAt = $this->ownerEndsAt?->lessThan($capEndsAt) ? $this->ownerEndsAt : $capEndsAt;
+        $ownerEndsAt = $this->guard->phaseEndsAt();
+        $endsAt = $ownerEndsAt?->lessThan($capEndsAt) ? $ownerEndsAt : $capEndsAt;
 
         $slots = $this->all();
 

@@ -151,6 +151,9 @@ _Avoid_: pending registration, claimed address
 A session that has named an account but still owes a challenge, an enrollment or a recovery before it is signed in. At most one per session.
 _Avoid_: park, half-authenticated, held user
 
+**Session phase**:
+The one time-limited record a session holds: a pending sign-in, a registration, a sudo-in-progress or a sudo grant. Holding one replaces the one before, so a session never holds two, and every auth-level change drops it.
+
 **Entry**:
 What core does once a proof is accepted for an account: signs it in, or holds its pending sign-in for what it still owes. A remembered return is not an entry.
 

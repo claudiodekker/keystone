@@ -74,7 +74,7 @@ abstract class SecurityController extends Controller
             leftovers: array_values($held->whereNotIn('type', $listed)->all()),
             recoveryCodes: $recoveryCodes,
             recoveryCodesLow: $recoveryCodes <= RecoveryCodes::RUNNING_LOW,
-            sudoEndsAt: (new SudoGate($guard))->liveGrant()?->endsAt->toIso8601String(),
+            sudoEndsAt: (new SudoGate($guard))->liveGrant()?->endsAt()->toIso8601String(),
             status: $status?->label(),
             sessions: $sessions === null ? [] : SessionRow::listOf($sessions->live()),
             sessionsStatus: $sessions === null ? Status::SESSIONS_UNAVAILABLE->label() : null,

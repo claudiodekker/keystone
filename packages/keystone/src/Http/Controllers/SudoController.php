@@ -9,8 +9,6 @@ use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\KeystoneUser;
 use ClaudioDekker\Keystone\RateLimiter;
 use ClaudioDekker\Keystone\RequestContext;
-use ClaudioDekker\Keystone\SecurityEventRecorder;
-use ClaudioDekker\Keystone\SecurityEventType;
 use ClaudioDekker\Keystone\SignInDecision;
 use ClaudioDekker\Keystone\Status;
 use ClaudioDekker\Keystone\StepKind;
@@ -104,16 +102,6 @@ abstract class SudoController extends Controller
 
         if (! $guard->check()) {
             return $this->refuseGuest();
-        }
-
-        /** @var Model&KeystoneUser $account */
-        $account = $guard->user();
-
-        if (! is_null($guard->sudoGrant())) {
-            (new SecurityEventRecorder)->record(
-                SecurityEventType::SUDO_REVOKED,
-                account: $account,
-            );
         }
 
         $guard->endSudo();
