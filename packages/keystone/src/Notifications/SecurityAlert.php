@@ -35,6 +35,7 @@ class SecurityAlert extends Notification implements SecurityEventAlertContract, 
     protected const array TYPES = [
         SecurityEventType::ACCOUNT_SUSPENDED,
         SecurityEventType::ACCOUNT_UNSUSPENDED,
+        SecurityEventType::ADDRESS_CLAIM_ATTEMPTED,
         SecurityEventType::CHALLENGE_ABANDONED,
         SecurityEventType::CREDENTIAL_ADDED,
         SecurityEventType::CREDENTIAL_REMOVED,

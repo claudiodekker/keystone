@@ -3,6 +3,7 @@
 namespace ClaudioDekker\Keystone;
 
 use ClaudioDekker\Keystone\Actions\AccountLookup;
+use ClaudioDekker\Keystone\Actions\CreateAccount;
 use ClaudioDekker\Keystone\Actions\RespondToDemotedSession;
 use ClaudioDekker\Keystone\Actions\RespondToExpiredSession;
 use ClaudioDekker\Keystone\Actions\RespondToSudoRequired;
@@ -49,6 +50,7 @@ class KeystoneServiceProvider extends ServiceProvider
 
         $this->app->singleton(CredentialTypes::class);
         $this->app->bindIf(AccountLookup::class);
+        $this->app->bindIf(CreateAccount::class);
         $this->app->bindIf(RespondToExpiredSession::class);
         $this->app->bindIf(RespondToDemotedSession::class);
         $this->app->bindIf(RespondToSudoRequired::class);
@@ -79,6 +81,11 @@ class KeystoneServiceProvider extends ServiceProvider
             $schedule->call(fn () => KnownDevices::prune(Keystone::guard()->userModel()))
                 ->name('keystone:prune-known-devices')
                 ->daily()
+                ->onOneServer();
+
+            $schedule->call(fn () => EmailedLinks::prune(Keystone::guard()->userModel()))
+                ->name('keystone:prune-used-email-links')
+                ->hourly()
                 ->onOneServer();
 
             $schedule->call(fn () => (new PendingChallenges(Keystone::guard()->userModel()))->sweep())

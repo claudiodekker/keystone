@@ -66,6 +66,7 @@ class AcceptedProof
                 credentialType: $credentialType,
                 credential: $credential,
                 reason: $passed->reason,
+                alert: $passed->alert,
                 knownDevice: $passed->knownDevice,
             );
         }

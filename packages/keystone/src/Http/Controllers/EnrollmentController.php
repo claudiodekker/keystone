@@ -56,10 +56,7 @@ abstract class EnrollmentController extends Controller
             return $pending;
         }
 
-        $types = array_map(fn (CredentialType $type) => [
-            'type' => $type->name(),
-            'shape' => $type->surfaces()[Surface::ENROLLMENT->value]->value,
-        ], $this->offer());
+        $types = $this->typeOptions($this->offer(), Surface::ENROLLMENT);
 
         $page = new EnrollmentPage(
             types: $types,
@@ -101,6 +98,7 @@ abstract class EnrollmentController extends Controller
             ceremony: $running->page,
             status: Status::flashed($request)?->label(),
             held: [],
+            origin: $pending->origin->value,
         );
 
         return $this->sendEnrollmentForm($request, $page);
@@ -149,7 +147,7 @@ abstract class EnrollmentController extends Controller
     }
 
     /**
-     * Cancel the sign-in held at enrollment, leaving a guest who still owes it.
+     * Cancel the sign-in held at enrollment, leaving a guest who still owes it, and an account a registration created in place.
      */
     public function destroy(Request $request): Response|Responsable
     {
@@ -161,7 +159,7 @@ abstract class EnrollmentController extends Controller
 
         Keystone::guard()->forgetPending();
 
-        Status::ENROLLMENT_CANCELLED->flash($request);
+        $pending->origin->cancelledStatus()->flash($request);
 
         return $this->sendEnrollmentCancelled($request);
     }

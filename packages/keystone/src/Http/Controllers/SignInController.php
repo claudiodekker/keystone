@@ -8,7 +8,6 @@ use ClaudioDekker\Keystone\Http\Concerns\RefusesSignedInUsers;
 use ClaudioDekker\Keystone\Http\PageValues\SignInPage;
 use ClaudioDekker\Keystone\IntendedUrl;
 use ClaudioDekker\Keystone\Keystone;
-use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\RateLimiter;
@@ -58,15 +57,13 @@ abstract class SignInController extends Controller
             return $this->refuseSignedIn();
         }
 
-        $types = array_map(fn (CredentialType $type) => [
-            'type' => $type->name(),
-            'shape' => $type->surfaces()[Surface::SIGN_IN->value]->value,
-        ], $this->types()->serving(Surface::SIGN_IN));
+        $types = $this->typeOptions($this->types()->serving(Surface::SIGN_IN), Surface::SIGN_IN);
 
         $page = new SignInPage(
             types: $types,
             status: Status::flashed($request)?->label(),
             rememberOffered: RememberTokens::isOffered(),
+            registrationOpen: $this->types()->serving(Surface::REGISTRATION) !== [],
         );
 
         return $this->sendSignInPage($request, $page);

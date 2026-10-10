@@ -7,6 +7,9 @@ use App\Http\Controllers\Auth\EnrollmentController;
 use App\Http\Controllers\Auth\OtherSessionsController;
 use App\Http\Controllers\Auth\RecoveryCodeRegenerationController;
 use App\Http\Controllers\Auth\RecoveryCodesController;
+use App\Http\Controllers\Auth\RegistrationController;
+use App\Http\Controllers\Auth\RegistrationFinishController;
+use App\Http\Controllers\Auth\RegistrationLinkController;
 use App\Http\Controllers\Auth\SecurityController;
 use App\Http\Controllers\Auth\SessionRevocationController;
 use App\Http\Controllers\Auth\SignInController;
@@ -35,6 +38,22 @@ Route::prefix('auth')->group(function () {
         Route::prefix('recovery-codes')->group(function () {
             Route::get('/', [RecoveryCodesController::class, 'show'])->name('login.recovery-codes');
             Route::post('confirm', [RecoveryCodesController::class, 'store'])->name('login.recovery-codes.submit');
+        });
+    });
+
+    Route::prefix('register')->group(function () {
+        Route::get('/', [RegistrationController::class, 'show'])->name('register');
+        Route::post('/', [RegistrationController::class, 'store'])->name('register.submit');
+        Route::get('link-sent', [RegistrationController::class, 'sent'])->name('register.link-sent');
+
+        Route::get('verify', [RegistrationLinkController::class, 'show'])->name('register.verify');
+        Route::post('verify', [RegistrationLinkController::class, 'store'])->name('register.verify.consume');
+        Route::get('link-expired', [RegistrationLinkController::class, 'expired'])->name('register.link-expired');
+
+        Route::prefix('finish')->group(function () {
+            Route::get('/', [RegistrationFinishController::class, 'show'])->name('register.finish');
+            Route::post('{type}', [RegistrationFinishController::class, 'store'])->name('register.finish.submit');
+            Route::delete('/', [RegistrationFinishController::class, 'destroy'])->name('register.finish.cancel');
         });
     });
 

@@ -46,6 +46,23 @@ const held = computed(() => props.option.held?.[0] ?? null);
         <Link v-if="held?.removable" :href="remove(held.id)" class="text-sm font-medium text-gray-900 underline">Remove password</Link>
     </div>
 
+    <FormShape
+        v-else-if="surface === 'registration'"
+        :option="option"
+        :surface="surface"
+        :fields="['password', 'password_confirmation']"
+        v-slot="{ errors }"
+    >
+        <PasswordField :id="`${option.type}-password`" autocomplete="new-password" :error="errors.password" />
+        <PasswordField
+            :id="`${option.type}-password-confirmation`"
+            name="password_confirmation"
+            autocomplete="new-password"
+            label="Confirm password"
+            :error="errors.password_confirmation"
+        />
+    </FormShape>
+
     <FormShape v-else :option="option" :surface="surface" :purpose="purpose" :fields="['password']" v-slot="{ errors }">
         <PasswordField :id="`${option.type}-password`" :error="errors.password" />
     </FormShape>

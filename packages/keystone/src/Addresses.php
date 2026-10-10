@@ -46,6 +46,27 @@ class Addresses
      */
     public function resolve(string $address): int|string|null
     {
+        $holders = $this->claims($address)->limit(2)->pluck('user_emails.user_id');
+
+        return $holders->count() === 1 ? $holders->first() : null;
+    }
+
+    /**
+     * Get the ids of every active account that holds the address verified or counting as verified, in id order.
+     *
+     * @return list<int|string>
+     */
+    public function claimants(string $address): array
+    {
+        /** @var list<int|string> */
+        return $this->claims($address)->orderBy('user_emails.user_id')->pluck('user_emails.user_id')->all();
+    }
+
+    /**
+     * Get the query for the active accounts that hold the address verified or counting as verified.
+     */
+    protected function claims(string $address): Builder
+    {
         $users = $this->users->getTable();
         $key = $this->users->getKeyName();
         $deletedAt = $this->users->getDeletedAtColumn();
@@ -59,17 +80,13 @@ class Addresses
             ->whereNotNull('user_emails.verified_at')
             ->orWhereNotExists($holdsAVerifiedAddress);
 
-        $holders = $this->users->getConnection()->table('user_emails')
+        return $this->users->getConnection()->table('user_emails')
             ->join($users, "{$users}.{$key}", '=', 'user_emails.user_id')
             ->where('user_emails.address', static::normalize($address))
             ->whereNull("{$users}.{$deletedAt}")
             ->whereNull("{$users}.invalidated_at")
             ->where($countsAsVerified)
-            ->distinct()
-            ->limit(2)
-            ->pluck('user_emails.user_id');
-
-        return $holders->count() === 1 ? $holders->first() : null;
+            ->distinct();
     }
 
     /**

@@ -38,6 +38,7 @@ Each feature file starts with an H1 title and one paragraph describing the user-
 - [Sign in](./sign-in.md) covers the password first factor, a refused credential and a suspended account.
 - [Second-factor challenge](./second-factor-challenge.md) covers the hold after the first factor, answering with TOTP, a wrong or replayed code, switching type and cancelling.
 - [Recovery codes](./recovery-codes.md) covers answering the challenge with a recovery code, the code being spent, the alert mail and the last code being kept.
+- [Registration](./registration.md) covers asking for a registration link for a free and a taken address, the alert to the owner, opening the mailed link without spending it, spending it on the finish page and a replay being refused.
 - [Sign out](./sign-out.md) covers signing out from home and the status shown afterwards.
 - [Sudo](./sudo.md) covers the workbench's page behind sudo, ending sudo, the gate's redirect and the replay through the password and the TOTP code.
 - [Security settings](./security-settings.md) covers the security page: the credentials with their last use, the recovery-code count, the sudo end time, ending sudo from it, setting up an authenticator app from its QR code, removing a credential with both refusals, signing out the other sessions from the link and from the offer after an enrollment, and, on a run started on the `database` session driver, the sessions list and revoking one session.

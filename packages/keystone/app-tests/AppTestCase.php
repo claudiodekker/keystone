@@ -15,6 +15,7 @@ use ClaudioDekker\Keystone\KnownDevices;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
+use ClaudioDekker\Keystone\Notifications\EmailedLinkMail;
 use ClaudioDekker\Keystone\RecoveryCodeRegeneration;
 use ClaudioDekker\Keystone\RecoveryCodes;
 use ClaudioDekker\Keystone\RememberTokens;
@@ -26,9 +27,11 @@ use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
@@ -178,11 +181,13 @@ abstract class AppTestCase extends TestCase
     }
 
     /**
-     * Keep sessions in the session driver from here on, as an app configured with it does.
+     * Keep sessions in the session driver from here on, as an app configured with it does, never sweeping expired ones.
+     *
+     * Laravel's session lottery would otherwise delete an expired session on a random request, which a test that lets one expire can't predict.
      */
     public function useSessionDriver(string $driver): void
     {
-        config(['session.driver' => $driver]);
+        config(['session.driver' => $driver, 'session.lottery' => [0, 100]]);
 
         $this->app['session']->forgetDrivers();
         $this->app->forgetInstance('session.store');
@@ -395,6 +400,43 @@ abstract class AppTestCase extends TestCase
     protected function regenerationCodes(): array
     {
         return (new RecoveryCodeRegeneration(Keystone::guard()))->staged()?->codes ?? [];
+    }
+
+    /**
+     * Get the URL of the last emailed link Keystone mailed the address while notifications were faked, failing when it mailed none.
+     */
+    public function mailedLinkTo(string $address): string
+    {
+        $mail = Notification::sent(new AnonymousNotifiable, EmailedLinkMail::class, fn ($mail, $channels, $notifiable) => $notifiable->routes['mail'] === $address)->last();
+
+        if (! $mail instanceof EmailedLinkMail) {
+            $this->fail("Keystone mailed no link to {$address}.");
+        }
+
+        return $mail->link->url;
+    }
+
+    /**
+     * Ask for a registration link for the address and spend it while notifications are faked, so the session registers the address.
+     */
+    public function registerAddress(string $address = 'new@example.com'): void
+    {
+        $this->post(route('register.submit'), ['email' => $address]);
+
+        $this->post($this->mailedLinkTo($address));
+    }
+
+    /**
+     * Finish the session's registration with the supported type, naming the new account.
+     *
+     * @return TestResponse<Response>
+     */
+    public function finishRegistration(CredentialTypeSupport $support, string $name = 'Jane Doe'): TestResponse
+    {
+        return $this->post(route('register.finish.submit', ['type' => $support->type()]), [
+            'name' => $name,
+            ...$support->validEnrollment(null),
+        ]);
     }
 
     /**
@@ -621,10 +663,31 @@ abstract class AppTestCase extends TestCase
      */
     public function assertHardeningFloor(TestResponse $response): void
     {
+        $this->assertFloorOf($response, self::HARDENING_HEADERS);
+    }
+
+    /**
+     * Assert the response carries the hardening floor of an emailed link's steps, which send no referrer at all.
+     *
+     * @param  TestResponse<Response>  $response
+     */
+    public function assertEmailedLinkHardeningFloor(TestResponse $response): void
+    {
+        $this->assertFloorOf($response, [...self::HARDENING_HEADERS, 'Referrer-Policy' => 'no-referrer']);
+    }
+
+    /**
+     * Assert the response carries the headers, the cache directives and the policy directives of a hardening floor, framed only as the app allows.
+     *
+     * @param  TestResponse<Response>  $response
+     * @param  array<string, string>  $floorHeaders
+     */
+    protected function assertFloorOf(TestResponse $response, array $floorHeaders): void
+    {
         $headers = $response->headers;
         $cacheControl = array_map($headers->getCacheControlDirective(...), ['no-store', 'max-age', 'must-revalidate']);
         $frameAncestors = (array) config('keystone.hardening.frame_ancestors');
-        $expectedHeaders = [...self::HARDENING_HEADERS, 'X-Frame-Options' => $frameAncestors === [] ? 'DENY' : null];
+        $expectedHeaders = [...$floorHeaders, 'X-Frame-Options' => $frameAncestors === [] ? 'DENY' : null];
         $expectedDirectives = [
             'object-src' => "'none'",
             'base-uri' => "'none'",

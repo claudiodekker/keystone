@@ -7,7 +7,6 @@ use ClaudioDekker\Keystone\Exceptions\LastRecoveryCode;
 use ClaudioDekker\Keystone\Http\PageValues\SudoPage;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\KeystoneUser;
-use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\RateLimiter;
 use ClaudioDekker\Keystone\RequestContext;
 use ClaudioDekker\Keystone\SecurityEventRecorder;
@@ -176,10 +175,7 @@ abstract class SudoController extends Controller
             return redirect($progress->intendedUrl);
         }
 
-        $types = array_map(fn (CredentialType $type) => [
-            'type' => $type->name(),
-            'shape' => $type->surfaces()[$progress->surface()->value]->value,
-        ], $decision->replayOffer($account, $progress->firstFactor));
+        $types = $this->typeOptions($decision->replayOffer($account, $progress->firstFactor), $progress->surface());
 
         $page = new SudoPage(
             types: $types,

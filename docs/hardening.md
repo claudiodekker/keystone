@@ -18,7 +18,7 @@ Every response from a Keystone route carries these headers, whatever produced it
 | `Cross-Origin-Resource-Policy` | `same-origin` |
 | `X-Frame-Options` | `DENY` |
 
-When your app or one of your middleware sets one of these headers too, Keystone's value replaces yours on Keystone's routes. `X-Frame-Options` is left out when you let other pages frame Keystone's (see [Framing](#framing)).
+When your app or one of your middleware sets one of these headers too, Keystone's value replaces yours on Keystone's routes. The steps of an emailed link, such as a [registration link](registration.md#the-link), send `Referrer-Policy: no-referrer` in place of the value above, so no request from them carries the link's URL. `X-Frame-Options` is left out when you let other pages frame Keystone's (see [Framing](#framing)).
 
 ### Content Security Policy
 

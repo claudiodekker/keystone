@@ -26,9 +26,19 @@ it('derives no flow for the challenge surface without a held sign-in', function 
     Flow::of(Keystone::guard(), Surface::CHALLENGE);
 })->throws(LogicException::class);
 
-it('derives no flow for a surface no flow uses yet', function (Surface $surface) {
-    Flow::of(Keystone::guard(), $surface);
-})->throws(LogicException::class)->with([Surface::REGISTRATION, Surface::ENROLLMENT]);
+it('derives no flow for a guest on the enrollment surface', function () {
+    Flow::of(Keystone::guard(), Surface::ENROLLMENT);
+})->throws(LogicException::class);
+
+it('derives the registration flow for a guest on the registration surface', function () {
+    expect(Flow::of(Keystone::guard(), Surface::REGISTRATION))->toBe(Flow::REGISTRATION);
+});
+
+it('derives no flow for a signed-in user on the registration surface', function () {
+    Keystone::guard()->setUser(User::factory()->create());
+
+    Flow::of(Keystone::guard(), Surface::REGISTRATION);
+})->throws(LogicException::class);
 
 it('derives the settings flow for a signed-in session on the enrollment surface', function () {
     Keystone::guard()->setUser(User::factory()->create());
@@ -85,4 +95,5 @@ test('only the flows behind a first factor share a guessable type\'s failures', 
     'enrollment' => [Flow::ENROLLMENT, false],
     'sudo' => [Flow::SUDO, true],
     'settings' => [Flow::SETTINGS, false],
+    'registration' => [Flow::REGISTRATION, false],
 ]);

@@ -1,6 +1,6 @@
 ---
 name: verify
-description: Launch the Keystone testbench workbench (the Inertia-Vue sign-in, second-factor challenge, recovery-code, sudo, security settings and sign-out pages plus the keystone:* operator commands) on its own port and database, drive it in headless Chromium through Playwright, and capture screenshots, network logs and security-event rows as proof. Use to confirm an auth change works in the real app, to reproduce a sign-in bug on the browser surface, or before opening a PR that changes user-facing behaviour.
+description: Launch the Keystone testbench workbench (the Inertia-Vue sign-in, registration, second-factor challenge, recovery-code, sudo, security settings and sign-out pages plus the keystone:* operator commands) on its own port and database, drive it in headless Chromium through Playwright, and capture screenshots, network logs and security-event rows as proof. Use to confirm an auth change works in the real app, to reproduce a sign-in bug on the browser surface, or before opening a PR that changes user-facing behaviour.
 ---
 
 # Verify Keystone in the workbench
@@ -66,7 +66,12 @@ Use these handles. Each one comes from the stub pages and is stable:
 | Page | URL | Handles |
 |---|---|---|
 | Home | `/` | link `Sign in` (guest), text `You're signed in.` and button `Sign out` (signed in) |
-| Sign in | `/auth/login` | heading `Sign in`, label `Email address`, label `Password`, button `Sign in` |
+| Sign in | `/auth/login` | heading `Sign in`, label `Email address`, label `Password`, button `Sign in`, link `Create an account` while registration is open |
+| Register | `/auth/register` | heading `Create an account`, label `Email address`, button `Send me a link`, link `Already have an account? Sign in`; reached by the link `Create an account` on the sign-in page |
+| Check your email | `/auth/register/link-sent` | heading `Check your email`, link `Use another address` |
+| Emailed link | `/auth/register/verify?…` | heading `Email address verified`, button `Continue`; opened from the link in the mail `Confirm your email address`, which `app.sh mail` prints |
+| Link expired | `/auth/register/link-expired` | heading `That link is no longer valid`, link `Send me a new link` |
+| Finish registering | `/auth/register/finish` | heading `Finish creating your account`, the proven address, label `Name`, label `Password` (pass `{ exact: true }`, since it also matches the confirmation), label `Confirm password`, button `Create account`, button `Cancel registration` |
 | Challenge | `/auth/login/challenge` | heading `Confirm it's you`, label `Code from your authenticator app` (TOTP), label `Recovery code`, button `Verify`, a button per other type named by type (`recovery-code`), button `Cancel sign-in` |
 | Home (signed in) | `/` | link `Security settings`, link `Page behind sudo`, button `End sudo` |
 | Security settings | `/settings/security` | heading `Security settings`, a section per type headed `Password`, `Authenticator app` and `Recovery codes`, section `Sudo` with button `End sudo` while sudo lasts, text `Sudo has ended.` after ending sudo, a link per credential named `Remove <name>` (`Remove Password`, `Remove Authenticator app`, or the credential's own name), a link per type named `Set up <name>` (`Change Password` once a password is set), text `The new credential was added.` and button `Sign out your other sessions` after an enrollment that added a credential, text `The credential was replaced. Your other sessions were signed out.` after a new authenticator or a new password replaced the old one, with no button, section `Sessions` with link `Sign out other sessions`, text `Your other sessions were signed out.` after a sign-out; on the `database` driver the section lists each session as an `li` with its device name (`Firefox on Windows`), `This device` on the current one and a link `Sign out <device>` on every other one, text `The session was signed out.` after a revoke, and the refusal `You cannot revoke your current session; sign out instead.` in red; on other drivers it says `Your sessions cannot be listed in this app.`; needs no sudo |

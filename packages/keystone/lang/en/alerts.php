@@ -27,6 +27,12 @@ return [
                 'what' => 'An administrator lifted the suspension of your account, so it can sign in again.',
             ],
         ],
+        'address' => [
+            'claim_attempted' => [
+                'subject' => 'Someone tried to sign up with your email address',
+                'what' => 'Someone just tried to sign up with your email address. Your account wasn\'t changed. If this was you, recover your account.',
+            ],
+        ],
         'challenge' => [
             'abandoned' => [
                 'subject' => 'A sign-in to your account was started but not finished',

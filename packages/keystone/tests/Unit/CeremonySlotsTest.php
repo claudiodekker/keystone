@@ -3,6 +3,7 @@
 use ClaudioDekker\Keystone\CeremonySlots;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\PendingStage;
+use ClaudioDekker\Keystone\Registering;
 use ClaudioDekker\Keystone\Tests\Fixtures\User;
 
 beforeEach(function () {
@@ -31,6 +32,19 @@ it('ends a slot with the pending sign-in that opened it, when that comes first',
 
     $this->travel(1)->second();
     expect($slots->get('form', 'challenge'))->toBeNull();
+});
+
+it('ends a slot with the registration that opened it, when that comes first', function () {
+    Keystone::guard()->startRegistration('new@example.com');
+    $this->travel(Registering::WINDOW_SECONDS - 60)->seconds();
+    $slots = Keystone::guard()->slots();
+    $slots->put('form', 'registration', 'bytes', capSeconds: 300);
+
+    $this->travel(59)->seconds();
+    expect($slots->get('form', 'registration'))->toBe('bytes');
+
+    $this->travel(1)->second();
+    expect($slots->get('form', 'registration'))->toBeNull();
 });
 
 it('ends a slot with the sign-in\'s absolute lifetime, when that comes first', function () {

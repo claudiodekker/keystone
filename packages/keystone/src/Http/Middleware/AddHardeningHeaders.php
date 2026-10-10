@@ -28,6 +28,11 @@ class AddHardeningHeaders
     ];
 
     /**
+     * The request attribute core sets on an emailed link's steps, whose responses send no referrer at all, so the link's URL never leaks.
+     */
+    public const string NO_REFERRER = 'keystone.no_referrer';
+
+    /**
      * The Content-Security-Policy directives forced over the app's own, besides frame-ancestors.
      */
     public const array POLICY_DIRECTIVES = [
@@ -60,6 +65,10 @@ class AddHardeningHeaders
         ];
 
         $response->headers->add(self::HEADERS);
+
+        if ($request->attributes->getBoolean(self::NO_REFERRER)) {
+            $response->headers->set('Referrer-Policy', 'no-referrer');
+        }
 
         if ($frameAncestors === []) {
             $response->headers->set('X-Frame-Options', 'DENY');

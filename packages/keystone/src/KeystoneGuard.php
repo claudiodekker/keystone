@@ -119,16 +119,22 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Hold the account's sign-in until it passes the stage, keeping whether it asked to be remembered and replacing any pending one.
+     * Hold the account's sign-in until it passes the stage, keeping whether it asked to be remembered and what opened it, and replacing any pending one.
      */
-    public function hold(Model&KeystoneUser $account, string $firstFactor, PendingStage $stage, string $intendedUrl, RememberMe $rememberMe = RememberMe::NOT_ASKED): void
-    {
+    public function hold(
+        Model&KeystoneUser $account,
+        string $firstFactor,
+        PendingStage $stage,
+        string $intendedUrl,
+        RememberMe $rememberMe = RememberMe::NOT_ASKED,
+        PendingOrigin $origin = PendingOrigin::LOGIN,
+    ): void {
         $this->changeAuthLevel();
 
         $this->session->put($this->pendingKey(), [
             'account' => $account->getAuthIdentifier(),
             'first_factor' => $firstFactor,
-            'origin' => PendingOrigin::LOGIN->value,
+            'origin' => $origin->value,
             'stage' => $stage->value,
             'intended_url' => $intendedUrl,
             'epoch' => $this->epochOf($account),
@@ -239,7 +245,54 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Get the ceremony slots, which end no later than the sign-in, pending or signed in, that opens them, or the sudo a signed-in session holds.
+     * Start registering the address a spent link proved, on a new session id, in place of any pending sign-in or earlier registration.
+     */
+    public function startRegistration(string $address): void
+    {
+        $this->changeAuthLevel();
+
+        $this->session->forget($this->pendingKey());
+        $this->session->put($this->registrationKey(), [
+            'address' => $address,
+            'proven_at' => Date::now()->getTimestamp(),
+        ]);
+    }
+
+    /**
+     * Get the session's live registration, forgetting one whose window ended or has no believable time to count from.
+     */
+    public function registration(): ?Registering
+    {
+        $held = $this->session->get($this->registrationKey());
+
+        if (! is_array($held) || ! is_string($held['address'] ?? null) || ! is_int($held['proven_at'] ?? null)) {
+            return null;
+        }
+
+        $provenAt = CarbonImmutable::createFromTimestamp($held['proven_at']);
+        $endsAt = $provenAt->addSeconds(Registering::WINDOW_SECONDS);
+
+        if ($provenAt->isFuture() || $endsAt->lessThanOrEqualTo(Date::now())) {
+            $this->session->forget($this->registrationKey());
+
+            return null;
+        }
+
+        return new Registering($held['address'], $endsAt);
+    }
+
+    /**
+     * End the registration without an account, forgetting the proven address and closing every ceremony slot.
+     */
+    public function endRegistration(): void
+    {
+        $this->session->forget($this->registrationKey());
+
+        $this->slots()->flush();
+    }
+
+    /**
+     * Get the ceremony slots, which end no later than the sign-in, pending or signed in, or the registration that opens them, or the sudo a signed-in session holds.
      */
     public function slots(): CeremonySlots
     {
@@ -963,7 +1016,7 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Get the time the session's current phase ends: a pending sign-in's end, a signed-in session's sudo or absolute lifetime, or never.
+     * Get the time the session's current phase ends: a pending sign-in's end, a registration's window, a signed-in session's sudo or absolute lifetime, or never.
      */
     protected function phaseEndsAt(): ?CarbonInterface
     {
@@ -972,7 +1025,7 @@ class KeystoneGuard extends SessionGuard
         return match (true) {
             $this->session->has($this->getName()) => $this->signedInPhaseEndsAt(),
             is_int($heldAt) => Date::createFromTimestamp($heldAt)->addSeconds(PendingSignIn::LIFETIME_SECONDS),
-            default => null,
+            default => $this->registration()?->endsAt,
         };
     }
 
@@ -1019,7 +1072,7 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Rotate the session id, close every ceremony slot and drop sudo, as every change of auth level does.
+     * Rotate the session id, close every ceremony slot, drop sudo and forget any registration, as every change of auth level does.
      */
     protected function changeAuthLevel(): void
     {
@@ -1028,6 +1081,7 @@ class KeystoneGuard extends SessionGuard
         $this->slots()->flush();
 
         $this->session->forget($this->sudoKey());
+        $this->session->forget($this->registrationKey());
     }
 
     /**
@@ -1084,5 +1138,13 @@ class KeystoneGuard extends SessionGuard
     protected function sudoKey(): string
     {
         return 'keystone_sudo_'.$this->name;
+    }
+
+    /**
+     * Get the session key holding the address a registration proved and the time it was proven.
+     */
+    protected function registrationKey(): string
+    {
+        return 'keystone_registration_'.$this->name;
     }
 }

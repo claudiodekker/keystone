@@ -2,7 +2,7 @@
 
 Keystone mails an account's owner when something happens to their account that they should know about, such as an operator ending every session of it. Each alert is about one [security event](security-events.md), or about an account's [abandoned challenges](#abandoned-challenges) together, sent by the recorder that records it, so nothing in your app needs to be wired up.
 
-Alerts are queued. Run a queue worker, or they are never sent: `queue.default` set to `sync` sends them inside the request, and production refuses to boot on the `null` queue (see [Configuration](configuration.md#boot-checks)).
+Alerts are queued. Run a queue worker, or they are never sent: `queue.default` set to `sync` sends them inside the request, and production refuses to boot on the `null` queue (see [Configuration](configuration.md#boot-checks)). Sending inside the request also makes it slower when it alerts, which can tell anyone watching the response time that an alert went out, such as when [registration](registration.md#asking-for-a-link) is asked for an address that already has an account.
 
 ## Types that alert
 
@@ -10,6 +10,7 @@ Alerts are queued. Run a queue worker, or they are never sent: `queue.default` s
 |---|---|
 | `account.suspended` | an operator suspended the account (see [Operator commands](operator-commands.md#suspending-accounts)) |
 | `account.unsuspended` | an operator lifted the account's suspension |
+| `address.claim_attempted` | someone tried to [register](registration.md#asking-for-a-link) with an address the account holds, or spent a registration link for it; the mail says the account wasn't changed, and names no address |
 | `challenge.abandoned` | a sign-in from a browser that isn't one of the account's [known devices](#new-devices) passed its first factor and hasn't passed the [challenge](challenge.md) 7 minutes later (see [Abandoned challenges](#abandoned-challenges)) |
 | `credential.added` | a credential was added to the account, at [enrollment](enrollment.md) or from the [security settings](security-settings.md#adding-a-credential) |
 | `credential.replaced` | a credential set up from the [security settings](security-settings.md#adding-a-credential) replaced the one of its type the account held, such as a changed [password](security-settings.md#passwords) or a new TOTP key |
@@ -21,7 +22,7 @@ Alerts are queued. Run a queue worker, or they are never sent: `queue.default` s
 | `session.revoked` | the user [revoked one of their sessions](security-settings.md#revoking-one-session); the mail names the IP address, location and device of the session that was signed out |
 | `sessions.revoked_others` | the user [signed out their other sessions](security-settings.md#signing-out-other-sessions) |
 | `sessions.terminated` | an operator ended every session of the account, unless they passed `--no-alert` (see [Operator commands](operator-commands.md#ending-sessions)); ending every account's sessions with `--all` alerts nobody |
-| `signed_in` | the account signed in from a browser that isn't one of its [known devices](#new-devices) |
+| `signed_in` | the account signed in from a browser that isn't one of its [known devices](#new-devices), except at the end of its [registration](registration.md#finishing) |
 | `sudo.failed` | a signed-in session gave a wrong answer when asked to prove it's the owner before a sensitive change (see [Sudo](sudo.md#the-replay)); a known device alerts too, because whoever answered holds the session |
 | `sudo.network_changed` | a signed-in session used its live sudo grant from another network than the one it was earned from, and lost it (see [Sudo](sudo.md#the-subnet)); a known device alerts too |
 
@@ -109,6 +110,8 @@ class SessionsEnded extends Notification implements SecurityEventAlertContract, 
 Copy what you need from the events in the constructor rather than keeping the events themselves: an event isn't stored when writing the audit trail failed, and a queued notification reloads a model it keeps from the database. Implement `ShouldQueue` so the mail doesn't slow the request down, and `ShouldBeEncrypted` so the IP address it carries isn't readable in your `jobs` and `failed_jobs` tables.
 
 A slot may name any type of security event, including one that doesn't alert by default, such as `proof.rejected`. `SecurityAlert` only has a mail for the types in the [table above](#types-that-alert), so a slot for any other type names your own notification.
+
+One slot holds a mail that isn't an alert. `account.registered` names `ClaudioDekker\Keystone\Notifications\Welcome`, which welcomes a new account at the address it registered with (see [The welcome mail](registration.md#the-welcome-mail)). Name your own notification there, built the same way, or set it to `null` to send no welcome mail.
 
 Set a slot to `null` to silence that type. There is no switch that silences every type at once. Your app refuses to boot on a slot holding any other value, a slot for a type that doesn't exist, a notification that doesn't implement `SecurityEventAlertContract`, or `SecurityAlert` for a type it has no mail for.
 

@@ -10,6 +10,16 @@ use ClaudioDekker\Keystone\Exceptions\Barred;
 class EnrollmentEntry extends Entry
 {
     /**
+     * Create a new enrollment entry instance.
+     */
+    public function __construct(
+        KeystoneGuard $guard,
+        protected SecurityEventRecorder $recorder = new SecurityEventRecorder,
+    ) {
+        parent::__construct($guard);
+    }
+
+    /**
      * Sign the pending sign-in in once its account, read afresh, owes nothing more, keep it at enrollment for what it still owes, or drop it when it now owes the challenge.
      *
      * @return Passed<Demand>
@@ -34,6 +44,12 @@ class EnrollmentEntry extends Entry
             return new Passed($owed);
         }
 
-        return $this->signIn($pending->account, $pending->rememberMe);
+        $passed = $this->signIn($pending->account, $pending->rememberMe, $pending->origin);
+
+        if ($pending->origin->recordsCompletedEnrollment()) {
+            $this->recorder->record(SecurityEventType::ENROLLMENT_COMPLETED, account: $pending->account, flow: Flow::ENROLLMENT->value);
+        }
+
+        return $passed;
     }
 }

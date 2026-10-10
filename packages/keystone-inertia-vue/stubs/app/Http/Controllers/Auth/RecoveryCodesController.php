@@ -21,6 +21,7 @@ class RecoveryCodesController extends Controller
 
         return Inertia::render('auth/RecoveryCodes', [
             'codes' => $page->codes,
+            'origin' => $page->origin,
         ]);
     }
 

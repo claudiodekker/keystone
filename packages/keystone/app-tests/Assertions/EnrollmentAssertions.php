@@ -107,6 +107,17 @@ trait EnrollmentAssertions
     }
 
     /**
+     * Assert the response confirms, on the sign-in page, the cancelled enrollment of an account a registration created, which it kept.
+     *
+     * @param  TestResponse<Response>  $response
+     */
+    public function assertRegistrationEnrollmentCancelled(TestResponse $response): void
+    {
+        $response->assertRedirectToRoute('login')
+            ->assertSessionHas(Status::SESSION_KEY, Status::REGISTRATION_ENROLLMENT_CANCELLED->value);
+    }
+
+    /**
      * Assert the response sends the user back to the offer when the type's ceremony couldn't start, with the message on the type.
      *
      * @param  TestResponse<Response>  $response

@@ -48,7 +48,7 @@ abstract class RecoveryCodesController extends Controller
 
         $setup = new RecoveryCodeSetup(Keystone::guard());
 
-        return $this->sendRecoveryCodesPage($request, new RecoveryCodesPage($setup->staged()));
+        return $this->sendRecoveryCodesPage($request, new RecoveryCodesPage($setup->staged(), origin: $pending->origin->value));
     }
 
     /**
