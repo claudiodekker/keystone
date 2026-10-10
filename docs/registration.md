@@ -1,6 +1,6 @@
 # Registration
 
-A visitor creates an account by proving they read the inbox of the address they type. They type it on the register page, Keystone mails it a link, and opening that link and choosing Continue starts the registration in their browser, on the finish page. There they choose a name and a password, and the account exists from that moment, signed in or held for the [enrollment](enrollment.md) it owes.
+A visitor creates an account by proving they read the inbox of the address they type. They type it on the register page, Keystone mails it a link, and opening that link and choosing Continue starts the registration in their browser, on the finish page. There they choose a name and a password, and the account exists from that moment, signed in or held for the [enrollment](enrollment.md) it owes. An app can also [skip the link](#registering-without-a-link).
 
 ## When registration is open
 
@@ -21,7 +21,7 @@ The Inertia-Vue sign-in page links to the register page only while registration 
 
 The register page (`register`) asks for an email address. Its form posts to `register.submit`, which requires an address of at most 255 characters that a strict reading of RFC 5322 accepts, refusing quoted local parts, comments and IP addresses in place of a domain, and stores it the way Keystone [stores every address](installation.md#email-addresses). Invalid input goes back to the register page with its errors, and only the address is flashed back.
 
-A valid address always sends the user on to the "check your email" step (`register.link-sent`). What happens behind it depends on who holds the address:
+While `keystone.email_verification.required` is on, a valid address always sends the user on to the "check your email" step (`register.link-sent`). What happens behind it depends on who holds the address:
 
 - When no active account holds it, Keystone mails it a registration link.
 - When an active account holds it verified, or holds it unverified while holding no verified address, Keystone mails nothing to it. It records `address.claim_attempted` on that account, with flow `registration`, and [alerts its owner](security-alerts.md) that someone tried to sign up with their address. A suspended account counts as active here.
@@ -31,7 +31,7 @@ The response is the same in every case, so the page can't tell anyone whether an
 
 ### The delivery limit
 
-Each address gets at most 3 registration mails in 10 minutes, links and alerts together, counted against the typed address whether or not an account holds it. Past that, the step answers exactly as before and mails nothing. The first refusal in a window records `limit.tripped` with the reason `keystone.delivery_limit`. Change the allowance with `keystone.rate_limits.deliveries_per_ten_minutes` (see [Rate limiting](rate-limiting.md#limits)). While the rate limiter's store is down, the step mails nothing and reports the failure.
+Each address gets at most 3 registration mails in 10 minutes, links and alerts together, counted against the typed address whether or not an account holds it. Past that, the step answers exactly as before and mails nothing. Registering [without a link](#registering-without-a-link) counts the same way. The first refusal in a window records `limit.tripped` with the reason `keystone.delivery_limit`. Change the allowance with `keystone.rate_limits.deliveries_per_ten_minutes` (see [Rate limiting](rate-limiting.md#limits)). While the rate limiter's store is down, the step mails nothing and reports the failure.
 
 ## The link
 
@@ -45,19 +45,36 @@ Links are signed and encrypted with keys derived from your current `APP_KEY` alo
 
 A link needs a working mailer and queue worker, and production refuses to boot without an `https` `app.url` (see [Configuration](configuration.md#boot-checks)). Behind a proxy, configure your trusted proxies, so the request's scheme, host and path match `app.url`'s. Otherwise every link is refused.
 
+## Registering without a link
+
+An app that accepts an address nobody proved can skip the link:
+
+```php
+// config/keystone.php
+'email_verification' => [
+    'required' => false,
+],
+```
+
+The register page then drops the line about the emailed link and labels its button "Continue", because the page value `mailsLink` is false. The form still posts to `register.submit`, with the same validation, but a valid address mails nothing. Keystone stores it in the session as the address being registered, unverified, starts the 30 minutes and sends the user straight to the finish page. The adapter's `sendRegistrationStarted` hook decides that response. The session gets a new id and drops any pending sign-in, as a spent link does.
+
+The owner of a taken address is still told. When an active account holds the address verified, or holds it unverified while holding no verified address, Keystone records `address.claim_attempted` on that account, with flow `registration`, and [alerts its owner](security-alerts.md), as asking for a link would. Like a mailed link, the alert is held back by the [delivery limit](#the-delivery-limit). Whether the address is free, taken or past the limit, the user lands on the finish page and the step takes at least 300 ms, so the response tells them nothing about the address.
+
+Finishing creates the account as [it does after a link](#finishing), with two differences. The address is stored unverified, and still as the primary address: it counts as verified for as long as the account holds no verified address, so its owner is alerted to later claims and receives the security mails. And it takes the address from no one, because it proves nothing: any number of accounts may go on holding it unverified beside a verified address. An address another active account holds verified, or holds unverified while holding no verified address, ends the registration at the finish and sends the user to the sign-in page, reading "That email address is already registered. Please sign in instead." That message is the one place this setting tells a visitor the address has an account. See [what loosening it costs](configuration.md#settings).
+
 ## The finish page
 
-The finish page (`register.finish`) shows the proven address and the credential types that serve registration, each with a form. A session that hasn't spent a link, or spent it more than 30 minutes ago, is sent back to the register page.
+The finish page (`register.finish`) shows the address being registered and the credential types that serve registration, each with a form. A session that hasn't spent a link or submitted an address without one, or did so more than 30 minutes ago, is sent back to the register page.
 
 ## Finishing
 
-The form posts to `register.finish.submit` with the type in the URL. With the password it takes a `name` of at most 255 characters and a new password typed twice, checked as every [new password](password.md#new-passwords) is. At registration the password may not contain a word of the part of the proven address before the `@` either. Invalid input goes back to the finish page with its errors, and only the name is flashed back.
+The form posts to `register.finish.submit` with the type in the URL. With the password it takes a `name` of at most 255 characters and a new password typed twice, checked as every [new password](password.md#new-passwords) is. At registration the password may not contain a word of the part of the address before the `@` either. Invalid input goes back to the finish page with its errors, and only the name is flashed back.
 
 Valid input creates the account in one database transaction:
 
-1. the proven address, removed from every other account that holds it (see [Other accounts holding the address](#other-accounts-holding-the-address));
+1. the address, removed from every other account that holds it when the link proved it (see [Other accounts holding the address](#other-accounts-holding-the-address));
 2. the users row, written by your app's [`CreateAccount`](#asking-for-more-than-a-name) action;
-3. the proven address, stored verified and as the account's primary address;
+3. the address, stored verified when the link proved it and unverified when the app [skips the link](#registering-without-a-link), and as the account's primary address either way;
 4. the password;
 5. an `account.registered` [security event](security-events.md#types), with flow `registration` and the new credential.
 
@@ -74,7 +91,7 @@ Two finishes posted from one browser at once, such as a double-clicked button, s
 
 ### Other accounts holding the address
 
-Any number of accounts may hold an address unverified, and the first account to verify it keeps it. Finishing verifies the proven address, so it deletes the address's row from every other account that holds it, in the same transaction, in order of account id. If the row was the account's primary address, another of its addresses becomes primary, a verified one first and the oldest otherwise.
+Any number of accounts may hold an address unverified, and the first account to verify it keeps it. Finishing after a link verifies the proven address, so it deletes the address's row from every other account that holds it, in the same transaction, in order of account id. If the row was the account's primary address, another of its addresses becomes primary, a verified one first and the oldest otherwise.
 
 Keystone does this silently: it records no event and mails no one. Those accounts never proved they own the address. Telling them it was verified would only tell whoever squatted on it that its owner just signed up. An active account always keeps a verified address here, because an account holding the address unverified and no verified address already counts as verified and stops the registration. A suspended account counts as active.
 
@@ -86,11 +103,11 @@ A deleted or invalidated account loses its row the same way, even when it held t
 
 ### When someone else got there first
 
-Between spending the link and finishing, another account may come to hold the address: an active account that verified it, or one that holds it unverified while holding no verified address. The finish then creates nothing, ends the registration and sends the user to the sign-in page, reading "That email address is already registered. Please sign in instead." The same happens to the slower of two finishes for one address that run at once, from two browsers that each spent a link: the database lets only one account hold an address verified, so the other's transaction rolls back whole. The accounts that held the address keep their rows then.
+Between spending the link, or submitting the address without one, and finishing, another account may come to hold the address: an active account that verified it, or one that holds it unverified while holding no verified address. The finish then creates nothing, ends the registration and sends the user to the sign-in page, reading "That email address is already registered. Please sign in instead." The same happens to the slower of two finishes for one address that run at once, from two browsers that each spent a link: the database lets only one account hold an address verified, so the other's transaction rolls back whole. The accounts that held the address keep their rows then. An address registered without a link has no link to spend, so this is also where such a registration learns the address is taken.
 
 ## Cancelling
 
-The finish page's cancel button (`DELETE` to `register.finish.cancel`) ends the registration before the account exists. It forgets the proven address and every ceremony a credential type started for it, and sends the user to the register page, reading "Registration cancelled. No account was created."
+The finish page's cancel button (`DELETE` to `register.finish.cancel`) ends the registration before the account exists. It forgets the address and every ceremony a credential type started for it, and sends the user to the register page, reading "Registration cancelled. No account was created."
 
 Once the account exists, cancelling the enrollment it owes signs the user out and keeps the account, reading "Your account was created. Sign in to finish setting it up." The account owes the enrollment again at its next sign-in (see [Cancelling](enrollment.md#cancelling)).
 
