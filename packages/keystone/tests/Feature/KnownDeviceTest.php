@@ -248,6 +248,7 @@ describe('a sign-in', function () {
     });
 
     it('still counts a device seen just inside the retention as known', function () {
+        $this->freezeSecond();
         $account = $this->createAccount();
         $this->arrangeCredential($account, new FormTypeSupport, Surface::SIGN_IN);
         $device = signInOnDevice($this, null);
