@@ -42,6 +42,8 @@ class AccountCreation
                 throw new AddressTaken;
             }
 
+            (new AddressClaims($this->guard, $this->recorder))->settle($address);
+
             $account = $this->createAccount->handle($profile);
 
             $changes = new AccountChanges($this->guard, $this->recorder);

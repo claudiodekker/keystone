@@ -33,4 +33,24 @@ class AddressClaims
             $this->recorder->record(SecurityEventType::ADDRESS_CLAIM_ATTEMPTED, account: $owner, flow: $flow->value);
         }
     }
+
+    /**
+     * Take the address from every account holding it, once an account is about to verify it, without telling them.
+     */
+    public function settle(string $address): void
+    {
+        $users = $this->guard->userModel();
+        $address = Addresses::normalize($address);
+
+        $holders = $users->getConnection()->table('user_emails')->where('address', $address)->distinct()->pluck('user_id');
+
+        /** @var iterable<Model&KeystoneUser> $losers */
+        $losers = $users->newQueryWithoutScopes()->whereKey($holders)->orderBy($users->getKeyName())->get();
+
+        $changes = new AccountChanges($this->guard, $this->recorder);
+
+        foreach ($losers as $loser) {
+            $changes->change($loser, fn (AccountChange $change) => $change->loseAddress($address));
+        }
+    }
 }

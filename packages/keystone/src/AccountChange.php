@@ -113,6 +113,29 @@ class AccountChange
     }
 
     /**
+     * Remove the address from the account, as Keystone stores it, moving the primary to another address when it was the primary one.
+     */
+    public function loseAddress(string $address): void
+    {
+        $address = Addresses::normalize($address);
+        $emails = fn () => $this->account->getConnection()->table('user_emails')->where('user_id', $this->account->getKey());
+
+        $wasPrimary = $emails()->where('address', $address)->where('is_primary', true)->exists();
+
+        $emails()->where('address', $address)->delete();
+
+        if (! $wasPrimary) {
+            return;
+        }
+
+        $fallback = $emails()->orderByRaw('case when verified_at is null then 1 else 0 end')->orderBy('id')->value('id');
+
+        if ($fallback !== null) {
+            $emails()->where('id', $fallback)->update(['is_primary' => true, 'updated_at' => Date::now()]);
+        }
+    }
+
+    /**
      * Store the enrolled credential on the account and record in the flow whether it was added or replaced what the account held.
      *
      * A credential that replaces its type takes the place of every credential of the type the account holds, disabled or not.

@@ -55,10 +55,11 @@ The form posts to `register.finish.submit` with the type in the URL. With the pa
 
 Valid input creates the account in one database transaction:
 
-1. the users row, written by your app's [`CreateAccount`](#asking-for-more-than-a-name) action;
-2. the proven address, stored verified and as the account's primary address;
-3. the password;
-4. an `account.registered` [security event](security-events.md#types), with flow `registration` and the new credential.
+1. the proven address, removed from every other account that holds it (see [Other accounts holding the address](#other-accounts-holding-the-address));
+2. the users row, written by your app's [`CreateAccount`](#asking-for-more-than-a-name) action;
+3. the proven address, stored verified and as the account's primary address;
+4. the password;
+5. an `account.registered` [security event](security-events.md#types), with flow `registration` and the new credential.
 
 The transaction commits, then the user is either signed in or held at enrollment:
 
@@ -71,13 +72,21 @@ A finish posted after the 30 minutes, even one whose password was still being ch
 
 Two finishes posted from one browser at once, such as a double-clicked button, share one session. The database still lets only one of them create the account, but the slower one may answer "That email address is already registered. Please sign in instead." after the faster one signed the browser in. This is a known limit: the account exists and the browser is signed in, and only that message is wrong.
 
+### Other accounts holding the address
+
+Any number of accounts may hold an address unverified, and the first account to verify it keeps it. Finishing verifies the proven address, so it deletes the address's row from every other account that holds it, in the same transaction, in order of account id. If the row was the account's primary address, another of its addresses becomes primary, a verified one first and the oldest otherwise.
+
+Keystone does this silently: it records no event and mails no one. Those accounts never proved they own the address. Telling them it was verified would only tell whoever squatted on it that its owner just signed up. An active account always keeps a verified address here, because an account holding the address unverified and no verified address already counts as verified and stops the registration. A suspended account counts as active.
+
+A deleted or invalidated account loses its row the same way, even when it held the address verified, so it no longer blocks the finish. Nothing else about it changes, even when the removal leaves it with no address.
+
 ### The welcome mail
 
 `account.registered` sends the new address a welcome mail through its [notification slot](security-alerts.md#changing-or-silencing-an-alert), `keystone.notifications.account.registered`, which names `ClaudioDekker\Keystone\Notifications\Welcome` by default. The mail is queued, like every alert. It is sent only while `keystone.events.enabled` is on, so with recording off no welcome mail is sent. To change its wording, override the keys under `keystone::mail.welcome` in `lang/vendor/keystone/{locale}/mail.php`. To send your own mail, name your notification in the slot, or set it to `null` to send none. Adding the password records no `credential.added` and sends no alert.
 
 ### When someone else got there first
 
-Between spending the link and finishing, another account may come to hold the address: an active account that verified it, or one that holds it unverified while holding no verified address. The finish then creates nothing, ends the registration and sends the user to the sign-in page, reading "That email address is already registered. Please sign in instead." The same happens to the slower of two finishes for one address that run at once, from two browsers that each spent a link: the database lets only one account hold an address verified, so the other's transaction rolls back whole.
+Between spending the link and finishing, another account may come to hold the address: an active account that verified it, or one that holds it unverified while holding no verified address. The finish then creates nothing, ends the registration and sends the user to the sign-in page, reading "That email address is already registered. Please sign in instead." The same happens to the slower of two finishes for one address that run at once, from two browsers that each spent a link: the database lets only one account hold an address verified, so the other's transaction rolls back whole. The accounts that held the address keep their rows then.
 
 ## Cancelling
 
