@@ -249,13 +249,37 @@ class KeystoneGuard extends SessionGuard
      */
     public function startRegistration(string $address): void
     {
+        $this->leaveForRegistration();
+
+        $this->session->put($this->registrationKey(), [
+            'address' => $address,
+            'started_at' => Date::now()->getTimestamp(),
+            'verified' => true,
+        ]);
+    }
+
+    /**
+     * Start registering the address someone typed and nothing proved, on a new session id, in place of any pending sign-in or earlier registration.
+     */
+    public function startUnverifiedRegistration(string $address): void
+    {
+        $this->leaveForRegistration();
+
+        $this->session->put($this->registrationKey(), [
+            'address' => $address,
+            'started_at' => Date::now()->getTimestamp(),
+            'verified' => false,
+        ]);
+    }
+
+    /**
+     * Move to a new session id and drop the pending sign-in, as a registration that starts does.
+     */
+    protected function leaveForRegistration(): void
+    {
         $this->changeAuthLevel();
 
         $this->session->forget($this->pendingKey());
-        $this->session->put($this->registrationKey(), [
-            'address' => $address,
-            'proven_at' => Date::now()->getTimestamp(),
-        ]);
     }
 
     /**
@@ -265,24 +289,24 @@ class KeystoneGuard extends SessionGuard
     {
         $held = $this->session->get($this->registrationKey());
 
-        if (! is_array($held) || ! is_string($held['address'] ?? null) || ! is_int($held['proven_at'] ?? null)) {
+        if (! is_array($held) || ! is_string($held['address'] ?? null) || ! is_int($held['started_at'] ?? null) || ! is_bool($held['verified'] ?? null)) {
             return null;
         }
 
-        $provenAt = CarbonImmutable::createFromTimestamp($held['proven_at']);
-        $endsAt = $provenAt->addSeconds(Registering::WINDOW_SECONDS);
+        $startedAt = CarbonImmutable::createFromTimestamp($held['started_at']);
+        $endsAt = $startedAt->addSeconds(Registering::WINDOW_SECONDS);
 
-        if ($provenAt->isFuture() || $endsAt->lessThanOrEqualTo(Date::now())) {
+        if ($startedAt->isFuture() || $endsAt->lessThanOrEqualTo(Date::now())) {
             $this->session->forget($this->registrationKey());
 
             return null;
         }
 
-        return new Registering($held['address'], $endsAt);
+        return new Registering($held['address'], $endsAt, $held['verified']);
     }
 
     /**
-     * End the registration without an account, forgetting the proven address and closing every ceremony slot.
+     * End the registration without an account, forgetting the address and closing every ceremony slot.
      */
     public function endRegistration(): void
     {

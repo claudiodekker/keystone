@@ -17,7 +17,7 @@ defineProps<RegisterPage>();
 
     <p v-if="status" class="text-sm font-medium text-green-600">{{ status }}</p>
 
-    <p class="text-sm text-gray-600">We'll email you a link to confirm the address is yours.</p>
+    <p v-if="mailsLink" class="text-sm text-gray-600">We'll email you a link to confirm the address is yours.</p>
 
     <Form v-bind="submit.form()" v-slot="{ errors, processing }" class="flex flex-col gap-4">
         <div class="flex flex-col gap-2">
@@ -35,7 +35,7 @@ defineProps<RegisterPage>();
         </div>
 
         <button type="submit" :disabled="processing" class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
-            Send me a link
+            {{ mailsLink ? 'Send me a link' : 'Continue' }}
         </button>
     </Form>
 

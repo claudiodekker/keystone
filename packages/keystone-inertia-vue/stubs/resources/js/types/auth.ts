@@ -27,6 +27,7 @@ export type SignInPage = {
 
 export type RegisterPage = {
     status: string | null;
+    mailsLink: boolean;
     email: string | null;
 };
 

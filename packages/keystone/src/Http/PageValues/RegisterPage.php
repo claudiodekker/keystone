@@ -12,6 +12,7 @@ readonly class RegisterPage
      */
     public function __construct(
         public ?string $status,
+        public bool $mailsLink,
     ) {
         //
     }

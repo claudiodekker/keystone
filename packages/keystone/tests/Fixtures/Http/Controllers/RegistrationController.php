@@ -15,7 +15,7 @@ class RegistrationController extends Controller
      */
     protected function sendRegistrationPage(Request $request, RegisterPage $page): JsonResponse
     {
-        return response()->json(['page' => 'register', 'status' => $page->status]);
+        return response()->json(['page' => 'register', 'status' => $page->status, 'mailsLink' => $page->mailsLink]);
     }
 
     /**
@@ -24,6 +24,14 @@ class RegistrationController extends Controller
     protected function sendRegistrationLinkSent(Request $request): RedirectResponse
     {
         return to_route('register.link-sent');
+    }
+
+    /**
+     * Send the user on to finish registering.
+     */
+    protected function sendRegistrationStarted(Request $request): RedirectResponse
+    {
+        return to_route('register.finish');
     }
 
     /**

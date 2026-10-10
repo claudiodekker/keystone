@@ -150,7 +150,7 @@ A signed-in user who opens or posts to any registration step is sent to `/`, a l
 
 The adapter publishes three controllers, with one hook per outcome:
 
-- `RegistrationController`: `sendRegistrationPage`, `sendRegistrationLinkSent` and `sendRegistrationLinkSentPage`;
+- `RegistrationController`: `sendRegistrationPage`, `sendRegistrationLinkSent`, `sendRegistrationStarted` and `sendRegistrationLinkSentPage`;
 - `RegistrationLinkController`: `sendRegistrationLinkPage`, `sendRegistrationLinkConsumed`, `sendRegistrationLinkExpired` and `sendRegistrationLinkExpiredPage`;
 - `RegistrationFinishController`: `sendRegistrationFinishPage`, `sendRegistered`, `sendRegistrationEnrollmentOwed`, `sendRegistrationRefused`, `sendAddressTaken`, `sendRegistrationBarred` and `sendRegistrationCancelled`.
 

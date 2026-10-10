@@ -32,6 +32,16 @@ trait RegistrationAssertions
     }
 
     /**
+     * Assert the response sends the user on to finish registering the address, with no link mailed.
+     *
+     * @param  TestResponse<Response>  $response
+     */
+    public function assertRegistrationStarted(TestResponse $response): void
+    {
+        $response->assertRedirectToRoute('register.finish');
+    }
+
+    /**
      * Assert the response is the step telling the user to check their inbox.
      *
      * @param  TestResponse<Response>  $response

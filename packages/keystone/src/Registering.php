@@ -10,7 +10,7 @@ use Carbon\CarbonImmutable;
 readonly class Registering
 {
     /**
-     * How long a proven address waits for its registration to finish.
+     * How long an address waits for its registration to finish.
      */
     public const int WINDOW_SECONDS = 1800;
 
@@ -20,6 +20,7 @@ readonly class Registering
     public function __construct(
         public string $address,
         public CarbonImmutable $endsAt,
+        public bool $verified,
     ) {
         //
     }

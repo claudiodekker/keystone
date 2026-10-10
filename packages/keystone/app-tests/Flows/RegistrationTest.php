@@ -103,6 +103,21 @@ it('mails nothing to an address an active account holds, and alerts that account
     $this->assertDatabaseHas('user_security_events', ['type' => 'address.claim_attempted', 'user_id' => $owner->getKey(), 'flow' => 'registration']);
 });
 
+it('takes an address without a link when email verification is off, answering a taken one exactly as a free one and alerting its owner', function () {
+    config(['keystone.email_verification.required' => false]);
+    $owner = $this->createAccount('jane@example.com');
+
+    $this->assertIndistinguishable(
+        fn () => tap($this->post(route('register.submit'), ['email' => 'jane@example.com']), $this->assertRegistrationStarted(...)),
+        fn () => tap($this->post(route('register.submit'), ['email' => 'new@example.com']), $this->assertRegistrationStarted(...)),
+    );
+
+    expect(Keystone::guard()->registration())->address->toBe('new@example.com')->verified->toBeFalse();
+    Notification::assertNotSentTo(new AnonymousNotifiable, EmailedLinkMail::class);
+    Notification::assertSentOnDemand(SecurityAlert::class, fn (SecurityAlert $alert, $channels, $notifiable) => $alert->type === SecurityEventType::ADDRESS_CLAIM_ATTEMPTED && $notifiable->routes['mail'] === 'jane@example.com');
+    $this->assertDatabaseHas('user_security_events', ['type' => 'address.claim_attempted', 'user_id' => $owner->getKey(), 'flow' => 'registration']);
+});
+
 it('waits out the timing floor for a free and a taken address', function (string $address) {
     $this->createAccount('jane@example.com');
 

@@ -428,27 +428,39 @@ describe('a registration', function () {
 
         expect(Auth::guard('web')->registration())->toBeNull();
     })->with([
-        'a future time' => fn () => ['address' => 'new@example.com', 'proven_at' => now()->addMinute()->getTimestamp()],
-        'no time' => [['address' => 'new@example.com']],
-        'no address' => fn () => ['proven_at' => now()->getTimestamp()],
+        'a future time' => fn () => ['address' => 'new@example.com', 'started_at' => now()->addMinute()->getTimestamp(), 'verified' => true],
+        'no time' => [['address' => 'new@example.com', 'verified' => true]],
+        'no address' => fn () => ['started_at' => now()->getTimestamp(), 'verified' => true],
+        'no verified flag' => fn () => ['address' => 'new@example.com', 'started_at' => now()->getTimestamp()],
+        'a verified flag that isn\'t a boolean' => fn () => ['address' => 'new@example.com', 'started_at' => now()->getTimestamp(), 'verified' => 1],
         'not an array' => ['new@example.com'],
     ]);
 
-    it('starts on a new session id, dropping sudo, every ceremony slot and the pending sign-in', function () {
+    it('holds whether the address was proven', function () {
+        $guard = Auth::guard('web');
+
+        $guard->startRegistration('new@example.com');
+        expect($guard->registration())->verified->toBeTrue();
+
+        $guard->startUnverifiedRegistration('new@example.com');
+        expect($guard->registration())->verified->toBeFalse();
+    });
+
+    it('starts on a new session id, dropping sudo, every ceremony slot and the pending sign-in', function (string $start) {
         $guard = Auth::guard('web');
         $guard->hold(User::factory()->create(), 'form', PendingStage::CHALLENGE, '/');
         $guard->slots()->put('form', 'challenge', 'bytes', capSeconds: 300);
         session()->put('keystone_sudo_web', ['started_at' => now()->getTimestamp(), 'intended_url' => '/settings']);
         $before = session()->getId();
 
-        $guard->startRegistration('new@example.com');
+        $guard->{$start}('new@example.com');
 
         expect(session()->getId())->not->toBe($before)
             ->and($guard->pending())->toBeNull()
             ->and(session()->has('keystone_sudo_web'))->toBeFalse()
             ->and($guard->slots()->get('form', 'challenge'))->toBeNull()
             ->and($guard->registration()?->address)->toBe('new@example.com');
-    });
+    })->with(['a spent link' => 'startRegistration', 'a typed address' => 'startUnverifiedRegistration']);
 
     it('ends with every change of auth level', function (Closure $change) {
         $guard = Auth::guard('web');
