@@ -69,7 +69,7 @@ Use these handles. Each one comes from the stub pages and is stable:
 | Sign in | `/auth/login` | heading `Sign in`, label `Email address`, label `Password`, button `Sign in`, link `Create an account` while registration is open |
 | Register | `/auth/register` | heading `Create an account`, label `Email address`, button `Send me a link`, link `Already have an account? Sign in`; reached by the link `Create an account` on the sign-in page |
 | Check your email | `/auth/register/link-sent` | heading `Check your email`, link `Use another address` |
-| Emailed link | `/auth/register/verify?…` | heading `Continue from your email`, button `Continue`; opened from the link in the mail `Confirm your email address`, which `app.sh mail` prints |
+| Emailed link | `/auth/register/verify?…` | heading `Email address verified`, button `Continue`; opened from the link in the mail `Confirm your email address`, which `app.sh mail` prints |
 | Link expired | `/auth/register/link-expired` | heading `That link is no longer valid`, link `Send me a new link` |
 | Finish registering | `/auth/register/finish` | heading `Finish creating your account`, the proven address, label `Name`, label `Password` (pass `{ exact: true }`, since it also matches the confirmation), label `Confirm password`, button `Create account`, button `Cancel registration` |
 | Challenge | `/auth/login/challenge` | heading `Confirm it's you`, label `Code from your authenticator app` (TOTP), label `Recovery code`, button `Verify`, a button per other type named by type (`recovery-code`), button `Cancel sign-in` |

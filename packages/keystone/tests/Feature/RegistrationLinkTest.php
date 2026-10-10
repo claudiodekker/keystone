@@ -133,6 +133,20 @@ describe('opening a link', function () {
             ->and(rejectedLinks()[0]->event->reason)->toBe('keystone.link_invalid');
     })->with(['opening it' => 'GET', 'spending it' => 'POST']);
 
+    it('refuses a spent link with the generic outcome, recording request.rejected', function () {
+        Event::fake([SecurityEventRecorded::class]);
+        $url = mailedRegistrationLink($this);
+        $this->post($url)->assertRedirectToRoute('register.finish');
+        session()->invalidate();
+
+        $response = $this->get($url);
+
+        $response->assertRedirectToRoute('register.link-expired');
+        expect(rejectedLinks())->toHaveCount(1)
+            ->and(rejectedLinks()[0]->event->reason)->toBe('keystone.link_used');
+        $this->assertDatabaseCount(EmailedLinks::TABLE, 1);
+    });
+
     it('posts back only the link\'s own query values', function () {
         $url = withQuery(mailedRegistrationLink($this), 'utm_source', 'newsletter');
 

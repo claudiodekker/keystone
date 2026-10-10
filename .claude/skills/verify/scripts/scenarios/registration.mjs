@@ -25,7 +25,7 @@ const { page, step, close } = await open(run, 'registration');
 
 const spendLink = async (link) => {
     await page.goto(link);
-    await page.getByRole('heading', { name: 'Continue from your email' }).waitFor();
+    await page.getByRole('heading', { name: 'Email address verified' }).waitFor();
     await page.getByRole('button', { name: 'Continue' }).click();
     await page.getByRole('heading', { name: 'Finish creating your account' }).waitFor();
 };
@@ -57,7 +57,7 @@ try {
     assert.ok(!decodeURIComponent(link).includes(address), 'the link never shows the address');
 
     const opened = await page.goto(link);
-    await page.getByRole('heading', { name: 'Continue from your email' }).waitFor();
+    await page.getByRole('heading', { name: 'Email address verified' }).waitFor();
     assert.equal(opened.headers()['referrer-policy'], 'no-referrer', "the link's step sends no referrer");
     assert.equal(value('select count(*) from used_email_links'), '0', 'opening the link spends nothing');
     await step('link-opened');
@@ -70,8 +70,6 @@ try {
     await step('link-spent');
 
     await other.page.goto(link);
-    await other.page.getByRole('heading', { name: 'Continue from your email' }).waitFor();
-    await other.page.getByRole('button', { name: 'Continue' }).click();
     await other.page.getByRole('heading', { name: 'That link is no longer valid' }).waitFor();
     assert.equal(new URL(other.page.url()).pathname, '/auth/register/link-expired', 'a spent link is refused in another browser');
     await other.step('link-replayed');

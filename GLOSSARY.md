@@ -121,7 +121,7 @@ The headers core puts on every response from a Keystone route, over any value th
 A route whose controller is one of core's controllers or the application's subclass of one. Core hardens its responses and refuses cross-site changes to it.
 
 **Emailed link**:
-A single-use link Keystone mails to prove its reader holds an inbox, built on `app.url` and working for 10 minutes. Opening it shows a page with one button and changes nothing; only that button's POST spends it.
+A single-use link Keystone mails to prove its reader holds an inbox, built on `app.url` and working for 10 minutes. Opening it shows a page with one button and spends nothing; only that button's POST spends it.
 _Avoid_: magic link (for the kind in general), signed URL
 
 **Security event**:

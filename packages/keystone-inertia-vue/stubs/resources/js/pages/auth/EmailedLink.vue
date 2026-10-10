@@ -9,11 +9,11 @@ defineProps<EmailedLinkPage>();
 </script>
 
 <template>
-    <Head title="Continue from your email" />
+    <Head title="Email address verified" />
 
-    <h1 class="text-xl font-semibold text-gray-900">Continue from your email</h1>
+    <h1 class="text-xl font-semibold text-gray-900">Email address verified</h1>
 
-    <p class="text-sm text-gray-600">You opened a link we emailed you. Choose Continue to use it. It works only once.</p>
+    <p class="text-sm text-gray-600">Choose Continue to carry on. Nothing happens until you do, and the link works only once.</p>
 
     <Form :action="action" method="post" v-slot="{ processing }">
         <button

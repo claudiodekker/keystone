@@ -67,7 +67,7 @@ class EmailedLinks
     }
 
     /**
-     * Read the link the request opened without spending it, or record why it was refused.
+     * Read the link the request opened without spending it while it is unspent, or record why it was refused.
      *
      * @template TLink of EmailedLink
      *
@@ -76,7 +76,17 @@ class EmailedLinks
      */
     public function open(Request $request, string $kind): ?EmailedLink
     {
-        return $this->read($request, $kind)?->link;
+        $verified = $this->read($request, $kind);
+
+        if ($verified === null) {
+            return null;
+        }
+
+        if ($this->spent($verified)) {
+            return $this->reject($verified->link, 'keystone.link_used');
+        }
+
+        return $verified->link;
     }
 
     /**
@@ -205,6 +215,16 @@ class EmailedLinks
     }
 
     /**
+     * Determine if the link's digest is already stored.
+     *
+     * @param  VerifiedLink<EmailedLink>  $verified
+     */
+    protected function spent(VerifiedLink $verified): bool
+    {
+        return $this->guard->userModel()->getConnection()->table(self::TABLE)->where('digest', $this->digest($verified))->exists();
+    }
+
+    /**
      * Store the link's digest until it expires, answering false when another request stored it first.
      *
      * @param  VerifiedLink<EmailedLink>  $verified
@@ -212,11 +232,21 @@ class EmailedLinks
     protected function spend(VerifiedLink $verified): bool
     {
         $stored = $this->guard->userModel()->getConnection()->table(self::TABLE)->insertOrIgnore([
-            'digest' => Hmac::make('keystone.emailed-link.digest', $verified->signature),
+            'digest' => $this->digest($verified),
             'expires_at' => $verified->expiresAt,
         ]);
 
         return $stored === 1;
+    }
+
+    /**
+     * Get the digest the spent link is stored under.
+     *
+     * @param  VerifiedLink<EmailedLink>  $verified
+     */
+    protected function digest(VerifiedLink $verified): string
+    {
+        return Hmac::make('keystone.emailed-link.digest', $verified->signature);
     }
 
     /**
