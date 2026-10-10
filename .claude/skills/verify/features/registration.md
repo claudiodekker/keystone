@@ -1,6 +1,6 @@
 # Registration
 
-A guest asks for a registration link at `/auth/register`, reached from the sign-in page's `Create an account` link. Every valid address lands on "Check your email". A free address is mailed a link. An address an account already holds is mailed nothing, and that account's owner is alerted instead. Opening the link shows a page with one `Continue` button that changes nothing. The button spends the link and lands on the finish page, which shows the proven address. A spent link is refused in any browser.
+A guest asks for a registration link at `/auth/register`, reached from the sign-in page's `Create an account` link. Every valid address lands on "Check your email". A free address is mailed a link. An address an account already holds is mailed nothing, and that account's owner is alerted instead. Opening the link shows a page with one `Continue` button that changes nothing. The button spends the link and lands on the finish page, which shows the proven address. A spent link is refused in any browser. On the finish page a name and a password twice create the account. The workbench requires a second factor and recovery codes, so the new account lands on the enrollment it owes, and is signed in once it has set up an authenticator app and saved its codes. `Cancel registration` on the finish page ends the registration and creates nothing.
 
 ## Sub-features
 
@@ -11,13 +11,18 @@ A guest asks for a registration link at `/auth/register`, reached from the sign-
 - `registration-link-open` opening the link shows the heading `Continue from your email`, sends `Referrer-Policy: no-referrer`, and leaves `used_email_links` empty.
 - `registration-link-spend` `Continue` lands on `/auth/register/finish` with the heading `Finish creating your account` and the address, and adds one row to `used_email_links`.
 - `registration-link-replay` the same link, opened and continued in another browser, lands on `/auth/register/link-expired` with the heading `That link is no longer valid`.
-- `registration-finish-guest` a browser that spent no link and opens `/auth/register/finish` lands on `/auth/register`.
+- `registration-finish-guest` a browser that spent no link and opens `/auth/register/finish` lands on `/auth/register` with no status.
+- `registration-finish` `Name`, `Password` and `Confirm password` filled and `Create account` chosen land on `/auth/login/enrollment` with the heading `Set up two-factor authentication` and a `Sign out` button in place of `Cancel sign-in`; the address is the new account's verified primary one, and `account.registered` and `sign_in.held` are recorded with flow `registration`.
+- `registration-enrollment-completed` enrolling `totp` and saving the recovery codes land on home with `You're signed in.`; `enrollment.completed` and `signed_in` are recorded with flow `enrollment`, `known_device` `0`, and no `New sign-in to your account` alert is mailed.
+- `registration-welcome` the new address is mailed `Welcome to <app name>`.
+- `registration-cancel` `Cancel registration` on the finish page lands on `/auth/register` reading `Registration cancelled. No account was created.`, and the address is on no account.
 
 ## How to get to it (user POV)
 
 - Choose `Sign in` on home (`/`), then `Create an account` on the sign-in page.
 - Open `/auth/register` directly.
 - Open the link from the mail `Confirm your email address`, then choose `Continue`.
+- Fill the finish page and choose `Create account`.
 
 ## Driving it with Playwright
 
@@ -30,14 +35,18 @@ Preconditions:
 - **Open the link.** `const response = await page.goto(link)`, then wait for the heading `Continue from your email`. `response.headers()['referrer-policy']` is `no-referrer`, and `app.sh sql <run> "select count(*) from used_email_links"` is still `0`.
 - **Spend it.** `page.getByRole('button', { name: 'Continue' }).click()`, then wait for the heading `Finish creating your account` and `page.getByText(address)`. `used_email_links` now holds one row.
 - **Replay it.** In a second browser from `open(run, name)`, open the same link and choose `Continue`. The heading `That link is no longer valid` appears at `/auth/register/link-expired`.
-- **Proof.** `app.sh sql <run> "select type, flow, user_id from user_security_events where type = 'address.claim_attempted'"` shows Jane's row. A refused link records `request.rejected` about nobody, so it is only in the log, not in the table.
+- **Finish.** On the finish page, `page.getByLabel('Name').fill(name)`, `page.getByLabel('Password', { exact: true }).fill(password)` and `page.getByLabel('Confirm password').fill(password)`, then `page.getByRole('button', { name: 'Create account' }).click()`. Wait for the heading `Set up two-factor authentication`.
+- **Enroll what it owes.** `page.getByRole('link', { name: 'totp' }).click()`, then fill `Code from your authenticator app` with `totp(await page.locator('code').innerText())` and choose `Set up`. On `Save your recovery codes`, fill `Type one of the codes to confirm you saved them` with the first `li` and choose `I saved them`. Wait for `You're signed in.`.
+- **Cancel.** On the finish page, `page.getByRole('button', { name: 'Cancel registration' }).click()`, then wait for `Registration cancelled. No account was created.`.
+- **Proof.** `app.sh sql <run> "select type, flow, user_id from user_security_events where type = 'address.claim_attempted'"` shows Jane's row. A refused link records `request.rejected` about nobody, so it is only in the log, not in the table. `app.sh sql <run> "select type, flow, known_device from user_security_events where user_id = <id> order by id"` shows the new account's trail: `account.registered`, `sign_in.held`, `credential.added`, `recovery_codes.generated`, `sudo.granted`, `enrollment.completed` and `signed_in`. `app.sh mail <run>` prints the welcome mail.
 
-The whole path is `scripts/scenarios/registration.mjs`: `node .claude/skills/verify/scripts/scenarios/registration.mjs <run>`. It uses a fresh address each time, so it runs again on the same run.
+The whole path is `scripts/scenarios/registration.mjs`: `node .claude/skills/verify/scripts/scenarios/registration.mjs <run>`. Run it on a fresh run: it expects `used_email_links` to start empty, and Jane's address gets only 3 registration mails in 10 minutes.
 
 ## Gotchas
 
 - The register page and the email submission take the same 300 ms whatever the address, so a taken address shows no sign of being taken in the browser. Read the mail log and the security events instead.
 - Each address gets at most 3 registration mails in 10 minutes, alerts included. A run that asks for Jane's address more often mails nothing more. Start a fresh run, or use another address.
 - The workbench lists the password on every surface, so registration is always open there, and the "Registration is not available." refusal can't be reached. The feature tests cover it.
-- The finish page shows the address only. Its form arrives with account creation.
+- The password may not contain a word of 4 or more characters from the address's local part. The scenario's addresses carry a timestamp, which counts as such a word, so its password holds no long run of digits.
+- The lost race (another account holding the address between the link and the finish) needs a second account to verify the address meanwhile, which no browser step does. The feature tests cover it.
 - Mails wait on the run's `database` queue until `app.sh mail` drains it, so read the link only after asking for it.

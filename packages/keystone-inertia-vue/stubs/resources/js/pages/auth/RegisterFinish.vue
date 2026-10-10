@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { Head } from '@inertiajs/vue3';
+import { Form, Head } from '@inertiajs/vue3';
+import CredentialTypeForm from '@/components/CredentialTypeForm.vue';
 import AuthLayout from '@/layouts/AuthLayout.vue';
+import { cancel } from '@/routes/register/finish';
 import type { RegisterFinishPage } from '@/types/auth';
 
 defineOptions({ layout: AuthLayout });
@@ -18,4 +20,10 @@ defineProps<RegisterFinishPage>();
     <p class="text-sm text-gray-600">
         You confirmed <span class="font-medium text-gray-900">{{ address }}</span> is yours.
     </p>
+
+    <CredentialTypeForm v-for="option in types" :key="option.type" :option="option" surface="registration" />
+
+    <Form v-bind="cancel.form()">
+        <button type="submit" class="text-sm text-gray-600 underline">Cancel registration</button>
+    </Form>
 </template>

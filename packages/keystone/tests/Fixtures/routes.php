@@ -36,6 +36,8 @@ Route::middleware('web')->group(function () {
     Route::post('register/verify', [RegistrationLinkController::class, 'store'])->name('register.verify.consume');
     Route::get('register/link-expired', [RegistrationLinkController::class, 'expired'])->name('register.link-expired');
     Route::get('register/finish', [RegistrationFinishController::class, 'show'])->name('register.finish');
+    Route::post('register/finish/{type}', [RegistrationFinishController::class, 'store'])->name('register.finish.submit');
+    Route::delete('register/finish', [RegistrationFinishController::class, 'destroy'])->name('register.finish.cancel');
     Route::post('logout', SignOutController::class)->name('logout');
     Route::get('sudo', [SudoController::class, 'show'])->name('sudo');
     Route::post('sudo/{type}', [SudoController::class, 'store'])->name('sudo.submit');

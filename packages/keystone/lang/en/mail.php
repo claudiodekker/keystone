@@ -11,4 +11,10 @@ return [
             'ignore' => 'If you didn\'t ask for this, ignore this email. No account is created without the link.',
         ],
     ],
+
+    'welcome' => [
+        'subject' => 'Welcome to :app',
+        'created' => 'Your :app account is ready.',
+        'sign_in' => 'Sign in with this email address from now on.',
+    ],
 ];

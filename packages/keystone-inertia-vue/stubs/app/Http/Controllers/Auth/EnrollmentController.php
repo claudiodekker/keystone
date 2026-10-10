@@ -39,6 +39,7 @@ class EnrollmentController extends Controller
             'ceremony' => $page->ceremony,
             'status' => $page->status,
             'held' => $page->held,
+            'origin' => $page->origin,
         ]);
     }
 

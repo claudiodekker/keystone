@@ -73,6 +73,7 @@ test('the credential epoch moves only for a change that removes, replaces or end
 })->with([
     'nothing' => [fn (AccountChange $change) => null, false],
     'adding a credential' => [fn (AccountChange $change) => $change->addCredential(new FormType, identifier: null, secret: 'new'), false],
+    'adding a verified address' => [fn (AccountChange $change) => $change->addVerifiedAddress('new@example.com'), false],
     'a rehash' => [fn (AccountChange $change, StoredCredential $credential) => $change->rehash($credential, type: 'form', secret: 'new-hash'), false],
     'an advance' => [fn (AccountChange $change, StoredCredential $credential) => $change->advance($credential, type: 'form', secret: 'next-step'), false],
     'spending a recovery code' => [fn (AccountChange $change) => $change->spendRecoveryCode('NO-SUCH-CODE', flow: Flow::CHALLENGE, keepLast: false), false],

@@ -2,6 +2,7 @@
 
 namespace ClaudioDekker\Keystone;
 
+use ClaudioDekker\Keystone\Exceptions\AddressTaken;
 use ClaudioDekker\Keystone\Exceptions\AlreadySuspended;
 use ClaudioDekker\Keystone\Exceptions\CurrentSession;
 use ClaudioDekker\Keystone\Exceptions\LastRecoveryCode;
@@ -15,6 +16,7 @@ use ClaudioDekker\Keystone\Methods\EnrolledCredential;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Date;
 
 /**
@@ -83,6 +85,31 @@ class AccountChange
             secret: $secret,
             label: $label,
         );
+    }
+
+    /**
+     * Give the account the address, as Keystone stores it, verified and as its primary address.
+     *
+     * @throws AddressTaken
+     */
+    public function addVerifiedAddress(string $address): void
+    {
+        $address = Addresses::normalize($address);
+        $now = Date::now();
+
+        try {
+            $this->account->getConnection()->table('user_emails')->insert([
+                'user_id' => $this->account->getKey(),
+                'address' => $address,
+                'verified_address' => $address,
+                'verified_at' => $now,
+                'is_primary' => true,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        } catch (UniqueConstraintViolationException) {
+            throw new AddressTaken;
+        }
     }
 
     /**
@@ -345,7 +372,9 @@ class AccountChange
     }
 
     /**
-     * Record the event about the account once the change commits, alerting the recipients read before it unless suppressed.
+     * Record the event about the account once the change commits, alerting the given recipients, or those read before it, unless suppressed.
+     *
+     * @param  list<string>|null  $recipients
      */
     public function record(
         SecurityEventType $type,
@@ -356,6 +385,7 @@ class AccountChange
         ?string $credentialType = null,
         ?StoredCredential $credential = null,
         ?RequestContext $context = null,
+        ?array $recipients = null,
     ): void {
         $this->events[] = fn (SecurityEventRecorder $recorder) => $recorder->record(
             $type,
@@ -365,7 +395,7 @@ class AccountChange
             credentialType: $credentialType,
             credential: $credential,
             operator: $operator,
-            recipients: $this->recipients,
+            recipients: $recipients ?? $this->recipients,
             alert: $alert,
             context: $context,
         );

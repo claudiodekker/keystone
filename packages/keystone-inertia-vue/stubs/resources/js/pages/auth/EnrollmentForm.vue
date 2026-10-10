@@ -26,6 +26,6 @@ const option = computed<CredentialTypeOption>(() => ({ type: props.type, shape: 
     <Link :href="enrollment()" class="text-sm text-gray-600 underline">Choose another method</Link>
 
     <Form v-bind="cancel.form()">
-        <button type="submit" class="text-sm text-gray-600 underline">Cancel sign-in</button>
+        <button type="submit" class="text-sm text-gray-600 underline">{{ origin === 'registration' ? 'Sign out' : 'Cancel sign-in' }}</button>
     </Form>
 </template>

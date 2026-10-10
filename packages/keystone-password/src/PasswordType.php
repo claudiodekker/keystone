@@ -132,14 +132,14 @@ class PasswordType implements CredentialType, RefusesEnrollment
     }
 
     /**
-     * Check the typed password against the subject's password at sign-in, or set the account's new password from the security settings.
+     * Check the typed password against the subject's password at sign-in, or set the account's first password at registration or its new one from the security settings.
      */
     public function verify(Surface $surface, array $input, array $credentials, mixed $ceremony = null): Proof
     {
         return match ($surface) {
             Surface::SIGN_IN => $this->signIn($input[self::FIELD], $credentials),
-            Surface::ENROLLMENT => $this->enroll($input, $credentials),
-            default => throw new LogicException("Verifying a password on {$surface->value} isn't built yet."),
+            Surface::REGISTRATION, Surface::ENROLLMENT => $this->enroll($input, $credentials),
+            default => throw new LogicException("A password can't be verified on {$surface->value}."),
         };
     }
 
@@ -255,36 +255,43 @@ class PasswordType implements CredentialType, RefusesEnrollment
     }
 
     /**
-     * Get the names a new password may not borrow a word from: the app's name and host, the configured context words, and every address the signed-in account holds.
+     * Get the names a new password may not borrow a word from: the app's name and host, the configured context words, every address the signed-in account holds and the address a registration proved.
      *
      * @return list<string>
      */
     protected function context(): array
     {
-        /** @var (Model&KeystoneUser)|null $account */
-        $account = Keystone::guard()->user();
         $url = config('app.url');
 
         $names = [
             config('app.name'),
             is_string($url) ? parse_url($url, PHP_URL_HOST) : null,
             ...config()->array('keystone-password.context_words'),
-            ...($account === null ? [] : $this->localParts($account)),
+            ...array_map(fn (string $address) => Str::beforeLast($address, '@'), $this->addresses()),
         ];
 
         return array_values(array_filter($names, is_string(...)));
     }
 
     /**
-     * Get the part before the @ of every address the account holds, verified or not.
+     * Get the addresses of whoever the new password is for: every one the signed-in account holds, verified or not, or the one the session registers.
      *
      * @return list<string>
      */
-    protected function localParts(Model&KeystoneUser $account): array
+    protected function addresses(): array
     {
-        $addresses = (new Addresses($account))->heldBy($account);
+        $guard = Keystone::guard();
 
-        return array_map(fn (string $address) => Str::beforeLast($address, '@'), $addresses);
+        /** @var (Model&KeystoneUser)|null $account */
+        $account = $guard->user();
+
+        if ($account !== null) {
+            return (new Addresses($account))->heldBy($account);
+        }
+
+        $registration = $guard->registration();
+
+        return $registration === null ? [] : [$registration->address];
     }
 
     /**

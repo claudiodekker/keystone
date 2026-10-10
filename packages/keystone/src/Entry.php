@@ -22,14 +22,14 @@ abstract class Entry implements Pass
     }
 
     /**
-     * Sign the account in, noting whether its browser was a known device of it.
+     * Sign the account in, noting whether its browser was a known device of it, and whether the sign-in alerts about a new device as the origin decides.
      *
      * @return Passed<Demand>
      *
      * @throws Barred
      */
-    protected function signIn(Model&KeystoneUser $account, RememberMe $rememberMe): Passed
+    protected function signIn(Model&KeystoneUser $account, RememberMe $rememberMe, PendingOrigin $origin = PendingOrigin::LOGIN): Passed
     {
-        return new Passed(Demand::SIGN_IN, SecurityEventType::SIGNED_IN, knownDevice: $this->guard->signIn($account, $rememberMe));
+        return new Passed(Demand::SIGN_IN, SecurityEventType::SIGNED_IN, knownDevice: $this->guard->signIn($account, $rememberMe), alert: $origin->alertsNewDevice());
     }
 }

@@ -135,7 +135,7 @@ _Avoid_: activity log
 A notification to the user about one security event.
 
 **Notification slot**:
-The config entry naming the notification one type of security event sends as its security alert, or null to silence that type alone.
+The config entry naming the notification one type of security event sends as its security alert, or null to silence that type alone. The slot of `account.registered` names the welcome mail a new account gets, which is not an alert.
 _Avoid_: alert switch
 
 ### Sign-in state

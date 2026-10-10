@@ -1,6 +1,6 @@
 # Registration
 
-A visitor creates an account by proving they read the inbox of the address they type. They type it on the register page, Keystone mails it a link, and opening that link and choosing Continue starts the registration in their browser, on the finish page.
+A visitor creates an account by proving they read the inbox of the address they type. They type it on the register page, Keystone mails it a link, and opening that link and choosing Continue starts the registration in their browser, on the finish page. There they choose a name and a password, and the account exists from that moment, signed in or held for the [enrollment](enrollment.md) it owes.
 
 ## When registration is open
 
@@ -47,11 +47,95 @@ A link needs a working mailer and queue worker, and production refuses to boot w
 
 ## The finish page
 
-The finish page (`register.finish`) shows the proven address and the credential types that serve registration. A session that hasn't spent a link, or spent it more than 30 minutes ago, is sent back to the register page.
+The finish page (`register.finish`) shows the proven address and the credential types that serve registration, each with a form. A session that hasn't spent a link, or spent it more than 30 minutes ago, is sent back to the register page.
+
+## Finishing
+
+The form posts to `register.finish.submit` with the type in the URL. With the password it takes a `name` of at most 255 characters and a new password typed twice, checked as every [new password](password.md#new-passwords) is. At registration the password may not contain a word of the part of the proven address before the `@` either. Invalid input goes back to the finish page with its errors, and only the name is flashed back.
+
+Valid input creates the account in one database transaction:
+
+1. the users row, written by your app's [`CreateAccount`](#asking-for-more-than-a-name) action;
+2. the proven address, stored verified and as the account's primary address;
+3. the password;
+4. an `account.registered` [security event](security-events.md#types), with flow `registration` and the new credential.
+
+The transaction commits, then the user is either signed in or held at enrollment:
+
+- An account that owes nothing is signed in on a new session id and sent to the page it asked for before registering, else `/`. Its session gets a new [sudo](sudo.md) grant, recorded as `sudo.granted`, and never keeps one the browser held before. The sign-in records `signed_in` with flow `registration` and no new-device alert, because the browser that created the account just proved the inbox.
+- An account that owes [enrollment](enrollment.md), as it does while either mandate is on, is held with origin `registration` and sent to set up what it owes. Holding it records `sign_in.held` with flow `registration`. Once it has enrolled everything, it is signed in the same way, and Keystone also records `enrollment.completed`.
+
+Either way, the registration ends and the session no longer holds the address. A credential the type couldn't make, such as when the hasher fails, keeps the registration, and sends the user back to the finish page with "The provided credential is invalid." on the type's field.
+
+A finish posted after the 30 minutes, even one whose password was still being checked when they ran out, creates nothing and sends the user back to the register page, which reads "Your registration expired. Ask for a new link." A finish posted by a session that never spent a link gets the same answer.
+
+Two finishes posted from one browser at once, such as a double-clicked button, share one session. The database still lets only one of them create the account, but the slower one may answer "That email address is already registered. Please sign in instead." after the faster one signed the browser in. This is a known limit: the account exists and the browser is signed in, and only that message is wrong.
+
+### The welcome mail
+
+`account.registered` sends the new address a welcome mail through its [notification slot](security-alerts.md#changing-or-silencing-an-alert), `keystone.notifications.account.registered`, which names `ClaudioDekker\Keystone\Notifications\Welcome` by default. The mail is queued, like every alert. It is sent only while `keystone.events.enabled` is on, so with recording off no welcome mail is sent. To change its wording, override the keys under `keystone::mail.welcome` in `lang/vendor/keystone/{locale}/mail.php`. To send your own mail, name your notification in the slot, or set it to `null` to send none. Adding the password records no `credential.added` and sends no alert.
+
+### When someone else got there first
+
+Between spending the link and finishing, another account may come to hold the address: an active account that verified it, or one that holds it unverified while holding no verified address. The finish then creates nothing, ends the registration and sends the user to the sign-in page, reading "That email address is already registered. Please sign in instead." The same happens to the slower of two finishes for one address that run at once, from two browsers that each spent a link: the database lets only one account hold an address verified, so the other's transaction rolls back whole.
+
+## Cancelling
+
+The finish page's cancel button (`DELETE` to `register.finish.cancel`) ends the registration before the account exists. It forgets the proven address and every ceremony a credential type started for it, and sends the user to the register page, reading "Registration cancelled. No account was created."
+
+Once the account exists, cancelling the enrollment it owes signs the user out and keeps the account, reading "Your account was created. Sign in to finish setting it up." The account owes the enrollment again at its next sign-in (see [Cancelling](enrollment.md#cancelling)).
+
+## Asking for more than a name
+
+The users row is written by `ClaudioDekker\Keystone\Actions\CreateAccount`. Its `rules()` give the fields the finish takes besides the credential, and its `handle()` creates the row from them, inside the transaction that writes the address and the credential. `handle()` receives exactly the top-level fields `rules()` names, so an override of one must match the other. Name each field plainly, with no wildcard or nested keys, and never with a name the credential type uses, such as `password` or `password_confirmation`: the finish splits the input between the two by those names. By default it asks for a `name` and fills it in on a new instance of your user model, whatever the model's `$fillable` says.
+
+To ask for more, or to refuse sign-ups, extend it and bind your class in a service provider. This one also asks which team the user joins, and refuses anyone without an invitation:
+
+```php
+namespace App\Actions;
+
+use App\Models\Invitation;
+use App\Models\User;
+use ClaudioDekker\Keystone\Actions\CreateAccount as KeystoneCreateAccount;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+
+class CreateAccount extends KeystoneCreateAccount
+{
+    public function rules(): array
+    {
+        return [
+            ...parent::rules(),
+            'team' => ['required', 'string', Rule::exists('teams', 'slug')],
+        ];
+    }
+
+    public function handle(array $profile): User
+    {
+        if (! Invitation::where('team', $profile['team'])->exists()) {
+            throw ValidationException::withMessages(['team' => 'You need an invitation to join this team.']);
+        }
+
+        return User::create(['name' => $profile['name'], 'team' => $profile['team']]);
+    }
+}
+```
+
+```php
+use App\Actions\CreateAccount;
+use ClaudioDekker\Keystone\Actions\CreateAccount as KeystoneCreateAccount;
+
+public function register(): void
+{
+    $this->app->bind(KeystoneCreateAccount::class, CreateAccount::class);
+}
+```
+
+Add the field to the finish form in `resources/js/partials/shapes/Form.vue`, next to `name`. Only the fields `rules()` names are flashed back after a refused finish, and the stub's `sendRegistrationFinishPage` passes `name` to the page, so pass your field there too. An exception thrown from `handle()` rolls the whole account back, and a `ValidationException` sends the user back to the finish page with its errors, keeping the registration. Never write Keystone's own columns or tables from it: Keystone writes the address and the credential itself. An account it creates suspended is kept, but the registration ends and the user is sent to the sign-in page with the refusal a suspended account gets there, "These credentials do not match our records.", recording `proof.rejected` with the reason `keystone.barred`.
 
 ## Signed-in users
 
-A signed-in user who opens any registration step is sent to `/`, and a link they post is not spent.
+A signed-in user who opens or posts to any registration step is sent to `/`, a link they post is not spent, and a finish they post creates nothing.
 
 ## Changing the responses
 
@@ -59,7 +143,7 @@ The adapter publishes three controllers, with one hook per outcome:
 
 - `RegistrationController`: `sendRegistrationPage`, `sendRegistrationLinkSent` and `sendRegistrationLinkSentPage`;
 - `RegistrationLinkController`: `sendRegistrationLinkPage`, `sendRegistrationLinkConsumed`, `sendRegistrationLinkExpired` and `sendRegistrationLinkExpiredPage`;
-- `RegistrationFinishController`: `sendRegistrationFinishPage`.
+- `RegistrationFinishController`: `sendRegistrationFinishPage`, `sendRegistered`, `sendRegistrationEnrollmentOwed`, `sendRegistrationRefused`, `sendAddressTaken`, `sendRegistrationBarred` and `sendRegistrationCancelled`.
 
 The link's page renders `auth/EmailedLink`, a page with one button that posts to the `action` it is given. Later emailed links reuse it. If you change a hook, redefine its assertion in `tests/Keystone/Assertions/RegistrationAssertions.php`, `RegistrationLinkAssertions.php` or `RegistrationFinishAssertions.php`, so Keystone's AppTests check your response instead.
 

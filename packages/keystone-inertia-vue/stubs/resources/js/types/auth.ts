@@ -1,6 +1,6 @@
 export type InitiateShape = 'form' | 'clientCeremony' | 'redirect' | 'delivered';
 
-export type Surface = 'sign-in' | 'challenge' | 'enrollment';
+export type Surface = 'sign-in' | 'challenge' | 'registration' | 'enrollment';
 
 export type Purpose = 'sudo' | 'settings';
 
@@ -38,6 +38,7 @@ export type RegisterFinishPage = {
     address: string;
     types: CredentialTypeOption[];
     status: string | null;
+    name: string | null;
 };
 
 export type ChallengePage = {
@@ -57,10 +58,12 @@ export type EnrollmentFormPage = {
     ceremony: Record<string, string>;
     status: string | null;
     held: RemovableCredential[];
+    origin?: string | null;
 };
 
 export type RecoveryCodesPage = {
     codes: string[];
+    origin: string;
 };
 
 export type RegenerateRecoveryCodesPage = {
