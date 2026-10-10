@@ -74,11 +74,11 @@ Two finishes posted from one browser at once, such as a double-clicked button, s
 
 ### Other accounts holding the address
 
-Any number of accounts may hold an address unverified, and the first account to verify it keeps it. Finishing verifies the proven address, so it deletes the address's row from every other account that holds it, in the same transaction, in order of account id. Each of those accounts records `address.lost` with flow `registration`. If the row was the account's primary address, another of its addresses becomes primary, a verified one first and the oldest otherwise.
+Any number of accounts may hold an address unverified, and the first account to verify it keeps it. Finishing verifies the proven address, so it deletes the address's row from every other account that holds it, in the same transaction, in order of account id. If the row was the account's primary address, another of its addresses becomes primary, a verified one first and the oldest otherwise.
 
-An active account is alerted that the address was removed because another account verified it first. A suspended account counts as active. The alert goes to the addresses the account keeps, read after the removal, so the removed address is never mailed. An active account always keeps a verified address here, because an account holding the address unverified and no verified address already counts as verified and stops the registration.
+Keystone does this silently: it records no event and mails no one. Those accounts never proved they own the address. Telling them it was verified would only tell whoever squatted on it that its owner just signed up. An active account always keeps a verified address here, because an account holding the address unverified and no verified address already counts as verified and stops the registration. A suspended account counts as active.
 
-A deleted or invalidated account only gets the `address.lost` audit entry and no mail. Its primary moves like any other account's, and nothing else about it changes, even when the removal leaves it with no address. Its row no longer blocks the finish, even when it held the address verified.
+A deleted or invalidated account loses its row the same way, even when it held the address verified, so it no longer blocks the finish. Nothing else about it changes, even when the removal leaves it with no address.
 
 ### The welcome mail
 
@@ -86,7 +86,7 @@ A deleted or invalidated account only gets the `address.lost` audit entry and no
 
 ### When someone else got there first
 
-Between spending the link and finishing, another account may come to hold the address: an active account that verified it, or one that holds it unverified while holding no verified address. The finish then creates nothing, ends the registration and sends the user to the sign-in page, reading "That email address is already registered. Please sign in instead." The same happens to the slower of two finishes for one address that run at once, from two browsers that each spent a link: the database lets only one account hold an address verified, so the other's transaction rolls back whole. The accounts that held the address keep their rows then, and nothing is recorded or mailed for them.
+Between spending the link and finishing, another account may come to hold the address: an active account that verified it, or one that holds it unverified while holding no verified address. The finish then creates nothing, ends the registration and sends the user to the sign-in page, reading "That email address is already registered. Please sign in instead." The same happens to the slower of two finishes for one address that run at once, from two browsers that each spent a link: the database lets only one account hold an address verified, so the other's transaction rolls back whole. The accounts that held the address keep their rows then.
 
 ## Cancelling
 

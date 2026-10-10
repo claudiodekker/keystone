@@ -11,7 +11,6 @@ Alerts are queued. Run a queue worker, or they are never sent: `queue.default` s
 | `account.suspended` | an operator suspended the account (see [Operator commands](operator-commands.md#suspending-accounts)) |
 | `account.unsuspended` | an operator lifted the account's suspension |
 | `address.claim_attempted` | someone tried to [register](registration.md#asking-for-a-link) with an address the account holds, or spent a registration link for it; the mail says the account wasn't changed, and names no address |
-| `address.lost` | an address was removed from the account because another account [verified it first at registration](registration.md#other-accounts-holding-the-address); the mail says an address was removed and names none, and goes to the addresses the account keeps |
 | `challenge.abandoned` | a sign-in from a browser that isn't one of the account's [known devices](#new-devices) passed its first factor and hasn't passed the [challenge](challenge.md) 7 minutes later (see [Abandoned challenges](#abandoned-challenges)) |
 | `credential.added` | a credential was added to the account, at [enrollment](enrollment.md) or from the [security settings](security-settings.md#adding-a-credential) |
 | `credential.replaced` | a credential set up from the [security settings](security-settings.md#adding-a-credential) replaced the one of its type the account held, such as a changed [password](security-settings.md#passwords) or a new TOTP key |
@@ -29,7 +28,7 @@ Alerts are queued. Run a queue worker, or they are never sent: `queue.default` s
 
 ## Who gets them
 
-Every verified address of the account gets its own mail. While an account has no verified address, its unverified addresses get one each instead. The addresses are read before the change that caused the event, so an address a change removes still hears about it. `address.lost` is the exception: it is read after the change, so the address it removed is never mailed.
+Every verified address of the account gets its own mail. While an account has no verified address, its unverified addresses get one each instead. The addresses are read before the change that caused the event, so an address a change removes still hears about it.
 
 There is no de-duplication: two events send two alerts, however alike. Only abandoned challenges share one.
 

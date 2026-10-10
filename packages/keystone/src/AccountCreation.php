@@ -42,7 +42,7 @@ class AccountCreation
                 throw new AddressTaken;
             }
 
-            (new AddressClaims($this->guard, $this->recorder))->settle($address, Flow::REGISTRATION);
+            (new AddressClaims($this->guard, $this->recorder))->settle($address);
 
             $account = $this->createAccount->handle($profile);
 

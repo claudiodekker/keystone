@@ -35,9 +35,9 @@ class AddressClaims
     }
 
     /**
-     * Take the address from every account holding it, once an account is about to verify it.
+     * Take the address from every account holding it, once an account is about to verify it, without telling them.
      */
-    public function settle(string $address, Flow $flow): void
+    public function settle(string $address): void
     {
         $users = $this->guard->userModel();
         $address = Addresses::normalize($address);
@@ -50,16 +50,7 @@ class AddressClaims
         $changes = new AccountChanges($this->guard, $this->recorder);
 
         foreach ($losers as $loser) {
-            $changes->change($loser, function (AccountChange $change) use ($address, $flow) {
-                $change->loseAddress($address);
-
-                $change->record(
-                    SecurityEventType::ADDRESS_LOST,
-                    alert: ! (new SignInDecision)->isDisabled($change->account),
-                    flow: $flow->value,
-                    recipients: (new Addresses($change->account))->recipientsOf($change->account),
-                );
-            });
+            $changes->change($loser, fn (AccountChange $change) => $change->loseAddress($address));
         }
     }
 }

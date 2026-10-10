@@ -32,10 +32,6 @@ return [
                 'subject' => 'Someone tried to sign up with your email address',
                 'what' => 'Someone just tried to sign up with your email address. Your account wasn\'t changed. If this was you, recover your account.',
             ],
-            'lost' => [
-                'subject' => 'An email address was removed from your account',
-                'what' => 'An email address was removed from your account because another account verified it first. Your account still has its other addresses.',
-            ],
         ],
         'challenge' => [
             'abandoned' => [
