@@ -42,7 +42,7 @@ abstract class RegistrationFinishController extends Controller
     }
 
     /**
-     * Show the proven address and the credential types that can finish the registration, or send a session without one back to register.
+     * Show the registering address and the credential types that can finish the registration, or send a session without one back to register.
      */
     public function show(Request $request): Response|Responsable
     {
@@ -64,7 +64,7 @@ abstract class RegistrationFinishController extends Controller
     }
 
     /**
-     * Create the account holding the proven address and a credential of the type, then sign it in or send it on to the enrollment it owes.
+     * Create the account holding the registering address and a credential of the type, then sign it in or send it on to the enrollment it owes.
      */
     public function store(Request $request, string $type): Response|Responsable
     {
@@ -115,7 +115,7 @@ abstract class RegistrationFinishController extends Controller
     }
 
     /**
-     * Cancel the registration before the account exists, forgetting the proven address and closing every ceremony slot.
+     * Cancel the registration before the account exists, forgetting the registering address and closing every ceremony slot.
      */
     public function destroy(Request $request): Response|Responsable
     {

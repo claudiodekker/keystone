@@ -623,3 +623,93 @@ describe('settling the claims on the address', function () {
         $this->assertDatabaseHas('user_emails', ['user_id' => $loser->getKey(), 'address' => 'new@example.com', 'verified_at' => null]);
     });
 });
+
+describe('finishing without email verification', function () {
+    beforeEach(function () {
+        $this->withoutMandates();
+        config(['keystone.email_verification.required' => false]);
+    });
+
+    function startUnverified(string $address = 'new@example.com'): void
+    {
+        test()->post(route('register.submit'), ['email' => $address])->assertRedirectToRoute('register.finish');
+    }
+
+    it('creates the account with the address as its primary one, unverified', function () {
+        startUnverified();
+
+        $response = $this->finishRegistration(new PasswordTypeSupport);
+
+        $response->assertRedirect('/');
+        $account = User::sole();
+        expect(Keystone::guard()->id())->toBe($account->getKey())
+            ->and(Keystone::guard()->registration())->toBeNull();
+        $this->assertDatabaseHas('user_emails', ['user_id' => $account->getKey(), 'address' => 'new@example.com', 'verified_address' => 'new@example.com', 'verified_at' => null, 'is_primary' => true]);
+        $this->assertDatabaseCount('user_emails', 1);
+        $this->assertDatabaseCount('user_credentials', 1);
+    });
+
+    it('lets the address count as verified while it is the account\'s only one, alerting the account to a later claim', function () {
+        startUnverified();
+        $this->finishRegistration(new PasswordTypeSupport);
+        $account = User::sole();
+        Keystone::guard()->signOut();
+        config(['keystone.email_verification.required' => true]);
+
+        $this->post(route('register.submit'), ['email' => 'new@example.com']);
+
+        Notification::assertSentOnDemand(SecurityAlert::class, fn (SecurityAlert $alert, $channels, $notifiable) => $alert->type === SecurityEventType::ADDRESS_CLAIM_ATTEMPTED && $notifiable->routes['mail'] === 'new@example.com');
+        $this->assertDatabaseHas('user_security_events', ['user_id' => $account->getKey(), 'type' => 'address.claim_attempted']);
+    });
+
+    it('says the address is already registered when it registers again unverified', function () {
+        startUnverified();
+        $this->finishRegistration(new PasswordTypeSupport);
+        Keystone::guard()->signOut();
+        startUnverified();
+
+        $response = $this->finishRegistration(new PasswordTypeSupport, name: 'Second');
+
+        $response->assertRedirectToRoute('login')->assertSessionHas(Status::SESSION_KEY, Status::ADDRESS_ALREADY_REGISTERED->value);
+        $this->assertDatabaseCount('users', 1);
+    });
+
+    it('leaves an account that holds the address unverified, beside a verified one, its row', function () {
+        startUnverified();
+        $holder = unverifiedHolder();
+
+        $this->finishRegistration(new PasswordTypeSupport)->assertRedirect('/');
+
+        $this->assertDatabaseHas('user_emails', ['user_id' => $holder->getKey(), 'address' => 'new@example.com', 'verified_at' => null]);
+        $this->assertDatabaseHas('user_emails', ['address' => 'new@example.com', 'verified_address' => 'new@example.com', 'verified_at' => null, 'is_primary' => true]);
+        $this->assertDatabaseCount('user_emails', 3);
+        $this->assertDatabaseMissing('user_security_events', ['user_id' => $holder->getKey()]);
+    });
+
+    it('creates nothing for an address an active account holds verified or counting as verified, and ends the registration', function (bool $verified) {
+        startUnverified();
+        $this->createAccount('new@example.com', verified: $verified);
+
+        $response = $this->finishRegistration(new PasswordTypeSupport);
+
+        $response->assertRedirectToRoute('login')->assertSessionHas(Status::SESSION_KEY, Status::ADDRESS_ALREADY_REGISTERED->value);
+        expect(Keystone::guard()->registration())->toBeNull()
+            ->and(Keystone::guard()->check())->toBeFalse();
+        $this->assertDatabaseCount('users', 1);
+        $this->assertDatabaseCount('user_credentials', 0);
+        $this->assertDatabaseMissing('user_security_events', ['type' => 'account.registered']);
+    })->with(['verified' => true, 'counted as verified' => false]);
+
+    it('creates one account when two finishes race for the address', function () {
+        startUnverified();
+        raceTheAddress();
+
+        $response = $this->finishRegistration(new PasswordTypeSupport);
+
+        $response->assertRedirectToRoute('login')->assertSessionHas(Status::SESSION_KEY, Status::ADDRESS_ALREADY_REGISTERED->value);
+        expect(Keystone::guard()->check())->toBeFalse()
+            ->and(Keystone::guard()->registration())->toBeNull();
+        $this->assertDatabaseMissing('users', ['name' => 'Jane Doe']);
+        $this->assertDatabaseCount('user_credentials', 0);
+    });
+});

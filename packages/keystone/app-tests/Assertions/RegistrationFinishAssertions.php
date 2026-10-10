@@ -23,7 +23,7 @@ trait RegistrationFinishAssertions
     }
 
     /**
-     * Assert the response sends a session that holds no proven address back to register.
+     * Assert the response sends a session that holds no registering address back to register.
      *
      * @param  TestResponse<Response>  $response
      */
@@ -33,7 +33,7 @@ trait RegistrationFinishAssertions
     }
 
     /**
-     * Assert the response sends a finish whose session holds no proven address back to register, saying the registration expired.
+     * Assert the response sends a finish whose session holds no registering address back to register, saying the registration expired.
      *
      * @param  TestResponse<Response>  $response
      */

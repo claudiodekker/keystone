@@ -113,6 +113,31 @@ class AccountChange
     }
 
     /**
+     * Give the account the address, as Keystone stores it, unverified and as its primary address, counting as verified while the account holds no verified one.
+     *
+     * @throws AddressTaken
+     */
+    public function addUnverifiedAddress(string $address): void
+    {
+        $address = Addresses::normalize($address);
+        $now = Date::now();
+
+        try {
+            $this->account->getConnection()->table('user_emails')->insert([
+                'user_id' => $this->account->getKey(),
+                'address' => $address,
+                'verified_address' => $address,
+                'verified_at' => null,
+                'is_primary' => true,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        } catch (UniqueConstraintViolationException) {
+            throw new AddressTaken;
+        }
+    }
+
+    /**
      * Remove the address from the account, as Keystone stores it, moving the primary to another address when it was the primary one.
      */
     public function loseAddress(string $address): void
