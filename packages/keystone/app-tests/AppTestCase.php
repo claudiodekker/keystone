@@ -181,11 +181,13 @@ abstract class AppTestCase extends TestCase
     }
 
     /**
-     * Keep sessions in the session driver from here on, as an app configured with it does.
+     * Keep sessions in the session driver from here on, as an app configured with it does, never sweeping expired ones.
+     *
+     * Laravel's session lottery would otherwise delete an expired session on a random request, which a test that lets one expire can't predict.
      */
     public function useSessionDriver(string $driver): void
     {
-        config(['session.driver' => $driver]);
+        config(['session.driver' => $driver, 'session.lottery' => [0, 100]]);
 
         $this->app['session']->forgetDrivers();
         $this->app->forgetInstance('session.store');
