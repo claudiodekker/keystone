@@ -195,6 +195,24 @@ describe('the mandates', function () {
     })->with(['keystone.require_second_factor', 'keystone.require_recovery_codes'])->with(['null' => [null], 'a string' => ['true']]);
 });
 
+describe('the email verification switch', function () {
+    it('refuses a requirement that isn\'t true or false', function (mixed $value) {
+        config(['keystone.email_verification.required' => $value]);
+
+        $failures = bootFailures();
+
+        expect($failures)->toBe(['keystone.email_verification.required must be true or false.']);
+    })->with(['null' => [null], 'a string' => ['true']]);
+
+    it('accepts registering without a link', function () {
+        config(['keystone.email_verification.required' => false]);
+
+        $failures = bootFailures();
+
+        expect($failures)->toBe([]);
+    });
+});
+
 describe('the IP-location port', function () {
     it('refuses a plaintext switch that isn\'t true or false', function (mixed $value) {
         config(['keystone.ip_location.allow_plaintext_driver' => $value]);
