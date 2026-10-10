@@ -536,3 +536,97 @@ describe('a lost race', function () {
         Notification::assertNotSentTo(new AnonymousNotifiable, Welcome::class);
     });
 });
+
+function unverifiedHolder(string $other = 'other@example.com', string $address = 'new@example.com'): User
+{
+    $holder = test()->createAccount($other);
+    test()->holdAddress($holder, $address, verified: false);
+
+    return $holder;
+}
+
+describe('settling the claims on the address', function () {
+    it('removes the row from an active account that held the address unverified, telling it at its remaining address only', function () {
+        $this->withoutMandates();
+        $this->registerAddress();
+        $loser = unverifiedHolder();
+
+        $this->finishRegistration(new PasswordTypeSupport)->assertRedirect('/');
+
+        $this->assertDatabaseMissing('user_emails', ['user_id' => $loser->getKey(), 'address' => 'new@example.com']);
+        $this->assertDatabaseHas('user_emails', ['user_id' => $loser->getKey(), 'address' => 'other@example.com']);
+        $this->assertDatabaseHas('user_security_events', ['type' => 'address.lost', 'user_id' => $loser->getKey(), 'flow' => 'registration']);
+        Notification::assertSentOnDemandTimes(SecurityAlert::class, 1);
+        Notification::assertSentOnDemand(SecurityAlert::class, fn (SecurityAlert $alert, array $channels, AnonymousNotifiable $notifiable) => $alert->type === SecurityEventType::ADDRESS_LOST && $notifiable->routes['mail'] === 'other@example.com');
+    });
+
+    it('treats a suspended account as active', function () {
+        $this->withoutMandates();
+        $this->registerAddress();
+        $loser = unverifiedHolder();
+        DB::table('users')->where('id', $loser->getKey())->update(['suspended_at' => now()]);
+
+        $this->finishRegistration(new PasswordTypeSupport);
+
+        $this->assertDatabaseMissing('user_emails', ['user_id' => $loser->getKey(), 'address' => 'new@example.com']);
+        Notification::assertSentOnDemandTimes(SecurityAlert::class, 1);
+    });
+
+    it('moves the primary of an account that lost it to its verified address', function () {
+        $this->withoutMandates();
+        $this->registerAddress();
+        $loser = unverifiedHolder();
+        DB::table('user_emails')->where('user_id', $loser->getKey())->update(['is_primary' => false]);
+        DB::table('user_emails')->where(['user_id' => $loser->getKey(), 'address' => 'new@example.com'])->update(['is_primary' => true]);
+
+        $this->finishRegistration(new PasswordTypeSupport);
+
+        $this->assertDatabaseHas('user_emails', ['user_id' => $loser->getKey(), 'address' => 'other@example.com', 'is_primary' => true]);
+        expect(DB::table('user_emails')->where('user_id', $loser->getKey())->where('is_primary', true)->count())->toBe(1);
+    });
+
+    it('lets a deleted or invalidated account that held the address verified lose it without a word to it', function (string $column) {
+        $this->withoutMandates();
+        $this->registerAddress();
+        $holder = $this->createAccount('new@example.com');
+        DB::table('user_emails')->where('user_id', $holder->getKey())->update(['verified_address' => 'new@example.com']);
+        DB::table('users')->where('id', $holder->getKey())->update([$column => now()]);
+
+        $this->finishRegistration(new PasswordTypeSupport)->assertRedirect('/');
+
+        $this->assertDatabaseMissing('user_emails', ['user_id' => $holder->getKey()]);
+        $this->assertDatabaseHas('user_emails', ['address' => 'new@example.com', 'verified_address' => 'new@example.com']);
+        $this->assertDatabaseHas('user_security_events', ['type' => 'address.lost', 'user_id' => $holder->getKey(), 'flow' => 'registration']);
+        Notification::assertNotSentTo(new AnonymousNotifiable, SecurityAlert::class);
+        expect(DB::table('users')->where('id', $holder->getKey())->value($column))->not->toBeNull();
+    })->with(['deleted_at', 'invalidated_at']);
+
+    it('settles every account that held the address, each with its own event', function () {
+        $this->withoutMandates();
+        $this->registerAddress();
+        $first = unverifiedHolder(other: 'first@example.com');
+        $second = unverifiedHolder(other: 'second@example.com');
+
+        $this->finishRegistration(new PasswordTypeSupport);
+
+        $this->assertDatabaseCount('user_emails', 3);
+        $this->assertDatabaseHas('user_security_events', ['type' => 'address.lost', 'user_id' => $first->getKey()]);
+        $this->assertDatabaseHas('user_security_events', ['type' => 'address.lost', 'user_id' => $second->getKey()]);
+        Notification::assertSentOnDemandTimes(SecurityAlert::class, 2);
+        Notification::assertSentOnDemand(SecurityAlert::class, fn (SecurityAlert $alert, array $channels, AnonymousNotifiable $notifiable) => $notifiable->routes['mail'] === 'first@example.com');
+        Notification::assertSentOnDemand(SecurityAlert::class, fn (SecurityAlert $alert, array $channels, AnonymousNotifiable $notifiable) => $notifiable->routes['mail'] === 'second@example.com');
+    });
+
+    it('leaves the holders their rows when another finish wins the address, recording and mailing nothing', function () {
+        $this->withoutMandates();
+        $this->registerAddress();
+        $loser = unverifiedHolder();
+        raceTheAddress();
+
+        $this->finishRegistration(new PasswordTypeSupport)->assertRedirectToRoute('login');
+
+        $this->assertDatabaseHas('user_emails', ['user_id' => $loser->getKey(), 'address' => 'new@example.com', 'verified_at' => null]);
+        $this->assertDatabaseMissing('user_security_events', ['type' => 'address.lost']);
+        Notification::assertNotSentTo(new AnonymousNotifiable, SecurityAlert::class);
+    });
+});

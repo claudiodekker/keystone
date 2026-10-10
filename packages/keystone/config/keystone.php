@@ -159,6 +159,7 @@ return [
         'account.suspended' => SecurityAlert::class,
         'account.unsuspended' => SecurityAlert::class,
         'address.claim_attempted' => SecurityAlert::class,
+        'address.lost' => SecurityAlert::class,
         'challenge.abandoned' => SecurityAlert::class,
         'credential.added' => SecurityAlert::class,
         'credential.removed' => SecurityAlert::class,
