@@ -1,17 +1,29 @@
 <?php
 
+use Carbon\CarbonImmutable;
 use ClaudioDekker\Keystone\AccountChange;
 use ClaudioDekker\Keystone\AccountChanges;
 use ClaudioDekker\Keystone\Actor;
+use ClaudioDekker\Keystone\Exceptions\Barred;
+use ClaudioDekker\Keystone\Exceptions\SudoRequired;
+use ClaudioDekker\Keystone\Exceptions\Superseded;
 use ClaudioDekker\Keystone\Flow;
 use ClaudioDekker\Keystone\KeystoneGuard;
 use ClaudioDekker\Keystone\Methods\EnrolledCredential;
 use ClaudioDekker\Keystone\Methods\StoredCredential;
 use ClaudioDekker\Keystone\Notifications\SecurityAlert;
+use ClaudioDekker\Keystone\PendingOrigin;
+use ClaudioDekker\Keystone\PendingSignIn;
+use ClaudioDekker\Keystone\PendingStage;
 use ClaudioDekker\Keystone\RecoveryCodes;
+use ClaudioDekker\Keystone\RememberMe;
+use ClaudioDekker\Keystone\RequestContext;
 use ClaudioDekker\Keystone\SecurityEvent;
 use ClaudioDekker\Keystone\SecurityEventRecorded;
 use ClaudioDekker\Keystone\SecurityEventType;
+use ClaudioDekker\Keystone\Subnet;
+use ClaudioDekker\Keystone\SudoGrant;
+use ClaudioDekker\Keystone\SudoInProgress;
 use ClaudioDekker\Keystone\Tests\Fixtures\FormType;
 use ClaudioDekker\Keystone\Tests\Fixtures\GuardedUser;
 use ClaudioDekker\Keystone\Tests\Fixtures\User;
@@ -410,4 +422,84 @@ it('writes to the account whatever the app\'s model guards or its observers refu
 
     expect($row->suspended_at)->not->toBeNull()
         ->and($row->credential_epoch)->toEqual(1);
+});
+
+function pendingSignIn(User $user): PendingSignIn
+{
+    return new PendingSignIn($user, 'form', PendingOrigin::LOGIN, PendingStage::CHALLENGE, '/', CarbonImmutable::now(), epochOf($user), false, null, RememberMe::NOT_ASKED);
+}
+
+function sudoInProgress(): SudoInProgress
+{
+    return new SudoInProgress('/', CarbonImmutable::now(), null);
+}
+
+function sudoGrant(): SudoGrant
+{
+    return new SudoGrant(CarbonImmutable::now(), CarbonImmutable::now()->addMinutes(5), new Subnet('127.0.0.0/24'));
+}
+
+function holdLiveSudo(): void
+{
+    app()->instance(RequestContext::class, new RequestContext(ipAddress: '127.0.0.1'));
+    guard()->beginSudo('/');
+    guard()->grantSudo(guard()->context()->subnet());
+}
+
+describe('the session writing the change', function () {
+    it('refuses a writer the account bars or the session may no longer write for, applying and recording nothing', function (string $refusal, Closure $writer, string $exception) {
+        $user = User::factory()->create();
+        holdLiveSudo();
+        $named = $writer($user);
+        match ($refusal) {
+            'barred' => DB::table('users')->where('id', $user->getKey())->update(['suspended_at' => now()]),
+            'superseded' => DB::table('users')->where('id', $user->getKey())->increment('credential_epoch'),
+            'sudo ended' => guard()->endSudo(),
+        };
+        Event::fake([SecurityEventRecorded::class]);
+
+        expect(fn () => changes()->change($user, fn (AccountChange $change) => $change->addCredential(new FormType, identifier: null, secret: 'new'), $named))->toThrow($exception);
+
+        $this->assertDatabaseCount('user_credentials', 0);
+        $this->assertDatabaseCount('user_security_events', 0);
+        Event::assertNotDispatched(SecurityEventRecorded::class);
+    })->with([
+        'a pending sign-in of a barred account' => ['barred', fn (User $user) => pendingSignIn($user), Barred::class],
+        'a pending sign-in off the epoch' => ['superseded', fn (User $user) => pendingSignIn($user), Superseded::class],
+        'a sudo grant of a barred account' => ['barred', fn () => sudoGrant(), Barred::class],
+        'a sudo grant that ended' => ['sudo ended', fn () => sudoGrant(), SudoRequired::class],
+        'a sudo in progress of a barred account' => ['barred', fn () => sudoInProgress(), Barred::class],
+    ]);
+
+    it('lets a writer that may write through', function (Closure $writer) {
+        $user = User::factory()->create();
+        holdLiveSudo();
+
+        changes()->change($user, fn (AccountChange $change) => $change->addCredential(new FormType, identifier: null, secret: 'new'), $writer($user));
+
+        $this->assertDatabaseCount('user_credentials', 1);
+    })->with([
+        'a pending sign-in on the epoch' => [fn (User $user) => pendingSignIn($user)],
+        'a sudo grant that is live' => [fn () => sudoGrant()],
+        'a sudo in progress of an account in good standing' => [fn () => sudoInProgress()],
+    ]);
+
+    it('lets a sudo in progress write whatever the epoch or the grant', function () {
+        $user = User::factory()->create();
+        DB::table('users')->where('id', $user->getKey())->increment('credential_epoch');
+
+        changes()->change($user, fn (AccountChange $change) => $change->addCredential(new FormType, identifier: null, secret: 'new'), sudoInProgress());
+
+        $this->assertDatabaseCount('user_credentials', 1);
+    });
+
+    it('lets a live sudo grant write whatever the epoch', function () {
+        $user = User::factory()->create();
+        holdLiveSudo();
+        DB::table('users')->where('id', $user->getKey())->increment('credential_epoch');
+
+        changes()->change($user, fn (AccountChange $change) => $change->addCredential(new FormType, identifier: null, secret: 'new'), sudoGrant());
+
+        $this->assertDatabaseCount('user_credentials', 1);
+    });
 });

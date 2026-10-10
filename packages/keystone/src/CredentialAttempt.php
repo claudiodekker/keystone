@@ -2,7 +2,9 @@
 
 namespace ClaudioDekker\Keystone;
 
+use ClaudioDekker\Keystone\Exceptions\Barred;
 use ClaudioDekker\Keystone\Exceptions\LastRecoveryCode;
+use ClaudioDekker\Keystone\Exceptions\Superseded;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\Proof;
 use ClaudioDekker\Keystone\Methods\RecoveryCodeType;
@@ -151,24 +153,26 @@ abstract class CredentialAttempt
     }
 
     /**
-     * Spend the account's recovery code the typed one matches, or refuse a barred account, a code it doesn't hold or the last one while it is kept.
+     * Spend the account's recovery code the typed one matches, or refuse a barred account, a session that may no longer write, a code it doesn't hold or the last one while it is kept.
      *
      * @throws LastRecoveryCode
      */
-    protected function spendRecoveryCode(Model&KeystoneUser $account, Flow $flow, RecoveryCodeType $type, #[\SensitiveParameter] string $typed, bool $keepLast): bool
+    protected function spendRecoveryCode(Model&KeystoneUser $account, Flow $flow, RecoveryCodeType $type, #[\SensitiveParameter] string $typed, bool $keepLast, PendingSignIn|SudoInProgress $writer): bool
     {
         try {
-            $spent = $this->spendCode($account, $flow, $typed, $keepLast);
+            $spent = $this->spendCode($account, $flow, $typed, $keepLast, $writer);
+        } catch (Barred) {
+            $this->recordRejected($account, $flow, $type, credential: null, reason: 'keystone.barred');
+
+            return false;
+        } catch (Superseded) {
+            $this->recordRejected($account, $flow, $type, credential: null, reason: 'keystone.superseded');
+
+            return false;
         } catch (LastRecoveryCode $e) {
             $this->recordRejected($account, $flow, $type, credential: null, reason: 'keystone.last_recovery_code');
 
             throw $e;
-        }
-
-        if ($spent === null) {
-            $this->recordRejected($account, $flow, $type, credential: null, reason: 'keystone.barred');
-
-            return false;
         }
 
         if (! $spent) {
@@ -179,21 +183,17 @@ abstract class CredentialAttempt
     }
 
     /**
-     * Spend the account's recovery code the typed one matches under its row lock, or answer null for a barred account.
+     * Spend the account's recovery code the typed one matches under its row lock, for the session writing it.
      *
+     * @throws Barred
+     * @throws Superseded
      * @throws LastRecoveryCode
      */
-    protected function spendCode(Model&KeystoneUser $account, Flow $flow, #[\SensitiveParameter] string $typed, bool $keepLast): ?bool
+    protected function spendCode(Model&KeystoneUser $account, Flow $flow, #[\SensitiveParameter] string $typed, bool $keepLast, PendingSignIn|SudoInProgress $writer): bool
     {
         $changes = new AccountChanges($this->guard);
 
-        return $changes->change($account, function (AccountChange $change) use ($typed, $flow, $keepLast) {
-            if ((new SignInDecision)->isBarred($change->account)) {
-                return null;
-            }
-
-            return $change->spendRecoveryCode($typed, flow: $flow, keepLast: $keepLast);
-        });
+        return $changes->change($account, fn (AccountChange $change) => $change->spendRecoveryCode($typed, flow: $flow, keepLast: $keepLast), $writer);
     }
 
     /**

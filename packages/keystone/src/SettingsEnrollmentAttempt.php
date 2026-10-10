@@ -2,6 +2,8 @@
 
 namespace ClaudioDekker\Keystone;
 
+use ClaudioDekker\Keystone\Exceptions\Barred;
+use ClaudioDekker\Keystone\Exceptions\SudoRequired;
 use ClaudioDekker\Keystone\Exceptions\Superseded;
 use ClaudioDekker\Keystone\Exceptions\Throttled;
 use ClaudioDekker\Keystone\Methods\CredentialType;
@@ -94,24 +96,26 @@ class SettingsEnrollmentAttempt extends CredentialAttempt
      */
     protected function store(Model&KeystoneUser $account, CredentialType $type, EnrolledCredential $enrolled, Flow $flow, array $provedAgainst): SettingsEnrollmentResult|string
     {
-        return (new AccountChanges($this->guard, $this->recorder))->change($account, function (AccountChange $change) use ($type, $enrolled, $flow, $provedAgainst) {
-            if ((new SignInDecision)->isBarred($change->account)) {
-                return 'keystone.barred';
-            }
+        $grant = (new SudoGate($this->guard))->liveGrant();
 
-            if (app(CredentialTypes::class)->find($type->name(), Surface::ENROLLMENT) === null) {
-                return 'keystone.unoffered';
-            }
+        if ($grant === null) {
+            return SettingsEnrollmentResult::SUDO_ENDED;
+        }
 
-            if ((new SudoGate($this->guard))->liveGrant() === null) {
-                return SettingsEnrollmentResult::SUDO_ENDED;
-            }
+        try {
+            return (new AccountChanges($this->guard, $this->recorder))->change($account, function (AccountChange $change) use ($type, $enrolled, $flow, $provedAgainst) {
+                if (app(CredentialTypes::class)->find($type->name(), Surface::ENROLLMENT) === null) {
+                    return 'keystone.unoffered';
+                }
 
-            try {
                 return $change->enroll($type, $enrolled, $flow, $provedAgainst);
-            } catch (Superseded) {
-                return 'keystone.superseded';
-            }
-        });
+            }, $grant);
+        } catch (Barred) {
+            return 'keystone.barred';
+        } catch (Superseded) {
+            return 'keystone.superseded';
+        } catch (SudoRequired) {
+            return SettingsEnrollmentResult::SUDO_ENDED;
+        }
     }
 }

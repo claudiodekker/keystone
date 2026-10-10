@@ -50,7 +50,7 @@ class SudoAttempt extends CredentialAttempt
             }
 
             if ($type instanceof RecoveryCodeType) {
-                return $this->spendCodeForSudo($account, $flow, $type, (string) $input[RecoveryCodeType::FIELD], $taken, $subnet);
+                return $this->spendCodeForSudo($account, $flow, $type, (string) $input[RecoveryCodeType::FIELD], $taken, $subnet, $progress);
             }
 
             [$proof, $credential] = $this->prove($progress->surface(), $type, $account, $input, $taken);
@@ -130,13 +130,13 @@ class SudoAttempt extends CredentialAttempt
      *
      * @throws LastRecoveryCode
      */
-    protected function spendCodeForSudo(Model&KeystoneUser $account, Flow $flow, RecoveryCodeType $type, #[\SensitiveParameter] string $typed, TakenAttempt $taken, Subnet $subnet): SudoResult
+    protected function spendCodeForSudo(Model&KeystoneUser $account, Flow $flow, RecoveryCodeType $type, #[\SensitiveParameter] string $typed, TakenAttempt $taken, Subnet $subnet, SudoInProgress $progress): SudoResult
     {
         if ($this->ranOut($taken)) {
             return SudoResult::REFUSED;
         }
 
-        if (! $this->spendRecoveryCode($account, $flow, $type, $typed, keepLast: true)) {
+        if (! $this->spendRecoveryCode($account, $flow, $type, $typed, keepLast: true, writer: $progress)) {
             return SudoResult::REFUSED;
         }
 
