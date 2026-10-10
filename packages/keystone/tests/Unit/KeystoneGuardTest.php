@@ -416,7 +416,7 @@ describe('a registration', function () {
 
         $this->travel(Registering::WINDOW_SECONDS - 1)->seconds();
         expect(nextRequest()->registration())->address->toBe('new@example.com')
-            ->endsAt->toEqual(now()->addSecond()->toImmutable());
+            ->endsAt()->toEqual(now()->addSecond()->toImmutable());
 
         $this->travel(1)->second();
         expect(nextRequest()->registration())->toBeNull()
@@ -446,20 +446,23 @@ describe('a registration', function () {
         expect($guard->registration())->verified->toBeFalse();
     });
 
-    it('starts on a new session id, dropping sudo, every ceremony slot and the pending sign-in', function (string $start, Closure $hold) {
+    it('starts on a new session id, dropping sudo, every ceremony slot and the pending sign-in', function (Closure $start, Closure $hold) {
         $guard = Auth::guard('web');
         $hold($guard);
         $guard->slots()->put('form', 'challenge', 'bytes', capSeconds: 300);
         $before = session()->getId();
 
-        $guard->{$start}('new@example.com');
+        $start($guard);
 
         expect(session()->getId())->not->toBe($before)
             ->and($guard->pending())->toBeNull()
             ->and($guard->sudoInProgress())->toBeNull()
             ->and($guard->slots()->get('form', 'challenge'))->toBeNull()
             ->and($guard->registration()?->address)->toBe('new@example.com');
-    })->with(['a spent link' => 'startRegistration', 'a typed address' => 'startUnverifiedRegistration'])->with([
+    })->with([
+        'a spent link' => [fn (KeystoneGuard $guard) => $guard->startRegistration('new@example.com')],
+        'a typed address' => [fn (KeystoneGuard $guard) => $guard->startUnverifiedRegistration('new@example.com')],
+    ])->with([
         'a pending sign-in' => [fn (KeystoneGuard $guard) => $guard->hold(User::factory()->create(), 'form', PendingStage::CHALLENGE, '/')],
         'a sudo-in-progress' => [fn (KeystoneGuard $guard) => $guard->beginSudo('/settings')],
     ]);

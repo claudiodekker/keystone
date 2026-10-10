@@ -12,18 +12,13 @@ beforeEach(function () {
     app()->instance(RequestContext::class, new RequestContext(ipAddress: '127.0.0.1'));
 });
 
-function heldPhase(): ?string
-{
-    return session('keystone_phase_web')['phase'] ?? null;
-}
-
 it('holds only the registration once one starts after a pending sign-in', function () {
     $guard = Keystone::guard();
     $guard->hold(User::factory()->create(), 'form', PendingStage::CHALLENGE, '/');
 
     $guard->startRegistration('new@example.com');
 
-    expect(heldPhase())->toBe('registering')
+    expect($guard->isPendingAt(PendingStage::CHALLENGE))->toBeFalse()
         ->and($guard->pending())->toBeNull()
         ->and($guard->registration()?->address)->toBe('new@example.com');
 });
@@ -34,8 +29,7 @@ it('holds only the pending sign-in once one is held during a registration', func
 
     $guard->hold(User::factory()->create(), 'form', PendingStage::CHALLENGE, '/');
 
-    expect(heldPhase())->toBe('pending')
-        ->and($guard->registration())->toBeNull()
+    expect($guard->registration())->toBeNull()
         ->and($guard->pending())->not->toBeNull();
 });
 
@@ -46,7 +40,7 @@ it('holds only the sudo grant once a pending sign-in signs in', function () {
 
     $guard->signIn($user);
 
-    expect(heldPhase())->toBe('sudo_granted')
+    expect($guard->isPendingAt(PendingStage::CHALLENGE))->toBeFalse()
         ->and($guard->pending())->toBeNull()
         ->and($guard->sudoGrant())->not->toBeNull();
 });
@@ -57,8 +51,7 @@ it('replaces a sudo grant with the sudo-in-progress that begins', function () {
 
     $guard->beginSudo('/settings');
 
-    expect(heldPhase())->toBe('sudo_in_progress')
-        ->and($guard->sudoGrant())->toBeNull()
+    expect($guard->sudoGrant())->toBeNull()
         ->and($guard->sudoInProgress()?->intendedUrl)->toBe('/settings');
 });
 
@@ -121,11 +114,11 @@ it('leaves a pending sign-in that ran out for the pending sign-in to drop on a n
 
     expect(Keystone::guard()->registration())->toBeNull()
         ->and(Keystone::guard()->sudoGrant())->toBeNull()
-        ->and(heldPhase())->toBe('pending');
+        ->and(Keystone::guard()->isPendingAt(PendingStage::CHALLENGE))->toBeTrue();
 
     $sessionId = session()->getId();
 
     expect(Keystone::guard()->pending())->toBeNull()
-        ->and(heldPhase())->toBeNull()
+        ->and(Keystone::guard()->isPendingAt(PendingStage::CHALLENGE))->toBeFalse()
         ->and(session()->getId())->not->toBe($sessionId);
 });

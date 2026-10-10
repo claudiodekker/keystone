@@ -179,27 +179,28 @@ class KeystoneGuard extends SessionGuard
      */
     public function pending(): ?PendingSignIn
     {
-        if (! $this->phase()->held() instanceof HeldSignIn) {
+        $phase = $this->phase();
+        $held = $phase->held();
+
+        if (! $held instanceof HeldSignIn) {
             return null;
         }
 
-        $live = $this->phase()->live(HeldSignIn::class);
-
-        if ($live === null) {
+        if (! $phase->isLive($held)) {
             $this->forgetPending();
 
             return null;
         }
 
-        $account = $this->retrieveAccount($live->accountId);
+        $account = $this->retrieveAccount($held->accountId);
 
-        if (is_null($account) || ! $this->isActive($account) || $this->epochOf($account) !== $live->epoch) {
+        if (is_null($account) || ! $this->isActive($account) || $this->epochOf($account) !== $held->epoch) {
             $this->voidPending($account);
 
             return null;
         }
 
-        return $live->toPendingSignIn($account);
+        return $held->toPendingSignIn($account);
     }
 
     /**
@@ -263,8 +264,10 @@ class KeystoneGuard extends SessionGuard
      */
     public function endRegistration(): void
     {
-        if ($this->phase()->held() instanceof Registering) {
-            $this->phase()->forget();
+        $phase = $this->phase();
+
+        if ($phase->held() instanceof Registering) {
+            $phase->forget();
         }
 
         $this->slots()->flush();
@@ -275,7 +278,28 @@ class KeystoneGuard extends SessionGuard
      */
     public function slots(): CeremonySlots
     {
-        return new CeremonySlots($this->session, fn () => $this->phaseEndsAt());
+        return new CeremonySlots($this->session, $this);
+    }
+
+    /**
+     * Get the time the session's current phase ends: a pending sign-in's end, a registration's window, a signed-in session's sudo or absolute lifetime, or never.
+     */
+    public function phaseEndsAt(): ?CarbonInterface
+    {
+        $phaseEndsAt = $this->phase()->endsAt();
+
+        if (! $this->session->has($this->getName())) {
+            return $phaseEndsAt;
+        }
+
+        $lifetimeSeconds = config('keystone.session.absolute_lifetime_seconds');
+        $signedInEndsAt = is_int($lifetimeSeconds) ? $this->signedInAt()?->addSeconds($lifetimeSeconds) : null;
+
+        if ($phaseEndsAt === null) {
+            return $signedInEndsAt;
+        }
+
+        return $signedInEndsAt?->lessThan($phaseEndsAt) ? $signedInEndsAt : $phaseEndsAt;
     }
 
     /**
@@ -399,7 +423,11 @@ class KeystoneGuard extends SessionGuard
 
         $this->changeAuthLevel();
 
-        $this->phase()->put(new SudoInProgress($progress->intendedUrl, $progress->startedAt, $firstFactor));
+        $this->phase()->put(new SudoInProgress(
+            intendedUrl: $progress->intendedUrl,
+            startedAt: $progress->startedAt,
+            firstFactor: $firstFactor,
+        ));
     }
 
     /**
@@ -424,7 +452,9 @@ class KeystoneGuard extends SessionGuard
     public function endSudo(): void
     {
         $grant = $this->sudoGrant();
-        $account = $this->signedInAccount();
+
+        /** @var (Model&KeystoneUser)|null $account */
+        $account = $this->user();
 
         $this->changeAuthLevel();
 
@@ -447,11 +477,14 @@ class KeystoneGuard extends SessionGuard
             return;
         }
 
+        /** @var (Model&KeystoneUser)|null $account */
+        $account = $this->user();
+
         $this->changeAuthLevel();
 
         (new SecurityEventRecorder)->record(
             SecurityEventType::SUDO_NETWORK_CHANGED,
-            account: $this->signedInAccount(),
+            account: $account,
         );
     }
 
@@ -754,9 +787,11 @@ class KeystoneGuard extends SessionGuard
      */
     protected function stampSudo(Subnet $subnet): void
     {
-        $grantedAt = Date::now()->toImmutable();
-
-        $this->phase()->put(new SudoGrant($grantedAt, $grantedAt->addSeconds($this->sudoLifetimeSeconds()), $subnet));
+        $this->phase()->put(new SudoGrant(
+            grantedAt: Date::now()->toImmutable(),
+            lifetimeSeconds: $this->sudoLifetimeSeconds(),
+            subnet: $subnet,
+        ));
     }
 
     /**
@@ -955,27 +990,6 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Get the time the session's current phase ends: a pending sign-in's end, a registration's window, a signed-in session's sudo or absolute lifetime, or never.
-     */
-    protected function phaseEndsAt(): ?CarbonInterface
-    {
-        $phaseEndsAt = $this->phase()->endsAt();
-
-        if (! $this->session->has($this->getName())) {
-            return $phaseEndsAt;
-        }
-
-        $lifetimeSeconds = config('keystone.session.absolute_lifetime_seconds');
-        $signedInEndsAt = is_int($lifetimeSeconds) ? $this->signedInAt()?->addSeconds($lifetimeSeconds) : null;
-
-        if ($phaseEndsAt === null) {
-            return $signedInEndsAt;
-        }
-
-        return $signedInEndsAt?->lessThan($phaseEndsAt) ? $signedInEndsAt : $phaseEndsAt;
-    }
-
-    /**
      * End the session and forget its user.
      */
     protected function endSession(): void
@@ -1061,16 +1075,5 @@ class KeystoneGuard extends SessionGuard
     protected function sudoLifetimeSeconds(): int
     {
         return config()->integer('keystone.sudo.lifetime_seconds');
-    }
-
-    /**
-     * Get the account the session is signed in as.
-     *
-     * @return (Model&KeystoneUser)|null
-     */
-    protected function signedInAccount(): ?Model
-    {
-        /** @var (Model&KeystoneUser)|null */
-        return $this->user();
     }
 }

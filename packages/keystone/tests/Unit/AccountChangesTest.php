@@ -436,7 +436,7 @@ function sudoInProgress(): SudoInProgress
 
 function sudoGrant(): SudoGrant
 {
-    return new SudoGrant(CarbonImmutable::now(), CarbonImmutable::now()->addMinutes(5), new Subnet('127.0.0.0/24'));
+    return new SudoGrant(CarbonImmutable::now(), 300, new Subnet('127.0.0.0/24'));
 }
 
 function holdLiveSudo(): void

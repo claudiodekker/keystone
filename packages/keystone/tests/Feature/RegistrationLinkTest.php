@@ -197,7 +197,7 @@ describe('spending a link', function () {
         $response->assertRedirectToRoute('register.finish')->assertHeader('Referrer-Policy', 'no-referrer');
         expect(session()->getId())->not->toBe($sessionId)
             ->and(Keystone::guard()->registration())->address->toBe('new@example.com')
-            ->endsAt->toEqual(now()->addSeconds(Registering::WINDOW_SECONDS)->toImmutable());
+            ->endsAt()->toEqual(now()->addSeconds(Registering::WINDOW_SECONDS)->toImmutable());
     });
 
     it('drops a pending sign-in, a stale sudo and every ceremony slot', function (Closure $hold) {

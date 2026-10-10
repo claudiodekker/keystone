@@ -232,6 +232,17 @@ describe('the lifetime', function () {
         'live a second before it runs out' => [59, fn ($response) => $response->assertOk()],
         'gone the second it runs out' => [60, fn ($response) => $response->assertRedirectToRoute('sudo')],
     ]);
+
+    it('shortens a grant already held when the configured lifetime is lowered', function () {
+        $this->freezeSecond();
+        $this->signInAccount(new FormTypeSupport);
+        $this->travel(60)->seconds();
+        config(['keystone.sudo.lifetime_seconds' => 60]);
+
+        $response = $this->get('probe');
+
+        $response->assertRedirectToRoute('sudo');
+    });
 });
 
 describe('sessions without a grant', function () {
