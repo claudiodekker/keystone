@@ -5,6 +5,7 @@ namespace ClaudioDekker\Keystone\AppTests\Concerns;
 use ClaudioDekker\Keystone\AppTests\Assertions\GuestStepAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\SignInAssertions;
 use ClaudioDekker\Keystone\AppTests\KeystoneTestResponse;
+use ClaudioDekker\Keystone\AppTests\Support\Browser;
 use ClaudioDekker\Keystone\AppTests\Support\CredentialTypeSupport;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Keystone;
@@ -70,6 +71,50 @@ trait InteractsWithKeystone
     public function freshBrowser(): static
     {
         $this->defaultCookies = [];
+
+        return $this;
+    }
+
+    /**
+     * Get the cookies the browser holds now, to come back with later.
+     */
+    public function browser(): Browser
+    {
+        return new Browser($this->defaultCookies);
+    }
+
+    /**
+     * Continue in a browser that holds the given cookies, as someone coming back with old cookies would.
+     *
+     * @return $this
+     */
+    public function returnWith(Browser $browser): static
+    {
+        $this->defaultCookies = $browser->cookies;
+
+        return $this;
+    }
+
+    /**
+     * Keep the URL as intended in the browser's session, where Laravel's guest redirect keeps it before sending a guest to sign in.
+     *
+     * AppTests can't count on a page of the app that sends guests to sign in, so this puts
+     * the URL where that redirect would have. It is the one place an AppTest writes the session.
+     *
+     * @return $this
+     */
+    public function arrivingFrom(string $url): static
+    {
+        $this->startRequest();
+
+        $session = $this->app['session.store'];
+
+        $session->setId($this->defaultCookies[$session->getName()] ?? null);
+        $session->start();
+        $session->put('url.intended', $url);
+        $session->save();
+
+        $this->defaultCookies[$session->getName()] = $session->getId();
 
         return $this;
     }

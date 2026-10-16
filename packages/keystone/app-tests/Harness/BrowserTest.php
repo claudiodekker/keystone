@@ -46,6 +46,74 @@ it('forgets every cookie in a fresh browser', function () {
     $this->assertSignInPage($response);
 });
 
+it('comes back with the cookies the browser held earlier', function () {
+    $user = $this->createUser();
+    UserEmail::factory()->for($user, 'user')->verified()->create(['address' => 'ada@example.com']);
+    $support = $this->supportFor(Surface::SIGN_IN);
+    $support->arrangeCredential(Surface::SIGN_IN, $user);
+    $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $signedIn = $this->browser();
+    $this->freshBrowser()->get(route('login'));
+
+    $response = $this->returnWith($signedIn)->get(route('login'));
+
+    $this->assertAlreadySignedIn($response);
+});
+
+it('puts the intended URL where the next sign-in reads it', function () {
+    $user = $this->createUser();
+    UserEmail::factory()->for($user, 'user')->verified()->create(['address' => 'ada@example.com']);
+    $support = $this->supportFor(Surface::SIGN_IN);
+    $support->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $this->arrivingFrom(url('/reports'));
+
+    $response = $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $this->assertSignedIn($response, '/reports');
+});
+
+it('keeps the rest of the browser session when it puts the intended URL', function () {
+    $user = $this->createUser();
+    UserEmail::factory()->for($user, 'user')->verified()->create(['address' => 'ada@example.com']);
+    $support = $this->supportFor(Surface::SIGN_IN);
+    $support->arrangeCredential(Surface::SIGN_IN, $user);
+    $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $this->arrivingFrom(url('/reports'));
+
+    $response = $this->get(route('login'));
+
+    $this->assertAlreadySignedIn($response);
+});
+
+it('puts nothing of an earlier browser in the session when it puts the intended URL', function () {
+    $user = $this->createUser();
+    UserEmail::factory()->for($user, 'user')->verified()->create(['address' => 'ada@example.com']);
+    $support = $this->supportFor(Surface::SIGN_IN);
+    $support->arrangeCredential(Surface::SIGN_IN, $user);
+    $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $this->freshBrowser()->arrivingFrom(url('/reports'));
+
+    $response = $this->get(route('login'));
+
+    $this->assertSignInPage($response);
+});
+
 it('keeps what each request flashed after a later request', function () {
     $refused = $this->post(route('login.submit', 'form'), [
         'identifier' => 'ada@example.com',
