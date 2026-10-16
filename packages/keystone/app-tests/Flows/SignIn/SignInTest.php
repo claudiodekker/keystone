@@ -35,4 +35,4 @@ it('refuses a wrong secret, flashing back only the identifier', function () {
 
     $this->assertSignInRefused($response, __('keystone::messages.credentials-rejected'));
     $this->assertSignInPage($next);
-})->group('V6.3.8');
+})->group('SI-11');

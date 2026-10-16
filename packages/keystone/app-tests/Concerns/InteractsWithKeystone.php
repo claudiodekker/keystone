@@ -10,16 +10,18 @@ use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\Surface;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
-use Illuminate\Session\ArraySessionHandler;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Testing\TestResponse;
+use PHPUnit\Framework\Assert;
+use Symfony\Component\HttpFoundation\Cookie;
 
 /**
  * Drive the app the way a user does, and check its answers through assertions the app can override.
  *
- * Every request starts afresh, like a new HTTP request from one browser: the guards and the session store
- * are built again, and only the cookies earlier responses set carry over. So the next request sees a
- * sign-in only when the session really stored it. The harness grows only through the named helpers
- * here, each with its own test under app-tests/Harness.
+ * Every request starts afresh, like a new HTTP request from one browser: the guards are built again, the
+ * session holds only what its storage keeps for the browser's cookie, and only the cookies earlier
+ * responses set carry over. So the next request sees a sign-in only when the session really stored
+ * it. The harness grows only through the named helpers here, each with its own test under app-tests/Harness.
  *
  * @api
  */
@@ -28,23 +30,6 @@ trait InteractsWithKeystone
     use GuestStepAssertions;
     use LazilyRefreshDatabase;
     use SignInAssertions;
-
-    /**
-     * The app's session storage, which outlives each request's session store.
-     */
-    protected ArraySessionHandler $sessions;
-
-    /**
-     * Keep every request's session in one storage the test holds.
-     */
-    protected function setUpInteractsWithKeystone(): void
-    {
-        $sessions = $this->sessions = new ArraySessionHandler($this->app['config']->get('session.lifetime'));
-
-        // The manager binds the callback to itself, so it can't reach the test through $this.
-        $this->app['session']->extend('keystone-app-tests', fn () => $sessions);
-        $this->app['config']->set('session.driver', 'keystone-app-tests');
-    }
 
     /**
      * Create a user from the app's own factory.
@@ -78,27 +63,68 @@ trait InteractsWithKeystone
     }
 
     /**
+     * Continue in a browser that holds no cookies, as someone else would.
+     *
+     * @return $this
+     */
+    public function freshBrowser(): static
+    {
+        $this->defaultCookies = [];
+
+        return $this;
+    }
+
+    /**
+     * Assert the two responses look the same to whoever sent them [I2].
+     *
+     * Status, redirect, flashed data, header names and Set-Cookie names must match; header values such as Date
+     * may differ. Flashed-back input is compared by its fields only, since each echoes what was typed.
+     */
+    public function assertIndistinguishable(KeystoneTestResponse $existing, KeystoneTestResponse $missing): void
+    {
+        Assert::assertSame($existing->getStatusCode(), $missing->getStatusCode(), 'The responses differ in status.');
+        Assert::assertSame($existing->headers->get('Location'), $missing->headers->get('Location'), 'The responses differ in redirect.');
+        Assert::assertEquals($this->comparableFlash($existing), $this->comparableFlash($missing), 'The responses differ in flashed data.');
+        Assert::assertSame($this->headerNames($existing), $this->headerNames($missing), 'The responses differ in header names.');
+        Assert::assertSame($this->cookieNames($existing), $this->cookieNames($missing), 'The responses differ in Set-Cookie names.');
+    }
+
+    /**
+     * Assert the request took at least the given time on the test clock.
+     */
+    public function assertTookAtLeast(KeystoneTestResponse $response, int $milliseconds): void
+    {
+        Assert::assertGreaterThanOrEqual($milliseconds, $response->milliseconds(), "The request took {$response->milliseconds()} ms on the test clock.");
+    }
+
+    /**
      * Send the request from the browser, starting the app's request state afresh.
      */
     public function call($method, $uri, $parameters = [], $cookies = [], $files = [], $server = [], $content = null): KeystoneTestResponse
     {
         $this->startRequest();
 
+        $startedAt = Date::now();
+
         $response = parent::call($method, $uri, $parameters, $cookies, $files, $server, $content);
 
         $this->keepCookies($response);
 
-        return KeystoneTestResponse::capture($response, $this->app['session.store']);
+        $session = clone $this->app['session.store'];
+
+        return KeystoneTestResponse::capture($response, $session, $startedAt->diffInMilliseconds(Date::now()));
     }
 
     /**
-     * Forget the guards and the session store an earlier request left in memory.
+     * Forget the guards and the session data an earlier request left in memory.
+     *
+     * Laravel keeps one session store for the whole test, and other services hold on to it, so the
+     * store stays and only its data goes. The request then loads what storage keeps for its cookie.
      */
     protected function startRequest(): void
     {
         $this->app['auth']->forgetGuards();
-        $this->app['session']->forgetDrivers();
-        $this->app->forgetInstance('session.store');
+        $this->app['session.store']->flush();
     }
 
     /**
@@ -115,5 +141,46 @@ trait InteractsWithKeystone
 
             $this->defaultCookies[$cookie->getName()] = $response->getCookie($cookie->getName())->getValue();
         }
+    }
+
+    /**
+     * Get the response's flashed data with the flashed-back input reduced to its fields.
+     *
+     * @return array<string, mixed>
+     */
+    protected function comparableFlash(KeystoneTestResponse $response): array
+    {
+        return [
+            ...$response->flashed(),
+            '_old_input' => array_keys($response->oldInput()),
+        ];
+    }
+
+    /**
+     * Get the response's header names, lowercase and sorted.
+     *
+     * @return list<string>
+     */
+    protected function headerNames(KeystoneTestResponse $response): array
+    {
+        return collect($response->headers->all())
+            ->keys()
+            ->sort()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Get the names of the cookies the response sets, sorted.
+     *
+     * @return list<string>
+     */
+    protected function cookieNames(KeystoneTestResponse $response): array
+    {
+        return collect($response->headers->getCookies())
+            ->map(fn (Cookie $cookie) => $cookie->getName())
+            ->sort()
+            ->values()
+            ->all();
     }
 }

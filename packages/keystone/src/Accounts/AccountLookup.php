@@ -13,12 +13,12 @@ use ClaudioDekker\Keystone\Models\UserEmail;
 class AccountLookup
 {
     /**
-     * Resolve the account the identifier names.
+     * Resolve the account the identifier names, or null when it names none.
      */
-    public function resolve(string $identifier): KeystoneUser
+    public function resolve(string $identifier): ?KeystoneUser
     {
-        $email = UserEmail::query()->where('address', $identifier)->firstOrFail();
+        $email = UserEmail::query()->where('address', $identifier)->first();
 
-        return $email->user()->sole();
+        return $email?->user;
     }
 }
