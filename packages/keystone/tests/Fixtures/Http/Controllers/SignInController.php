@@ -35,4 +35,14 @@ class SignInController extends BaseSignInController
     {
         return redirect($redirectTo);
     }
+
+    /**
+     * Return to the sign-in page with the message on the identifier.
+     */
+    protected function sendSignInRefused(Request $request, string $message): Response
+    {
+        return to_route('login')
+            ->withErrors(['identifier' => $message])
+            ->onlyInput('identifier');
+    }
 }

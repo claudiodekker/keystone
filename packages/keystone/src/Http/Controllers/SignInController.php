@@ -4,7 +4,9 @@ namespace ClaudioDekker\Keystone\Http\Controllers;
 
 use ClaudioDekker\Keystone\Http\Pages\SignInPage;
 use ClaudioDekker\Keystone\Session\SessionState;
+use ClaudioDekker\Keystone\SignIn\Refused;
 use ClaudioDekker\Keystone\SignIn\SignIn;
+use ClaudioDekker\Keystone\Status;
 use Illuminate\Contracts\Support\Responsable;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -33,9 +35,13 @@ abstract class SignInController
      */
     public function store(Request $request, string $type, SignIn $signIn): Response|Responsable
     {
-        $redirectTo = $signIn->attempt($type, $request->all());
+        $outcome = $signIn->attempt($type, $request->all());
 
-        return $this->sendSignedIn($request, $redirectTo);
+        if ($outcome instanceof Refused) {
+            return $this->sendSignInRefused($request, Status::CREDENTIALS_REJECTED->label());
+        }
+
+        return $this->sendSignedIn($request, $outcome->redirectTo);
     }
 
     /**
@@ -52,4 +58,9 @@ abstract class SignInController
      * Send the user on after a completed sign-in.
      */
     abstract protected function sendSignedIn(Request $request, string $redirectTo): Response|Responsable;
+
+    /**
+     * Refuse the sign-in with the one translated message every refusal shares.
+     */
+    abstract protected function sendSignInRefused(Request $request, string $message): Response|Responsable;
 }

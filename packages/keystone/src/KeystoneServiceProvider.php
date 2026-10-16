@@ -16,13 +16,14 @@ use LogicException;
 class KeystoneServiceProvider extends ServiceProvider
 {
     /**
-     * Register the keystone guard driver and the migrations.
+     * Register the keystone guard driver, the migrations and the translations.
      */
     public function boot(): void
     {
         Auth::extend('keystone', $this->createGuard(...));
 
         $this->loadMigrationsFrom(dirname(__DIR__).'/database/migrations');
+        $this->loadTranslationsFrom(dirname(__DIR__).'/lang', 'keystone');
     }
 
     /**

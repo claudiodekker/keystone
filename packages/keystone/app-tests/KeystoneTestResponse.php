@@ -36,6 +36,16 @@ class KeystoneTestResponse extends TestResponse
     }
 
     /**
+     * Get the input the request flashed back to the form.
+     *
+     * @return array<string, mixed>
+     */
+    public function oldInput(): array
+    {
+        return $this->session->get('_old_input', []);
+    }
+
+    /**
      * Get the session as the request left it.
      */
     protected function session(): Session

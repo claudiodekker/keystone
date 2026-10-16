@@ -30,11 +30,11 @@ class SignIn
     }
 
     /**
-     * Attempt to sign in with the named type and the submitted input, and get the path to send the user to.
+     * Attempt to sign in with the named type and the submitted input.
      *
      * @param  array<string, mixed>  $input
      */
-    public function attempt(string $type, array $input): string
+    public function attempt(string $type, array $input): SignedIn|Refused
     {
         $credentialType = Keystone::credentialTypes()->find($type);
 
@@ -46,9 +46,13 @@ class SignIn
             credentials: $this->credentials($credentialType, $account),
         );
 
-        $credentialType->verify($verification);
+        $proof = $credentialType->verify($verification);
 
-        return $this->session->signIn($account);
+        if (! $proof->isProven()) {
+            return new Refused;
+        }
+
+        return new SignedIn($this->session->signIn($account));
     }
 
     /**
