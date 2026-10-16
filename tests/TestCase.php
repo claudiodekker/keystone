@@ -2,12 +2,15 @@
 
 namespace ClaudioDekker\Keystone\Tests;
 
+use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Sleep;
 use LogicException;
 use Orchestra\Testbench\TestCase as BaseTestCase;
+use PHPUnit\Framework\Assert;
 
 /**
  * Run a test in an app with every package installed, held to the suite's rules.
@@ -25,6 +28,23 @@ class TestCase extends BaseTestCase
         Queue::createPayloadUsing($this->refuseRealQueuePushes(...));
         $this->freezeTime();
         Sleep::fake(syncWithCarbon: true);
+        Exceptions::swap(new ExceptionHandlerFake($this->app->make(ExceptionHandler::class)));
+
+        $this->beforeApplicationDestroyed($this->assertEveryReportAsserted(...));
+    }
+
+    /**
+     * Assert the test asserted every exception it reported.
+     */
+    protected function assertEveryReportAsserted(): void
+    {
+        $handler = Exceptions::getFacadeRoot();
+
+        if (! $handler instanceof ExceptionHandlerFake) {
+            Assert::fail('The suite already fakes the exception handler. Remove the Exceptions::fake() call from the test.');
+        }
+
+        $handler->assertEveryReportAsserted();
     }
 
     /**
