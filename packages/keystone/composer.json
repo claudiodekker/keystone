@@ -1,0 +1,14 @@
+{
+    "name": "claudiodekker/keystone",
+    "description": "Authentication for Laravel: sign-in, two-factor, passkeys and account recovery.",
+    "license": "MIT",
+    "require": {
+        "php": "^8.4",
+        "laravel/framework": "^13.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "ClaudioDekker\\Keystone\\": "src/"
+        }
+    }
+}
