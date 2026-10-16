@@ -4,6 +4,8 @@ namespace ClaudioDekker\Keystone\Tests;
 
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
+use LogicException;
 use Orchestra\Testbench\TestCase as BaseTestCase;
 
 /**
@@ -19,6 +21,22 @@ class TestCase extends BaseTestCase
         parent::setUp();
 
         Http::preventStrayRequests();
+        Queue::createPayloadUsing($this->refuseRealQueuePushes(...));
+    }
+
+    /**
+     * Refuse a job pushed to any queue connection but sync.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    protected function refuseRealQueuePushes(string $connection, ?string $queue, array $payload): array
+    {
+        if ($connection !== 'sync') {
+            throw new LogicException("Pushed [{$payload['displayName']}] to the [{$connection}] queue. Fake it with Queue::fake(), or dispatch it on sync.");
+        }
+
+        return [];
     }
 
     /**
