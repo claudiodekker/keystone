@@ -1434,3 +1434,34 @@ class NoUnserialize extends FunctionCalls
         return 'Store JSON and read it with json_decode().';
     }
 }
+
+/**
+ * Refuse eval() in src.
+ */
+class NoEval extends Check
+{
+    /**
+     * The paths the check reads, as fnmatch patterns from the repository root.
+     *
+     * @var list<string>
+     */
+    protected array $paths = ['packages/*/src/*.php'];
+
+    /**
+     * Get the failure message, naming the fix.
+     */
+    public function message(): string
+    {
+        return 'Remove eval() and write the code out.';
+    }
+
+    /**
+     * Get the lines that call eval().
+     *
+     * @return list<int>
+     */
+    protected function lines(File $file): array
+    {
+        return $file->lines($file->find(fn (Node $node) => $node instanceof Expr\Eval_));
+    }
+}
