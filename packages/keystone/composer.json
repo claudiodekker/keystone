@@ -4,6 +4,7 @@
     "license": "MIT",
     "require": {
         "php": "^8.4",
+        "ext-intl": "*",
         "laravel/framework": "^13.0"
     },
     "autoload": {

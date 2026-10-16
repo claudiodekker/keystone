@@ -32,7 +32,7 @@ jobs:
       - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: ${{ matrix.php }}
-          extensions: pdo_sqlite
+          extensions: intl, pdo_sqlite
           coverage: none
 
       - run: composer update --prefer-stable --no-interaction --no-progress ${{ matrix.dependencies == 'lowest' && '--prefer-lowest' || '' }}
@@ -70,7 +70,7 @@ jobs:
       - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: '8.5'
-          extensions: pdo_pgsql
+          extensions: intl, pdo_pgsql
           coverage: none
 
       - run: composer update --prefer-stable --no-interaction --no-progress
@@ -107,7 +107,7 @@ jobs:
       - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: '8.5'
-          extensions: pdo_mysql
+          extensions: intl, pdo_mysql
           coverage: none
 
       - run: composer update --prefer-stable --no-interaction --no-progress

@@ -17,7 +17,7 @@ class AccountLookup
      */
     public function resolve(string $identifier): ?KeystoneUser
     {
-        $email = UserEmail::query()->where('address', $identifier)->first();
+        $email = UserEmail::query()->where('address', EmailAddress::normalize($identifier))->first();
 
         return $email?->user;
     }
