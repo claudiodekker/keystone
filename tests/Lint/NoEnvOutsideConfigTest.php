@@ -1,7 +1,7 @@
 <?php
 
+use ClaudioDekker\Keystone\Lint\Checks\NoEnvOutsideConfig;
 use ClaudioDekker\Keystone\Lint\File;
-use ClaudioDekker\Keystone\Lint\NoEnvOutsideConfig;
 
 it('fails env() outside a config file', function (string $path) {
     $file = new File($path, "<?php\n\n\$key = env('APP_KEY');\n\\env('APP_KEY');\n");

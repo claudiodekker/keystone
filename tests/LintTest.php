@@ -1,23 +1,14 @@
 <?php
 
-use ClaudioDekker\Keystone\Lint\File;
-use PhpParser\Node;
-use PhpParser\Node\Stmt\Class_;
-
 dataset('checks', function () {
-    $classes = File::read('lint.php')->find(
-        fn (Node $node) => $node instanceof Class_
-            && $node->extends !== null
-            && ! $node->isAbstract(),
-    );
-
-    return collect($classes)
-        ->mapWithKeys(fn (Class_ $class) => [(string) $class->name => [(string) $class->name]])
+    return collect(glob(__DIR__.'/../lint/Checks/*.php'))
+        ->map(fn (string $path) => basename($path, '.php'))
+        ->mapWithKeys(fn (string $check) => [$check => [$check]])
         ->all();
 });
 
 it('holds over the repository', function (string $check) {
-    $check = "ClaudioDekker\\Keystone\\Lint\\{$check}";
+    $check = "ClaudioDekker\\Keystone\\Lint\\Checks\\{$check}";
 
     expect((new $check)->run())->toBe([]);
 })->with('checks');

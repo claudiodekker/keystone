@@ -1,7 +1,7 @@
 <?php
 
+use ClaudioDekker\Keystone\Lint\Checks\NoMatchOnCall;
 use ClaudioDekker\Keystone\Lint\File;
-use ClaudioDekker\Keystone\Lint\NoMatchOnCall;
 
 it('fails a match whose subject is a call', function (string $subject) {
     $file = new File('packages/keystone/src/Example.php', "<?php\n\n\$name = match ({$subject}) {\n    default => 'other',\n};\n");

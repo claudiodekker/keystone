@@ -1,7 +1,7 @@
 <?php
 
+use ClaudioDekker\Keystone\Lint\Checks\NoWeakHashes;
 use ClaudioDekker\Keystone\Lint\File;
-use ClaudioDekker\Keystone\Lint\NoWeakHashes;
 
 it('fails md5 and sha1 in src', function () {
     $file = new File('packages/keystone/src/Example.php', <<<'PHP'

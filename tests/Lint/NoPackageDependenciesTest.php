@@ -1,7 +1,7 @@
 <?php
 
+use ClaudioDekker\Keystone\Lint\Checks\NoPackageDependencies;
 use ClaudioDekker\Keystone\Lint\File;
-use ClaudioDekker\Keystone\Lint\NoPackageDependencies;
 
 it('fails core when it uses a class from another package', function () {
     $file = new File('packages/keystone/src/Example.php', <<<'PHP'

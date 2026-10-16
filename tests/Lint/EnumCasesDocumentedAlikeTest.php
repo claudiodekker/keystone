@@ -1,6 +1,6 @@
 <?php
 
-use ClaudioDekker\Keystone\Lint\EnumCasesDocumentedAlike;
+use ClaudioDekker\Keystone\Lint\Checks\EnumCasesDocumentedAlike;
 use ClaudioDekker\Keystone\Lint\File;
 
 it('fails the cases without a docblock in an enum that documents some of its cases', function () {

@@ -1,7 +1,7 @@
 <?php
 
+use ClaudioDekker\Keystone\Lint\Checks\NoEval;
 use ClaudioDekker\Keystone\Lint\File;
-use ClaudioDekker\Keystone\Lint\NoEval;
 
 it('fails eval in src', function () {
     $file = new File('packages/keystone/src/Example.php', <<<'PHP'

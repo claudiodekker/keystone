@@ -1,7 +1,7 @@
 <?php
 
+use ClaudioDekker\Keystone\Lint\Checks\OneClausePerLine;
 use ClaudioDekker\Keystone\Lint\File;
-use ClaudioDekker\Keystone\Lint\OneClausePerLine;
 
 it('fails a condition of three clauses on one line', function (string $condition) {
     $file = new File('packages/keystone/src/Example.php', "<?php\n\nif ({$condition}) {\n    go();\n}\n");

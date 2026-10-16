@@ -1,7 +1,7 @@
 <?php
 
+use ClaudioDekker\Keystone\Lint\Checks\NoFinal;
 use ClaudioDekker\Keystone\Lint\File;
-use ClaudioDekker\Keystone\Lint\NoFinal;
 
 it('fails a final class in src', function () {
     $file = new File('packages/keystone/src/Example.php', <<<'PHP'

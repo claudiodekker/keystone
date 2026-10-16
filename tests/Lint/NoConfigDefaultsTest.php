@@ -1,7 +1,7 @@
 <?php
 
+use ClaudioDekker\Keystone\Lint\Checks\NoConfigDefaults;
 use ClaudioDekker\Keystone\Lint\File;
-use ClaudioDekker\Keystone\Lint\NoConfigDefaults;
 
 it('fails a config read with an inline default', function () {
     $file = new File('packages/keystone/src/Example.php', <<<'PHP'

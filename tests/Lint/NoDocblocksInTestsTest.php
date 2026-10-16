@@ -1,7 +1,7 @@
 <?php
 
+use ClaudioDekker\Keystone\Lint\Checks\NoDocblocksInTests;
 use ClaudioDekker\Keystone\Lint\File;
-use ClaudioDekker\Keystone\Lint\NoDocblocksInTests;
 
 it('fails a docblock above a test', function () {
     $file = new File('packages/keystone/tests/Feature/ExampleTest.php', <<<'PHP'

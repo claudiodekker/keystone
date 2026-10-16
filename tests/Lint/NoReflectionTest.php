@@ -1,7 +1,7 @@
 <?php
 
+use ClaudioDekker\Keystone\Lint\Checks\NoReflection;
 use ClaudioDekker\Keystone\Lint\File;
-use ClaudioDekker\Keystone\Lint\NoReflection;
 
 it('fails reflection under whatever name the file imports it', function () {
     $file = new File('packages/keystone/src/Example.php', <<<'PHP'

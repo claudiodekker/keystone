@@ -1,6 +1,6 @@
 <?php
 
-use ClaudioDekker\Keystone\Lint\BlankLineAfterMultilineStatements;
+use ClaudioDekker\Keystone\Lint\Checks\BlankLineAfterMultilineStatements;
 use ClaudioDekker\Keystone\Lint\File;
 
 it('fails a statement that follows a multiline statement directly', function () {

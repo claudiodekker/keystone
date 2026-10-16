@@ -1,7 +1,7 @@
 <?php
 
+use ClaudioDekker\Keystone\Lint\Checks\NoDebugCalls;
 use ClaudioDekker\Keystone\Lint\File;
-use ClaudioDekker\Keystone\Lint\NoDebugCalls;
 
 it('fails a call to a debug function', function (string $function) {
     $file = new File('packages/keystone/src/Example.php', "<?php\n\n{$function}(\$user);\n");

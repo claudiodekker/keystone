@@ -1,7 +1,7 @@
 <?php
 
+use ClaudioDekker\Keystone\Lint\Checks\NoWeakRandomness;
 use ClaudioDekker\Keystone\Lint\File;
-use ClaudioDekker\Keystone\Lint\NoWeakRandomness;
 
 it('fails rand, mt_rand and uniqid in src', function () {
     $file = new File('packages/keystone/src/Example.php', <<<'PHP'

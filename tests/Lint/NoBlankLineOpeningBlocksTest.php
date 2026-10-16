@@ -1,7 +1,7 @@
 <?php
 
+use ClaudioDekker\Keystone\Lint\Checks\NoBlankLineOpeningBlocks;
 use ClaudioDekker\Keystone\Lint\File;
-use ClaudioDekker\Keystone\Lint\NoBlankLineOpeningBlocks;
 
 it('fails a block that opens with a blank line', function () {
     $file = new File('packages/keystone/src/Example.php', <<<'PHP'

@@ -1,7 +1,7 @@
 <?php
 
+use ClaudioDekker\Keystone\Lint\Checks\NoTestDependencies;
 use ClaudioDekker\Keystone\Lint\File;
-use ClaudioDekker\Keystone\Lint\NoTestDependencies;
 
 it('fails a class in src that uses a class from tests', function () {
     $file = new File('packages/keystone/src/Example.php', <<<'PHP'

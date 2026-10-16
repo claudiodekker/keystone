@@ -1,7 +1,7 @@
 <?php
 
+use ClaudioDekker\Keystone\Lint\Checks\SortedEnumCases;
 use ClaudioDekker\Keystone\Lint\File;
-use ClaudioDekker\Keystone\Lint\SortedEnumCases;
 
 it('fails an enum case that sorts before the case above it', function () {
     $file = new File('packages/keystone/src/Mode.php', <<<'PHP'

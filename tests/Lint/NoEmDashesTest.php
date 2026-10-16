@@ -1,7 +1,7 @@
 <?php
 
+use ClaudioDekker\Keystone\Lint\Checks\NoEmDashes;
 use ClaudioDekker\Keystone\Lint\File;
-use ClaudioDekker\Keystone\Lint\NoEmDashes;
 
 it('fails an em dash in any kind of file', function (string $path) {
     $file = new File($path, "Fast, \u{2014} and loose.\n\nNo dash here.\nOne \u{2014} two \u{2014} three.\n");

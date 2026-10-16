@@ -1,7 +1,7 @@
 <?php
 
+use ClaudioDekker\Keystone\Lint\Checks\NoUnserialize;
 use ClaudioDekker\Keystone\Lint\File;
-use ClaudioDekker\Keystone\Lint\NoUnserialize;
 
 it('fails unserialize in src', function () {
     $file = new File('packages/keystone/src/Example.php', <<<'PHP'

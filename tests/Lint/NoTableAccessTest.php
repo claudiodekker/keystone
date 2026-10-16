@@ -1,7 +1,7 @@
 <?php
 
+use ClaudioDekker\Keystone\Lint\Checks\NoTableAccess;
 use ClaudioDekker\Keystone\Lint\File;
-use ClaudioDekker\Keystone\Lint\NoTableAccess;
 
 it('fails table access that skips the models', function () {
     $file = new File('packages/keystone/src/Example.php', <<<'PHP'

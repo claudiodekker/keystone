@@ -1,6 +1,6 @@
 <?php
 
-use ClaudioDekker\Keystone\Lint\DocumentedDeclarations;
+use ClaudioDekker\Keystone\Lint\Checks\DocumentedDeclarations;
 use ClaudioDekker\Keystone\Lint\File;
 
 it('fails a class, property, method and function without a docblock', function () {
@@ -125,7 +125,7 @@ it('reads src, test support code and the lint', function (string $path) {
     'packages/keystone/src/Example.php',
     'packages/keystone/tests/Support/Example.php',
     'tests/Example.php',
-    'lint.php',
+    'lint/Example.php',
 ]);
 
 it('leaves the test cases without a docblock', function () {

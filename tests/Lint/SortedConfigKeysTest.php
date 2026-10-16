@@ -1,7 +1,7 @@
 <?php
 
+use ClaudioDekker\Keystone\Lint\Checks\SortedConfigKeys;
 use ClaudioDekker\Keystone\Lint\File;
-use ClaudioDekker\Keystone\Lint\SortedConfigKeys;
 
 it('fails a key that sorts before the key above it, at any depth', function () {
     $file = new File('packages/keystone/config/keystone.php', <<<'PHP'

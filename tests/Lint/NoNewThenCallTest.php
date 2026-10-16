@@ -1,7 +1,7 @@
 <?php
 
+use ClaudioDekker\Keystone\Lint\Checks\NoNewThenCall;
 use ClaudioDekker\Keystone\Lint\File;
-use ClaudioDekker\Keystone\Lint\NoNewThenCall;
 
 it('fails a new object with several arguments called at once with several arguments', function () {
     $file = new File('packages/keystone/src/Example.php', <<<'PHP'

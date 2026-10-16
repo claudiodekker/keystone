@@ -1,6 +1,6 @@
 <?php
 
-use ClaudioDekker\Keystone\Lint\DurationsAsProducts;
+use ClaudioDekker\Keystone\Lint\Checks\DurationsAsProducts;
 use ClaudioDekker\Keystone\Lint\File;
 
 it('fails a duration in seconds that is a whole number of minutes', function () {

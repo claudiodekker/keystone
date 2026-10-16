@@ -1,7 +1,7 @@
 <?php
 
+use ClaudioDekker\Keystone\Lint\Checks\TestsInUnitOrFeature;
 use ClaudioDekker\Keystone\Lint\File;
-use ClaudioDekker\Keystone\Lint\TestsInUnitOrFeature;
 
 it('fails a package test outside Unit and Feature', function (string $path) {
     $file = new File($path, "<?php\n\nit('does a thing', function () {});\n");

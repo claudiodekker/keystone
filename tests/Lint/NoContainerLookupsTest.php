@@ -1,7 +1,7 @@
 <?php
 
+use ClaudioDekker\Keystone\Lint\Checks\NoContainerLookups;
 use ClaudioDekker\Keystone\Lint\File;
-use ClaudioDekker\Keystone\Lint\NoContainerLookups;
 
 it('fails app() and resolve() inside a method', function () {
     $file = new File('packages/keystone/src/Example.php', <<<'PHP'
