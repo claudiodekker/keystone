@@ -3,6 +3,7 @@
 namespace ClaudioDekker\Keystone\Tests;
 
 use ClaudioDekker\Keystone\AppTests\Concerns\AppliesTheBootstrapRules;
+use ClaudioDekker\Keystone\Tests\Fixtures\FixtureServiceProvider;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Orchestra\Testbench\TestCase as BaseTestCase;
@@ -16,7 +17,7 @@ class TestCase extends BaseTestCase
     use LazilyRefreshDatabase;
 
     /**
-     * Get the service providers every package registers through package discovery.
+     * Get the service providers every package registers through package discovery, then the fixture app's.
      *
      * @return list<class-string>
      */
@@ -26,6 +27,7 @@ class TestCase extends BaseTestCase
 
         return collect($files->glob(dirname(__DIR__).'/packages/*/composer.json'))
             ->flatMap(fn (string $path) => $files->json($path)['extra']['laravel']['providers'] ?? [])
+            ->push(FixtureServiceProvider::class)
             ->values()
             ->all();
     }

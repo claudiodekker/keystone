@@ -8,7 +8,8 @@
     },
     "autoload": {
         "psr-4": {
-            "ClaudioDekker\\Keystone\\": "src/"
+            "ClaudioDekker\\Keystone\\": "src/",
+            "ClaudioDekker\\Keystone\\Database\\Factories\\": "database/factories/"
         }
     },
     "extra": {
