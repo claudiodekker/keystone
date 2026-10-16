@@ -5,6 +5,7 @@ namespace ClaudioDekker\Keystone\Tests;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Sleep;
 use LogicException;
 use Orchestra\Testbench\TestCase as BaseTestCase;
 
@@ -22,6 +23,8 @@ class TestCase extends BaseTestCase
 
         Http::preventStrayRequests();
         Queue::createPayloadUsing($this->refuseRealQueuePushes(...));
+        $this->freezeTime();
+        Sleep::fake(syncWithCarbon: true);
     }
 
     /**
