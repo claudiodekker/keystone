@@ -6,7 +6,9 @@ use PhpParser\Node\Stmt\Class_;
 
 dataset('checks', function () {
     $classes = File::read('lint.php')->find(
-        fn (Node $node) => $node instanceof Class_ && $node->extends !== null && ! $node->isAbstract(),
+        fn (Node $node) => $node instanceof Class_
+            && $node->extends !== null
+            && ! $node->isAbstract(),
     );
 
     return collect($classes)
