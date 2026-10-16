@@ -4,6 +4,7 @@ namespace ClaudioDekker\Keystone\Tests;
 
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
@@ -17,6 +18,8 @@ use PHPUnit\Framework\Assert;
  */
 class TestCase extends BaseTestCase
 {
+    use LazilyRefreshDatabase;
+
     /**
      * Set up the app and hold the test to the suite's rules.
      */
