@@ -46,6 +46,16 @@ class Keystone
     }
 
     /**
+     * Forget every registered credential type.
+     *
+     * @internal
+     */
+    public static function flushState(): void
+    {
+        static::$credentialTypes = [];
+    }
+
+    /**
      * Get the guard Keystone's routes sign in with.
      *
      * @internal

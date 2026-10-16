@@ -16,6 +16,14 @@ use LogicException;
 class KeystoneServiceProvider extends ServiceProvider
 {
     /**
+     * Start the app from no registered credential types, so each app registers its own in boot().
+     */
+    public function register(): void
+    {
+        Keystone::flushState();
+    }
+
+    /**
      * Register the keystone guard driver, the migrations and the translations.
      */
     public function boot(): void
