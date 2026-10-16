@@ -13,3 +13,17 @@
 - Fix review feedback in the PR it was left on, even when later PRs extend that code.
 - With more than one PR open, give the review and merge order in the thread.
 - After `CODING_STANDARDS.md` changes, re-review every open PR against it.
+
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues via `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five canonical labels (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: root `GLOSSARY.md` + `docs/adr/`. See `docs/agents/domain.md`.
