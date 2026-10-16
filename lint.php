@@ -895,3 +895,60 @@ class OneClausePerLine extends Check
         return in_array($token->id, [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true);
     }
 }
+
+/**
+ * Require the cases of an enum in alphabetical order.
+ */
+class SortedEnumCases extends Check
+{
+    /**
+     * Get the failure message, naming the fix.
+     */
+    public function message(): string
+    {
+        return "Sort the enum's cases alphabetically.";
+    }
+
+    /**
+     * Get the lines of the cases that sort before the case above them.
+     *
+     * @return list<int>
+     */
+    protected function lines(File $file): array
+    {
+        return collect($file->find(fn (Node $node) => $node instanceof Stmt\Enum_))
+            ->flatMap(fn (Stmt\Enum_ $enum) => $this->unsorted($this->cases($enum)))
+            ->map(fn (Stmt\EnumCase $case) => $case->getStartLine())
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Get the cases of the enum.
+     *
+     * @return list<Stmt\EnumCase>
+     */
+    protected function cases(Stmt\Enum_ $enum): array
+    {
+        return collect($enum->stmts)
+            ->filter(fn (Node $statement) => $statement instanceof Stmt\EnumCase)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Get the cases that sort before the case above them.
+     *
+     * @param  list<Stmt\EnumCase>  $cases
+     * @return list<Stmt\EnumCase>
+     */
+    protected function unsorted(array $cases): array
+    {
+        return collect($cases)
+            ->sliding(2)
+            ->filter(fn (Collection $pair) => strcmp($pair->last()->name->toString(), $pair->first()->name->toString()) < 0)
+            ->map(fn (Collection $pair) => $pair->last())
+            ->values()
+            ->all();
+    }
+}
