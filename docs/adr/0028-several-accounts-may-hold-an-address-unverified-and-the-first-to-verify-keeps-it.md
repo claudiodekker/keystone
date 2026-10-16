@@ -1,6 +1,6 @@
 # Several accounts may hold an address unverified, and the first to verify it keeps it
 
-Keystone lets any number of accounts hold the same address unverified. Only an active account's verified hold blocks others, and so does an active account that holds the address while it holds no verified address, because its unverified addresses count as verified. A deleted or invalidated account blocks no one.
+Keystone lets any number of accounts hold the same address unverified. Only an active account's verified hold blocks others. An account that holds no verified address treats its unverified addresses as verified for itself (sign-in, alerts, recovery), but that is derived, never stored: it sets no `verified_address` and blocks no one. Another account that verifies the address keeps it. A deleted or invalidated account blocks no one.
 
 The first account to verify an address keeps it. In the same transaction, every other account loses its row for that address. Its primary moves to another address, a verified one first. The removal is silent: no event is recorded and no alert is sent. The losing account never proved it owns the address, so it gains nothing from hearing about it. An alert would tell a squatter that the owner just verified the address, which an attacker holding many addresses could act on.
 
@@ -8,9 +8,9 @@ Version 3 kept a unique constraint on each address. It created a placeholder use
 
 ## Consequences
 
-- Registration needs no invalidation. It checks the claimants before it settles, and an active account holding the address with no verified address is a claimant that stops the registration. So an active account that loses a row at registration always keeps a verified address.
+- Registration checks the claimants before it settles, and only an active account holding the address verified stops it. A registration through an emailed link verifies the address, so it takes the row from accounts that only counted it as verified. One left with no address is invalidated, as below. A registration without a link verifies nothing and takes no row.
 - Registration locks the losing accounts in id order before it creates the account, so two finishes can't deadlock on the same set.
-- Verifying an address from its link locks the verifying account and every holder in one statement in id order, checks the claimants under those locks, and takes the row from every holder but the verifier in the same transaction, so two accounts verifying one address can't deadlock and an account that came to claim it stops the verification.
+- Verifying an address from its link locks the verifying account and every holder in one statement in id order, checks the claimants under those locks, and takes the row from every holder but the verifier in the same transaction, so two accounts verifying one address can't deadlock.
 - A finish that loses the race for the address rolls back whole. The losing accounts keep their rows, and nothing is recorded or mailed.
 - An account may find an address it added unverified gone without notice. When losing an address leaves an active account with none, that account's invalidation gets its own event, `account.invalidated`, and no alert. The address it lost is gone, so an alert would go to an inbox that belongs to someone else now.
 - Every path that verifies an address, such as a verification link or recovery, settles the same way through the same removal. A path that can leave an active account with no address must invalidate it.
