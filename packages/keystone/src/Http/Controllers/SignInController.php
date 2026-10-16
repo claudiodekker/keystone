@@ -3,6 +3,8 @@
 namespace ClaudioDekker\Keystone\Http\Controllers;
 
 use ClaudioDekker\Keystone\Http\Pages\SignInPage;
+use ClaudioDekker\Keystone\Keystone;
+use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Session\SessionState;
 use ClaudioDekker\Keystone\SignIn\Refused;
 use ClaudioDekker\Keystone\SignIn\SignIn;
@@ -27,7 +29,11 @@ abstract class SignInController
             return $this->sendAlreadySignedIn($request);
         }
 
-        return $this->sendSignInPage($request, new SignInPage);
+        $page = new SignInPage(
+            types: Keystone::credentialTypes()->shapes(Surface::SIGN_IN),
+        );
+
+        return $this->sendSignInPage($request, $page);
     }
 
     /**

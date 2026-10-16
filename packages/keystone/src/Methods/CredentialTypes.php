@@ -39,4 +39,24 @@ readonly class CredentialTypes
             fn (CredentialType $type) => $type->initiateShape($surface) !== null,
         ));
     }
+
+    /**
+     * Get the name and initiate shape of each type that serves the surface, as a page lists them.
+     *
+     * @return list<array{name: string, shape: string}>
+     */
+    public function shapes(Surface $surface): array
+    {
+        $shapes = [];
+
+        foreach ($this->types as $type) {
+            $shape = $type->initiateShape($surface);
+
+            if ($shape !== null) {
+                $shapes[] = ['name' => $type->name(), 'shape' => $shape->value];
+            }
+        }
+
+        return $shapes;
+    }
 }
