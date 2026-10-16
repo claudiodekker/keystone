@@ -897,27 +897,27 @@ class OneClausePerLine extends Check
 }
 
 /**
- * Require the cases of an enum in alphabetical order.
+ * Check the cases of every enum.
  */
-class SortedEnumCases extends Check
+abstract class EnumCases extends Check
 {
     /**
-     * Get the failure message, naming the fix.
+     * Get the cases of the enum that break the rule.
+     *
+     * @param  list<Stmt\EnumCase>  $cases
+     * @return list<Stmt\EnumCase>
      */
-    public function message(): string
-    {
-        return "Sort the enum's cases alphabetically.";
-    }
+    abstract protected function offending(array $cases): array;
 
     /**
-     * Get the lines of the cases that sort before the case above them.
+     * Get the lines of the enum cases that break the rule.
      *
      * @return list<int>
      */
     protected function lines(File $file): array
     {
         return collect($file->find(fn (Node $node) => $node instanceof Stmt\Enum_))
-            ->flatMap(fn (Stmt\Enum_ $enum) => $this->unsorted($this->cases($enum)))
+            ->flatMap(fn (Stmt\Enum_ $enum) => $this->offending($this->cases($enum)))
             ->map(fn (Stmt\EnumCase $case) => $case->getStartLine())
             ->values()
             ->all();
@@ -935,6 +935,20 @@ class SortedEnumCases extends Check
             ->values()
             ->all();
     }
+}
+
+/**
+ * Require the cases of an enum in alphabetical order.
+ */
+class SortedEnumCases extends EnumCases
+{
+    /**
+     * Get the failure message, naming the fix.
+     */
+    public function message(): string
+    {
+        return "Sort the enum's cases alphabetically.";
+    }
 
     /**
      * Get the cases that sort before the case above them.
@@ -942,7 +956,7 @@ class SortedEnumCases extends Check
      * @param  list<Stmt\EnumCase>  $cases
      * @return list<Stmt\EnumCase>
      */
-    protected function unsorted(array $cases): array
+    protected function offending(array $cases): array
     {
         return collect($cases)
             ->sliding(2)
@@ -950,5 +964,36 @@ class SortedEnumCases extends Check
             ->map(fn (Collection $pair) => $pair->last())
             ->values()
             ->all();
+    }
+}
+
+/**
+ * Require an enum to document every case or none.
+ */
+class EnumCasesDocumentedAlike extends EnumCases
+{
+    /**
+     * Get the failure message, naming the fix.
+     */
+    public function message(): string
+    {
+        return 'Document every case of the enum, or none.';
+    }
+
+    /**
+     * Get the undocumented cases of an enum that documents some of its cases.
+     *
+     * @param  list<Stmt\EnumCase>  $cases
+     * @return list<Stmt\EnumCase>
+     */
+    protected function offending(array $cases): array
+    {
+        $undocumented = collect($cases)->filter(fn (Stmt\EnumCase $case) => $case->getDocComment() === null);
+
+        if ($undocumented->count() === count($cases)) {
+            return [];
+        }
+
+        return $undocumented->values()->all();
     }
 }
