@@ -31,7 +31,10 @@
     "autoload-dev": {
         "psr-4": {
             "ClaudioDekker\\Keystone\\Tests\\": "tests/"
-        }
+        },
+        "files": [
+            "lint.php"
+        ]
     },
     "scripts": {
         "check": [
