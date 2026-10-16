@@ -6,6 +6,7 @@ use Illuminate\Filesystem\Filesystem;
 use Illuminate\Process\Factory as ProcessFactory;
 use PhpParser\Node;
 use PhpParser\Node\Expr;
+use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitor\NameResolver;
@@ -34,7 +35,7 @@ class File
     /**
      * The file's statements, with names resolved.
      *
-     * @var array<Node\Stmt>|null
+     * @var array<Stmt>|null
      */
     protected ?array $statements = null;
 
@@ -74,7 +75,7 @@ class File
     /**
      * Get the file's statements, with every class and function name resolved.
      *
-     * @return array<Node\Stmt>
+     * @return array<Stmt>
      */
     public function statements(): array
     {
@@ -426,5 +427,46 @@ class NoPackageDependencies extends Check
             ->flatMap(fn (string $path) => array_keys($files->json($path)['autoload']['psr-4'] ?? []))
             ->values()
             ->all();
+    }
+}
+
+/**
+ * Refuse a final declaration in src.
+ */
+class NoFinal extends Check
+{
+    /**
+     * The paths the check reads, as fnmatch patterns from the repository root.
+     *
+     * @var list<string>
+     */
+    protected array $paths = ['packages/*/src/*.php'];
+
+    /**
+     * Get the failure message, naming the fix.
+     */
+    public function message(): string
+    {
+        return "Remove final; apps extend Keystone's classes.";
+    }
+
+    /**
+     * Get the lines that declare a final class, method, constant or property.
+     *
+     * @return list<int>
+     */
+    protected function lines(File $file): array
+    {
+        return $file->lines($file->find(fn (Node $node) => $this->isFinal($node)));
+    }
+
+    /**
+     * Determine if the node declares something final.
+     */
+    protected function isFinal(Node $node): bool
+    {
+        $declarations = [Stmt\Class_::class, Stmt\ClassConst::class, Stmt\ClassMethod::class, Stmt\Property::class];
+
+        return in_array($node::class, $declarations, true) && $node->isFinal();
     }
 }
