@@ -1,0 +1,21 @@
+version: 2
+
+updates:
+    - package-ecosystem: composer
+      directory: /
+      schedule:
+          interval: weekly
+
+    - package-ecosystem: npm
+      directory: /
+      schedule:
+          interval: weekly
+      ignore:
+          # vue-tsc can't run on TypeScript 7 yet
+          - dependency-name: typescript
+            versions: ['>=7']
+
+    - package-ecosystem: github-actions
+      directory: /
+      schedule:
+          interval: weekly

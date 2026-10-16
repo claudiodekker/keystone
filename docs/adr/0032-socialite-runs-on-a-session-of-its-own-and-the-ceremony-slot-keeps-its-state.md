@@ -1,0 +1,17 @@
+# Socialite runs on a session of its own, and the ceremony slot keeps its state
+
+A credential type never touches the session: what it needs between two requests lives in a ceremony slot, which core encrypts, keys by type and purpose, ends with the phase that owns it, and clears on every change of auth level (ADR 0021, ADR 0023). `keystone-oauth` runs on Laravel Socialite, whose `redirect()` writes `state` and the PKCE `code_verifier` straight into the request's session under fixed keys, and whose `user()` reads them back. This decides how the two fit.
+
+- **Socialite never sees the real session.** Every Socialite driver Keystone uses runs against a detached in-memory session, and the state and the verifier are read out of it after the redirect. The exchange runs on a fresh in-memory session seeded with the verifier. Keystone never calls `user()`: core has already compared the state, and `user()` would only read it back from a session.
+- **The ceremony slot is the only in-flight storage.** Core keeps the state, and the type keeps the provider, the verifier and the redirect URI, in one slot per type and flow. The slot is encrypted, ends after 10 minutes or with the sudo it was opened under, closes on every auth-level change, and is replaced by the next start. A second type's slot, or the same type's slot for another flow, never collides with it.
+- **Core owns the state check.** Core refuses a state shorter than 32 characters, which also catches a driver made `stateless()`. The callback is taken only when its `state` matches in constant time. A matching return closes the slot before anything else, so a replay finds nothing. A return with another state is refused without calling the type and leaves the slot open, so a forged return can't cancel the real one.
+- **Every leg gets a pristine driver.** Nothing an app set on its own cached driver, `stateless()` or `with()`, carries over. Keystone always enables PKCE, sets exactly the configured scopes and the flow's callback URL, and passes `with()` only `[]` or, for a sudo flow, `prompt=login` and `max_age=0`. `with()` replaces the parameters instead of merging them, and nothing else reaches it, so `state`, `redirect_uri` and `client_id` can't be overridden.
+
+The alternative was to let Socialite write the real session and move the two keys into the slot right after. It lost because the keys sit in the session unencrypted between the write and the move, a failure in between leaves them there, and every later Socialite call in the app could read or overwrite them. A second alternative, `stateless()` with core passing `state` through `with()`, lost because Socialite also merges `with()` into the token request, and because it switches off the check that keeps `stateless()` from ever being used.
+
+## Consequences
+
+- An app's own Socialite usage, such as social sign-in built outside Keystone, can't disturb a Keystone link in progress, and Keystone never writes `state` or `code_verifier` into the session it would read.
+- `keystone-oauth` depends on Socialite's public driver API and on `redirect()` writing its keys to the request's session. A Socialite major that changes those needs the package changed with it.
+- A driver an app adds with `Socialite::extend()` works as long as it extends `Laravel\Socialite\Two\AbstractProvider`. An OAuth 1 driver can't start.
+- The access token lives only inside the exchange. Keystone can't call the provider's API on the user's behalf later, and stores nothing it would have to revoke.
