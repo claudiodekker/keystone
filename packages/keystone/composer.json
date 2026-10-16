@@ -10,5 +10,12 @@
         "psr-4": {
             "ClaudioDekker\\Keystone\\": "src/"
         }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "ClaudioDekker\\Keystone\\KeystoneServiceProvider"
+            ]
+        }
     }
 }
