@@ -13,12 +13,26 @@ use ClaudioDekker\Keystone\Models\UserEmail;
 class AccountLookup
 {
     /**
-     * Resolve the account the identifier names, or null when it names none.
+     * Resolve the account the identifier names, or null when it names none or more than one.
+     *
+     * An address resolves to the account holding it verified; when none does, only to the one account that counts it as verified.
      */
     public function resolve(string $identifier): ?KeystoneUser
     {
-        $email = UserEmail::query()->where('address', EmailAddress::normalize($identifier))->first();
+        $address = EmailAddress::normalize($identifier);
 
-        return $email?->user;
+        $verified = UserEmail::query()->whereVerified($address)->first();
+
+        if ($verified !== null) {
+            return $verified->user;
+        }
+
+        $holders = UserEmail::query()->whereCountingAsVerified($address)->limit(2)->get();
+
+        if ($holders->count() !== 1) {
+            return null;
+        }
+
+        return $holders->first()?->user;
     }
 }

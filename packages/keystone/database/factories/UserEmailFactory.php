@@ -31,8 +31,8 @@ class UserEmailFactory extends Factory
      */
     public function verified(): static
     {
-        return $this->state(fn (array $attributes) => [
-            'verified_address' => $attributes['address'],
+        return $this->state([
+            'verified_address' => fn (array $attributes) => $attributes['address'],
         ]);
     }
 }

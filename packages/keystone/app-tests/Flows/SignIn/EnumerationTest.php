@@ -22,9 +22,30 @@ it('answers an unknown address exactly like a wrong secret', function () {
     $this->assertIndistinguishable($wrongSecret, $unknown);
 })->group('SI-3', 'SI-11');
 
+it('answers an address two accounts count as verified exactly like a wrong secret', function () {
+    $user = $this->createUser();
+    UserEmail::factory()->for($user, 'user')->verified()->create(['address' => 'ada@example.com']);
+    UserEmail::factory()->count(2)->create(['address' => 'shared@example.com']);
+    $support = $this->supportFor(Surface::SIGN_IN);
+    $support->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $wrongSecret = $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->rejectedProof(Surface::SIGN_IN),
+    ]);
+
+    $unresolved = $this->freshBrowser()->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'shared@example.com',
+        ...$support->rejectedProof(Surface::SIGN_IN),
+    ]);
+
+    $this->assertIndistinguishable($wrongSecret, $unresolved);
+})->group('SI-3', 'SI-8', 'SI-11');
+
 it('takes at least 300 ms to refuse', function (string $identifier) {
     $user = $this->createUser();
     UserEmail::factory()->for($user, 'user')->verified()->create(['address' => 'ada@example.com']);
+    UserEmail::factory()->count(2)->create(['address' => 'shared@example.com']);
     $support = $this->supportFor(Surface::SIGN_IN);
     $support->arrangeCredential(Surface::SIGN_IN, $user);
 
@@ -37,4 +58,5 @@ it('takes at least 300 ms to refuse', function (string $identifier) {
 })->with([
     'a wrong secret' => 'ada@example.com',
     'an unknown address' => 'grace@example.com',
+    'an unresolved address' => 'shared@example.com',
 ])->group('SI-3');

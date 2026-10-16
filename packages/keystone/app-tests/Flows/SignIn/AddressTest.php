@@ -49,6 +49,67 @@ it('folds no accents away', function () {
     $this->assertSignInRefused($response, __('keystone::messages.credentials-rejected'));
 })->group('H4');
 
+it("doesn't sign in with an unverified address while the account holds a verified one", function () {
+    $user = $this->createUser();
+    UserEmail::factory()->for($user, 'user')->verified()->create(['address' => 'ada@example.com']);
+    UserEmail::factory()->for($user, 'user')->create(['address' => 'ada@work.example']);
+    $support = $this->supportFor(Surface::SIGN_IN);
+    $support->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $response = $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@work.example',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $this->assertSignInRefused($response, __('keystone::messages.credentials-rejected'));
+})->group('SI-8');
+
+it('signs in with an unverified address while the account holds no verified one', function () {
+    $user = $this->createUser();
+    UserEmail::factory()->for($user, 'user')->create(['address' => 'ada@example.com']);
+    $support = $this->supportFor(Surface::SIGN_IN);
+    $support->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $response = $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $this->assertSignedIn($response, '/');
+});
+
+it('signs in neither account that counts one address as verified', function () {
+    $ada = $this->createUser();
+    $grace = $this->createUser();
+    UserEmail::factory()->for($ada, 'user')->create(['address' => 'shared@example.com']);
+    UserEmail::factory()->for($grace, 'user')->create(['address' => 'shared@example.com']);
+    $support = $this->supportFor(Surface::SIGN_IN);
+    $support->arrangeCredential(Surface::SIGN_IN, $ada);
+
+    $response = $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'shared@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $ada),
+    ]);
+
+    $this->assertSignInRefused($response, __('keystone::messages.credentials-rejected'));
+})->group('SI-8');
+
+it("doesn't sign in with an address another account holds verified", function () {
+    $ada = $this->createUser();
+    $grace = $this->createUser();
+    UserEmail::factory()->for($grace, 'user')->create(['address' => 'shared@example.com']);
+    UserEmail::factory()->for($ada, 'user')->verified()->create(['address' => 'shared@example.com']);
+    $support = $this->supportFor(Surface::SIGN_IN);
+    $support->arrangeCredential(Surface::SIGN_IN, $grace);
+
+    $response = $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'shared@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $grace),
+    ]);
+
+    $this->assertSignInRefused($response, __('keystone::messages.credentials-rejected'));
+})->group('SI-8');
+
 it('refuses an identifier that is no address like an unknown one', function () {
     $user = $this->createUser();
     UserEmail::factory()->for($user, 'user')->verified()->create(['address' => 'ada@example.com']);

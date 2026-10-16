@@ -6,7 +6,9 @@ use ClaudioDekker\Keystone\Accounts\EmailAddress;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Database\Factories\UserEmailFactory;
 use ClaudioDekker\Keystone\Keystone;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -41,5 +43,39 @@ class UserEmail extends Model
     protected function address(): Attribute
     {
         return Attribute::set(fn (string $address) => EmailAddress::normalize($address));
+    }
+
+    /**
+     * Store the verified address normalized, like the address.
+     *
+     * @return Attribute<never, string>
+     */
+    protected function verifiedAddress(): Attribute
+    {
+        return Attribute::set(fn (string $address) => EmailAddress::normalize($address));
+    }
+
+    /**
+     * Scope the query to the row that holds the address verified.
+     *
+     * @param  Builder<static>  $query
+     */
+    #[Scope]
+    protected function whereVerified(Builder $query, string $address): void
+    {
+        $query->where('verified_address', $address);
+    }
+
+    /**
+     * Scope the query to the rows of the address whose account holds no verified address at all.
+     *
+     * Such an account counts its unverified addresses as verified, as long as no account holds one verified.
+     *
+     * @param  Builder<static>  $query
+     */
+    #[Scope]
+    protected function whereCountingAsVerified(Builder $query, string $address): void
+    {
+        $query->where('address', $address)->whereNotIn('user_id', static::query()->select('user_id')->whereNotNull('verified_address'));
     }
 }
