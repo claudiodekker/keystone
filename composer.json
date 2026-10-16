@@ -30,6 +30,7 @@
     },
     "autoload-dev": {
         "psr-4": {
+            "ClaudioDekker\\Keystone\\AppTests\\": "packages/keystone/app-tests/",
             "ClaudioDekker\\Keystone\\Lint\\": "lint/",
             "ClaudioDekker\\Keystone\\Tests\\": "tests/"
         }
