@@ -1,7 +1,6 @@
 <?php
 
 use ClaudioDekker\Keystone\Methods\Surface;
-use ClaudioDekker\Keystone\Models\UserEmail;
 
 it('requires an identifier and the fields the type names', function () {
     $support = $this->supportFor(Surface::SIGN_IN);
@@ -39,11 +38,11 @@ it('refuses an identifier longer than 255 characters, flashing back only the ide
     $this->assertSignInInvalid($response, [
         'identifier' => __('validation.max.string', ['attribute' => 'identifier', 'max' => 255]),
     ]);
-})->group('MF-12');
+});
 
 it('takes an identifier of 255 characters', function () {
     $user = $this->createUser();
-    UserEmail::factory()->for($user, 'user')->verified()->create(['address' => str_repeat('a', 243).'@example.com']);
+    $this->addVerifiedAddress($user, str_repeat('a', 243).'@example.com');
     $support = $this->supportFor(Surface::SIGN_IN);
     $support->arrangeCredential(Surface::SIGN_IN, $user);
 

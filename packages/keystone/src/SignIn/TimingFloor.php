@@ -10,9 +10,9 @@ use Throwable;
 /**
  * Hold a step's answer until a fixed time has passed since it started, so every refusal takes as long.
  *
- * It measures with the app's clock and waits with Sleep, so under a frozen test clock the work takes
- * no time and the wait moves the clock by exactly the floor. Laravel's Timebox measures with
- * microtime(), which a faked sleep doesn't move.
+ * It measures with the app's clock and waits with Sleep, so on a frozen test clock the
+ * work takes no time, and the wait moves the clock by exactly the floor. Laravel's
+ * Timebox instead measures with microtime(), which a faked sleep doesn't move.
  *
  * @internal
  */

@@ -12,7 +12,7 @@ it('keeps two addresses that differ only by an accent apart, on every engine', f
     $email = UserEmail::factory()->for(User::factory(), 'user')->verified()->create(['address' => 'rene@example.com']);
 
     expect(UserEmail::query()->whereVerified('rene@example.com')->sole()->is($email))->toBeTrue();
-})->group('H4');
+});
 
 it('lets one account at a time hold an address verified', function () {
     UserEmail::factory()->for(User::factory(), 'user')->verified()->create(['address' => 'ada@example.com']);

@@ -11,8 +11,9 @@ use Symfony\Component\HttpFoundation\Response;
 /**
  * A test response that keeps the session as its own request left it, and how long the request took on the test clock.
  *
- * Each request of an AppTest gets a session store of its own, so the response reads the session from
- * the store its request used, never from whatever store a later request built.
+ * Every request of an AppTest shares the app's one session store, so each
+ * response keeps a copy of the session as its request left it. Reading
+ * the store afterwards would show what the next request put there.
  *
  * @api
  *

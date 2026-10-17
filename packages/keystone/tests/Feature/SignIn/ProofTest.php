@@ -25,7 +25,7 @@ it("signs nobody in with a proof of another account's credential", function () {
 
     expect($outcome)->toBeInstanceOf(Refused::class)
         ->and(Keystone::guard()->check())->toBeFalse();
-})->group('SI-9', 'MF-10');
+});
 
 it("signs nobody in with a proof of the account's credential of another type", function () {
     $ada = User::factory()->create();
@@ -41,7 +41,7 @@ it("signs nobody in with a proof of the account's credential of another type", f
 
     expect($outcome)->toBeInstanceOf(Refused::class)
         ->and(Keystone::guard()->check())->toBeFalse();
-})->group('SI-9');
+});
 
 it('signs nobody in with a proof when the identifier names no account', function () {
     $grace = User::factory()->create();
@@ -56,7 +56,7 @@ it('signs nobody in with a proof when the identifier names no account', function
 
     expect($outcome)->toBeInstanceOf(Refused::class)
         ->and(Keystone::guard()->check())->toBeFalse();
-})->group('SI-9');
+});
 
 it('still calls the type, with no credentials, when the identifier names no account', function () {
     $type = Keystone::credentialTypes()->find('form', Surface::SIGN_IN);
@@ -69,7 +69,7 @@ it('still calls the type, with no credentials, when the identifier names no acco
     expect($type->verifications())->toHaveCount(1)
         ->and($type->verifications()[0]->credentials)->toBe([])
         ->and($type->verifications()[0]->input)->toBe(['secret' => 'any horse']);
-})->group('SI-3');
+});
 
 it('makes the type compare against a decoy secret when the identifier names no account', function () {
     $type = Keystone::credentialTypes()->find('form', Surface::SIGN_IN);
@@ -80,4 +80,4 @@ it('makes the type compare against a decoy secret when the identifier names no a
     ]);
 
     expect($type->comparisons())->toBe(1);
-})->group('SI-3');
+});

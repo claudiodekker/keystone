@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Create the fixture app's user table, with the columns ADR 0003 leaves in place.
+     * Create the fixture app's user table, with the columns Laravel's default users table has.
      */
     public function up(): void
     {

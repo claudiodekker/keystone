@@ -11,7 +11,7 @@ it('compares addresses as binary on each engine CI runs', function (string $conn
     'MySQL' => ['mysql', 'utf8mb4_bin'],
     'Postgres' => ['pgsql', 'C'],
     'SQLite' => ['sqlite', 'BINARY'],
-])->group('H4');
+]);
 
 it('names the engines it supports when the default connection is another', function () {
     config(['database.default' => 'sqlsrv']);

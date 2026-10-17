@@ -1,7 +1,6 @@
 <?php
 
 use ClaudioDekker\Keystone\Methods\Surface;
-use ClaudioDekker\Keystone\Models\UserEmail;
 
 beforeEach(function () {
     if ($this->supportsFor(Surface::SIGN_IN) === []) {
@@ -12,11 +11,11 @@ beforeEach(function () {
 it('signs in with a valid proof of every installed type that serves sign-in', function () {
     foreach ($this->supportsFor(Surface::SIGN_IN) as $support) {
         $user = $this->createUser();
-        $email = UserEmail::factory()->for($user, 'user')->verified()->create();
+        $address = $this->addVerifiedAddress($user);
         $support->arrangeCredential(Surface::SIGN_IN, $user);
 
-        $response = $this->freshBrowser()->post(route('login.submit', $support->type()->name()), [
-            'identifier' => $email->address,
+        $response = $this->withoutCookies()->post(route('login.submit', $support->type()->name()), [
+            'identifier' => $address,
             ...$support->validProof(Surface::SIGN_IN, $user),
         ]);
 
@@ -27,11 +26,11 @@ it('signs in with a valid proof of every installed type that serves sign-in', fu
 it('refuses a rejected proof of every installed type that serves sign-in', function () {
     foreach ($this->supportsFor(Surface::SIGN_IN) as $support) {
         $user = $this->createUser();
-        $email = UserEmail::factory()->for($user, 'user')->verified()->create();
+        $address = $this->addVerifiedAddress($user);
         $support->arrangeCredential(Surface::SIGN_IN, $user);
 
-        $response = $this->freshBrowser()->post(route('login.submit', $support->type()->name()), [
-            'identifier' => $email->address,
+        $response = $this->withoutCookies()->post(route('login.submit', $support->type()->name()), [
+            'identifier' => $address,
             ...$support->rejectedProof(Surface::SIGN_IN),
         ]);
 
@@ -42,20 +41,20 @@ it('refuses a rejected proof of every installed type that serves sign-in', funct
 it('answers no account exactly like a rejected proof, for every installed type that serves sign-in', function () {
     foreach ($this->supportsFor(Surface::SIGN_IN) as $support) {
         $user = $this->createUser();
-        $email = UserEmail::factory()->for($user, 'user')->verified()->create();
+        $address = $this->addVerifiedAddress($user);
         $support->arrangeCredential(Surface::SIGN_IN, $user);
 
-        $rejected = $this->freshBrowser()->post(route('login.submit', $support->type()->name()), [
-            'identifier' => $email->address,
+        $rejected = $this->withoutCookies()->post(route('login.submit', $support->type()->name()), [
+            'identifier' => $address,
             ...$support->rejectedProof(Surface::SIGN_IN),
         ]);
 
-        $missing = $this->freshBrowser()->post(route('login.submit', $support->type()->name()), [
-            'identifier' => 'nobody.'.$email->address,
+        $missing = $this->withoutCookies()->post(route('login.submit', $support->type()->name()), [
+            'identifier' => 'nobody.'.$address,
             ...$support->rejectedProof(Surface::SIGN_IN),
         ]);
 
         $this->assertIndistinguishable($rejected, $missing);
         $this->assertTookAtLeast($missing, 300);
     }
-})->group('SI-3', 'SI-11');
+});

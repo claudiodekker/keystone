@@ -6,11 +6,11 @@ use ClaudioDekker\Keystone\AppTests\Assertions\GuestStepAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\SignInAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\SignOutAssertions;
 use ClaudioDekker\Keystone\AppTests\KeystoneTestResponse;
-use ClaudioDekker\Keystone\AppTests\Support\Browser;
 use ClaudioDekker\Keystone\AppTests\Support\CredentialTypeSupport;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\Surface;
+use ClaudioDekker\Keystone\Models\UserEmail;
 use Closure;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
@@ -22,10 +22,9 @@ use Symfony\Component\HttpFoundation\Cookie;
 /**
  * Drive the app the way a user does, and check its answers through assertions the app can override.
  *
- * Every request starts afresh, like a new HTTP request from one browser: the guards are built again, the
- * session holds only what its storage keeps for the browser's cookie, and only the cookies earlier
- * responses set carry over. So the next request sees a sign-in only when the session really stored
- * it.
+ * Each request starts afresh: the guards are built again and only the cookies that earlier
+ * responses set carry over, so the session holds only what its storage keeps for those
+ * cookies. The next request sees a sign-in only when the session really stored it.
  *
  * @api
  */
@@ -55,6 +54,31 @@ trait InteractsWithKeystone
         }
 
         return $model::factory()->create($attributes);
+    }
+
+    /**
+     * Give the user a verified address, a made-up one unless given, and return it as stored.
+     */
+    public function addVerifiedAddress(KeystoneUser $user, ?string $address = null): string
+    {
+        $email = UserEmail::factory()
+            ->for($user, 'user')
+            ->verified()
+            ->create(array_filter(['address' => $address]));
+
+        return $email->address;
+    }
+
+    /**
+     * Give the user an address nobody verified, and return it as stored.
+     */
+    public function addUnverifiedAddress(KeystoneUser $user, string $address): string
+    {
+        $email = UserEmail::factory()
+            ->for($user, 'user')
+            ->create(['address' => $address]);
+
+        return $email->address;
     }
 
     /**
@@ -92,11 +116,11 @@ trait InteractsWithKeystone
     }
 
     /**
-     * Continue in a browser that holds no cookies, as someone else would.
+     * Send the next requests without the cookies earlier responses set, as someone else would.
      *
      * @return $this
      */
-    public function freshBrowser(): static
+    public function withoutCookies(): static
     {
         $this->defaultCookies = [];
 
@@ -104,27 +128,17 @@ trait InteractsWithKeystone
     }
 
     /**
-     * Get the cookies the browser holds now, to come back with later.
-     */
-    public function browser(): Browser
-    {
-        return new Browser($this->defaultCookies);
-    }
-
-    /**
-     * Continue in a browser that holds the given cookies, as someone coming back with old cookies would.
+     * Get the cookies the next request sends, to send them again later with withCookies().
      *
-     * @return $this
+     * @return array<string, string>
      */
-    public function returnWith(Browser $browser): static
+    public function cookies(): array
     {
-        $this->defaultCookies = $browser->cookies;
-
-        return $this;
+        return $this->defaultCookies;
     }
 
     /**
-     * Keep the URL as intended in the browser's session, where Laravel's guest redirect keeps it before sending a guest to sign in.
+     * Keep the URL as intended in the session, where Laravel's guest redirect keeps it before sending a guest to sign in.
      *
      * @return $this
      */
@@ -136,7 +150,7 @@ trait InteractsWithKeystone
     }
 
     /**
-     * Run app code inside a request from the browser, so whatever it leaves in the session reaches the next request.
+     * Run app code inside a request, so whatever it leaves in the session reaches the next request.
      *
      * @template TResult
      *
@@ -162,7 +176,7 @@ trait InteractsWithKeystone
     }
 
     /**
-     * Assert the two responses match in status, redirect, flashed data, and header and cookie names.
+     * Assert the two responses match in status, redirect, flashed data, header and cookie names, and the time they took.
      */
     public function assertIndistinguishable(KeystoneTestResponse $existing, KeystoneTestResponse $missing): void
     {
@@ -171,6 +185,7 @@ trait InteractsWithKeystone
         Assert::assertEquals($this->comparableFlash($existing), $this->comparableFlash($missing), 'The responses differ in flashed data.');
         Assert::assertSame($this->headerNames($existing), $this->headerNames($missing), 'The responses differ in header names.');
         Assert::assertSame($this->cookieNames($existing), $this->cookieNames($missing), 'The responses differ in Set-Cookie names.');
+        Assert::assertSame($existing->milliseconds(), $missing->milliseconds(), 'The responses differ in the time they took on the test clock.');
     }
 
     /**
@@ -182,7 +197,7 @@ trait InteractsWithKeystone
     }
 
     /**
-     * Send the request from the browser, starting the app's request state afresh.
+     * Send the request with the cookies earlier responses set, starting the app's request state afresh.
      */
     public function call($method, $uri, $parameters = [], $cookies = [], $files = [], $server = [], $content = null): KeystoneTestResponse
     {
@@ -213,7 +228,7 @@ trait InteractsWithKeystone
     }
 
     /**
-     * Keep the cookies the response set for the browser's next request.
+     * Keep the cookies the response set for the next request.
      */
     protected function keepCookies(TestResponse $response): void
     {

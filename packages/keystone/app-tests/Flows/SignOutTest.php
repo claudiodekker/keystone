@@ -1,7 +1,6 @@
 <?php
 
 use ClaudioDekker\Keystone\Methods\Surface;
-use ClaudioDekker\Keystone\Models\UserEmail;
 use Illuminate\Auth\Events\Logout;
 use Illuminate\Support\Facades\Event;
 
@@ -11,7 +10,7 @@ beforeEach(function () {
 
 it('signs the user out, and the next request is a guest again', function () {
     $user = $this->createUser();
-    UserEmail::factory()->for($user, 'user')->verified()->create(['address' => 'ada@example.com']);
+    $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::SIGN_IN);
     $support->arrangeCredential(Surface::SIGN_IN, $user);
     $this->post(route('login.submit', $support->type()->name()), [
@@ -29,7 +28,7 @@ it('signs the user out, and the next request is a guest again', function () {
 
 it('ends the whole session, so nothing it held outlives signing out', function () {
     $user = $this->createUser();
-    UserEmail::factory()->for($user, 'user')->verified()->create(['address' => 'ada@example.com']);
+    $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::SIGN_IN);
     $support->arrangeCredential(Surface::SIGN_IN, $user);
     $this->post(route('login.submit', $support->type()->name()), [
@@ -38,11 +37,11 @@ it('ends the whole session, so nothing it held outlives signing out', function (
     ]);
 
     $this->arrivingFrom(url('/reports'));
-    $signedIn = $this->browser();
+    $signedIn = $this->cookies();
 
     $this->post(route('logout'));
 
-    $next = $this->returnWith($signedIn)->post(route('login.submit', $support->type()->name()), [
+    $next = $this->withCookies($signedIn)->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada@example.com',
         ...$support->validProof(Surface::SIGN_IN, $user),
     ]);
@@ -52,7 +51,7 @@ it('ends the whole session, so nothing it held outlives signing out', function (
 
 it("dispatches Laravel's Logout event for the user who signed out", function () {
     $user = $this->createUser();
-    UserEmail::factory()->for($user, 'user')->verified()->create(['address' => 'ada@example.com']);
+    $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::SIGN_IN);
     $support->arrangeCredential(Surface::SIGN_IN, $user);
     $this->post(route('login.submit', $support->type()->name()), [

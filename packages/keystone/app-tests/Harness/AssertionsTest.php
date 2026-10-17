@@ -2,7 +2,6 @@
 
 use ClaudioDekker\Keystone\AppTests\KeystoneTestResponse;
 use ClaudioDekker\Keystone\Methods\Surface;
-use ClaudioDekker\Keystone\Models\UserEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Session\ArraySessionHandler;
 use Illuminate\Session\Store;
@@ -31,7 +30,7 @@ it('fails assertAlreadySignedIn on the sign-in page', function () {
 
 it('fails assertSignedIn on a refusal', function () {
     $user = $this->createUser();
-    UserEmail::factory()->for($user, 'user')->verified()->create(['address' => 'ada@example.com']);
+    $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::SIGN_IN);
     $support->arrangeCredential(Surface::SIGN_IN, $user);
 
@@ -45,7 +44,7 @@ it('fails assertSignedIn on a refusal', function () {
 
 it('fails assertSignedIn on a sign-in that lands somewhere else', function () {
     $user = $this->createUser();
-    UserEmail::factory()->for($user, 'user')->verified()->create(['address' => 'ada@example.com']);
+    $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::SIGN_IN);
     $support->arrangeCredential(Surface::SIGN_IN, $user);
     $this->arrivingFrom(url('/reports'));
@@ -60,7 +59,7 @@ it('fails assertSignedIn on a sign-in that lands somewhere else', function () {
 
 it('fails assertSignInRefused on a sign-in', function () {
     $user = $this->createUser();
-    UserEmail::factory()->for($user, 'user')->verified()->create(['address' => 'ada@example.com']);
+    $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::SIGN_IN);
     $support->arrangeCredential(Surface::SIGN_IN, $user);
 
@@ -74,7 +73,7 @@ it('fails assertSignInRefused on a sign-in', function () {
 
 it('fails assertSignInRefused on a refusal with another message', function () {
     $user = $this->createUser();
-    UserEmail::factory()->for($user, 'user')->verified()->create(['address' => 'ada@example.com']);
+    $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::SIGN_IN);
     $support->arrangeCredential(Surface::SIGN_IN, $user);
 
@@ -105,7 +104,7 @@ it('fails assertSignInRefused on a refusal that flashes back no identifier', fun
 
 it('fails assertSignInInvalid on a refusal', function () {
     $user = $this->createUser();
-    UserEmail::factory()->for($user, 'user')->verified()->create(['address' => 'ada@example.com']);
+    $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::SIGN_IN);
     $support->arrangeCredential(Surface::SIGN_IN, $user);
 

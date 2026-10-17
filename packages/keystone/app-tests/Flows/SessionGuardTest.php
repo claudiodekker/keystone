@@ -28,7 +28,7 @@ it('signs nobody in through a SessionGuard method, even with a hash in users.pas
     'once' => fn (KeystoneUser $user) => Auth::once(['email' => 'ada@example.com', 'password' => 'legacy-secret']),
     'onceUsingId' => fn (KeystoneUser $user) => Auth::onceUsingId($user->getAuthIdentifier()),
     'validate' => fn (KeystoneUser $user) => Auth::validate(['email' => 'ada@example.com', 'password' => 'legacy-secret']),
-])->group('H2');
+]);
 
 it('refuses HTTP Basic credentials, even with a hash in users.password', function (Closure $signIn) {
     $this->createUser(['email' => 'ada@example.com', 'password' => Hash::make('legacy-secret')]);
@@ -39,7 +39,7 @@ it('refuses HTTP Basic credentials, even with a hash in users.password', functio
 })->with([
     'basic' => fn () => Auth::setRequest(Request::create('/', server: ['PHP_AUTH_USER' => 'ada@example.com', 'PHP_AUTH_PW' => 'legacy-secret']))->basic(),
     'onceBasic' => fn () => Auth::setRequest(Request::create('/', server: ['PHP_AUTH_USER' => 'ada@example.com', 'PHP_AUTH_PW' => 'legacy-secret']))->onceBasic(),
-])->group('H2');
+]);
 
 it('throws from Auth::login(), which has no way to report a refusal', function () {
     $user = $this->createUser();
@@ -47,7 +47,7 @@ it('throws from Auth::login(), which has no way to report a refusal', function (
     $login = fn () => $this->duringRequest(fn () => Auth::login($user));
 
     expect($login)->toThrow(LogicException::class, 'Keystone signs users in. Auth::login() cannot report a refusal.');
-})->group('H2');
+});
 
 it('signs no other device out through Auth::logoutOtherDevices()', function () {
     $user = $this->createUser(['email' => 'ada@example.com', 'password' => Hash::make('legacy-secret')]);
@@ -55,7 +55,7 @@ it('signs no other device out through Auth::logoutOtherDevices()', function () {
     $this->actingAs($user)->duringRequest(fn () => Auth::logoutOtherDevices('legacy-secret'));
 
     Event::assertNotDispatched(OtherDeviceLogout::class);
-})->group('H2');
+});
 
 it("restores no session from Laravel's remember-me cookie", function () {
     $user = $this->createUser(['email' => 'ada@example.com', 'password' => Hash::make('legacy-secret'), 'remember_token' => 'legacy-token']);
@@ -65,7 +65,7 @@ it("restores no session from Laravel's remember-me cookie", function () {
     $response = $this->get(route('login'));
 
     $this->assertSignInPage($response);
-})->group('H2');
+});
 
 it('still lets a test sign a user in with actingAs()', function () {
     $user = $this->createUser();

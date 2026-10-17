@@ -1,11 +1,10 @@
 <?php
 
 use ClaudioDekker\Keystone\Methods\Surface;
-use ClaudioDekker\Keystone\Models\UserEmail;
 
 it('answers an unknown address exactly like a wrong secret', function () {
     $user = $this->createUser();
-    UserEmail::factory()->for($user, 'user')->verified()->create(['address' => 'ada@example.com']);
+    $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::SIGN_IN);
     $support->arrangeCredential(Surface::SIGN_IN, $user);
 
@@ -14,18 +13,19 @@ it('answers an unknown address exactly like a wrong secret', function () {
         ...$support->rejectedProof(Surface::SIGN_IN),
     ]);
 
-    $unknown = $this->freshBrowser()->post(route('login.submit', $support->type()->name()), [
+    $unknown = $this->withoutCookies()->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'grace@example.com',
         ...$support->rejectedProof(Surface::SIGN_IN),
     ]);
 
     $this->assertIndistinguishable($wrongSecret, $unknown);
-})->group('SI-3', 'SI-11');
+});
 
 it('answers an address two accounts count as verified exactly like a wrong secret', function () {
     $user = $this->createUser();
-    UserEmail::factory()->for($user, 'user')->verified()->create(['address' => 'ada@example.com']);
-    UserEmail::factory()->count(2)->create(['address' => 'shared@example.com']);
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $this->addUnverifiedAddress($this->createUser(), 'shared@example.com');
+    $this->addUnverifiedAddress($this->createUser(), 'shared@example.com');
     $support = $this->supportFor(Surface::SIGN_IN);
     $support->arrangeCredential(Surface::SIGN_IN, $user);
 
@@ -34,18 +34,19 @@ it('answers an address two accounts count as verified exactly like a wrong secre
         ...$support->rejectedProof(Surface::SIGN_IN),
     ]);
 
-    $unresolved = $this->freshBrowser()->post(route('login.submit', $support->type()->name()), [
+    $unresolved = $this->withoutCookies()->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'shared@example.com',
         ...$support->rejectedProof(Surface::SIGN_IN),
     ]);
 
     $this->assertIndistinguishable($wrongSecret, $unresolved);
-})->group('SI-3', 'SI-8', 'SI-11');
+});
 
 it('takes at least 300 ms to refuse', function (string $identifier) {
     $user = $this->createUser();
-    UserEmail::factory()->for($user, 'user')->verified()->create(['address' => 'ada@example.com']);
-    UserEmail::factory()->count(2)->create(['address' => 'shared@example.com']);
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $this->addUnverifiedAddress($this->createUser(), 'shared@example.com');
+    $this->addUnverifiedAddress($this->createUser(), 'shared@example.com');
     $support = $this->supportFor(Surface::SIGN_IN);
     $support->arrangeCredential(Surface::SIGN_IN, $user);
 
@@ -59,11 +60,11 @@ it('takes at least 300 ms to refuse', function (string $identifier) {
     'a wrong secret' => 'ada@example.com',
     'an unknown address' => 'grace@example.com',
     'an unresolved address' => 'shared@example.com',
-])->group('SI-3');
+]);
 
 it('answers an identifier that is not valid UTF-8 exactly like a wrong secret', function () {
     $user = $this->createUser();
-    UserEmail::factory()->for($user, 'user')->verified()->create(['address' => 'ada@example.com']);
+    $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::SIGN_IN);
     $support->arrangeCredential(Surface::SIGN_IN, $user);
 
@@ -72,10 +73,10 @@ it('answers an identifier that is not valid UTF-8 exactly like a wrong secret', 
         ...$support->rejectedProof(Surface::SIGN_IN),
     ]);
 
-    $malformed = $this->freshBrowser()->post(route('login.submit', $support->type()->name()), [
+    $malformed = $this->withoutCookies()->post(route('login.submit', $support->type()->name()), [
         'identifier' => "ada\xFF@example.com",
         ...$support->rejectedProof(Surface::SIGN_IN),
     ]);
 
     $this->assertIndistinguishable($wrongSecret, $malformed);
-})->group('SI-3', 'SI-11');
+});

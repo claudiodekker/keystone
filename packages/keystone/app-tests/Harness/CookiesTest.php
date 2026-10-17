@@ -2,7 +2,6 @@
 
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\Surface;
-use ClaudioDekker\Keystone\Models\UserEmail;
 use Illuminate\Support\Sleep;
 
 it('starts each request without the user an earlier one held only in memory', function () {
@@ -16,7 +15,7 @@ it('starts each request without the user an earlier one held only in memory', fu
 
 it('keeps a sign-in for the next request through the session cookie', function () {
     $user = $this->createUser();
-    UserEmail::factory()->for($user, 'user')->verified()->create(['address' => 'ada@example.com']);
+    $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::SIGN_IN);
     $support->arrangeCredential(Surface::SIGN_IN, $user);
 
@@ -30,9 +29,9 @@ it('keeps a sign-in for the next request through the session cookie', function (
     $this->assertAlreadySignedIn($response);
 });
 
-it('forgets every cookie in a fresh browser', function () {
+it('sends none of the cookies earlier responses set after withoutCookies()', function () {
     $user = $this->createUser();
-    UserEmail::factory()->for($user, 'user')->verified()->create(['address' => 'ada@example.com']);
+    $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::SIGN_IN);
     $support->arrangeCredential(Surface::SIGN_IN, $user);
 
@@ -41,14 +40,14 @@ it('forgets every cookie in a fresh browser', function () {
         ...$support->validProof(Surface::SIGN_IN, $user),
     ]);
 
-    $response = $this->freshBrowser()->get(route('login'));
+    $response = $this->withoutCookies()->get(route('login'));
 
     $this->assertSignInPage($response);
 });
 
-it('comes back with the cookies the browser held earlier', function () {
+it('sends the cookies it held earlier again with withCookies()', function () {
     $user = $this->createUser();
-    UserEmail::factory()->for($user, 'user')->verified()->create(['address' => 'ada@example.com']);
+    $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::SIGN_IN);
     $support->arrangeCredential(Surface::SIGN_IN, $user);
     $this->post(route('login.submit', $support->type()->name()), [
@@ -56,17 +55,17 @@ it('comes back with the cookies the browser held earlier', function () {
         ...$support->validProof(Surface::SIGN_IN, $user),
     ]);
 
-    $signedIn = $this->browser();
-    $this->freshBrowser()->get(route('login'));
+    $signedIn = $this->cookies();
+    $this->withoutCookies()->get(route('login'));
 
-    $response = $this->returnWith($signedIn)->get(route('login'));
+    $response = $this->withCookies($signedIn)->get(route('login'));
 
     $this->assertAlreadySignedIn($response);
 });
 
 it('puts the intended URL where the next sign-in reads it', function () {
     $user = $this->createUser();
-    UserEmail::factory()->for($user, 'user')->verified()->create(['address' => 'ada@example.com']);
+    $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::SIGN_IN);
     $support->arrangeCredential(Surface::SIGN_IN, $user);
 
@@ -80,9 +79,9 @@ it('puts the intended URL where the next sign-in reads it', function () {
     $this->assertSignedIn($response, '/reports');
 });
 
-it('keeps the rest of the browser session when it puts the intended URL', function () {
+it('keeps the rest of the session when it puts the intended URL', function () {
     $user = $this->createUser();
-    UserEmail::factory()->for($user, 'user')->verified()->create(['address' => 'ada@example.com']);
+    $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::SIGN_IN);
     $support->arrangeCredential(Surface::SIGN_IN, $user);
     $this->post(route('login.submit', $support->type()->name()), [
@@ -97,9 +96,9 @@ it('keeps the rest of the browser session when it puts the intended URL', functi
     $this->assertAlreadySignedIn($response);
 });
 
-it('puts nothing of an earlier browser in the session when it puts the intended URL', function () {
+it('starts a new session without cookies when it puts the intended URL', function () {
     $user = $this->createUser();
-    UserEmail::factory()->for($user, 'user')->verified()->create(['address' => 'ada@example.com']);
+    $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::SIGN_IN);
     $support->arrangeCredential(Surface::SIGN_IN, $user);
     $this->post(route('login.submit', $support->type()->name()), [
@@ -107,7 +106,7 @@ it('puts nothing of an earlier browser in the session when it puts the intended 
         ...$support->validProof(Surface::SIGN_IN, $user),
     ]);
 
-    $this->freshBrowser()->arrivingFrom(url('/reports'));
+    $this->withoutCookies()->arrivingFrom(url('/reports'));
 
     $response = $this->get(route('login'));
 
@@ -130,7 +129,7 @@ it('keeps what each request flashed after a later request', function () {
         'secret' => 'wrong horse',
     ]);
 
-    $this->freshBrowser()->post(route('login.submit', 'form'), [
+    $this->withoutCookies()->post(route('login.submit', 'form'), [
         'identifier' => 'grace@example.com',
         'secret' => 'wrong horse',
     ]);
