@@ -40,12 +40,12 @@ class SignInController extends BaseSignInController
     }
 
     /**
-     * Return to the sign-in page with the message on the identifier.
+     * Return to the sign-in page with the message on the identifier, flashing back all input as a careless app would.
      */
     protected function sendSignInRefused(Request $request, string $message): Response
     {
         return to_route('login')
             ->withErrors(['identifier' => $message])
-            ->onlyInput('identifier');
+            ->withInput();
     }
 }
