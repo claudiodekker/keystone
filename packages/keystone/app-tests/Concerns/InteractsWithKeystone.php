@@ -7,12 +7,15 @@ use ClaudioDekker\Keystone\AppTests\Assertions\GuestStepAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\SignInAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\SignOutAssertions;
 use ClaudioDekker\Keystone\AppTests\Support\CredentialTypeSupport;
+use ClaudioDekker\Keystone\AppTests\Support\RecordedSecurityEvents;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Models\UserEmail;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Testing\TestResponse;
+use Monolog\Handler\TestHandler;
 use PHPUnit\Framework\Assert;
 use Symfony\Component\HttpFoundation\Cookie;
 
@@ -27,6 +30,21 @@ trait InteractsWithKeystone
     use LazilyRefreshDatabase;
     use SignInAssertions;
     use SignOutAssertions;
+
+    /**
+     * The handler that keeps every line the security log channel wrote during the test.
+     */
+    protected TestHandler $securityLog;
+
+    /**
+     * Keep the lines the security log channel writes, so a test can read them.
+     */
+    protected function setUpInteractsWithKeystone(): void
+    {
+        $this->securityLog = new TestHandler;
+
+        Log::channel(config('keystone.log_channel'))->pushHandler($this->securityLog);
+    }
 
     /**
      * Create a user from the app's own factory, naming the fix when the app has none.
@@ -94,6 +112,14 @@ trait InteractsWithKeystone
             ->exists();
 
         Assert::assertTrue($held, "The user holds no unverified [{$address}].");
+    }
+
+    /**
+     * Get what Keystone recorded during the test: the stored security events and the security event log lines.
+     */
+    public function securityEvents(): RecordedSecurityEvents
+    {
+        return new RecordedSecurityEvents($this->securityLog);
     }
 
     /**

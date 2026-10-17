@@ -4,7 +4,9 @@ namespace ClaudioDekker\Keystone;
 
 use ClaudioDekker\Keystone\Auth\KeystoneGuard;
 use ClaudioDekker\Keystone\Exceptions\KeystoneMisconfiguredException;
+use ClaudioDekker\Keystone\Http\Middleware\CaptureRequestContext;
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\ServiceProvider;
 
@@ -16,22 +18,34 @@ use Illuminate\Support\ServiceProvider;
 class KeystoneServiceProvider extends ServiceProvider
 {
     /**
-     * Start the app from no registered credential types, so each app registers its own in boot().
+     * Merge the config, and start the app from no registered credential types, so each app registers its own in boot().
      */
     public function register(): void
     {
+        $this->mergeConfigFrom(dirname(__DIR__).'/config/keystone.php', 'keystone');
+
         Keystone::flushState();
     }
 
     /**
-     * Register the keystone guard driver, the migrations and the translations.
+     * Register the keystone guard driver, the request context middleware, the migrations and the translations.
      */
     public function boot(): void
     {
         Auth::extend('keystone', $this->createGuard(...));
 
+        $this->captureRequestContext();
+
         $this->loadMigrationsFrom(dirname(__DIR__).'/database/migrations');
         $this->loadTranslationsFrom(dirname(__DIR__).'/lang', 'keystone');
+    }
+
+    /**
+     * Add the request context middleware to the end of the global middleware, so it runs after the app's trusted-proxy middleware.
+     */
+    protected function captureRequestContext(): void
+    {
+        $this->app->make(Kernel::class)->pushMiddleware(CaptureRequestContext::class);
     }
 
     /**

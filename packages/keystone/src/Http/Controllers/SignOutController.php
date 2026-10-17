@@ -2,6 +2,8 @@
 
 namespace ClaudioDekker\Keystone\Http\Controllers;
 
+use ClaudioDekker\Keystone\SecurityEvents\Recorder;
+use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use ClaudioDekker\Keystone\Session\SessionState;
 use Illuminate\Contracts\Support\Responsable;
 use Illuminate\Http\Request;
@@ -17,9 +19,13 @@ abstract class SignOutController
     /**
      * Sign the user out, a guest included, so a repeated sign-out ends the same way.
      */
-    public function destroy(Request $request, SessionState $session): Response|Responsable
+    public function destroy(Request $request, SessionState $session, Recorder $recorder): Response|Responsable
     {
-        $session->signOut();
+        $user = $session->signOut();
+
+        if ($user !== null) {
+            $recorder->record(SecurityEventType::SIGNED_OUT, account: $user);
+        }
 
         return $this->sendSignedOut($request);
     }

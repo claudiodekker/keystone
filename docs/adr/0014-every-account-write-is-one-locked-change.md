@@ -14,7 +14,7 @@ A change may name the session writing it: a pending sign-in, a sudo grant or a s
 - The mover's own session survives: when the change moves the epoch and the current session was signed in as the account on the epoch that moved, it is re-stamped with the new one and its id is rotated. A session already on an older epoch is not revived.
 - Operators end sessions with `keystone:end-sessions {user}` or `--all`, or by dispatching a job from an admin panel. Keystone doesn't authorize either; the app decides who may run them.
 - `sessions.terminated` is recorded with actor `operator` and the operator the command or job names, in a fixed `operator` field (cut to 64 characters, control characters replaced), since events carry no free-form metadata.
-- `--all` moves every account's epoch in one query, the operator's own session included, and records one `sessions.terminated` about nobody, with reason `keystone.every_account`. Like every event about nobody it is a log line only, not a row on each account's trail, so ending every session costs one update however many accounts there are.
+- `--all` moves every account's epoch in one query, the operator's own session included, and records one anonymous `sessions.terminated`, with reason `keystone.every_account`. Like every anonymous event it is a log line only, not a row on each account's trail, so ending every session costs one update however many accounts there are.
 - Ending an account's sessions alerts the owner at the recipients read before the change, unless the operator suppresses it (ADR 0015).
 - What an account owes is read from its credentials and recovery codes when it is needed (ADR 0018), so the change stores nothing for it.
 - No flow writes credentials or recovery codes around an account change.
