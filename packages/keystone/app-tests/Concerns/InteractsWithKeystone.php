@@ -14,7 +14,6 @@ use ClaudioDekker\Keystone\Models\UserEmail;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Date;
-use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\Assert;
 use Symfony\Component\HttpFoundation\Cookie;
 
@@ -30,6 +29,7 @@ use Symfony\Component\HttpFoundation\Cookie;
 trait InteractsWithKeystone
 {
     use GuestStepAssertions;
+    use InteractsWithCookies;
     use LazilyRefreshDatabase;
     use SignInAssertions;
     use SignOutAssertions;
@@ -115,28 +115,6 @@ trait InteractsWithKeystone
     }
 
     /**
-     * Send the next requests without the cookies earlier responses set, as someone else would.
-     *
-     * @return $this
-     */
-    public function withoutCookies(): static
-    {
-        $this->defaultCookies = [];
-
-        return $this;
-    }
-
-    /**
-     * Get the cookies the next request sends, to send them again later with withCookies().
-     *
-     * @return array<string, string>
-     */
-    public function cookies(): array
-    {
-        return $this->defaultCookies;
-    }
-
-    /**
      * Assert the two responses match in status, redirect, flashed data, header and cookie names, and the time they took.
      */
     public function assertIndistinguishable(KeystoneTestResponse $existing, KeystoneTestResponse $missing): void
@@ -179,16 +157,6 @@ trait InteractsWithKeystone
         $this->app['session.store']->flush();
 
         return KeystoneTestResponse::capture($response, $session, $startedAt->diffInMilliseconds(Date::now()));
-    }
-
-    /**
-     * Keep the cookies the response set for the next request.
-     */
-    protected function keepCookies(TestResponse $response): void
-    {
-        foreach ($response->headers->getCookies() as $cookie) {
-            $this->defaultCookies[$cookie->getName()] = $response->getCookie($cookie->getName())->getValue();
-        }
     }
 
     /**
