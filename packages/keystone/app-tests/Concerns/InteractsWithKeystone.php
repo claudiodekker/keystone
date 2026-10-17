@@ -126,8 +126,6 @@ trait InteractsWithKeystone
     /**
      * Keep the URL as intended in the browser's session, where Laravel's guest redirect keeps it before sending a guest to sign in.
      *
-     * AppTests can't count on a page of the app that sends guests to sign in, so this puts the URL where that redirect would have.
-     *
      * @return $this
      */
     public function arrivingFrom(string $url): static
@@ -164,10 +162,7 @@ trait InteractsWithKeystone
     }
 
     /**
-     * Assert the two responses look the same to whoever sent them [I2].
-     *
-     * Status, redirect, flashed data, header names and Set-Cookie names must match; header values such as Date
-     * may differ. Flashed-back input is compared by its fields only, since each echoes what was typed.
+     * Assert the two responses match in status, redirect, flashed data, and header and cookie names.
      */
     public function assertIndistinguishable(KeystoneTestResponse $existing, KeystoneTestResponse $missing): void
     {
@@ -206,9 +201,6 @@ trait InteractsWithKeystone
 
     /**
      * Forget the guards and the session data an earlier request left in memory.
-     *
-     * Laravel keeps one session store for the whole test, and other services hold on to it, so the
-     * store stays and only its data goes. The request then loads what storage keeps for its cookie.
      */
     protected function startRequest(): void
     {

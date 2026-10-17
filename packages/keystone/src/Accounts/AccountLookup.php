@@ -14,8 +14,6 @@ class AccountLookup
 {
     /**
      * Resolve the account the identifier names, or null when it names none or more than one.
-     *
-     * An address resolves to the account holding it verified; when none does, only to the one account that counts it as verified.
      */
     public function resolve(string $identifier): ?KeystoneUser
     {

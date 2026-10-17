@@ -16,8 +16,6 @@ class SignInDecision
 {
     /**
      * Get the account the proof signs in, or null when it signs in nobody.
-     *
-     * A proof names a credential, never a user, and the credential's owner must be the account the identifier named.
      */
     public function decide(Proof $proof, CredentialType $type, ?KeystoneUser $subject): ?KeystoneUser
     {

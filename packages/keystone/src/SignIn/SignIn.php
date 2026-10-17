@@ -37,8 +37,6 @@ class SignIn
     /**
      * Attempt to sign in with the type and the submitted input.
      *
-     * Every refusal takes the timing floor and comes back the same; a sign-in answers as soon as it completes.
-     *
      * @param  array<string, mixed>  $input
      *
      * @throws ValidationException
@@ -74,8 +72,6 @@ class SignIn
     /**
      * Sign in the account the identifier names when the type proves one of its credentials.
      *
-     * The type is called even when the identifier names no account, so it does the same work either way.
-     *
      * @param  array<string, mixed>  $validated
      */
     protected function prove(CredentialType $type, array $validated): SignedIn|Refused
@@ -88,6 +84,7 @@ class SignIn
             credentials: $this->credentials($type, $account),
         );
 
+        // The type verifies even when no account holds the identifier, so it does the same work either way.
         $proof = $type->verify($verification);
 
         $owner = $this->decision->decide($proof, $type, $account);

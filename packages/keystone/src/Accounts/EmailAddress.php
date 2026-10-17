@@ -12,7 +12,7 @@ use Normalizer;
 class EmailAddress
 {
     /**
-     * Normalize a typed or stored address, so one mailbox always compares equal [H4].
+     * Normalize a typed or stored address, so one mailbox always compares equal.
      */
     public static function normalize(string $address): string
     {

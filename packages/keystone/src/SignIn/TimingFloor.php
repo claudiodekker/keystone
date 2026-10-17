@@ -26,8 +26,6 @@ class TimingFloor
     /**
      * Run the work, then wait out the rest of the floor unless its result may answer early.
      *
-     * The floor holds when the work throws, too, before the exception goes on.
-     *
      * @template TResult
      *
      * @param  Closure(): TResult  $work

@@ -69,8 +69,6 @@ class UserEmail extends Model
     /**
      * Scope the query to the rows of the address whose account holds no verified address at all.
      *
-     * Such an account counts its unverified addresses as verified, as long as no account holds one verified.
-     *
      * @param  Builder<static>  $query
      */
     #[Scope]
