@@ -24,6 +24,21 @@ it('refuses the right secret as throttled after the allowance of wrong secrets i
     $this->assertSignInThrottled($response);
 });
 
+it('counts again once the hour has passed', function () {
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+    $this->submitRejectedProofs($support, 'ada@example.com', $this->failedAttemptAllowance());
+
+    $this->travel(60 * 60)->seconds();
+    $response = $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $this->assertSignedIn($response, '/');
+});
+
 it('leaves earlier failures counted after a success in between', function () {
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
