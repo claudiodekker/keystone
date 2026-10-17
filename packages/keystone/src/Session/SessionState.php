@@ -4,6 +4,7 @@ namespace ClaudioDekker\Keystone\Session;
 
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Keystone;
+use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Status;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Contracts\Events\Dispatcher;
@@ -73,6 +74,17 @@ class SessionState
     public function status(): ?Status
     {
         return Status::tryFrom($this->session->get(static::STATUS, ''));
+    }
+
+    /**
+     * Get the flow a step on the surface is in, or null when it is in none, such as signing out.
+     */
+    public function flow(?Surface $surface): ?Flow
+    {
+        return match ($surface) {
+            Surface::SIGN_IN => Flow::SIGN_IN,
+            default => null,
+        };
     }
 
     /**

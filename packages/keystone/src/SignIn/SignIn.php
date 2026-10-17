@@ -9,6 +9,8 @@ use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Methods\Verification;
 use ClaudioDekker\Keystone\Models\UserCredential;
+use ClaudioDekker\Keystone\SecurityEvents\Recorder;
+use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use ClaudioDekker\Keystone\Session\SessionState;
 use Illuminate\Contracts\Validation\Factory as ValidationFactory;
 use Illuminate\Support\Arr;
@@ -27,6 +29,7 @@ class SignIn
     public function __construct(
         protected AccountLookup $accounts,
         protected SignInDecision $decision,
+        protected Recorder $recorder,
         protected SessionState $session,
         protected TimingFloor $floor,
         protected ValidationFactory $validation,
@@ -92,7 +95,17 @@ class SignIn
             return new Refused;
         }
 
-        return new SignedIn($this->session->signIn($owner));
+        $redirectTo = $this->session->signIn($owner);
+
+        $this->recorder->record(
+            SecurityEventType::SIGNED_IN,
+            account: $owner,
+            surface: Surface::SIGN_IN,
+            credentialType: $type,
+            credential: $proof->credential,
+        );
+
+        return new SignedIn($redirectTo);
     }
 
     /**

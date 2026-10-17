@@ -7,6 +7,7 @@ use ClaudioDekker\Keystone\AppTests\Assertions\GuestStepAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\SignInAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\SignOutAssertions;
 use ClaudioDekker\Keystone\AppTests\Support\CredentialTypeSupport;
+use ClaudioDekker\Keystone\AppTests\Support\RecordedSecurityEvents;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\Surface;
@@ -94,6 +95,14 @@ trait InteractsWithKeystone
             ->exists();
 
         Assert::assertTrue($held, "The user holds no unverified [{$address}].");
+    }
+
+    /**
+     * Get what Keystone recorded during the test: the stored security events and the security event log lines.
+     */
+    public function securityEvents(): RecordedSecurityEvents
+    {
+        return new RecordedSecurityEvents;
     }
 
     /**

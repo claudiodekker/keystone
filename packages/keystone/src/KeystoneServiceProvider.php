@@ -16,10 +16,12 @@ use Illuminate\Support\ServiceProvider;
 class KeystoneServiceProvider extends ServiceProvider
 {
     /**
-     * Start the app from no registered credential types, so each app registers its own in boot().
+     * Merge the config, and start the app from no registered credential types, so each app registers its own in boot().
      */
     public function register(): void
     {
+        $this->mergeConfigFrom(dirname(__DIR__).'/config/keystone.php', 'keystone');
+
         Keystone::flushState();
     }
 
