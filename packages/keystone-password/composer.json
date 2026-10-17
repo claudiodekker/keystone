@@ -11,5 +11,12 @@
         "psr-4": {
             "ClaudioDekker\\Keystone\\Password\\": "src/"
         }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "ClaudioDekker\\Keystone\\Password\\PasswordServiceProvider"
+            ]
+        }
     }
 }

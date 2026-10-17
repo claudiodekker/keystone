@@ -112,4 +112,4 @@ A trait of `assert*` methods, one per response hook, that AppTests check answers
 
 ## Test support
 
-What a credential type gives AppTests: arrange a credential, give a valid proof and give a rejected proof. Core's fake types in its `tests/` are their own test support.
+What a credential type gives AppTests: arrange a credential, give a valid proof and give a rejected proof. Core's fake types in its `tests/` are their own test support. A method package's type names its test support with the `UseTestSupport` attribute, as a model names its factory.

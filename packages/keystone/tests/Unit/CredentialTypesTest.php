@@ -1,5 +1,6 @@
 <?php
 
+use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Tests\Fixtures\Methods\FakeChallengeType;
@@ -23,4 +24,10 @@ it('lists only the types that serve sign-in, each with its initiate shape', func
 it('finds a type only on a surface it serves', function () {
     expect($this->types->find('challenge-only', Surface::SIGN_IN))->toBeNull()
         ->and($this->types->find('challenge-only', Surface::CHALLENGE))->not->toBeNull();
+});
+
+it("offers the fixture app's types before any installed method package's", function () {
+    $types = Keystone::credentialTypes()->serving(Surface::SIGN_IN);
+
+    expect($types[0])->toBeInstanceOf(FakeFormType::class);
 });
