@@ -7,9 +7,11 @@ use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Exceptions\ThrottledException;
 use ClaudioDekker\Keystone\Methods\Credential;
 use ClaudioDekker\Keystone\Methods\CredentialType;
+use ClaudioDekker\Keystone\Methods\Proof;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Methods\Verification;
 use ClaudioDekker\Keystone\Models\UserCredential;
+use ClaudioDekker\Keystone\RateLimits\CountedAttempt;
 use ClaudioDekker\Keystone\RateLimits\Limiter;
 use ClaudioDekker\Keystone\SecurityEvents\Recorder;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
@@ -17,6 +19,7 @@ use ClaudioDekker\Keystone\Session\SessionState;
 use Illuminate\Contracts\Validation\Factory as ValidationFactory;
 use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 /**
  * Attempt a sign-in with a credential type's proof, from the submitted input to a signed-in session or one refusal.
@@ -87,15 +90,9 @@ class SignIn
     {
         $account = $this->accounts->resolve($validated['identifier']);
 
-        $this->limiter->takeFailedAttempt($type, Surface::SIGN_IN, $account, $validated['identifier']);
+        $attempt = $this->limiter->takeFailedAttempt($type, Surface::SIGN_IN, $account, $validated['identifier']);
 
-        $verification = new Verification(
-            surface: Surface::SIGN_IN,
-            input: Arr::except($validated, 'identifier'),
-            credentials: $this->credentials($type, $account),
-        );
-
-        $proof = $type->verify($verification);
+        $proof = $this->verify($type, $account, $validated, $attempt);
 
         $owner = $this->decision->decide($proof, $type, $account);
 
@@ -112,6 +109,8 @@ class SignIn
 
         $redirectTo = $this->session->signIn($owner);
 
+        $this->limiter->giveBack($attempt);
+
         $this->recorder->record(
             SecurityEventType::SIGNED_IN,
             account: $owner,
@@ -121,6 +120,28 @@ class SignIn
         );
 
         return new SignedIn($redirectTo);
+    }
+
+    /**
+     * Let the type verify the input against the account's credentials, giving the attempt back when the type throws.
+     *
+     * @param  array<string, mixed>  $validated
+     */
+    protected function verify(CredentialType $type, ?KeystoneUser $account, array $validated, CountedAttempt $attempt): Proof
+    {
+        $verification = new Verification(
+            surface: Surface::SIGN_IN,
+            input: Arr::except($validated, 'identifier'),
+            credentials: $this->credentials($type, $account),
+        );
+
+        try {
+            return $type->verify($verification);
+        } catch (Throwable $exception) {
+            $this->limiter->giveBack($attempt);
+
+            throw $exception;
+        }
     }
 
     /**

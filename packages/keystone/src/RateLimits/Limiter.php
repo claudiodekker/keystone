@@ -61,6 +61,20 @@ class Limiter
     }
 
     /**
+     * Give a counted attempt back, unless the window it was counted in has ended.
+     */
+    public function giveBack(CountedAttempt $attempt): void
+    {
+        $secondsLeft = $this->counts->availableIn($attempt->key);
+
+        if ($secondsLeft === 0 || ! $attempt->endsAt(Date::now()->getTimestamp() + $secondsLeft)) {
+            return;
+        }
+
+        $this->counts->decrement($attempt->key, $secondsLeft);
+    }
+
+    /**
      * Take one count of the key with one atomic increment, and get the count it reached with the end of its window.
      */
     protected function take(string $key, Limit $limit): CountedAttempt
