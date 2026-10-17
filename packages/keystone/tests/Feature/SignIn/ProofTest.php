@@ -70,3 +70,14 @@ it('still calls the type, with no credentials, when the identifier names no acco
         ->and($type->verifications()[0]->credentials)->toBe([])
         ->and($type->verifications()[0]->input)->toBe(['secret' => 'any horse']);
 })->group('SI-3');
+
+it('makes the type compare against a decoy secret when the identifier names no account', function () {
+    $type = Keystone::credentialTypes()->find('form', Surface::SIGN_IN);
+
+    $this->app->make(SignIn::class)->attempt($type, [
+        'identifier' => 'nobody@example.com',
+        'secret' => 'any horse',
+    ]);
+
+    expect($type->comparisons())->toBe(1);
+})->group('SI-3');

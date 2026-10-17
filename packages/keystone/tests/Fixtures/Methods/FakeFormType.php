@@ -25,11 +25,21 @@ class FakeFormType implements CredentialType, CredentialTypeSupport
     protected const string SECRET = 'correct horse';
 
     /**
+     * The secret compared in place of a credential when there is none.
+     */
+    protected const string DECOY = 'decoy horse';
+
+    /**
      * The verifications the type was given, in order.
      *
      * @var list<Verification>
      */
     protected array $verifications = [];
+
+    /**
+     * The number of secrets the type compared, real or decoy.
+     */
+    protected int $comparisons = 0;
 
     /**
      * The credential every verify claims to prove, whatever it was given.
@@ -87,13 +97,29 @@ class FakeFormType implements CredentialType, CredentialTypeSupport
             return Proof::proven($this->forged);
         }
 
+        $submitted = (string) $verification->input['secret'];
+
+        if ($verification->credentials === []) {
+            $this->compare(static::DECOY, $submitted);
+
+            return Proof::rejected();
+        }
+
         foreach ($verification->credentials as $credential) {
-            if (hash_equals((string) $credential->secret, (string) $verification->input['secret'])) {
+            if ($this->compare((string) $credential->secret, $submitted)) {
                 return Proof::proven($credential);
             }
         }
 
         return Proof::rejected();
+    }
+
+    /**
+     * Get the number of secrets the type compared, real or decoy.
+     */
+    public function comparisons(): int
+    {
+        return $this->comparisons;
     }
 
     /**
@@ -151,5 +177,15 @@ class FakeFormType implements CredentialType, CredentialTypeSupport
     public function rejectedProof(Surface $surface): array
     {
         return ['secret' => 'wrong horse'];
+    }
+
+    /**
+     * Determine if the two secrets match, counting the comparison.
+     */
+    protected function compare(string $known, string $submitted): bool
+    {
+        $this->comparisons++;
+
+        return hash_equals($known, $submitted);
     }
 }
