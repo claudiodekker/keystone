@@ -4,6 +4,7 @@ namespace ClaudioDekker\Keystone\Tests\Fixtures\Methods;
 
 use ClaudioDekker\Keystone\AppTests\Support\CredentialTypeSupport;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
+use ClaudioDekker\Keystone\Methods\Credential;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\InitiateShape;
 use ClaudioDekker\Keystone\Methods\Proof;
@@ -14,7 +15,7 @@ use ClaudioDekker\Keystone\Models\UserCredential;
 /**
  * A credential type of the form shape that compares a stored secret, and deliberately not a password.
  *
- * It is its own test support.
+ * It is its own test support, records what it was given, and can forge a proof for core's own tests.
  */
 class FakeFormType implements CredentialType, CredentialTypeSupport
 {
@@ -22,6 +23,18 @@ class FakeFormType implements CredentialType, CredentialTypeSupport
      * The secret every arranged credential holds.
      */
     protected const string SECRET = 'correct horse';
+
+    /**
+     * The verifications the type was given, in order.
+     *
+     * @var list<Verification>
+     */
+    protected array $verifications = [];
+
+    /**
+     * The credential every verify claims to prove, whatever it was given.
+     */
+    protected ?Credential $forged = null;
 
     /**
      * Get the type's name.
@@ -64,6 +77,12 @@ class FakeFormType implements CredentialType, CredentialTypeSupport
      */
     public function verify(Verification $verification): Proof
     {
+        $this->verifications[] = $verification;
+
+        if ($this->forged !== null) {
+            return Proof::proven($this->forged);
+        }
+
         foreach ($verification->credentials as $credential) {
             if (hash_equals((string) $credential->secret, (string) $verification->input['secret'])) {
                 return Proof::proven($credential);
@@ -71,6 +90,24 @@ class FakeFormType implements CredentialType, CredentialTypeSupport
         }
 
         return Proof::rejected();
+    }
+
+    /**
+     * Make every verify claim to prove the given credential, as a broken or hostile type would.
+     */
+    public function forgeProofOf(UserCredential $credential): void
+    {
+        $this->forged = $credential->toCredential();
+    }
+
+    /**
+     * Get the verifications the type was given, in order.
+     *
+     * @return list<Verification>
+     */
+    public function verifications(): array
+    {
+        return $this->verifications;
     }
 
     /**

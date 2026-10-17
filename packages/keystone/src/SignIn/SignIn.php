@@ -26,6 +26,7 @@ class SignIn
      */
     public function __construct(
         protected AccountLookup $accounts,
+        protected SignInDecision $decision,
         protected SessionState $session,
         protected TimingFloor $floor,
         protected ValidationFactory $validation,
@@ -89,11 +90,13 @@ class SignIn
 
         $proof = $type->verify($verification);
 
-        if ($account === null || ! $proof->isProven()) {
+        $owner = $this->decision->decide($proof, $type, $account);
+
+        if ($owner === null) {
             return new Refused;
         }
 
-        return new SignedIn($this->session->signIn($account));
+        return new SignedIn($this->session->signIn($owner));
     }
 
     /**

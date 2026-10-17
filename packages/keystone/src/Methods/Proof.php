@@ -34,12 +34,4 @@ readonly class Proof
     {
         return new static(null);
     }
-
-    /**
-     * Determine if the proof proves a credential.
-     */
-    public function isProven(): bool
-    {
-        return $this->credential !== null;
-    }
 }
