@@ -15,7 +15,6 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Date;
 use PHPUnit\Framework\Assert;
-use Symfony\Component\HttpFoundation\Cookie;
 
 /**
  * Drive the app the way a user does, and check its answers through assertions the app can override.
@@ -181,20 +180,6 @@ trait InteractsWithKeystone
     {
         return collect($response->headers->all())
             ->keys()
-            ->sort()
-            ->values()
-            ->all();
-    }
-
-    /**
-     * Get the names of the cookies the response sets, sorted.
-     *
-     * @return list<string>
-     */
-    protected function cookieNames(KeystoneTestResponse $response): array
-    {
-        return collect($response->headers->getCookies())
-            ->map(fn (Cookie $cookie) => $cookie->getName())
             ->sort()
             ->values()
             ->all();

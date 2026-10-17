@@ -3,6 +3,7 @@
 namespace ClaudioDekker\Keystone\AppTests\Concerns;
 
 use Illuminate\Testing\TestResponse;
+use Symfony\Component\HttpFoundation\Cookie;
 
 /**
  * Carry the cookies each response sets into the test's next request.
@@ -41,5 +42,19 @@ trait InteractsWithCookies
         foreach ($response->headers->getCookies() as $cookie) {
             $this->defaultCookies[$cookie->getName()] = $response->getCookie($cookie->getName())->getValue();
         }
+    }
+
+    /**
+     * Get the names of the cookies the response sets, sorted.
+     *
+     * @return list<string>
+     */
+    protected function cookieNames(TestResponse $response): array
+    {
+        return collect($response->headers->getCookies())
+            ->map(fn (Cookie $cookie) => $cookie->getName())
+            ->sort()
+            ->values()
+            ->all();
     }
 }
