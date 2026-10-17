@@ -3,11 +3,13 @@
 namespace ClaudioDekker\Keystone\SecurityEvents;
 
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
+use ClaudioDekker\Keystone\Http\RequestContext;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Models\UserSecurityEvent;
 use ClaudioDekker\Keystone\Session\SessionState;
 use Illuminate\Contracts\Config\Repository as Config;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -27,8 +29,11 @@ class Recorder
     /**
      * Create the recorder.
      */
-    public function __construct(protected Config $config, protected SessionState $session)
-    {
+    public function __construct(
+        protected Config $config,
+        protected Request $request,
+        protected SessionState $session,
+    ) {
         //
     }
 
@@ -63,6 +68,8 @@ class Recorder
         ?CredentialType $credentialType,
         int|string|null $credential,
     ): UserSecurityEvent {
+        $context = RequestContext::of($this->request);
+
         return (new UserSecurityEvent)->forceFill([
             'id' => strtolower((string) Str::ulid()),
             'occurred_at' => Date::now()->toImmutable(),
@@ -74,11 +81,11 @@ class Recorder
             'credential_id' => $credential,
             'credential_label' => null,
             'reason' => null,
-            'ip_address' => null,
+            'ip_address' => $context?->ipAddress,
             'location' => null,
-            'user_agent' => null,
+            'user_agent' => $context?->userAgent,
             'known_device' => null,
-            'request_id' => null,
+            'request_id' => $context?->requestId,
         ]);
     }
 
