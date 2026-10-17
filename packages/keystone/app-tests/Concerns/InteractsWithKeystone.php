@@ -2,6 +2,7 @@
 
 namespace ClaudioDekker\Keystone\AppTests\Concerns;
 
+use ClaudioDekker\Keystone\Accounts\EmailAddress;
 use ClaudioDekker\Keystone\AppTests\Assertions\GuestStepAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\SignInAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\SignOutAssertions;
@@ -75,6 +76,33 @@ trait InteractsWithKeystone
             ->create(['address' => $address]);
 
         return $email->address;
+    }
+
+    /**
+     * Assert the user holds the address verified, as Keystone reads it.
+     */
+    public function assertAddressVerified(KeystoneUser $user, string $address): void
+    {
+        $held = UserEmail::query()
+            ->whereVerified(EmailAddress::normalize($address))
+            ->where('user_id', $user->getAuthIdentifier())
+            ->exists();
+
+        Assert::assertTrue($held, "The user holds no verified [{$address}].");
+    }
+
+    /**
+     * Assert the user holds the address unverified, as Keystone reads it.
+     */
+    public function assertAddressUnverified(KeystoneUser $user, string $address): void
+    {
+        $held = UserEmail::query()
+            ->where('address', EmailAddress::normalize($address))
+            ->whereNull('verified_address')
+            ->where('user_id', $user->getAuthIdentifier())
+            ->exists();
+
+        Assert::assertTrue($held, "The user holds no unverified [{$address}].");
     }
 
     /**

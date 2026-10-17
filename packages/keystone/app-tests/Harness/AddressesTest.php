@@ -1,48 +1,55 @@
 <?php
 
-use ClaudioDekker\Keystone\Methods\Surface;
+use PHPUnit\Framework\AssertionFailedError;
 
-it('adds a verified address, so the account no longer signs in with its unverified ones', function () {
+it('adds a verified address', function () {
     $user = $this->createUser();
-    $this->addUnverifiedAddress($user, 'ada@work.example');
+
     $this->addVerifiedAddress($user, 'ada@example.com');
-    $support = $this->supportFor(Surface::SIGN_IN);
-    $support->arrangeCredential(Surface::SIGN_IN, $user);
 
-    $response = $this->post(route('login.submit', $support->type()->name()), [
-        'identifier' => 'ada@work.example',
-        ...$support->validProof(Surface::SIGN_IN, $user),
-    ]);
-
-    $this->assertSignInRefused($response, __('keystone::messages.credentials-rejected'));
+    $this->assertAddressVerified($user, 'ada@example.com');
 });
 
 it('adds a made-up verified address when given none, and returns it', function () {
     $user = $this->createUser();
+
     $address = $this->addVerifiedAddress($user);
-    $support = $this->supportFor(Surface::SIGN_IN);
-    $support->arrangeCredential(Surface::SIGN_IN, $user);
 
-    $response = $this->post(route('login.submit', $support->type()->name()), [
-        'identifier' => $address,
-        ...$support->validProof(Surface::SIGN_IN, $user),
-    ]);
-
-    $this->assertSignedIn($response, '/');
+    $this->assertAddressVerified($user, $address);
 });
 
-it('adds an unverified address, which signs in neither of two accounts that hold it', function () {
-    $ada = $this->createUser();
-    $grace = $this->createUser();
-    $this->addUnverifiedAddress($ada, 'shared@example.com');
-    $this->addUnverifiedAddress($grace, 'shared@example.com');
-    $support = $this->supportFor(Surface::SIGN_IN);
-    $support->arrangeCredential(Surface::SIGN_IN, $ada);
+it('adds an unverified address', function () {
+    $user = $this->createUser();
 
-    $response = $this->post(route('login.submit', $support->type()->name()), [
-        'identifier' => 'shared@example.com',
-        ...$support->validProof(Surface::SIGN_IN, $ada),
-    ]);
+    $this->addUnverifiedAddress($user, 'ada@example.com');
 
-    $this->assertSignInRefused($response, __('keystone::messages.credentials-rejected'));
+    $this->assertAddressUnverified($user, 'ada@example.com');
+});
+
+it('fails assertAddressVerified on an unverified address', function () {
+    $user = $this->createUser();
+    $this->addUnverifiedAddress($user, 'ada@example.com');
+
+    expect(fn () => $this->assertAddressVerified($user, 'ada@example.com'))->toThrow(AssertionFailedError::class, 'The user holds no verified [ada@example.com].');
+});
+
+it("fails assertAddressVerified on another account's verified address", function () {
+    $user = $this->createUser();
+    $this->addVerifiedAddress($this->createUser(), 'ada@example.com');
+
+    expect(fn () => $this->assertAddressVerified($user, 'ada@example.com'))->toThrow(AssertionFailedError::class, 'The user holds no verified [ada@example.com].');
+});
+
+it('fails assertAddressUnverified on a verified address', function () {
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+
+    expect(fn () => $this->assertAddressUnverified($user, 'ada@example.com'))->toThrow(AssertionFailedError::class, 'The user holds no unverified [ada@example.com].');
+});
+
+it("fails assertAddressUnverified on another account's unverified address", function () {
+    $user = $this->createUser();
+    $this->addUnverifiedAddress($this->createUser(), 'ada@example.com');
+
+    expect(fn () => $this->assertAddressUnverified($user, 'ada@example.com'))->toThrow(AssertionFailedError::class, 'The user holds no unverified [ada@example.com].');
 });
