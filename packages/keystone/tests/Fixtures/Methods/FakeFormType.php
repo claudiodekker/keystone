@@ -51,6 +51,13 @@ class FakeFormType implements CredentialType, CredentialTypeSupport
     protected ?Closure $duringNextVerify = null;
 
     /**
+     * The rehash the next proven proof carries.
+     *
+     * @var (Closure(): string)|null
+     */
+    protected ?Closure $nextRehash = null;
+
+    /**
      * Get the type's name.
      */
     public function name(): string
@@ -100,7 +107,7 @@ class FakeFormType implements CredentialType, CredentialTypeSupport
         $this->runDuringVerify();
 
         if ($this->forged !== null) {
-            return Proof::proven($this->forged);
+            return $this->proven($this->forged);
         }
 
         $submitted = (string) $verification->input['secret'];
@@ -113,7 +120,7 @@ class FakeFormType implements CredentialType, CredentialTypeSupport
 
         foreach ($verification->credentials as $credential) {
             if ($this->compare((string) $credential->secret, $submitted)) {
-                return Proof::proven($credential);
+                return $this->proven($credential);
             }
         }
 
@@ -155,6 +162,16 @@ class FakeFormType implements CredentialType, CredentialTypeSupport
     }
 
     /**
+     * Make the next proof the type proves carry the rehash.
+     *
+     * @param  Closure(): string  $rehash
+     */
+    public function rehashNextProof(Closure $rehash): void
+    {
+        $this->nextRehash = $rehash;
+    }
+
+    /**
      * Get the type this supports, which is itself.
      */
     public function type(): CredentialType
@@ -193,6 +210,17 @@ class FakeFormType implements CredentialType, CredentialTypeSupport
     public function rejectedProof(Surface $surface): array
     {
         return ['secret' => 'wrong horse'];
+    }
+
+    /**
+     * Prove the credential, carrying the queued rehash once.
+     */
+    protected function proven(Credential $credential): Proof
+    {
+        $rehash = $this->nextRehash;
+        $this->nextRehash = null;
+
+        return Proof::proven($credential, $rehash);
     }
 
     /**

@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use SensitiveParameter;
 
 /**
  * A credential an account holds, of any type.
@@ -45,6 +46,22 @@ class UserCredential extends Model
     public function toCredential(): Credential
     {
         return new Credential($this->getKey(), $this->secret);
+    }
+
+    /**
+     * Replace the secret, only while the row still holds the ciphertext this model loaded.
+     *
+     * Every write encrypts with a fresh IV, so a ciphertext that differs from the loaded one means another write got there first.
+     */
+    public function updateSecretUnlessChanged(#[SensitiveParameter] string $secret): void
+    {
+        $loaded = $this->getRawOriginal('secret');
+        $encrypted = $this->castAttributeAsEncryptedString('secret', $secret);
+
+        $this->newQuery()
+            ->whereKey($this->getKey())
+            ->where('secret', $loaded)
+            ->update(['secret' => $encrypted]);
     }
 
     /**
