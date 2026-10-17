@@ -50,6 +50,8 @@ class Limiter
     /**
      * Count a request of the step kind against the IP address and, separately, the signed-in account, and refuse it once either count is spent.
      *
+     * A store failure is reported and lets the request through.
+     *
      * @throws ThrottledException
      */
     public function takeRequest(StepKind $kind): void
@@ -64,6 +66,7 @@ class Limiter
 
         $spent = collect($keys)
             ->map(fn (string $key) => $this->take($key, Limit::REQUEST))
+            ->whereNotNull()
             ->filter(fn (CountedAttempt $attempt) => $attempt->isOver($allowance));
 
         if ($spent->isEmpty()) {
@@ -78,6 +81,8 @@ class Limiter
      *
      * An identifier that names no account is counted by its address as the account lookup compares it.
      *
+     * A store failure is reported and refuses the attempt.
+     *
      * @throws ThrottledException
      */
     public function takeFailedAttempt(CredentialType $type, Surface $surface, ?KeystoneUser $account, string $identifier): CountedAttempt
@@ -86,7 +91,7 @@ class Limiter
         $key = $this->key(Limit::FAILED_ATTEMPT, ...$this->subject($account, $identifier), ...[$type->name(), $flow->value]);
         $allowance = $this->config->integer('keystone.rate_limits.failed_attempts_per_hour');
 
-        $attempt = $this->take($key, Limit::FAILED_ATTEMPT);
+        $attempt = $this->take($key, Limit::FAILED_ATTEMPT) ?? throw ThrottledException::retryAfter(1);
 
         if (! $attempt->isOver($allowance)) {
             return $attempt;
@@ -97,8 +102,33 @@ class Limiter
 
     /**
      * Give a counted attempt back, unless the window it was counted in has ended.
+     *
+     * A store failure is reported and leaves the attempt counted.
      */
     public function giveBack(CountedAttempt $attempt): void
+    {
+        rescue(fn () => $this->release($attempt));
+    }
+
+    /**
+     * Take one count of the key with one atomic increment, and get the count it reached with the end of its window, or null when the store failed.
+     *
+     * The store failure is reported, and each limit decides what a missing count means.
+     */
+    protected function take(string $key, Limit $limit): ?CountedAttempt
+    {
+        return rescue(function () use ($key, $limit) {
+            $count = $this->counts->increment($key, $limit->windowSeconds());
+            $availableAt = Date::now()->getTimestamp() + $this->counts->availableIn($key);
+
+            return new CountedAttempt($key, $limit, $count, $availableAt);
+        });
+    }
+
+    /**
+     * Decrement the attempt's key, unless the window it was counted in has ended.
+     */
+    protected function release(CountedAttempt $attempt): void
     {
         $secondsLeft = $this->counts->availableIn($attempt->key);
 
@@ -107,17 +137,6 @@ class Limiter
         }
 
         $this->counts->decrement($attempt->key, $secondsLeft);
-    }
-
-    /**
-     * Take one count of the key with one atomic increment, and get the count it reached with the end of its window.
-     */
-    protected function take(string $key, Limit $limit): CountedAttempt
-    {
-        $count = $this->counts->increment($key, $limit->windowSeconds());
-        $availableAt = Date::now()->getTimestamp() + $this->counts->availableIn($key);
-
-        return new CountedAttempt($key, $limit, $count, $availableAt);
     }
 
     /**
