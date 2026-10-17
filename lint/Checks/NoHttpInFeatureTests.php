@@ -93,8 +93,7 @@ class NoHttpInFeatureTests extends Check
         }
 
         return $node instanceof Expr\MethodCall
-            && $node->var instanceof Expr\Variable
-            && $node->var->name === 'this'
+            && $this->isThis($node->var)
             && $node->name instanceof Node\Identifier
             && in_array($node->name->toLowerString(), $this->requests, true);
     }

@@ -45,6 +45,6 @@ class ResponsesThroughAssertionTraits extends Check
         return ($node instanceof Expr\MethodCall || $node instanceof Expr\NullsafeMethodCall)
             && $node->name instanceof Node\Identifier
             && str_starts_with($node->name->toLowerString(), 'assert')
-            && ! ($node->var instanceof Expr\Variable && $node->var->name === 'this');
+            && ! $this->isThis($node->var);
     }
 }
