@@ -21,6 +21,56 @@ it('fails an inline comment of several lines that is not a slope', function () {
     expect((new SlopedComments)->check($file))->toBe([3, 7]);
 });
 
+it('fails a config banner whose prose is not a slope', function () {
+    $file = new File('packages/keystone/config/keystone.php', <<<'PHP'
+        <?php
+
+        return [
+
+            /*
+            |--------------------------------------------------------------------------
+            | Rate Limits
+            |--------------------------------------------------------------------------
+            |
+            | How many failed attempts an account gets per credential type and flow
+            | in an hour, and how many requests of each step kind one IP address
+            | or one signed-in account gets in a minute. The windows are fixed.
+            |
+            */
+
+            'rate_limits' => [],
+
+        ];
+        PHP);
+
+    expect((new SlopedComments)->check($file))->toBe([10]);
+});
+
+it('passes a config banner whose prose is a slope', function () {
+    $file = new File('packages/keystone/config/keystone.php', <<<'PHP'
+        <?php
+
+        return [
+
+            /*
+            |--------------------------------------------------------------------------
+            | Security Events
+            |--------------------------------------------------------------------------
+            |
+            | Every security event is recorded unless enabled is set to false. That
+            | turns the recorder off in any environment, so no trail is kept and
+            | no alert is sent. Only the boolean false turns the recorder off.
+            |
+            */
+
+            'events' => [],
+
+        ];
+        PHP);
+
+    expect((new SlopedComments)->check($file))->toBe([]);
+});
+
 it('passes single lines and slopes, and leaves docblocks alone', function () {
     $file = new File('packages/keystone/src/Example.php', <<<'PHP'
         <?php
