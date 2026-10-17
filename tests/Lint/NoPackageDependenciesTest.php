@@ -50,8 +50,8 @@ it('lets another package use itself', function () {
     expect((new NoPackageDependencies(['ClaudioDekker\\Keystone\\Password\\']))->check($file))->toBe([]);
 });
 
-it('finds no other package while core is the only one', function () {
-    $file = new File('packages/keystone/src/Example.php', "<?php\n\nuse ClaudioDekker\\Keystone\\Password\\Rules\\PasswordRule;\n");
+it('reads the namespaces of the other packages from their manifests', function () {
+    $file = new File('packages/keystone/src/Example.php', "<?php\n\nuse ClaudioDekker\\Keystone\\Password\\PasswordType;\n");
 
-    expect((new NoPackageDependencies)->check($file))->toBe([]);
+    expect((new NoPackageDependencies)->check($file))->toBe([3]);
 });
