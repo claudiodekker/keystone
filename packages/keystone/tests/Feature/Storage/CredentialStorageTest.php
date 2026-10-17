@@ -19,3 +19,14 @@ it('leaves the secret out of the array form', function () {
 
     expect($credential->toArray())->not->toHaveKey('secret');
 });
+
+it('keeps a replaced secret encrypted at rest', function () {
+    $credential = UserCredential::factory()->create(['secret' => 'correct horse']);
+    $loaded = UserCredential::query()->findOrFail($credential->getKey());
+
+    $loaded->updateSecretUnlessChanged('new horse');
+
+    $stored = UserCredential::query()->toBase()->where('id', $credential->getKey())->value('secret');
+    expect($stored)->not->toBe('new horse')
+        ->and(Crypt::decryptString($stored))->toBe('new horse');
+});

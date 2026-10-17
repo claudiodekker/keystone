@@ -5,7 +5,6 @@ namespace ClaudioDekker\Keystone\SignIn;
 use ClaudioDekker\Keystone\Accounts\AccountLookup;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Exceptions\ThrottledException;
-use ClaudioDekker\Keystone\Methods\Credential;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\Proof;
 use ClaudioDekker\Keystone\Methods\Surface;
@@ -17,6 +16,7 @@ use ClaudioDekker\Keystone\SecurityEvents\Recorder;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use ClaudioDekker\Keystone\Session\SessionState;
 use Illuminate\Contracts\Validation\Factory as ValidationFactory;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
 use Throwable;
@@ -80,7 +80,7 @@ class SignIn
     }
 
     /**
-     * Sign in the account the identifier names when the type proves one of its credentials.
+     * Sign in the account the identifier names when the type proves one of its credentials, then write the proof's rehash.
      *
      * @param  array<string, mixed>  $validated
      *
@@ -92,7 +92,9 @@ class SignIn
 
         $attempt = $this->limiter->takeFailedAttempt($type, Surface::SIGN_IN, $account, $validated['identifier']);
 
-        $proof = $this->verify($type, $account, $validated, $attempt);
+        $credentials = $this->credentials($type, $account);
+
+        $proof = $this->verify($type, $credentials, $validated, $attempt);
 
         $owner = $this->decision->decide($proof, $type, $account);
 
@@ -119,20 +121,23 @@ class SignIn
             credential: $proof->credential,
         );
 
+        $this->rehash($proof, $credentials);
+
         return new SignedIn($redirectTo);
     }
 
     /**
      * Let the type verify the input against the account's credentials, giving the attempt back when the type throws.
      *
+     * @param  Collection<int, UserCredential>  $credentials
      * @param  array<string, mixed>  $validated
      */
-    protected function verify(CredentialType $type, ?KeystoneUser $account, array $validated, CountedAttempt $attempt): Proof
+    protected function verify(CredentialType $type, Collection $credentials, array $validated, CountedAttempt $attempt): Proof
     {
         $verification = new Verification(
             surface: Surface::SIGN_IN,
             input: Arr::except($validated, 'identifier'),
-            credentials: $this->credentials($type, $account),
+            credentials: $credentials->map->toCredential()->values()->all(),
         );
 
         try {
@@ -147,22 +152,47 @@ class SignIn
     /**
      * Get the account's credentials of the type, none when there is no account.
      *
-     * @return array<int, Credential>
+     * @return Collection<int, UserCredential>
      */
-    protected function credentials(CredentialType $type, ?KeystoneUser $account): array
+    protected function credentials(CredentialType $type, ?KeystoneUser $account): Collection
     {
         if ($account === null) {
-            return [];
+            return new Collection;
         }
 
-        $credentials = UserCredential::query()
+        return UserCredential::query()
             ->where('user_id', $account->getAuthIdentifier())
             ->where('type', $type->name())
             ->get();
+    }
 
-        return $credentials
-            ->map(fn (UserCredential $credential) => $credential->toCredential())
-            ->values()
-            ->all();
+    /**
+     * Write the proof's rehash over the credential it proved, reporting a failure without undoing the sign-in.
+     *
+     * @param  Collection<int, UserCredential>  $credentials
+     */
+    protected function rehash(Proof $proof, Collection $credentials): void
+    {
+        $proven = $credentials->find($proof->credential);
+
+        if ($proven === null) {
+            return;
+        }
+
+        rescue(fn () => $this->writeRehash($proof, $proven));
+    }
+
+    /**
+     * Make the proof's rehash and write it over the proven credential, unless its secret changed meanwhile.
+     */
+    protected function writeRehash(Proof $proof, UserCredential $proven): void
+    {
+        $secret = $proof->rehashed();
+
+        if ($secret === null) {
+            return;
+        }
+
+        $proven->updateSecretUnlessChanged($secret);
     }
 }
