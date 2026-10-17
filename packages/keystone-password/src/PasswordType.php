@@ -23,7 +23,7 @@ use SensitiveParameter;
 class PasswordType implements CredentialType
 {
     /**
-     * The most characters a password may have at sign-in, which bounds the cost of an argon2 check.
+     * The most characters a password may have at sign-in.
      */
     protected const int MAX_LENGTH = 1024;
 
@@ -39,7 +39,7 @@ class PasswordType implements CredentialType
     ];
 
     /**
-     * Create the type, reading the app's hashing config when it verifies, so a change at runtime takes effect.
+     * Create the type.
      */
     public function __construct(protected Repository $config, protected DummyHash $dummyHash)
     {
@@ -75,7 +75,7 @@ class PasswordType implements CredentialType
     }
 
     /**
-     * Get the rules for the password: a string of up to 1024 characters.
+     * Get the rules for the password.
      *
      * @return array<string, mixed>
      */
@@ -92,14 +92,15 @@ class PasswordType implements CredentialType
     public function verify(Verification $verification): Proof
     {
         $password = (string) $verification->input['password'];
+        $usable = array_filter($verification->credentials, fn (Credential $credential) => $this->driverFor($credential) !== null);
 
-        if ($verification->credentials === []) {
+        if ($usable === []) {
             $this->checkDummy($password);
 
             return Proof::rejected();
         }
 
-        foreach ($verification->credentials as $credential) {
+        foreach ($usable as $credential) {
             if ($this->matches($password, $credential)) {
                 return $this->proven($credential, $password);
             }
@@ -109,23 +110,25 @@ class PasswordType implements CredentialType
     }
 
     /**
+     * Get the Hash driver of the algorithm that made the credential's hash, or null when no driver can check it.
+     *
+     * With its verify option on, a Laravel driver throws on a hash of another algorithm rather than refusing it.
+     */
+    protected function driverFor(Credential $credential): ?string
+    {
+        $algorithm = Hash::info((string) $credential->secret)['algoName'];
+
+        return static::DRIVERS[$algorithm] ?? null;
+    }
+
+    /**
      * Determine if the password matches the credential's hash, checked by the driver of the hash's own algorithm.
-     *
-     *
-     * The driver's verify option stays on: a bcrypt hash goes to the bcrypt driver, so HASH_VERIFY never has to be off.
      */
     protected function matches(#[SensitiveParameter] string $password, Credential $credential): bool
     {
-        $hash = (string) $credential->secret;
-        $driver = static::DRIVERS[Hash::info($hash)['algoName']] ?? null;
+        $driver = (string) $this->driverFor($credential);
 
-        if ($driver === null) {
-            $this->checkDummy($password);
-
-            return false;
-        }
-
-        return Hash::driver($driver)->check($password, $hash);
+        return Hash::driver($driver)->check($password, (string) $credential->secret);
     }
 
     /**
@@ -137,13 +140,11 @@ class PasswordType implements CredentialType
     }
 
     /**
-     * Prove the credential, carrying a rehash when its hash is not of the app's driver and cost.
-     *
-     * Only the cheap needsRehash() runs here. Hash::make() waits in the closure until core has signed the account in.
+     * Prove the credential, carrying a rehash when the app wants one and its hash is not of the app's driver and cost.
      */
     protected function proven(Credential $credential, #[SensitiveParameter] string $password): Proof
     {
-        if (! Hash::needsRehash((string) $credential->secret)) {
+        if (! $this->config->boolean('hashing.rehash_on_login', true) || ! Hash::needsRehash((string) $credential->secret)) {
             return Proof::proven($credential);
         }
 

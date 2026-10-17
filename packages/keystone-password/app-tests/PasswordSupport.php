@@ -8,6 +8,7 @@ use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Models\UserCredential;
+use ClaudioDekker\Keystone\Password\AppTests\Support\FailingHasher;
 use ClaudioDekker\Keystone\Password\AppTests\Support\RefusingHasher;
 use Illuminate\Support\Facades\Hash;
 use PHPUnit\Framework\Assert;
@@ -90,6 +91,19 @@ class PasswordSupport implements CredentialTypeSupport
         $real = Hash::driver($driver);
 
         Hash::extend($driver, fn () => new RefusingHasher($real));
+        Hash::forgetDrivers();
+
+        return $this;
+    }
+
+    /**
+     * Make the driver fail to hash from now on, while it still checks, as a hasher that is down would.
+     */
+    public function failHashingWith(string $driver): static
+    {
+        $real = Hash::driver($driver);
+
+        Hash::extend($driver, fn () => new FailingHasher($real));
         Hash::forgetDrivers();
 
         return $this;
