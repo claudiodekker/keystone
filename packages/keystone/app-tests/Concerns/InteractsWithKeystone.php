@@ -11,7 +11,6 @@ use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Models\UserEmail;
-use Closure;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Date;
@@ -138,32 +137,6 @@ trait InteractsWithKeystone
     }
 
     /**
-     * Run app code inside a request, so whatever it leaves in the session reaches the next request.
-     *
-     * @template TResult
-     *
-     * @param  Closure(): TResult  $code
-     * @return TResult
-     */
-    public function duringRequest(Closure $code): mixed
-    {
-        $this->startRequest();
-
-        $session = $this->app['session.store'];
-
-        $session->setId($this->defaultCookies[$session->getName()] ?? null);
-        $session->start();
-
-        $result = $code();
-
-        $session->save();
-
-        $this->defaultCookies[$session->getName()] = $session->getId();
-
-        return $result;
-    }
-
-    /**
      * Assert the two responses match in status, redirect, flashed data, header and cookie names, and the time they took.
      */
     public function assertIndistinguishable(KeystoneTestResponse $existing, KeystoneTestResponse $missing): void
@@ -185,11 +158,15 @@ trait InteractsWithKeystone
     }
 
     /**
-     * Send the request with the cookies earlier responses set, then forget the session data it left in memory.
+     * Send the request with fresh guards and the cookies earlier responses set, then forget the session data it left in memory.
      */
     public function call($method, $uri, $parameters = [], $cookies = [], $files = [], $server = [], $content = null): KeystoneTestResponse
     {
-        $this->startRequest();
+        $this->app['auth']->forgetGuards();
+
+        if ($this->actor !== null) {
+            $this->app['auth']->guard()->setUser($this->actor);
+        }
 
         $startedAt = Date::now();
 
@@ -202,18 +179,6 @@ trait InteractsWithKeystone
         $this->app['session.store']->flush();
 
         return KeystoneTestResponse::capture($response, $session, $startedAt->diffInMilliseconds(Date::now()));
-    }
-
-    /**
-     * Forget the guards an earlier request built, putting back the user actingAs() set.
-     */
-    protected function startRequest(): void
-    {
-        $this->app['auth']->forgetGuards();
-
-        if ($this->actor !== null) {
-            $this->app['auth']->guard()->setUser($this->actor);
-        }
     }
 
     /**
