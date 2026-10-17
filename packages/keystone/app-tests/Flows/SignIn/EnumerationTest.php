@@ -60,3 +60,22 @@ it('takes at least 300 ms to refuse', function (string $identifier) {
     'an unknown address' => 'grace@example.com',
     'an unresolved address' => 'shared@example.com',
 ])->group('SI-3');
+
+it('answers an identifier that is not valid UTF-8 exactly like a wrong secret', function () {
+    $user = $this->createUser();
+    UserEmail::factory()->for($user, 'user')->verified()->create(['address' => 'ada@example.com']);
+    $support = $this->supportFor(Surface::SIGN_IN);
+    $support->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $wrongSecret = $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->rejectedProof(Surface::SIGN_IN),
+    ]);
+
+    $malformed = $this->freshBrowser()->post(route('login.submit', $support->type()->name()), [
+        'identifier' => "ada\xFF@example.com",
+        ...$support->rejectedProof(Surface::SIGN_IN),
+    ]);
+
+    $this->assertIndistinguishable($wrongSecret, $malformed);
+})->group('SI-3', 'SI-11');
