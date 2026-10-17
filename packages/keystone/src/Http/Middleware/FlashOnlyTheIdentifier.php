@@ -8,7 +8,7 @@ use Illuminate\Support\Arr;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Keep only the identifier in the input a Keystone action flashes back, whatever answered: a hook, a refusal or Laravel's validation [MF-12].
+ * Keep only the identifier in the input a Keystone action flashes back, whatever answered: a hook, a refusal or Laravel's validation.
  *
  * @internal
  */
@@ -23,7 +23,9 @@ class FlashOnlyTheIdentifier
 
         $session = $request->session();
 
-        $session->put('_old_input', Arr::only($session->get('_old_input', []), ['identifier']));
+        if ($session->has('_old_input')) {
+            $session->put('_old_input', Arr::only($session->get('_old_input'), ['identifier']));
+        }
 
         return $response;
     }
