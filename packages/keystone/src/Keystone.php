@@ -4,12 +4,12 @@ namespace ClaudioDekker\Keystone;
 
 use ClaudioDekker\Keystone\Auth\KeystoneGuard;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
+use ClaudioDekker\Keystone\Exceptions\KeystoneMisconfiguredException;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use Illuminate\Auth\EloquentUserProvider;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
-use LogicException;
 
 /**
  * Hold what the app and the method packages tell Keystone at boot.
@@ -65,7 +65,7 @@ class Keystone
         $guard = Auth::guard();
 
         if (! $guard instanceof KeystoneGuard) {
-            throw new LogicException('Keystone needs the keystone driver on the default auth guard.');
+            throw KeystoneMisconfiguredException::guardDriver();
         }
 
         return $guard;
@@ -83,13 +83,13 @@ class Keystone
         $provider = static::guard()->getProvider();
 
         if (! $provider instanceof EloquentUserProvider) {
-            throw new LogicException('Keystone needs the eloquent user provider on the keystone guard.');
+            throw KeystoneMisconfiguredException::userProvider();
         }
 
         $model = $provider->getModel();
 
         if (! is_a($model, KeystoneUser::class, true)) {
-            throw new LogicException("Keystone needs the user model [{$model}] to implement KeystoneUser.");
+            throw KeystoneMisconfiguredException::userModel($model);
         }
 
         return $model;

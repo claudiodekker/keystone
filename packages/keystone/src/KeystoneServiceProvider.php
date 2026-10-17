@@ -3,10 +3,10 @@
 namespace ClaudioDekker\Keystone;
 
 use ClaudioDekker\Keystone\Auth\KeystoneGuard;
+use ClaudioDekker\Keystone\Exceptions\KeystoneMisconfiguredException;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\ServiceProvider;
-use LogicException;
 
 /**
  * Register Keystone with the app.
@@ -44,7 +44,7 @@ class KeystoneServiceProvider extends ServiceProvider
         $provider = Auth::createUserProvider($config['provider'] ?? null);
 
         if ($provider === null) {
-            throw new LogicException("Keystone needs a user provider on the [{$name}] guard.");
+            throw KeystoneMisconfiguredException::missingUserProvider($name);
         }
 
         $guard = new KeystoneGuard($name, $provider, $app->make('session.store'));

@@ -2,11 +2,11 @@
 
 namespace ClaudioDekker\Keystone\Database;
 
+use ClaudioDekker\Keystone\Exceptions\KeystoneMisconfiguredException;
 use Illuminate\Support\Facades\DB;
-use LogicException;
 
 /**
- * The collation that makes a string column compare as binary on the default connection [H4].
+ * The collation that makes a string column compare as binary on the default connection.
  *
  * @internal
  */
@@ -23,7 +23,7 @@ class Collation
             'mariadb', 'mysql' => 'utf8mb4_bin',
             'pgsql' => 'C',
             'sqlite' => 'BINARY',
-            default => throw new LogicException("Keystone keeps its tables on MariaDB, MySQL, Postgres or SQLite, not [{$driver}]."),
+            default => throw KeystoneMisconfiguredException::databaseDriver($driver),
         };
     }
 }

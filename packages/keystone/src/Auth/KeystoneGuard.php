@@ -2,9 +2,9 @@
 
 namespace ClaudioDekker\Keystone\Auth;
 
+use ClaudioDekker\Keystone\Exceptions\SessionGuardSignInException;
 use Illuminate\Auth\SessionGuard;
 use Illuminate\Contracts\Auth\Authenticatable;
-use LogicException;
 use SensitiveParameter;
 
 /**
@@ -60,7 +60,7 @@ class KeystoneGuard extends SessionGuard
      */
     public function login(Authenticatable $user, $remember = false): never
     {
-        throw new LogicException('Keystone signs users in. Auth::login() cannot report a refusal.');
+        throw SessionGuardSignInException::login();
     }
 
     /**
