@@ -1,6 +1,5 @@
 <?php
 
-use ClaudioDekker\Keystone\AppTests\Support\CredentialTypeSupport;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\InitiateShape;
@@ -39,10 +38,10 @@ beforeEach(function () {
 });
 
 it('lists only the types that serve sign-in, each with its initiate shape', function () {
-    $types = collect($this->supportsFor(Surface::SIGN_IN))
-        ->map(fn (CredentialTypeSupport $support) => [
-            'name' => $support->type()->name(),
-            'shape' => $support->type()->initiateShape(Surface::SIGN_IN)->value,
+    $types = collect(Keystone::credentialTypes()->serving(Surface::SIGN_IN))
+        ->map(fn (CredentialType $type) => [
+            'name' => $type->name(),
+            'shape' => $type->initiateShape(Surface::SIGN_IN)->value,
         ])
         ->all();
 

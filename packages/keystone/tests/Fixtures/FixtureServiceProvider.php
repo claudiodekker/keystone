@@ -3,6 +3,7 @@
 namespace ClaudioDekker\Keystone\Tests\Fixtures;
 
 use ClaudioDekker\Keystone\Keystone;
+use ClaudioDekker\Keystone\Tests\Fixtures\Methods\FakeChallengeType;
 use ClaudioDekker\Keystone\Tests\Fixtures\Methods\FakeFormType;
 use ClaudioDekker\Keystone\Tests\Fixtures\Models\User;
 use Illuminate\Support\Facades\Route;
@@ -30,6 +31,7 @@ class FixtureServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Keystone::credentialType(new FakeFormType);
+        Keystone::credentialType(new FakeChallengeType);
 
         Route::middleware('web')->group(__DIR__.'/routes/keystone.php');
 
