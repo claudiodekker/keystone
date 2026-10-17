@@ -95,6 +95,14 @@ it('fails assertSignInRefused on a refusal that flashes back the secret', functi
     expect(fn () => $this->assertSignInRefused($response, __('keystone::messages.credentials-rejected')))->toThrow(AssertionFailedError::class, 'The response flashed back more than the identifier.');
 });
 
+it('fails assertSignInRefused on a refusal that flashes back no identifier', function () {
+    $session = new Store('session', new ArraySessionHandler(1));
+    $session->flash('errors', (new ViewErrorBag)->put('default', new MessageBag(['identifier' => [__('keystone::messages.credentials-rejected')]])));
+    $response = KeystoneTestResponse::capture(TestResponse::fromBaseResponse(new RedirectResponse(route('login'))), $session, 300);
+
+    expect(fn () => $this->assertSignInRefused($response, __('keystone::messages.credentials-rejected')))->toThrow(AssertionFailedError::class, 'The response flashed back no identifier.');
+});
+
 it('fails assertSignInInvalid on a refusal', function () {
     $user = $this->createUser();
     UserEmail::factory()->for($user, 'user')->verified()->create(['address' => 'ada@example.com']);

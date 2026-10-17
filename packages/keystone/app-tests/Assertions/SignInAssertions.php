@@ -34,6 +34,8 @@ trait SignInAssertions
         $response->assertRedirectToRoute('login');
         $response->assertSessionHasErrors(['identifier' => $message]);
 
+        Assert::assertArrayHasKey('identifier', $response->oldInput(), 'The response flashed back no identifier.');
+
         $this->assertFlashedOnlyTheIdentifier($response);
     }
 
