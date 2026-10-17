@@ -37,6 +37,15 @@ it('fails table access in the tests of a package', function () {
     expect((new NoTableAccess)->check($file))->toBe([3]);
 });
 
+it('fails table access in the AppTests and database files of a package', function (string $path) {
+    $file = new File($path, "<?php\n\nDB::table('user_emails')->insert([]);\n");
+
+    expect((new NoTableAccess)->check($file))->toBe([3]);
+})->with([
+    'packages/keystone/app-tests/Flows/ExampleTest.php',
+    'packages/keystone/database/factories/ExampleFactory.php',
+]);
+
 it('passes the other uses of the facade and queries through models', function () {
     $file = new File('packages/keystone/src/Example.php', <<<'PHP'
         <?php

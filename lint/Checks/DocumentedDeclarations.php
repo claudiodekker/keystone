@@ -17,7 +17,7 @@ class DocumentedDeclarations extends Check
      *
      * @var list<string>
      */
-    protected array $paths = ['packages/*/src/*.php', 'packages/*/app-tests/*.php', 'packages/*/tests/*.php', 'tests/*.php', 'lint/*.php'];
+    protected array $paths = ['packages/*/src/*.php', 'packages/*/app-tests/*.php', 'packages/*/database/*.php', 'packages/*/tests/*.php', 'tests/*.php', 'lint/*.php'];
 
     /**
      * The paths the check skips.

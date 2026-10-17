@@ -17,7 +17,7 @@ class NoTableAccess extends Check
      *
      * @var list<string>
      */
-    protected array $paths = ['packages/*/src/*.php', 'packages/*/tests/*.php'];
+    protected array $paths = ['packages/*/src/*.php', 'packages/*/app-tests/*.php', 'packages/*/database/*.php', 'packages/*/tests/*.php'];
 
     /**
      * Get the failure message, naming the fix.
