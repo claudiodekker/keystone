@@ -113,10 +113,10 @@ it('starts a new session without cookies when it puts the intended URL', functio
     $this->assertSignInPage($response);
 });
 
-it('keeps what app code leaves in the session for the next request', function () {
+it('keeps what the test puts in the session for the next request', function () {
     $user = $this->createUser();
 
-    $this->duringRequest(fn () => session()->put(Keystone::guard()->getName(), $user->getAuthIdentifier()));
+    $this->withSession([Keystone::guard()->getName() => $user->getAuthIdentifier()]);
 
     $response = $this->get(route('login'));
 

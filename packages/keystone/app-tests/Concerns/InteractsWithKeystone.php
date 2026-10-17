@@ -22,9 +22,9 @@ use Symfony\Component\HttpFoundation\Cookie;
 /**
  * Drive the app the way a user does, and check its answers through assertions the app can override.
  *
- * Each request starts afresh: the guards are built again and only the cookies that earlier
- * responses set carry over, so the session holds only what its storage keeps for those
- * cookies. The next request sees a sign-in only when the session really stored it.
+ * Each request starts afresh: the guards are built again, and the session holds only what its
+ * storage keeps for the cookies that earlier responses set, plus what the test put in with
+ * withSession(). The next request sees a sign-in only when the session really stored it.
  *
  * @api
  */
@@ -197,7 +197,7 @@ trait InteractsWithKeystone
     }
 
     /**
-     * Send the request with the cookies earlier responses set, starting the app's request state afresh.
+     * Send the request with the cookies earlier responses set, then forget the session data it left in memory.
      */
     public function call($method, $uri, $parameters = [], $cookies = [], $files = [], $server = [], $content = null): KeystoneTestResponse
     {
@@ -211,16 +211,17 @@ trait InteractsWithKeystone
 
         $session = clone $this->app['session.store'];
 
+        $this->app['session.store']->flush();
+
         return KeystoneTestResponse::capture($response, $session, $startedAt->diffInMilliseconds(Date::now()));
     }
 
     /**
-     * Forget the guards and the session data an earlier request left in memory.
+     * Forget the guards an earlier request built, putting back the user actingAs() set.
      */
     protected function startRequest(): void
     {
         $this->app['auth']->forgetGuards();
-        $this->app['session.store']->flush();
 
         if ($this->actor !== null) {
             $this->app['auth']->guard()->setUser($this->actor);
