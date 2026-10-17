@@ -196,7 +196,7 @@ class FakeFormType implements CredentialType, CredentialTypeSupport
     }
 
     /**
-     * Run the work queued for this verify, once, so work that verifies again doesn't run it again.
+     * Run the work queued for this verify once, clearing it first so a verify it starts doesn't run it again.
      */
     protected function runDuringVerify(): void
     {

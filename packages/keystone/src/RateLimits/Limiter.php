@@ -63,11 +63,11 @@ class Limiter
     public function takeRequest(StepKind $kind): void
     {
         $allowance = $this->config->integer('keystone.rate_limits.requests_per_minute.'.$kind->value);
-        $keys = [$this->key(Limit::REQUEST, $kind->value, 'address', $this->address())];
+        $keys = [$this->key(Limit::REQUEST, [$kind->value, 'address', $this->address()])];
         $account = $this->session->account();
 
         if ($account !== null) {
-            $keys[] = $this->key(Limit::REQUEST, $kind->value, 'account', (string) $account->getAuthIdentifier());
+            $keys[] = $this->key(Limit::REQUEST, [$kind->value, 'account', (string) $account->getAuthIdentifier()]);
         }
 
         $spent = collect($keys)
@@ -98,7 +98,7 @@ class Limiter
     public function takeFailedAttempt(CredentialType $type, Surface $surface, ?KeystoneUser $account, string $identifier): CountedAttempt
     {
         $flow = $this->session->flow($surface) ?? throw new LogicException("No flow counts failed attempts on the [{$surface->value}] surface.");
-        $key = $this->key(Limit::FAILED_ATTEMPT, ...$this->subject($account, $identifier), ...[$type->name(), $flow->value]);
+        $key = $this->key(Limit::FAILED_ATTEMPT, [...$this->subject($account, $identifier), $type->name(), $flow->value]);
         $allowance = $this->config->integer('keystone.rate_limits.failed_attempts_per_hour');
 
         $attempt = $this->take($key, Limit::FAILED_ATTEMPT) ?? throw ThrottledException::retryAfter(1);
@@ -207,8 +207,10 @@ class Limiter
 
     /**
      * Get the store key of the limit's parts, hashed under the rate limit subkey of the app key.
+     *
+     * @param  list<string>  $parts
      */
-    protected function key(Limit $limit, string ...$parts): string
+    protected function key(Limit $limit, array $parts): string
     {
         $message = json_encode([$limit->value, ...$parts], JSON_THROW_ON_ERROR);
 
