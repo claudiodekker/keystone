@@ -6,6 +6,7 @@ use ClaudioDekker\Keystone\Accounts\EmailAddress;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Exceptions\ThrottledException;
 use ClaudioDekker\Keystone\Http\RequestContext;
+use ClaudioDekker\Keystone\Http\Subnet;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Session\SessionState;
@@ -142,13 +143,17 @@ class Limiter
     }
 
     /**
-     * Get the request's IP address, or the part every request without a usable one shares.
+     * Get the request's IP address as the request limit counts it, or the part every request without a usable one shares.
      */
     protected function address(): string
     {
         $ipAddress = RequestContext::of($this->request)?->ipAddress;
 
-        return $ipAddress ?? static::UNKNOWN_ADDRESS;
+        if ($ipAddress === null) {
+            return static::UNKNOWN_ADDRESS;
+        }
+
+        return Subnet::counted($ipAddress) ?? static::UNKNOWN_ADDRESS;
     }
 
     /**
