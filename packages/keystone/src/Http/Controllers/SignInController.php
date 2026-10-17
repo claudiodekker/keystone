@@ -2,6 +2,7 @@
 
 namespace ClaudioDekker\Keystone\Http\Controllers;
 
+use ClaudioDekker\Keystone\Http\Middleware\FlashOnlyTheIdentifier;
 use ClaudioDekker\Keystone\Http\Pages\SignInPage;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\Surface;
@@ -11,15 +12,29 @@ use ClaudioDekker\Keystone\SignIn\SignIn;
 use ClaudioDekker\Keystone\Status;
 use Illuminate\Contracts\Support\Responsable;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
  * Show the sign-in page and take a proof of a credential type, ending every outcome in one response hook.
  *
  * @api
  */
-abstract class SignInController
+abstract class SignInController implements HasMiddleware
 {
+    /**
+     * Get the middleware every sign-in action runs, whatever the app's subclass overrides.
+     *
+     * @return list<class-string>
+     */
+    public static function middleware(): array
+    {
+        return [
+            FlashOnlyTheIdentifier::class,
+        ];
+    }
+
     /**
      * Show the sign-in page to a guest.
      */
@@ -46,7 +61,9 @@ abstract class SignInController
             return $this->sendAlreadySignedIn($request);
         }
 
-        $outcome = $signIn->attempt($type, $request->all());
+        $credentialType = Keystone::credentialTypes()->find($type, Surface::SIGN_IN) ?? throw new NotFoundHttpException;
+
+        $outcome = $signIn->attempt($credentialType, $request->all());
 
         if ($outcome instanceof Refused) {
             return $this->sendSignInRefused($request, Status::CREDENTIALS_REJECTED->label());

@@ -50,3 +50,19 @@ it('lists only the types that serve sign-in, each with its initiate shape', func
 
     $this->assertSignInPage($response, ['types' => $types]);
 });
+
+it('answers a type that is not installed as not found', function () {
+    $response = $this->post(route('login.submit', 'not-installed'), [
+        'identifier' => 'ada@example.com',
+    ]);
+
+    $this->assertSignInTypeNotFound($response);
+});
+
+it('answers a type that serves no sign-in as not found', function () {
+    $response = $this->post(route('login.submit', 'serves-no-sign-in'), [
+        'identifier' => 'ada@example.com',
+    ]);
+
+    $this->assertSignInTypeNotFound($response);
+});

@@ -54,7 +54,9 @@ class FakeFormType implements CredentialType, CredentialTypeSupport
      */
     public function rules(Surface $surface): array
     {
-        return [];
+        return [
+            'secret' => ['required', 'string'],
+        ];
     }
 
     /**

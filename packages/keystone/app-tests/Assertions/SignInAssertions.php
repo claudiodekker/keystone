@@ -38,6 +38,26 @@ trait SignInAssertions
     }
 
     /**
+     * Assert the response refused the submit as invalid on the given fields, flashing back nothing but the identifier.
+     *
+     * @param  array<int|string, string>  $fields  Field names, or a field's expected message by its name.
+     */
+    public function assertSignInInvalid(KeystoneTestResponse $response, array $fields): void
+    {
+        $response->assertInvalid($fields);
+
+        Assert::assertSame([], array_values(array_diff(array_keys($response->oldInput()), ['identifier'])), 'The response flashed back more than the identifier.');
+    }
+
+    /**
+     * Assert the response answered a credential type the sign-in page doesn't offer as not found.
+     */
+    public function assertSignInTypeNotFound(KeystoneTestResponse $response): void
+    {
+        $response->assertNotFound();
+    }
+
+    /**
      * Assert the response sent the signed-in user on to the given path.
      */
     public function assertSignedIn(KeystoneTestResponse $response, string $redirectTo): void

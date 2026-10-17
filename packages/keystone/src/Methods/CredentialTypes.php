@@ -20,11 +20,17 @@ readonly class CredentialTypes
     }
 
     /**
-     * Find the type with the given name.
+     * Find the type with the given name, when it serves the surface.
      */
-    public function find(string $name): CredentialType
+    public function find(string $name, Surface $surface): ?CredentialType
     {
-        return $this->types[$name];
+        $type = $this->types[$name] ?? null;
+
+        if ($type?->initiateShape($surface) === null) {
+            return null;
+        }
+
+        return $type;
     }
 
     /**
