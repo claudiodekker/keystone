@@ -93,22 +93,6 @@ it('signs in neither account that counts one address as verified', function () {
     $this->assertSignInRefused($response, __('keystone::messages.credentials-rejected'));
 });
 
-it("doesn't sign in with an address another account holds verified", function () {
-    $ada = $this->createUser();
-    $grace = $this->createUser();
-    $this->addUnverifiedAddress($grace, 'shared@example.com');
-    $this->addVerifiedAddress($ada, 'shared@example.com');
-    $support = $this->supportFor(Surface::SIGN_IN);
-    $support->arrangeCredential(Surface::SIGN_IN, $grace);
-
-    $response = $this->post(route('login.submit', $support->type()->name()), [
-        'identifier' => 'shared@example.com',
-        ...$support->validProof(Surface::SIGN_IN, $grace),
-    ]);
-
-    $this->assertSignInRefused($response, __('keystone::messages.credentials-rejected'));
-});
-
 it('refuses an identifier that is no address like an unknown one', function () {
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
