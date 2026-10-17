@@ -4,7 +4,6 @@ namespace ClaudioDekker\Keystone\Lint\Checks;
 
 use ClaudioDekker\Keystone\Lint\Check;
 use ClaudioDekker\Keystone\Lint\File;
-use Illuminate\Testing\TestResponse;
 use PhpParser\Node;
 use PhpParser\Node\Expr;
 
@@ -29,7 +28,7 @@ class ResponsesThroughAssertionTraits extends Check
     }
 
     /**
-     * Get the lines that call a response assertion on anything but the test case.
+     * Get the lines that call an assert* method on anything but the test case.
      *
      * @return list<int>
      */
@@ -39,14 +38,13 @@ class ResponsesThroughAssertionTraits extends Check
     }
 
     /**
-     * Determine if the node calls an assertion of Laravel's test response on a receiver other than $this, such as $response->assertRedirect().
+     * Determine if the node calls assert* on a receiver other than $this, such as $response->assertRedirect().
      */
     protected function isForeignAssertion(Node $node): bool
     {
         return ($node instanceof Expr\MethodCall || $node instanceof Expr\NullsafeMethodCall)
             && $node->name instanceof Node\Identifier
             && str_starts_with($node->name->toLowerString(), 'assert')
-            && method_exists(TestResponse::class, $node->name->toString())
             && ! $this->isThis($node->var);
     }
 }
