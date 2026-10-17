@@ -2,6 +2,7 @@
 
 use ClaudioDekker\Keystone\Methods\Surface;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Response;
 use Illuminate\Support\MessageBag;
 use Illuminate\Support\ViewErrorBag;
 use Illuminate\Testing\TestResponse;
@@ -127,4 +128,35 @@ it('fails assertSignedOut on a redirect somewhere else', function () {
     $response = TestResponse::fromBaseResponse(new RedirectResponse(url('/')));
 
     expect(fn () => $this->assertSignedOut($response))->toThrow(AssertionFailedError::class);
+});
+
+it('fails assertSignInThrottled on a refusal', function () {
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $response = $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->rejectedProof(Surface::SIGN_IN),
+    ]);
+
+    expect(fn () => $this->assertSignInThrottled($response))->toThrow(AssertionFailedError::class);
+});
+
+it('fails assertSignInThrottled on a throttled answer without Retry-After', function () {
+    $response = TestResponse::fromBaseResponse(new Response('', 429));
+
+    expect(fn () => $this->assertSignInThrottled($response))->toThrow(AssertionFailedError::class, 'The response gave no Retry-After of at least one second.');
+});
+
+it('fails assertSignOutThrottled on a sign-out', function () {
+    $response = $this->post(route('logout'));
+
+    expect(fn () => $this->assertSignOutThrottled($response))->toThrow(AssertionFailedError::class);
+});
+
+it('fails assertSignOutThrottled on a throttled answer without Retry-After', function () {
+    $response = TestResponse::fromBaseResponse(new Response('', 429));
+
+    expect(fn () => $this->assertSignOutThrottled($response))->toThrow(AssertionFailedError::class, 'The response gave no Retry-After of at least one second.');
 });
