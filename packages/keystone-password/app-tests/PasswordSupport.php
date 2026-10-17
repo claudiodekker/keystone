@@ -62,13 +62,21 @@ class PasswordSupport implements CredentialTypeSupport
     }
 
     /**
-     * Give the user a password hashed by the given driver, the app's own unless named, as an import would store it.
+     * Give the user a password hashed by the given driver, the app's own unless named.
      */
     public function arrangePassword(KeystoneUser $user, string $password, ?string $driver = null): static
     {
+        return $this->arrangeHash($user, Hash::driver($driver)->make($password));
+    }
+
+    /**
+     * Give the user a credential holding the stored value as it is, as an import would write a hash.
+     */
+    public function arrangeHash(KeystoneUser $user, ?string $hash): static
+    {
         UserCredential::factory()->for($user, 'user')->create([
             'type' => 'password',
-            'secret' => Hash::driver($driver)->make($password),
+            'secret' => $hash,
         ]);
 
         return $this;

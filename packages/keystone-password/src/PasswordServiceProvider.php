@@ -30,7 +30,7 @@ class PasswordServiceProvider extends ServiceProvider
     {
         $config = $this->app->make(Repository::class);
 
-        Keystone::credentialType(new PasswordType($config));
+        Keystone::credentialType(new PasswordType($config, new DummyHash($config)));
         TrimStrings::except(static::PASSWORD_FIELDS);
     }
 }
