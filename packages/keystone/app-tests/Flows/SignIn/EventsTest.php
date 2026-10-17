@@ -1,5 +1,6 @@
 <?php
 
+use Carbon\CarbonImmutable;
 use ClaudioDekker\Keystone\Events\SecurityEventRecorded;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Models\UserSecurityEvent;
@@ -185,6 +186,45 @@ it("carries the request's address, user agent and request id, in the row and in 
         ->and($line['ip_address'])->toBe('203.0.113.9')
         ->and($line['user_agent'])->toBe('Mozilla/5.0 (X11; Linux x86_64)')
         ->and($line['request_id'])->toBe($event->request_id);
+});
+
+it('logs every fixed field in the context of the log line', function () {
+    $this->travelTo(CarbonImmutable::parse('2026-10-17 12:00:00', 'UTC'));
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $line = $this->securityEvents()->logged()[0];
+
+    expect(array_keys($line))->toBe([
+        'id',
+        'occurred_at',
+        'type',
+        'user_id',
+        'actor',
+        'flow',
+        'credential_type',
+        'credential_id',
+        'credential_label',
+        'reason',
+        'ip_address',
+        'location',
+        'user_agent',
+        'known_device',
+        'request_id',
+    ])
+        ->and($line['id'])->toBe($this->securityEvents()->for($user)->sole()->id)
+        ->and($line['occurred_at'])->toBe('2026-10-17T12:00:00.000000Z')
+        ->and($line['type'])->toBe('signed_in')
+        ->and($line['actor'])->toBe('user')
+        ->and($line['flow'])->toBe('sign-in')
+        ->and($line['credential_type'])->toBe($support->type()->name())
+        ->and($line['credential_id'])->not->toBeNull();
 });
 
 it('gives each request its own request id', function () {
