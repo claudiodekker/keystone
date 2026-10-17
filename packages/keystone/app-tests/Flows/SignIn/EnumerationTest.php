@@ -22,7 +22,6 @@ it('answers an unknown address exactly like a wrong secret', function () {
     ]);
 
     $this->assertSignInRefused($unknown, __('keystone::messages.credentials-rejected'));
-
     $this->assertIndistinguishable($wrongSecret, $unknown);
     Sleep::assertSequence([Sleep::for(300)->milliseconds(), Sleep::for(300)->milliseconds()]);
 });
@@ -48,7 +47,6 @@ it('answers an address two accounts count as verified exactly like a wrong secre
     ]);
 
     $this->assertSignInRefused($unresolved, __('keystone::messages.credentials-rejected'));
-
     $this->assertIndistinguishable($wrongSecret, $unresolved);
     Sleep::assertSequence([Sleep::for(300)->milliseconds(), Sleep::for(300)->milliseconds()]);
 });
@@ -92,7 +90,6 @@ it('answers an identifier that is not valid UTF-8 exactly like a wrong secret', 
     ]);
 
     $this->assertSignInRefused($malformed, __('keystone::messages.credentials-rejected'));
-
     $this->assertIndistinguishable($wrongSecret, $malformed);
     Sleep::assertSequence([Sleep::for(300)->milliseconds(), Sleep::for(300)->milliseconds()]);
 });

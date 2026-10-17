@@ -58,7 +58,6 @@ it('answers no account exactly like a rejected proof, for every installed type t
         ]);
 
         $this->assertSignInRefused($missing, __('keystone::messages.credentials-rejected'));
-
         $this->assertIndistinguishable($rejected, $missing);
     }
 
