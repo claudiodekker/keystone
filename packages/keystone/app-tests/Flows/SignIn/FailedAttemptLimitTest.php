@@ -204,3 +204,53 @@ it('gives a sign-in its own count back, and no more', function () {
 
     $this->assertSignInThrottled($spent);
 });
+
+it('keeps a count per account, so another account still signs in once one is throttled', function () {
+    $ada = $this->createUser();
+    $this->addVerifiedAddress($ada, 'ada@example.com');
+    $grace = $this->createUser();
+    $this->addVerifiedAddress($grace, 'grace@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $ada)->arrangeCredential(Surface::SIGN_IN, $grace);
+    $this->submitRejectedProofs($support, 'ada@example.com', $this->failedAttemptAllowance());
+
+    $throttled = $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $ada),
+    ]);
+
+    $signIn = $this->flushSession()->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'grace@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $grace),
+    ]);
+
+    $this->assertSignInThrottled($throttled);
+    $this->assertSignedIn($signIn, '/');
+});
+
+it('keeps a count per credential type, so another type still signs the account in once one is throttled', function () {
+    $supports = $this->supportsFor(Surface::SIGN_IN);
+
+    if (count($supports) < 2) {
+        $this->markTestSkipped('Fewer than two installed credential types with test support serve sign-in.');
+    }
+
+    [$spent, $other] = $supports;
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $spent->arrangeCredential(Surface::SIGN_IN, $user);
+    $other->arrangeCredential(Surface::SIGN_IN, $user);
+    $this->submitRejectedProofs($spent, 'ada@example.com', $this->failedAttemptAllowance());
+
+    $throttled = $this->post(route('login.submit', $spent->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$spent->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $signIn = $this->flushSession()->post(route('login.submit', $other->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$other->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $this->assertSignInThrottled($throttled);
+    $this->assertSignedIn($signIn, '/');
+});
