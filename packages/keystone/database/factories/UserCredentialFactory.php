@@ -7,7 +7,7 @@ use ClaudioDekker\Keystone\Models\UserCredential;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * Make credentials for the app's users; a type's test support says which type and secret.
+ * Make credentials for the app's users.
  *
  * @extends Factory<UserCredential>
  */
