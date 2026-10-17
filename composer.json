@@ -5,6 +5,7 @@
     "type": "project",
     "require": {
         "php": "^8.4",
+        "ext-intl": "*",
         "laravel/framework": "^13.0"
     },
     "require-dev": {
@@ -25,20 +26,25 @@
     ],
     "autoload": {
         "psr-4": {
-            "ClaudioDekker\\Keystone\\": "packages/keystone/src/"
+            "ClaudioDekker\\Keystone\\": "packages/keystone/src/",
+            "ClaudioDekker\\Keystone\\Database\\Factories\\": "packages/keystone/database/factories/"
         }
     },
     "autoload-dev": {
         "psr-4": {
+            "ClaudioDekker\\Keystone\\AppTests\\": "packages/keystone/app-tests/",
             "ClaudioDekker\\Keystone\\Lint\\": "lint/",
-            "ClaudioDekker\\Keystone\\Tests\\": "tests/"
+            "ClaudioDekker\\Keystone\\Tests\\": [
+                "tests/",
+                "packages/keystone/tests/"
+            ]
         }
     },
     "scripts": {
         "check": [
             "@composer validate --strict",
             "pint --test",
-            "phpstan analyse --no-progress --memory-limit=1G packages/*/src",
+            "phpstan analyse --no-progress --memory-limit=1G packages/*/src packages/*/tests/Fixtures",
             "pest",
             "@composer audit"
         ]

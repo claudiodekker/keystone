@@ -2,6 +2,9 @@
 
 namespace ClaudioDekker\Keystone\Lint;
 
+use PhpParser\Node;
+use PhpParser\Node\Expr;
+
 /**
  * A rule the repository holds to.
  */
@@ -82,6 +85,14 @@ abstract class Check
     protected function reads(string $path): bool
     {
         return $this->matches($this->paths, $path) && ! $this->matches($this->except, $path);
+    }
+
+    /**
+     * Determine if the node is the $this variable.
+     */
+    protected function isThis(Node $node): bool
+    {
+        return $node instanceof Expr\Variable && $node->name === 'this';
     }
 
     /**

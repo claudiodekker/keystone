@@ -54,8 +54,17 @@ it('passes a class that can be extended', function () {
     expect((new NoFinal)->check($file))->toBe([]);
 });
 
-it('reads only src', function () {
-    $file = new File('packages/keystone/tests/Fixtures/Example.php', "<?php\n\nfinal class Example {}\n");
+it('reads the AppTests and test support of packages, which apps extend too', function (string $path) {
+    $file = new File($path, "<?php\n\nfinal class Example {}\n");
+
+    expect((new NoFinal)->check($file))->toBe([3]);
+})->with([
+    'packages/keystone/app-tests/Concerns/Example.php',
+    'packages/keystone/tests/Fixtures/Example.php',
+]);
+
+it('reads only the packages', function () {
+    $file = new File('tests/Example.php', "<?php\n\nfinal class Example {}\n");
 
     expect((new NoFinal)->check($file))->toBe([]);
 });

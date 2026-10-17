@@ -1,6 +1,6 @@
 <?php
 
-namespace ClaudioDekker\Keystone\Tests;
+namespace ClaudioDekker\Keystone\AppTests;
 
 use Closure;
 use Illuminate\Support\Testing\Fakes\ExceptionHandlerFake as BaseExceptionHandlerFake;
@@ -9,6 +9,8 @@ use Throwable;
 
 /**
  * Fake the exception handler and remember which reports the test asserted.
+ *
+ * @internal
  */
 class ExceptionHandlerFake extends BaseExceptionHandlerFake
 {

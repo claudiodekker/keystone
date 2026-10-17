@@ -123,6 +123,8 @@ it('reads src, test support code and the lint', function (string $path) {
     expect((new DocumentedDeclarations)->check($file))->toBe([3]);
 })->with([
     'packages/keystone/src/Example.php',
+    'packages/keystone/app-tests/Concerns/Example.php',
+    'packages/keystone/database/factories/Example.php',
     'packages/keystone/tests/Support/Example.php',
     'tests/Example.php',
     'lint/Example.php',
