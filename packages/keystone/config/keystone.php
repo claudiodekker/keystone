@@ -37,7 +37,7 @@ return [
     |
     | How many failed attempts an account gets per credential type and flow
     | in an hour, and how many requests of each step kind one IP address
-    | or one signed-in account gets in a minute. The windows are fixed.
+    | or one signed-in account gets a minute. The windows are fixed.
     |
     */
 
