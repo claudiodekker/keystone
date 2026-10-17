@@ -3,12 +3,14 @@
 namespace ClaudioDekker\Keystone\SecurityEvents;
 
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
+use ClaudioDekker\Keystone\Events\SecurityEventRecorded;
 use ClaudioDekker\Keystone\Http\RequestContext;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Models\UserSecurityEvent;
 use ClaudioDekker\Keystone\Session\SessionState;
 use Illuminate\Contracts\Config\Repository as Config;
+use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Log;
@@ -31,6 +33,7 @@ class Recorder
      */
     public function __construct(
         protected Config $config,
+        protected Dispatcher $events,
         protected Request $request,
         protected SessionState $session,
     ) {
@@ -56,6 +59,8 @@ class Recorder
         }
 
         $entry->saveQuietly();
+
+        $this->events->dispatch(new SecurityEventRecorded($entry));
     }
 
     /**

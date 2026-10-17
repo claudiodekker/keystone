@@ -1,8 +1,10 @@
 <?php
 
+use ClaudioDekker\Keystone\Events\SecurityEventRecorded;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use Illuminate\Http\Middleware\TrustProxies;
+use Illuminate\Support\Facades\Event;
 
 afterEach(function () {
     TrustProxies::flushState();
@@ -48,6 +50,7 @@ it('records proof.rejected for the account when its sign-in is refused', functio
 });
 
 it('writes only a log line for a refused sign-in with a made-up address, and stores the typed address nowhere', function () {
+    Event::fake([SecurityEventRecorded::class]);
     $support = $this->supportFor(Surface::SIGN_IN);
 
     $response = $this->post(route('login.submit', $support->type()->name()), [
@@ -65,6 +68,24 @@ it('writes only a log line for a refused sign-in with a made-up address, and sto
         ->and($lines[0]['user_id'])->toBeNull()
         ->and($lines[0]['credential_type'])->toBe($support->type()->name())
         ->and(json_encode($lines, JSON_THROW_ON_ERROR))->not->toContain('grace');
+
+    Event::assertNotDispatched(SecurityEventRecorded::class);
+});
+
+it('dispatches SecurityEventRecorded with the whole entry', function () {
+    Event::fake([SecurityEventRecorded::class]);
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $event = $this->securityEvents()->for($user)->sole();
+
+    Event::assertDispatched(SecurityEventRecorded::class, fn (SecurityEventRecorded $recorded) => $recorded->entry->is($event) && $recorded->entry->type === SecurityEventType::SIGNED_IN);
 });
 
 it("carries the request's address, user agent and request id, in the row and in the log line", function () {
