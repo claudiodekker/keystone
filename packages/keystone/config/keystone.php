@@ -30,4 +30,24 @@ return [
 
     'log_channel' => null,
 
+    /*
+    |--------------------------------------------------------------------------
+    | Rate Limits
+    |--------------------------------------------------------------------------
+    |
+    | How many failed attempts an account gets per credential type and flow
+    | in an hour, and how many requests of each step kind one IP address
+    | or one signed-in account gets in a minute. The windows are fixed.
+    |
+    */
+
+    'rate_limits' => [
+        'failed_attempts_per_hour' => 20,
+        'requests_per_minute' => [
+            'change' => 10,
+            'submit' => 10,
+            'view' => 60,
+        ],
+    ],
+
 ];

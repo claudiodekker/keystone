@@ -4,11 +4,13 @@ namespace ClaudioDekker\Keystone\SignIn;
 
 use ClaudioDekker\Keystone\Accounts\AccountLookup;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
+use ClaudioDekker\Keystone\Exceptions\ThrottledException;
 use ClaudioDekker\Keystone\Methods\Credential;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Methods\Verification;
 use ClaudioDekker\Keystone\Models\UserCredential;
+use ClaudioDekker\Keystone\RateLimits\Limiter;
 use ClaudioDekker\Keystone\SecurityEvents\Recorder;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use ClaudioDekker\Keystone\Session\SessionState;
@@ -29,6 +31,7 @@ class SignIn
     public function __construct(
         protected AccountLookup $accounts,
         protected SignInDecision $decision,
+        protected Limiter $limiter,
         protected Recorder $recorder,
         protected SessionState $session,
         protected TimingFloor $floor,
@@ -42,6 +45,7 @@ class SignIn
      *
      * @param  array<string, mixed>  $input
      *
+     * @throws ThrottledException
      * @throws ValidationException
      */
     public function attempt(CredentialType $type, array $input): SignedIn|Refused
@@ -76,10 +80,14 @@ class SignIn
      * Sign in the account the identifier names when the type proves one of its credentials.
      *
      * @param  array<string, mixed>  $validated
+     *
+     * @throws ThrottledException
      */
     protected function prove(CredentialType $type, array $validated): SignedIn|Refused
     {
         $account = $this->accounts->resolve($validated['identifier']);
+
+        $this->limiter->takeFailedAttempt($type, Surface::SIGN_IN, $account, $validated['identifier']);
 
         $verification = new Verification(
             surface: Surface::SIGN_IN,

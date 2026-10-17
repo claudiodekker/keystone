@@ -18,4 +18,12 @@ trait SignOutAssertions
     {
         $response->assertRedirectToRoute('login');
     }
+
+    /**
+     * Assert the response refused signing out as throttled.
+     */
+    public function assertSignOutThrottled(TestResponse $response): void
+    {
+        $this->assertThrottled($response);
+    }
 }
