@@ -14,8 +14,6 @@ use ClaudioDekker\Keystone\Models\UserCredential;
 
 /**
  * A credential type of the form shape that compares a stored secret, and deliberately not a password.
- *
- * It is its own test support, records what it was given, and can forge a proof for core's own tests.
  */
 class FakeFormType implements CredentialType, CredentialTypeSupport
 {

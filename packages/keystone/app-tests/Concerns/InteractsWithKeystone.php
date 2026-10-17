@@ -25,7 +25,7 @@ use Symfony\Component\HttpFoundation\Cookie;
  * Every request starts afresh, like a new HTTP request from one browser: the guards are built again, the
  * session holds only what its storage keeps for the browser's cookie, and only the cookies earlier
  * responses set carry over. So the next request sees a sign-in only when the session really stored
- * it. The harness grows only through the named helpers here, each with its own test under app-tests/Harness.
+ * it.
  *
  * @api
  */

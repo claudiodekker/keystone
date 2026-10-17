@@ -14,7 +14,7 @@ use Illuminate\Support\Str;
 /**
  * Own Keystone's side of the session: who is signed in, and the status the next page shows.
  *
- * Every change of auth level goes through here, so the session rotates in one place. Controllers never touch the session or the guard.
+ * Every change of auth level goes through here, so the session rotates in one place.
  *
  * @internal
  */

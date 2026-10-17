@@ -84,7 +84,6 @@ class SignIn
             credentials: $this->credentials($type, $account),
         );
 
-        // The type verifies even when no account holds the identifier, so it does the same work either way.
         $proof = $type->verify($verification);
 
         $owner = $this->decision->decide($proof, $type, $account);

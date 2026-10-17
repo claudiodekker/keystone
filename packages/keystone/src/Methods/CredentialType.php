@@ -5,8 +5,6 @@ namespace ClaudioDekker\Keystone\Methods;
 /**
  * A way to prove identity that a method package registers, which reaches core only through this contract.
  *
- * A capability only some types need is its own small interface that a type implements, checked with instanceof.
- *
  * @internal
  */
 interface CredentialType
