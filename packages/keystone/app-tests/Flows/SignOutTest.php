@@ -33,16 +33,18 @@ it('ends the whole session, so nothing it held outlives signing out', function (
     $support->arrangeCredential(Surface::SIGN_IN, $user);
     $cookie = config('session.cookie');
 
-    $signedIn = $this->post(route('login.submit', $support->type()->name()), [
+    $signIn = $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada@example.com',
         ...$support->validProof(Surface::SIGN_IN, $user),
-    ])->getCookie($cookie)->getValue();
+    ]);
 
+    $signedIn = $signIn->getCookie($cookie)->getValue();
     $this->withSession(['url.intended' => url('/reports')]);
 
     $this->withCookie($cookie, $signedIn)->post(route('logout'));
 
-    $next = $this->flushSession()->withCookie($cookie, $signedIn)->post(route('login.submit', $support->type()->name()), [
+    $this->flushSession()->withCookie($cookie, $signedIn);
+    $next = $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada@example.com',
         ...$support->validProof(Surface::SIGN_IN, $user),
     ]);
