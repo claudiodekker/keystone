@@ -41,7 +41,7 @@ class PasswordType implements CredentialType
     /**
      * Create the type, reading the app's hashing config when it verifies, so a change at runtime takes effect.
      */
-    public function __construct(protected Repository $config)
+    public function __construct(protected Repository $config, protected DummyHash $dummyHash)
     {
         //
     }
@@ -93,6 +93,12 @@ class PasswordType implements CredentialType
     {
         $password = (string) $verification->input['password'];
 
+        if ($verification->credentials === []) {
+            $this->checkDummy($password);
+
+            return Proof::rejected();
+        }
+
         foreach ($verification->credentials as $credential) {
             if ($this->matches($password, $credential)) {
                 return $this->proven($credential, $password);
@@ -105,6 +111,7 @@ class PasswordType implements CredentialType
     /**
      * Determine if the password matches the credential's hash, checked by the driver of the hash's own algorithm.
      *
+     *
      * The driver's verify option stays on: a bcrypt hash goes to the bcrypt driver, so HASH_VERIFY never has to be off.
      */
     protected function matches(#[SensitiveParameter] string $password, Credential $credential): bool
@@ -112,7 +119,21 @@ class PasswordType implements CredentialType
         $hash = (string) $credential->secret;
         $driver = static::DRIVERS[Hash::info($hash)['algoName']] ?? null;
 
+        if ($driver === null) {
+            $this->checkDummy($password);
+
+            return false;
+        }
+
         return Hash::driver($driver)->check($password, $hash);
+    }
+
+    /**
+     * Check the password against the dummy hash, so a subject without a usable password costs what a wrong password does.
+     */
+    protected function checkDummy(#[SensitiveParameter] string $password): void
+    {
+        Hash::check($password, $this->dummyHash->get());
     }
 
     /**
