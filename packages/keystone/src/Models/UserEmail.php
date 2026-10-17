@@ -74,6 +74,12 @@ class UserEmail extends Model
     #[Scope]
     protected function whereCountingAsVerified(Builder $query, string $address): void
     {
-        $query->where('address', $address)->whereNotIn('user_id', static::query()->select('user_id')->whereNotNull('verified_address'));
+        $verifiedHolders = static::query()
+            ->select('user_id')
+            ->whereNotNull('verified_address');
+
+        $query
+            ->where('address', $address)
+            ->whereNotIn('user_id', $verifiedHolders);
     }
 }

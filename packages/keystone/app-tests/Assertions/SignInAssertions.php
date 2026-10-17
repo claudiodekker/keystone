@@ -34,7 +34,7 @@ trait SignInAssertions
         $response->assertRedirectToRoute('login');
         $response->assertSessionHasErrors(['identifier' => $message]);
 
-        Assert::assertSame(['identifier'], array_keys($response->oldInput()), 'The response flashed back more than the identifier.');
+        $this->assertFlashedOnlyTheIdentifier($response);
     }
 
     /**
@@ -46,7 +46,7 @@ trait SignInAssertions
     {
         $response->assertInvalid($fields);
 
-        Assert::assertSame([], array_values(array_diff(array_keys($response->oldInput()), ['identifier'])), 'The response flashed back more than the identifier.');
+        $this->assertFlashedOnlyTheIdentifier($response);
     }
 
     /**
@@ -63,5 +63,15 @@ trait SignInAssertions
     public function assertSignedIn(KeystoneTestResponse $response, string $redirectTo): void
     {
         $response->assertRedirect($redirectTo);
+    }
+
+    /**
+     * Assert the response flashed back no input but the identifier.
+     */
+    protected function assertFlashedOnlyTheIdentifier(KeystoneTestResponse $response): void
+    {
+        $others = array_diff(array_keys($response->oldInput()), ['identifier']);
+
+        Assert::assertSame([], array_values($others), 'The response flashed back more than the identifier.');
     }
 }

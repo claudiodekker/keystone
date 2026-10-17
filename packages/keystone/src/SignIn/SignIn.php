@@ -112,6 +112,9 @@ class SignIn
             ->where('type', $type->name())
             ->get();
 
-        return array_values($credentials->map(fn (UserCredential $credential) => $credential->toCredential())->all());
+        return $credentials
+            ->map(fn (UserCredential $credential) => $credential->toCredential())
+            ->values()
+            ->all();
     }
 }
