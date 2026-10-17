@@ -2,11 +2,18 @@
 
 use ClaudioDekker\Keystone\Events\SecurityEventRecorded;
 use ClaudioDekker\Keystone\Methods\Surface;
+use ClaudioDekker\Keystone\Models\UserSecurityEvent;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Middleware\TrustProxies;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Exceptions;
+use Illuminate\Support\Sleep;
 
 afterEach(function () {
+    Model::encryptUsing(null);
     TrustProxies::flushState();
 });
 
@@ -144,6 +151,105 @@ it('replaces control characters and invalid UTF-8 in the user agent and cuts it 
 
     expect($event->user_agent)->toBe('Mozilla  /5.0?'.str_repeat('a', 498))
         ->and($this->securityEvents()->logged()[0]['user_agent'])->toBe($event->user_agent);
+});
+
+it('records a refused sign-in inside the timing floor', function () {
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+    $this->travelTo(now()->startOfSecond()->addMilliseconds(800));
+    $startedAt = now();
+
+    $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->rejectedProof(Surface::SIGN_IN),
+    ]);
+
+    Sleep::assertSequence([Sleep::for(300)->milliseconds()]);
+    expect($this->securityEvents()->for($user)->sole()->occurred_at->equalTo($startedAt))->toBeTrue();
+});
+
+it('still signs in and writes the row and the event when the log channel fails', function () {
+    Event::fake([SecurityEventRecorded::class]);
+    config(['logging.channels.broken' => ['driver' => 'single', 'path' => '/dev/null/keystone.log'], 'keystone.log_channel' => 'broken']);
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $response = $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $this->assertSignedIn($response, '/');
+    expect($this->securityEvents()->for($user)->sole()->type)->toBe(SecurityEventType::SIGNED_IN);
+    Event::assertDispatched(SecurityEventRecorded::class);
+    Exceptions::assertReported(UnexpectedValueException::class);
+});
+
+it('still signs in and writes the log line and the event when the row cannot be written', function () {
+    Event::fake([SecurityEventRecorded::class]);
+    DB::beforeExecuting(function (string $query) {
+        if (str_starts_with($query, 'insert') && str_contains($query, (new UserSecurityEvent)->getTable())) {
+            throw new RuntimeException('The database refused the insert.');
+        }
+    });
+
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $response = $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $this->assertSignedIn($response, '/');
+    expect($this->securityEvents()->for($user))->toBeEmpty()
+        ->and($this->securityEvents()->logged()[0]['type'])->toBe('signed_in');
+
+    Event::assertDispatched(SecurityEventRecorded::class, fn (SecurityEventRecorded $recorded) => $recorded->entry->user_id === $user->getAuthIdentifier());
+    Exceptions::assertReported(fn (RuntimeException $exception) => $exception->getMessage() === 'The database refused the insert.');
+});
+
+it('still signs in and records when an app listener fails', function () {
+    Event::listen(SecurityEventRecorded::class, fn () => throw new RuntimeException('The listener failed.'));
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $response = $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $this->assertSignedIn($response, '/');
+    expect($this->securityEvents()->for($user)->sole()->type)->toBe(SecurityEventType::SIGNED_IN)
+        ->and($this->securityEvents()->logged()[0]['type'])->toBe('signed_in');
+
+    Exceptions::assertReported(fn (RuntimeException $exception) => $exception->getMessage() === 'The listener failed.');
+});
+
+it('still signs in and records nothing when the entry cannot be built', function () {
+    Event::fake([SecurityEventRecorded::class]);
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+    $encrypter = Mockery::mock(Crypt::getFacadeRoot())->makePartial();
+    $encrypter->shouldReceive('encrypt')->once()->andThrow(new RuntimeException('The encryption key is lost.'));
+    Model::encryptUsing($encrypter);
+
+    $response = $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $this->assertSignedIn($response, '/');
+    expect($this->securityEvents()->stored())->toBeEmpty()
+        ->and($this->securityEvents()->logged())->toBe([]);
+
+    Event::assertNotDispatched(SecurityEventRecorded::class);
+    Exceptions::assertReported(fn (RuntimeException $exception) => $exception->getMessage() === 'The encryption key is lost.');
 });
 
 it("reads the address the app's trusted proxy forwarded", function () {

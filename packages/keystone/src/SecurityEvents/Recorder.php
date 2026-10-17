@@ -50,17 +50,20 @@ class Recorder
         ?CredentialType $credentialType = null,
         int|string|null $credential = null,
     ): void {
-        $entry = $this->makeEntry($type, $account, $surface, $credentialType, $credential);
+        $entry = rescue(fn () => $this->makeEntry($type, $account, $surface, $credentialType, $credential));
 
-        $this->log($entry);
+        if ($entry === null) {
+            return;
+        }
+
+        rescue(fn () => $this->log($entry));
 
         if ($entry->isAnonymous()) {
             return;
         }
 
-        $entry->saveQuietly();
-
-        $this->events->dispatch(new SecurityEventRecorded($entry));
+        rescue(fn () => $entry->saveQuietly());
+        rescue(fn () => $this->events->dispatch(new SecurityEventRecorded($entry)));
     }
 
     /**
