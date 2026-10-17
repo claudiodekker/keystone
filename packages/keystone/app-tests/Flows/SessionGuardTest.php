@@ -16,7 +16,7 @@ beforeEach(function () {
 it('signs nobody in through a SessionGuard method, even with a hash in users.password', function (Closure $signIn) {
     $user = $this->createUser(['email' => 'ada@example.com', 'password' => Hash::make('legacy-secret')]);
 
-    $this->duringRequest(fn () => $signIn($user));
+    $signIn($user);
 
     $next = $this->get(route('login'));
 
@@ -33,9 +33,7 @@ it('signs nobody in through a SessionGuard method, even with a hash in users.pas
 it('refuses HTTP Basic credentials, even with a hash in users.password', function (Closure $signIn) {
     $this->createUser(['email' => 'ada@example.com', 'password' => Hash::make('legacy-secret')]);
 
-    $basic = fn () => $this->duringRequest($signIn);
-
-    expect($basic)->toThrow(UnauthorizedHttpException::class);
+    expect($signIn)->toThrow(UnauthorizedHttpException::class);
 })->with([
     'basic' => fn () => Auth::setRequest(Request::create('/', server: ['PHP_AUTH_USER' => 'ada@example.com', 'PHP_AUTH_PW' => 'legacy-secret']))->basic(),
     'onceBasic' => fn () => Auth::setRequest(Request::create('/', server: ['PHP_AUTH_USER' => 'ada@example.com', 'PHP_AUTH_PW' => 'legacy-secret']))->onceBasic(),
@@ -44,15 +42,15 @@ it('refuses HTTP Basic credentials, even with a hash in users.password', functio
 it('throws from Auth::login(), which has no way to report a refusal', function () {
     $user = $this->createUser();
 
-    $login = fn () => $this->duringRequest(fn () => Auth::login($user));
-
-    expect($login)->toThrow(LogicException::class, 'Keystone signs users in. Auth::login() cannot report a refusal.');
+    expect(fn () => Auth::login($user))->toThrow(LogicException::class, 'Keystone signs users in. Auth::login() cannot report a refusal.');
 });
 
 it('signs no other device out through Auth::logoutOtherDevices()', function () {
     $user = $this->createUser(['email' => 'ada@example.com', 'password' => Hash::make('legacy-secret')]);
 
-    $this->actingAs($user)->duringRequest(fn () => Auth::logoutOtherDevices('legacy-secret'));
+    $this->actingAs($user);
+
+    Auth::logoutOtherDevices('legacy-secret');
 
     Event::assertNotDispatched(OtherDeviceLogout::class);
 });
