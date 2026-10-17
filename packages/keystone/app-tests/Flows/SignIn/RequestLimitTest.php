@@ -2,6 +2,7 @@
 
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\RateLimits\StepKind;
+use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 
 it('refuses the sign-in submit over the allowance before validation, even with an empty payload', function () {
     $support = $this->supportFor(Surface::SIGN_IN);
@@ -61,6 +62,35 @@ it('counts every request without a usable address together', function () {
     $response = $this->withServerVariables(['REMOTE_ADDR' => 'garbage'])->post(route('login.submit', $support->type()->name()));
 
     $this->assertSignInThrottled($response);
+});
+
+it('records limit.tripped once for a signed-in account whose request limit trips', function () {
+    $user = $this->createUser();
+
+    foreach (range(1, $this->requestAllowance(StepKind::VIEW) + 3) as $i) {
+        $this->actingAs($user)->get(route('login'));
+    }
+
+    $tripped = $this->securityEvents()->for($user)->where('type', SecurityEventType::LIMIT_TRIPPED)->values();
+
+    expect($tripped)->toHaveCount(1)
+        ->and($tripped[0]->reason)->toBe('keystone.request_limit')
+        ->and($tripped[0]->credential_type)->toBeNull();
+});
+
+it('logs limit.tripped for a guest whose request limit trips', function () {
+    $support = $this->supportFor(Surface::SIGN_IN);
+
+    foreach (range(1, $this->requestAllowance(StepKind::SUBMIT) + 3) as $i) {
+        $this->post(route('login.submit', $support->type()->name()));
+    }
+
+    $lines = collect($this->securityEvents()->logged())->where('type', 'limit.tripped')->values();
+
+    expect($this->securityEvents()->stored())->toBeEmpty()
+        ->and($lines)->toHaveCount(1)
+        ->and($lines[0]['user_id'])->toBeNull()
+        ->and($lines[0]['reason'])->toBe('keystone.request_limit');
 });
 
 it('counts the requests of a signed-in account together, whatever address they come from', function () {

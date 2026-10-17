@@ -30,6 +30,14 @@ readonly class CountedAttempt
     }
 
     /**
+     * Determine if the count is the first over the allowance, which trips the limit.
+     */
+    public function isFirstOver(int $allowance): bool
+    {
+        return $this->count === $allowance + 1;
+    }
+
+    /**
      * Determine if the window the attempt was counted in ends at the timestamp.
      */
     public function endsAt(int $timestamp): bool

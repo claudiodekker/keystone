@@ -2,7 +2,12 @@
 
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\RateLimits\StepKind;
+use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
+use ClaudioDekker\Keystone\Session\Flow;
+use Illuminate\Auth\Events\Lockout;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Exceptions;
 
 it('refuses the right secret as throttled after the allowance of wrong secrets in an hour', function () {
     $user = $this->createUser();
@@ -99,6 +104,61 @@ it('keeps a count each for two made-up addresses that differ only in an accent',
     ]);
 
     $this->assertSignInRefused($response, __('keystone::messages.credentials-rejected'));
+});
+
+it('records limit.tripped for the account once, on the first refused attempt of the window', function () {
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $this->submitRejectedProofs($support, 'ada@example.com', $this->failedAttemptAllowance() + 3);
+
+    $events = $this->securityEvents()->for($user);
+    $tripped = $events->where('type', SecurityEventType::LIMIT_TRIPPED)->values();
+
+    expect($events->pluck('type')->all())->toBe([...array_fill(0, $this->failedAttemptAllowance(), SecurityEventType::PROOF_REJECTED), SecurityEventType::LIMIT_TRIPPED])
+        ->and($tripped[0]->reason)->toBe('keystone.failed_attempt_limit')
+        ->and($tripped[0]->credential_type)->toBe($support->type()->name())
+        ->and($tripped[0]->flow)->toBe(Flow::SIGN_IN);
+});
+
+it('logs limit.tripped once for a made-up address, and stores the typed address nowhere', function () {
+    $support = $this->supportFor(Surface::SIGN_IN);
+
+    $this->submitRejectedProofs($support, 'grace@example.com', $this->failedAttemptAllowance() + 3);
+
+    $lines = collect($this->securityEvents()->logged())->where('type', 'limit.tripped')->values();
+
+    expect($this->securityEvents()->stored())->toBeEmpty()
+        ->and($lines)->toHaveCount(1)
+        ->and($lines[0]['user_id'])->toBeNull()
+        ->and($lines[0]['reason'])->toBe('keystone.failed_attempt_limit')
+        ->and(json_encode($lines, JSON_THROW_ON_ERROR))->not->toContain('grace');
+});
+
+it("dispatches Laravel's Lockout event once when the limit trips", function () {
+    Event::fake([Lockout::class]);
+    $support = $this->supportFor(Surface::SIGN_IN);
+
+    $this->submitRejectedProofs($support, 'grace@example.com', $this->failedAttemptAllowance() + 3);
+
+    Event::assertDispatchedTimes(Lockout::class, 1);
+});
+
+it('keeps refusing when a lockout listener fails, and reports the failure', function () {
+    Event::listen(Lockout::class, fn () => throw new RuntimeException('The listener failed.'));
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+    $this->submitRejectedProofs($support, 'ada@example.com', $this->failedAttemptAllowance());
+
+    $response = $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $this->assertSignInThrottled($response);
+    Exceptions::assertReported(fn (RuntimeException $exception) => $exception->getMessage() === 'The listener failed.');
 });
 
 it('gives a sign-in its own count back, and no more', function () {

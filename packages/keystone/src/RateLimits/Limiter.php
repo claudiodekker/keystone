@@ -9,9 +9,13 @@ use ClaudioDekker\Keystone\Http\RequestContext;
 use ClaudioDekker\Keystone\Http\Subnet;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\Surface;
+use ClaudioDekker\Keystone\SecurityEvents\Recorder;
+use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use ClaudioDekker\Keystone\Session\SessionState;
+use Illuminate\Auth\Events\Lockout;
 use Illuminate\Cache\RateLimiter;
 use Illuminate\Config\Repository as Config;
+use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Date;
 use LogicException;
@@ -41,6 +45,8 @@ class Limiter
     public function __construct(
         protected Config $config,
         protected RateLimiter $counts,
+        protected Dispatcher $events,
+        protected Recorder $recorder,
         protected Request $request,
         protected SessionState $session,
     ) {
@@ -73,6 +79,10 @@ class Limiter
             return;
         }
 
+        if ($spent->contains(fn (CountedAttempt $attempt) => $attempt->isFirstOver($allowance))) {
+            $this->trip(Limit::REQUEST, $account);
+        }
+
         throw ThrottledException::retryAfter($this->secondsUntil($spent->max->availableAt));
     }
 
@@ -95,6 +105,10 @@ class Limiter
 
         if (! $attempt->isOver($allowance)) {
             return $attempt;
+        }
+
+        if ($attempt->isFirstOver($allowance)) {
+            $this->trip(Limit::FAILED_ATTEMPT, $account, $surface, $type);
         }
 
         throw ThrottledException::retryAfter($this->secondsUntil($attempt->availableAt));
@@ -123,6 +137,22 @@ class Limiter
 
             return new CountedAttempt($key, $limit, $count, $availableAt);
         });
+    }
+
+    /**
+     * Record the limit's trip and dispatch Laravel's lockout event, whose failing listener is reported and changes nothing.
+     */
+    protected function trip(Limit $limit, ?KeystoneUser $account, ?Surface $surface = null, ?CredentialType $type = null): void
+    {
+        $this->recorder->record(
+            SecurityEventType::LIMIT_TRIPPED,
+            account: $account,
+            surface: $surface,
+            credentialType: $type,
+            reason: $limit->reason(),
+        );
+
+        rescue(fn () => $this->events->dispatch(new Lockout($this->request)));
     }
 
     /**

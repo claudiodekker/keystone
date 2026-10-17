@@ -22,4 +22,12 @@ enum Limit: string
             Limit::REQUEST => 60,
         };
     }
+
+    /**
+     * Get the reason a trip of the limit is recorded with.
+     */
+    public function reason(): string
+    {
+        return 'keystone.'.$this->value;
+    }
 }
