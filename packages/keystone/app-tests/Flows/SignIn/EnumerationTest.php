@@ -6,8 +6,7 @@ use Illuminate\Support\Sleep;
 it('answers an unknown address exactly like a wrong secret', function () {
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
-    $support = $this->supportFor(Surface::SIGN_IN);
-    $support->arrangeCredential(Surface::SIGN_IN, $user);
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
 
     $wrongSecret = $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada@example.com',
@@ -31,8 +30,7 @@ it('answers an address two accounts count as verified exactly like a wrong secre
     $this->addVerifiedAddress($user, 'ada@example.com');
     $this->addUnverifiedAddress($this->createUser(), 'shared@example.com');
     $this->addUnverifiedAddress($this->createUser(), 'shared@example.com');
-    $support = $this->supportFor(Surface::SIGN_IN);
-    $support->arrangeCredential(Surface::SIGN_IN, $user);
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
 
     $wrongSecret = $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada@example.com',
@@ -56,8 +54,7 @@ it('waits 300 ms before it refuses', function (string $identifier) {
     $this->addVerifiedAddress($user, 'ada@example.com');
     $this->addUnverifiedAddress($this->createUser(), 'shared@example.com');
     $this->addUnverifiedAddress($this->createUser(), 'shared@example.com');
-    $support = $this->supportFor(Surface::SIGN_IN);
-    $support->arrangeCredential(Surface::SIGN_IN, $user);
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
 
     $response = $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => $identifier,
@@ -74,8 +71,7 @@ it('waits 300 ms before it refuses', function (string $identifier) {
 it('answers an identifier that is not valid UTF-8 exactly like a wrong secret', function () {
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
-    $support = $this->supportFor(Surface::SIGN_IN);
-    $support->arrangeCredential(Surface::SIGN_IN, $user);
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
 
     $wrongSecret = $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada@example.com',

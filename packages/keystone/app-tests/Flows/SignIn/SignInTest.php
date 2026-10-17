@@ -11,8 +11,7 @@ beforeEach(function () {
 it('signs a user in with their email address and secret', function () {
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
-    $support = $this->supportFor(Surface::SIGN_IN);
-    $support->arrangeCredential(Surface::SIGN_IN, $user);
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
 
     $response = $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada@example.com',
@@ -28,8 +27,7 @@ it('signs a user in with their email address and secret', function () {
 it("dispatches Laravel's Login event for the user who signed in", function () {
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
-    $support = $this->supportFor(Surface::SIGN_IN);
-    $support->arrangeCredential(Surface::SIGN_IN, $user);
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
 
     $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada@example.com',
@@ -42,8 +40,7 @@ it("dispatches Laravel's Login event for the user who signed in", function () {
 it('gives the session a new id on sign-in', function () {
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
-    $support = $this->supportFor(Surface::SIGN_IN);
-    $support->arrangeCredential(Surface::SIGN_IN, $user);
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
     $cookie = config('session.cookie');
 
     $beforeSigningIn = $this->get(route('login'))->getCookie($cookie)->getValue();
@@ -61,8 +58,7 @@ it('gives the session a new id on sign-in', function () {
 it('lands on the intended URL after signing in', function (string $intended) {
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
-    $support = $this->supportFor(Surface::SIGN_IN);
-    $support->arrangeCredential(Surface::SIGN_IN, $user);
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
     $this->withSession(['url.intended' => $intended]);
 
     $response = $this->post(route('login.submit', $support->type()->name()), [
@@ -79,8 +75,7 @@ it('lands on the intended URL after signing in', function (string $intended) {
 it('lands on / when the intended URL is not a path on the app', function (string $intended) {
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
-    $support = $this->supportFor(Surface::SIGN_IN);
-    $support->arrangeCredential(Surface::SIGN_IN, $user);
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
     $this->withSession(['url.intended' => $intended]);
 
     $response = $this->post(route('login.submit', $support->type()->name()), [
@@ -110,8 +105,7 @@ it('refuses a signed-in user on the sign-in page', function () {
 it('refuses a signed-in user at the sign-in submit before checking the proof', function () {
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
-    $support = $this->supportFor(Surface::SIGN_IN);
-    $support->arrangeCredential(Surface::SIGN_IN, $user);
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
 
     $response = $this->actingAs($user)->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada@example.com',
@@ -124,8 +118,7 @@ it('refuses a signed-in user at the sign-in submit before checking the proof', f
 it('refuses a wrong secret, flashing back only the identifier', function () {
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
-    $support = $this->supportFor(Surface::SIGN_IN);
-    $support->arrangeCredential(Surface::SIGN_IN, $user);
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
 
     $response = $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada@example.com',

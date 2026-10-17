@@ -149,12 +149,14 @@ class FakeFormType implements CredentialType, CredentialTypeSupport
     /**
      * Give the user a credential holding the fixture secret.
      */
-    public function arrangeCredential(Surface $surface, KeystoneUser $user): void
+    public function arrangeCredential(Surface $surface, KeystoneUser $user): static
     {
         UserCredential::factory()->for($user, 'user')->create([
             'type' => $this->name(),
             'secret' => static::SECRET,
         ]);
+
+        return $this;
     }
 
     /**

@@ -11,8 +11,7 @@ beforeEach(function () {
 it('signs the user out, and the next request is a guest again', function () {
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
-    $support = $this->supportFor(Surface::SIGN_IN);
-    $support->arrangeCredential(Surface::SIGN_IN, $user);
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
 
     $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada@example.com',
@@ -29,8 +28,7 @@ it('signs the user out, and the next request is a guest again', function () {
 it('ends the whole session, so nothing it held outlives signing out', function () {
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
-    $support = $this->supportFor(Surface::SIGN_IN);
-    $support->arrangeCredential(Surface::SIGN_IN, $user);
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
     $cookie = config('session.cookie');
 
     $signIn = $this->post(route('login.submit', $support->type()->name()), [
@@ -55,8 +53,7 @@ it('ends the whole session, so nothing it held outlives signing out', function (
 it("dispatches Laravel's Logout event for the user who signed out", function () {
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
-    $support = $this->supportFor(Surface::SIGN_IN);
-    $support->arrangeCredential(Surface::SIGN_IN, $user);
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
 
     $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada@example.com',

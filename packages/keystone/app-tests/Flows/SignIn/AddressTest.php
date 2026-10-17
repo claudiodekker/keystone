@@ -5,8 +5,7 @@ use ClaudioDekker\Keystone\Methods\Surface;
 it('matches a typed address to its account whatever its case, Unicode form or IDN spelling', function (string $typed) {
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'rené@bücher.example');
-    $support = $this->supportFor(Surface::SIGN_IN);
-    $support->arrangeCredential(Surface::SIGN_IN, $user);
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
 
     $response = $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => $typed,
@@ -23,8 +22,7 @@ it('matches a typed address to its account whatever its case, Unicode form or ID
 it('matches an address stored with surrounding spaces', function () {
     $user = $this->createUser();
     $this->addVerifiedAddress($user, ' ada@example.com  ');
-    $support = $this->supportFor(Surface::SIGN_IN);
-    $support->arrangeCredential(Surface::SIGN_IN, $user);
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
 
     $response = $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada@example.com',
@@ -37,8 +35,7 @@ it('matches an address stored with surrounding spaces', function () {
 it('folds no accents away', function () {
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'rené@example.com');
-    $support = $this->supportFor(Surface::SIGN_IN);
-    $support->arrangeCredential(Surface::SIGN_IN, $user);
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
 
     $response = $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'rene@example.com',
@@ -52,8 +49,7 @@ it("doesn't sign in with an unverified address while the account holds a verifie
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
     $this->addUnverifiedAddress($user, 'ada@work.example');
-    $support = $this->supportFor(Surface::SIGN_IN);
-    $support->arrangeCredential(Surface::SIGN_IN, $user);
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
 
     $response = $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada@work.example',
@@ -66,8 +62,7 @@ it("doesn't sign in with an unverified address while the account holds a verifie
 it('signs in with an unverified address while the account holds no verified one', function () {
     $user = $this->createUser();
     $this->addUnverifiedAddress($user, 'ada@example.com');
-    $support = $this->supportFor(Surface::SIGN_IN);
-    $support->arrangeCredential(Surface::SIGN_IN, $user);
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
 
     $response = $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada@example.com',
@@ -82,8 +77,7 @@ it('signs in neither account that counts one address as verified', function () {
     $grace = $this->createUser();
     $this->addUnverifiedAddress($ada, 'shared@example.com');
     $this->addUnverifiedAddress($grace, 'shared@example.com');
-    $support = $this->supportFor(Surface::SIGN_IN);
-    $support->arrangeCredential(Surface::SIGN_IN, $ada);
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $ada);
 
     $response = $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'shared@example.com',
@@ -96,8 +90,7 @@ it('signs in neither account that counts one address as verified', function () {
 it('refuses an identifier that is no address like an unknown one', function () {
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
-    $support = $this->supportFor(Surface::SIGN_IN);
-    $support->arrangeCredential(Surface::SIGN_IN, $user);
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
 
     $response = $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada',
@@ -110,8 +103,7 @@ it('refuses an identifier that is no address like an unknown one', function () {
 it('tells apart two domains IDN cannot spell in ASCII', function () {
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@one..example');
-    $support = $this->supportFor(Surface::SIGN_IN);
-    $support->arrangeCredential(Surface::SIGN_IN, $user);
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
 
     $response = $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada@two..example',

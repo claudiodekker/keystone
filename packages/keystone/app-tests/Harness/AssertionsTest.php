@@ -28,8 +28,7 @@ it('fails assertAlreadySignedIn on the sign-in page', function () {
 it('fails assertSignedIn on a refusal', function () {
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
-    $support = $this->supportFor(Surface::SIGN_IN);
-    $support->arrangeCredential(Surface::SIGN_IN, $user);
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
 
     $response = $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada@example.com',
@@ -42,8 +41,7 @@ it('fails assertSignedIn on a refusal', function () {
 it('fails assertSignedIn on a sign-in that lands somewhere else', function () {
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
-    $support = $this->supportFor(Surface::SIGN_IN);
-    $support->arrangeCredential(Surface::SIGN_IN, $user);
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
     $this->withSession(['url.intended' => url('/reports')]);
 
     $response = $this->post(route('login.submit', $support->type()->name()), [
@@ -57,8 +55,7 @@ it('fails assertSignedIn on a sign-in that lands somewhere else', function () {
 it('fails assertSignInRefused on a sign-in', function () {
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
-    $support = $this->supportFor(Surface::SIGN_IN);
-    $support->arrangeCredential(Surface::SIGN_IN, $user);
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
 
     $response = $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada@example.com',
@@ -71,8 +68,7 @@ it('fails assertSignInRefused on a sign-in', function () {
 it('fails assertSignInRefused on a refusal with another message', function () {
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
-    $support = $this->supportFor(Surface::SIGN_IN);
-    $support->arrangeCredential(Surface::SIGN_IN, $user);
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
 
     $response = $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada@example.com',
@@ -102,8 +98,7 @@ it('fails assertSignInRefused on a refusal that flashes back no identifier', fun
 it('fails assertSignInInvalid on a refusal', function () {
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
-    $support = $this->supportFor(Surface::SIGN_IN);
-    $support->arrangeCredential(Surface::SIGN_IN, $user);
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
 
     $response = $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada@example.com',

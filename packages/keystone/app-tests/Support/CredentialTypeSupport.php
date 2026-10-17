@@ -21,7 +21,7 @@ interface CredentialTypeSupport
     /**
      * Give the user a credential of the type that answers on the surface.
      */
-    public function arrangeCredential(Surface $surface, KeystoneUser $user): void;
+    public function arrangeCredential(Surface $surface, KeystoneUser $user): static;
 
     /**
      * Get the fields that prove the user's arranged credential on the surface.

@@ -43,8 +43,7 @@ it('refuses an identifier longer than 255 characters, flashing back only the ide
 it('takes an identifier of 255 characters', function () {
     $user = $this->createUser();
     $this->addVerifiedAddress($user, str_repeat('a', 243).'@example.com');
-    $support = $this->supportFor(Surface::SIGN_IN);
-    $support->arrangeCredential(Surface::SIGN_IN, $user);
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
 
     $response = $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => str_repeat('a', 243).'@example.com',
