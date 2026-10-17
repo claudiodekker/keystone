@@ -4,6 +4,7 @@ namespace ClaudioDekker\Keystone\RateLimits;
 
 use ClaudioDekker\Keystone\Accounts\EmailAddress;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
+use ClaudioDekker\Keystone\Exceptions\MissingFlowException;
 use ClaudioDekker\Keystone\Exceptions\ThrottledException;
 use ClaudioDekker\Keystone\Http\RequestContext;
 use ClaudioDekker\Keystone\Http\Subnet;
@@ -18,7 +19,6 @@ use Illuminate\Config\Repository as Config;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Date;
-use LogicException;
 
 /**
  * Count requests and failed attempts against their allowances in Laravel's rate-limiter store, and refuse a spent one as throttled.
@@ -95,7 +95,7 @@ class Limiter
      */
     public function takeFailedAttempt(CredentialType $type, Surface $surface, ?KeystoneUser $account, string $identifier): CountedAttempt
     {
-        $flow = $this->session->flow($surface) ?? throw new LogicException("No flow counts failed attempts on the [{$surface->value}] surface.");
+        $flow = $this->session->flow($surface) ?? throw MissingFlowException::forSurface($surface);
         $key = $this->key(Limit::FAILED_ATTEMPT, [...$this->subject($account, $identifier), $type->name(), $flow->value]);
         $allowance = $this->config->integer('keystone.rate_limits.failed_attempts_per_hour');
 
@@ -133,7 +133,11 @@ class Limiter
             $count = $this->counts->increment($key, $limit->windowSeconds());
             $availableAt = Date::now()->getTimestamp() + $this->counts->availableIn($key);
 
-            return new CountedAttempt($key, $limit, $count, $availableAt);
+            return new CountedAttempt(
+                key: $key,
+                count: $count,
+                availableAt: $availableAt,
+            );
         });
     }
 

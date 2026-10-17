@@ -2,6 +2,7 @@
 
 // The Retry-After arithmetic and the one programming error, driven without the sleeps a sign-in adds to the clock.
 
+use ClaudioDekker\Keystone\Exceptions\MissingFlowException;
 use ClaudioDekker\Keystone\Exceptions\ThrottledException;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\Surface;
@@ -41,5 +42,5 @@ it('refuses to count a failed attempt on a surface that is in no flow', function
 
     $take = fn () => $limiter->takeFailedAttempt($type, Surface::CHALLENGE, null, 'grace@example.com');
 
-    expect($take)->toThrow(LogicException::class, 'No flow counts failed attempts on the [challenge] surface.');
+    expect($take)->toThrow(MissingFlowException::class, 'No flow counts failed attempts on the [challenge] surface.');
 });

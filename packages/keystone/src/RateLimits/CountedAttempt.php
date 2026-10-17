@@ -14,7 +14,6 @@ readonly class CountedAttempt
      */
     public function __construct(
         public string $key,
-        public Limit $limit,
         public int $count,
         public int $availableAt,
     ) {
