@@ -80,6 +80,26 @@ Who is asking: the request's IP address, its subnet, its cleaned user agent, its
 
 The part of the flows a request is in, such as sign-in, derived from the session's phase and the surface. No caller passes it.
 
+## Rate limiter
+
+The one place core counts requests and failed attempts against their allowances, in Laravel's rate-limiter store under hashed keys. Methods and controllers never see a key, a count or an allowance. A spent limit refuses as throttled.
+
+## Request limit
+
+The rate limiter's count of requests per step kind, taken by controller middleware before validation, per IP address and, separately, per signed-in account.
+
+## Failed-attempt limit
+
+The rate limiter's count of attempts per account, credential type and flow, taken before the type verifies anything and given back only when the attempt signs in or the type throws, inside the window it was taken in. A refused attempt stays counted, and nothing ever resets a count.
+
+## Step kind
+
+What the request limit counts an endpoint as: `view` for a page, `submit` for a proof, `change` for signing out. Each kind has its own allowance a minute.
+
+## Throttled
+
+The one refusal every spent limit gives: 429, `Retry-After` in seconds and one message, the same for a real account, a made-up one and an unknown credential type. It renders through the exception handler, never through a response hook.
+
 ## AppTest
 
 A test in a package's `app-tests/` that drives the app's own routes and published controllers, and checks each answer through an assertion the app can override. AppTests are the feature suite.
