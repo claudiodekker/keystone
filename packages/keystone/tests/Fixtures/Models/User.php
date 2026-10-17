@@ -2,7 +2,6 @@
 
 namespace ClaudioDekker\Keystone\Tests\Fixtures\Models;
 
-use ClaudioDekker\Keystone\Auth\HasKeystone;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Tests\Fixtures\Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
@@ -17,8 +16,6 @@ class User extends Authenticatable implements KeystoneUser
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory;
-
-    use HasKeystone;
 
     /**
      * The table the model reads.
