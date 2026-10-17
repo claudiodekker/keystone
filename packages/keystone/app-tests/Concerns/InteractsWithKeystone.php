@@ -6,13 +6,19 @@ use ClaudioDekker\Keystone\Accounts\EmailAddress;
 use ClaudioDekker\Keystone\AppTests\Assertions\GuestStepAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\SignInAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\SignOutAssertions;
+use ClaudioDekker\Keystone\AppTests\Assertions\ThrottledAssertions;
 use ClaudioDekker\Keystone\AppTests\Support\CredentialTypeSupport;
 use ClaudioDekker\Keystone\AppTests\Support\RecordedSecurityEvents;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Models\UserEmail;
+use ClaudioDekker\Keystone\RateLimits\StepKind;
+use Illuminate\Cache\ArrayStore;
+use Illuminate\Cache\RateLimiter;
+use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Testing\TestResponse;
 use Monolog\Handler\TestHandler;
@@ -30,6 +36,7 @@ trait InteractsWithKeystone
     use LazilyRefreshDatabase;
     use SignInAssertions;
     use SignOutAssertions;
+    use ThrottledAssertions;
 
     /**
      * The handler that keeps every line the security log channel wrote during the test.
@@ -37,13 +44,54 @@ trait InteractsWithKeystone
     protected TestHandler $securityLog;
 
     /**
-     * Keep the lines the security log channel writes, so a test can read them.
+     * Keep the lines the security log channel writes, and count rate limits in a store of this test's own.
      */
     protected function setUpInteractsWithKeystone(): void
     {
         $this->securityLog = new TestHandler;
 
         Log::channel(config('keystone.log_channel'))->pushHandler($this->securityLog);
+
+        $this->countLimitsIn(Cache::repository(new ArrayStore));
+    }
+
+    /**
+     * Count rate limits in the given store for the rest of the test, whatever store the app limits in.
+     */
+    public function countLimitsIn(Repository $store): void
+    {
+        $this->app->instance(RateLimiter::class, new RateLimiter($store));
+    }
+
+    /**
+     * Get how many failed attempts an account gets per credential type and flow in an hour, as the app configures it.
+     */
+    public function failedAttemptAllowance(): int
+    {
+        return config()->integer('keystone.rate_limits.failed_attempts_per_hour');
+    }
+
+    /**
+     * Get how many requests of the step kind one IP address or one signed-in account gets in a minute, as the app configures it.
+     */
+    public function requestAllowance(StepKind $kind): int
+    {
+        return config()->integer('keystone.rate_limits.requests_per_minute.'.$kind->value);
+    }
+
+    /**
+     * Submit the type's rejected proof for the identifier the given number of times, each from its own address, so only the failed-attempt limit is spent.
+     */
+    public function submitRejectedProofs(CredentialTypeSupport $support, string $identifier, int $times): void
+    {
+        foreach (range(1, $times) as $i) {
+            $address = '10.'.intdiv($i, 256).'.'.($i % 256).'.1';
+
+            $this->withServerVariables(['REMOTE_ADDR' => $address])->post(route('login.submit', $support->type()->name()), [
+                'identifier' => $identifier,
+                ...$support->rejectedProof(Surface::SIGN_IN),
+            ]);
+        }
     }
 
     /**

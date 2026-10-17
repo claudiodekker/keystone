@@ -3,9 +3,11 @@
 namespace ClaudioDekker\Keystone\Http\Controllers;
 
 use ClaudioDekker\Keystone\Http\Middleware\FlashOnlyTheIdentifier;
+use ClaudioDekker\Keystone\Http\Middleware\LimitRequests;
 use ClaudioDekker\Keystone\Http\Pages\SignInPage;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\Surface;
+use ClaudioDekker\Keystone\RateLimits\StepKind;
 use ClaudioDekker\Keystone\Session\SessionState;
 use ClaudioDekker\Keystone\SignIn\Refused;
 use ClaudioDekker\Keystone\SignIn\SignIn;
@@ -13,6 +15,7 @@ use ClaudioDekker\Keystone\Status;
 use Illuminate\Contracts\Support\Responsable;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
@@ -26,12 +29,16 @@ abstract class SignInController implements HasMiddleware
     /**
      * Get the middleware every sign-in action runs, whatever the app's subclass overrides.
      *
-     * @return list<class-string>
+     * Every action but store() counts as a view, so an action the app adds is limited too.
+     *
+     * @return list<Middleware|string>
      */
     public static function middleware(): array
     {
         return [
             FlashOnlyTheIdentifier::class,
+            new Middleware(LimitRequests::for(StepKind::SUBMIT), only: ['store']),
+            new Middleware(LimitRequests::for(StepKind::VIEW), except: ['store']),
         ];
     }
 

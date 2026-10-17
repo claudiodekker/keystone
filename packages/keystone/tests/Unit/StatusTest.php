@@ -12,4 +12,5 @@ it('tells the user each status in the words the spec gives', function (Status $s
 })->with([
     'credentials rejected' => [Status::CREDENTIALS_REJECTED, 'These credentials do not match our records.'],
     'signed out' => [Status::SIGNED_OUT, 'You have been logged out.'],
+    'throttled' => [Status::THROTTLED, 'Too many attempts. Please try again in :seconds seconds.'],
 ]);

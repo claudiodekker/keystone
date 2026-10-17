@@ -4,17 +4,22 @@ namespace ClaudioDekker\Keystone\SignIn;
 
 use ClaudioDekker\Keystone\Accounts\AccountLookup;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
+use ClaudioDekker\Keystone\Exceptions\ThrottledException;
 use ClaudioDekker\Keystone\Methods\Credential;
 use ClaudioDekker\Keystone\Methods\CredentialType;
+use ClaudioDekker\Keystone\Methods\Proof;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Methods\Verification;
 use ClaudioDekker\Keystone\Models\UserCredential;
+use ClaudioDekker\Keystone\RateLimits\CountedAttempt;
+use ClaudioDekker\Keystone\RateLimits\Limiter;
 use ClaudioDekker\Keystone\SecurityEvents\Recorder;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use ClaudioDekker\Keystone\Session\SessionState;
 use Illuminate\Contracts\Validation\Factory as ValidationFactory;
 use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 /**
  * Attempt a sign-in with a credential type's proof, from the submitted input to a signed-in session or one refusal.
@@ -29,6 +34,7 @@ class SignIn
     public function __construct(
         protected AccountLookup $accounts,
         protected SignInDecision $decision,
+        protected Limiter $limiter,
         protected Recorder $recorder,
         protected SessionState $session,
         protected TimingFloor $floor,
@@ -42,6 +48,7 @@ class SignIn
      *
      * @param  array<string, mixed>  $input
      *
+     * @throws ThrottledException
      * @throws ValidationException
      */
     public function attempt(CredentialType $type, array $input): SignedIn|Refused
@@ -76,18 +83,16 @@ class SignIn
      * Sign in the account the identifier names when the type proves one of its credentials.
      *
      * @param  array<string, mixed>  $validated
+     *
+     * @throws ThrottledException
      */
     protected function prove(CredentialType $type, array $validated): SignedIn|Refused
     {
         $account = $this->accounts->resolve($validated['identifier']);
 
-        $verification = new Verification(
-            surface: Surface::SIGN_IN,
-            input: Arr::except($validated, 'identifier'),
-            credentials: $this->credentials($type, $account),
-        );
+        $attempt = $this->limiter->takeFailedAttempt($type, Surface::SIGN_IN, $account, $validated['identifier']);
 
-        $proof = $type->verify($verification);
+        $proof = $this->verify($type, $account, $validated, $attempt);
 
         $owner = $this->decision->decide($proof, $type, $account);
 
@@ -104,6 +109,8 @@ class SignIn
 
         $redirectTo = $this->session->signIn($owner);
 
+        $this->limiter->giveBack($attempt);
+
         $this->recorder->record(
             SecurityEventType::SIGNED_IN,
             account: $owner,
@@ -113,6 +120,28 @@ class SignIn
         );
 
         return new SignedIn($redirectTo);
+    }
+
+    /**
+     * Let the type verify the input against the account's credentials, giving the attempt back when the type throws.
+     *
+     * @param  array<string, mixed>  $validated
+     */
+    protected function verify(CredentialType $type, ?KeystoneUser $account, array $validated, CountedAttempt $attempt): Proof
+    {
+        $verification = new Verification(
+            surface: Surface::SIGN_IN,
+            input: Arr::except($validated, 'identifier'),
+            credentials: $this->credentials($type, $account),
+        );
+
+        try {
+            return $type->verify($verification);
+        } catch (Throwable $exception) {
+            $this->limiter->giveBack($attempt);
+
+            throw $exception;
+        }
     }
 
     /**

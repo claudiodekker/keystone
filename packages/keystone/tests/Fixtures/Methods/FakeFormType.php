@@ -11,6 +11,7 @@ use ClaudioDekker\Keystone\Methods\Proof;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Methods\Verification;
 use ClaudioDekker\Keystone\Models\UserCredential;
+use Closure;
 
 /**
  * A credential type of the form shape that compares a stored secret, and deliberately not a password.
@@ -43,6 +44,11 @@ class FakeFormType implements CredentialType, CredentialTypeSupport
      * The credential every verify claims to prove, whatever it was given.
      */
     protected ?Credential $forged = null;
+
+    /**
+     * The work to run inside the next verify, once the attempt is counted and before any secret is compared.
+     */
+    protected ?Closure $duringNextVerify = null;
 
     /**
      * Get the type's name.
@@ -90,6 +96,8 @@ class FakeFormType implements CredentialType, CredentialTypeSupport
     public function verify(Verification $verification): Proof
     {
         $this->verifications[] = $verification;
+
+        $this->runDuringVerify();
 
         if ($this->forged !== null) {
             return Proof::proven($this->forged);
@@ -139,6 +147,14 @@ class FakeFormType implements CredentialType, CredentialTypeSupport
     }
 
     /**
+     * Run the callback inside the next verify, as another request would while this one waits on the type.
+     */
+    public function duringNextVerify(Closure $callback): void
+    {
+        $this->duringNextVerify = $callback;
+    }
+
+    /**
      * Get the type this supports, which is itself.
      */
     public function type(): CredentialType
@@ -177,6 +193,19 @@ class FakeFormType implements CredentialType, CredentialTypeSupport
     public function rejectedProof(Surface $surface): array
     {
         return ['secret' => 'wrong horse'];
+    }
+
+    /**
+     * Run the work queued for this verify once, clearing it first so a verify it starts doesn't run it again.
+     */
+    protected function runDuringVerify(): void
+    {
+        $callback = $this->duringNextVerify;
+        $this->duringNextVerify = null;
+
+        if ($callback !== null) {
+            $callback();
+        }
     }
 
     /**

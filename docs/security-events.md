@@ -26,6 +26,7 @@ Set `log_channel` to the name of a channel in your `logging.php` to send the log
 
 | Type | Recorded when |
 |---|---|
+| `limit.tripped` | A rate limit refused its first attempt of the window. The reason names the limit: `keystone.failed_attempt_limit` or `keystone.request_limit`. |
 | `proof.rejected` | A sign-in was refused for an account that the typed address named. |
 | `signed_in` | A session signed in. |
 | `signed_out` | The user signed out. |

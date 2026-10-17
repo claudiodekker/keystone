@@ -13,12 +13,15 @@ enum Status: string
 {
     case CREDENTIALS_REJECTED = 'credentials-rejected';
     case SIGNED_OUT = 'signed-out';
+    case THROTTLED = 'throttled';
 
     /**
-     * Get the status's message in the app's locale.
+     * Get the status's message in the app's locale, with its placeholders replaced.
+     *
+     * @param  array<string, int|string>  $replace
      */
-    public function label(): string
+    public function label(array $replace = []): string
     {
-        return Lang::get('keystone::messages.'.$this->value);
+        return Lang::get('keystone::messages.'.$this->value, $replace);
     }
 }

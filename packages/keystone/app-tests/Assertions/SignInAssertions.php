@@ -60,6 +60,14 @@ trait SignInAssertions
     }
 
     /**
+     * Assert the response refused the sign-in request as throttled.
+     */
+    public function assertSignInThrottled(TestResponse $response): void
+    {
+        $this->assertThrottled($response);
+    }
+
+    /**
      * Assert the response sent the signed-in user on to the given path.
      */
     public function assertSignedIn(TestResponse $response, string $redirectTo): void

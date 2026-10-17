@@ -2,11 +2,14 @@
 
 namespace ClaudioDekker\Keystone\Http\Controllers;
 
+use ClaudioDekker\Keystone\Http\Middleware\LimitRequests;
+use ClaudioDekker\Keystone\RateLimits\StepKind;
 use ClaudioDekker\Keystone\SecurityEvents\Recorder;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use ClaudioDekker\Keystone\Session\SessionState;
 use Illuminate\Contracts\Support\Responsable;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -14,8 +17,20 @@ use Symfony\Component\HttpFoundation\Response;
  *
  * @api
  */
-abstract class SignOutController
+abstract class SignOutController implements HasMiddleware
 {
+    /**
+     * Get the middleware signing out runs, whatever the app's subclass overrides.
+     *
+     * @return list<string>
+     */
+    public static function middleware(): array
+    {
+        return [
+            LimitRequests::for(StepKind::CHANGE),
+        ];
+    }
+
     /**
      * Sign the user out, a guest included, so a repeated sign-out ends the same way.
      */
