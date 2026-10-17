@@ -16,12 +16,12 @@ use PHPUnit\Framework\Assert;
  *
  * @api
  */
-trait AppliesTheBootstrapRules
+trait AppliesBootstrapRules
 {
     /**
      * Apply the rules once the app is up.
      */
-    protected function setUpAppliesTheBootstrapRules(): void
+    protected function setUpAppliesBootstrapRules(): void
     {
         Http::preventStrayRequests();
         Queue::createPayloadUsing($this->refuseRealQueuePushes(...));

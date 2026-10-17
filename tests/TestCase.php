@@ -2,7 +2,7 @@
 
 namespace ClaudioDekker\Keystone\Tests;
 
-use ClaudioDekker\Keystone\AppTests\Concerns\AppliesTheBootstrapRules;
+use ClaudioDekker\Keystone\AppTests\Concerns\AppliesBootstrapRules;
 use ClaudioDekker\Keystone\Tests\Fixtures\FixtureServiceProvider;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
@@ -13,7 +13,7 @@ use Orchestra\Testbench\TestCase as BaseTestCase;
  */
 class TestCase extends BaseTestCase
 {
-    use AppliesTheBootstrapRules;
+    use AppliesBootstrapRules;
     use LazilyRefreshDatabase;
 
     /**
