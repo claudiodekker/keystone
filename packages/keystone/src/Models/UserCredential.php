@@ -23,6 +23,13 @@ class UserCredential extends Model
     use HasFactory;
 
     /**
+     * The attributes kept out of the model's array form.
+     *
+     * @var list<string>
+     */
+    protected $hidden = ['secret'];
+
+    /**
      * Get the account that holds the credential.
      *
      * @return BelongsTo<Model&KeystoneUser, $this>
@@ -38,5 +45,17 @@ class UserCredential extends Model
     public function toCredential(): Credential
     {
         return new Credential($this->getKey(), $this->secret);
+    }
+
+    /**
+     * Get the attribute casts: core always encrypts the secret, whatever the type hashed into it.
+     *
+     * @return array{secret: 'encrypted'}
+     */
+    protected function casts(): array
+    {
+        return [
+            'secret' => 'encrypted',
+        ];
     }
 }

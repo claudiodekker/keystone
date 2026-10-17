@@ -1,5 +1,6 @@
 <?php
 
+use ClaudioDekker\Keystone\Database\Collation;
 use ClaudioDekker\Keystone\Keystone;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
@@ -17,8 +18,8 @@ return new class extends Migration
         Schema::create('user_emails', function (Blueprint $table) use ($user) {
             $table->id();
             $table->foreignIdFor($user, 'user_id')->constrained($user->getTable(), $user->getKeyName())->cascadeOnDelete();
-            $table->string('address');
-            $table->string('verified_address')->nullable()->unique();
+            $table->string('address')->collation(Collation::binary());
+            $table->string('verified_address')->nullable()->unique()->collation(Collation::binary());
             $table->timestamps();
 
             $table->unique(['user_id', 'address']);
