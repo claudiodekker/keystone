@@ -1,9 +1,14 @@
 <?php
 
 use ClaudioDekker\Keystone\Methods\Surface;
+use Illuminate\Auth\Events\Login;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Sleep;
 
 beforeEach(function () {
+    Event::fake([Login::class]);
+
     if ($this->supportsFor(Surface::SIGN_IN) === []) {
         $this->markTestSkipped('No installed credential type with test support serves sign-in.');
     }
@@ -15,12 +20,14 @@ it('signs in with a valid proof of every installed type that serves sign-in', fu
         $address = $this->addVerifiedAddress($user);
         $support->arrangeCredential(Surface::SIGN_IN, $user);
 
+        Auth::forgetGuards();
         $response = $this->flushSession()->post(route('login.submit', $support->type()->name()), [
             'identifier' => $address,
             ...$support->validProof(Surface::SIGN_IN, $user),
         ]);
 
         $this->assertSignedIn($response, '/');
+        Event::assertDispatched(Login::class, fn (Login $event) => $event->user->is($user));
     }
 });
 

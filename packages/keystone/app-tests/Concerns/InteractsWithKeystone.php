@@ -11,7 +11,6 @@ use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Models\UserEmail;
-use Illuminate\Foundation\Http\Events\RequestHandled;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\Assert;
@@ -28,14 +27,6 @@ trait InteractsWithKeystone
     use LazilyRefreshDatabase;
     use SignInAssertions;
     use SignOutAssertions;
-
-    /**
-     * Forget the guards after each request, so the next request sees a sign-in only when the session stored it.
-     */
-    protected function setUpInteractsWithKeystone(): void
-    {
-        $this->app['events']->listen(RequestHandled::class, fn () => $this->app['auth']->forgetGuards());
-    }
 
     /**
      * Create a user from the app's own factory, naming the fix when the app has none.

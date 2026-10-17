@@ -2,6 +2,7 @@
 
 use ClaudioDekker\Keystone\Methods\Surface;
 use Illuminate\Auth\Events\Login;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Event;
 
 beforeEach(function () {
@@ -18,6 +19,7 @@ it('signs a user in with their email address and secret', function () {
         ...$support->validProof(Surface::SIGN_IN, $user),
     ]);
 
+    Auth::forgetGuards();
     $next = $this->get(route('login'));
 
     $this->assertSignedIn($response, '/');
@@ -50,6 +52,7 @@ it('gives the session a new id on sign-in', function () {
         ...$support->validProof(Surface::SIGN_IN, $user),
     ]);
 
+    Auth::forgetGuards();
     $response = $this->flushSession()->withCookie($cookie, $beforeSigningIn)->get(route('login'));
 
     $this->assertSignInPage($response);
