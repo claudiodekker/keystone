@@ -64,8 +64,8 @@ class SignIn
     protected function validate(CredentialType $type, array $input): array
     {
         $rules = [
-            'identifier' => ['required', 'string', 'max:255'],
             ...$type->rules(Surface::SIGN_IN),
+            'identifier' => ['required', 'string', 'max:255'],
         ];
 
         return $this->validation->make($input, $rules)->validate();
