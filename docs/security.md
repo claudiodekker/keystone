@@ -47,6 +47,7 @@ The refusal is `ClaudioDekker\Keystone\Exceptions\ThrottledException`, which you
 
 ```php
 use ClaudioDekker\Keystone\Exceptions\ThrottledException;
+use Illuminate\Foundation\Configuration\Exceptions;
 
 ->withExceptions(function (Exceptions $exceptions) {
     $exceptions->render(function (ThrottledException $e) {
