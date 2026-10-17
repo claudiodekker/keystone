@@ -55,7 +55,7 @@ trait AppliesTheBootstrapRules
     protected function refuseRealQueuePushes(string $connection, ?string $queue, array $payload): array
     {
         if ($connection !== 'sync') {
-            throw new LogicException("Pushed [{$payload['displayName']}] to the [{$connection}] queue. Fake it with Queue::fake(), or dispatch it on sync.");
+            throw new LogicException("Pushed [{$payload['displayName']}] to the [{$connection}] queue. Fake the queue in the test with Queue::fake().");
         }
 
         return [];
