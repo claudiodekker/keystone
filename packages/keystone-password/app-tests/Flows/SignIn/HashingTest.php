@@ -17,8 +17,12 @@ it('signs in with a stored hash of another driver, and rehashes it to the app dr
     Auth::forgetGuards();
     $second = $this->flushSession()->post(route('login.submit', 'password'), $fields);
 
+    Auth::forgetGuards();
+    $next = $this->get(route('login'));
+
     $this->assertSignedIn($first, '/');
     $this->assertSignedIn($second, '/');
+    $this->assertAlreadySignedIn($next);
 })->with([
     'bcrypt under argon2id' => ['bcrypt', 'argon2id'],
     'argon2i under argon2id' => ['argon', 'argon2id'],

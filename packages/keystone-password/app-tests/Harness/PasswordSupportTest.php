@@ -2,6 +2,7 @@
 
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Password\AppTests\PasswordSupport;
+use Illuminate\Support\Facades\Auth;
 
 it('gives the contract AppTests the test support of the installed password type', function () {
     $names = collect($this->supportsFor(Surface::SIGN_IN))
@@ -18,7 +19,11 @@ it('arranges a password hashed by the named driver', function () {
 
     $response = $this->post(route('login.submit', 'password'), ['identifier' => 'ada@example.com', 'password' => '  odd horse  ']);
 
+    Auth::forgetGuards();
+    $next = $this->get(route('login'));
+
     $this->assertSignedIn($response, '/');
+    $this->assertAlreadySignedIn($next);
 });
 
 it('makes a driver refuse every hash', function () {

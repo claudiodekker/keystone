@@ -23,6 +23,11 @@ use SensitiveParameter;
 class PasswordType implements CredentialType
 {
     /**
+     * The most characters a password may have at sign-in, which bounds the cost of an argon2 check.
+     */
+    protected const int MAX_LENGTH = 1024;
+
+    /**
      * The Hash driver that checks each algorithm password_get_info() names.
      *
      * @var array<string, string>
@@ -70,14 +75,14 @@ class PasswordType implements CredentialType
     }
 
     /**
-     * Get the rules for the password.
+     * Get the rules for the password: a string of up to 1024 characters.
      *
      * @return array<string, mixed>
      */
     public function rules(Surface $surface): array
     {
         return [
-            'password' => ['required', 'string'],
+            'password' => ['required', 'string', 'max:'.static::MAX_LENGTH],
         ];
     }
 
