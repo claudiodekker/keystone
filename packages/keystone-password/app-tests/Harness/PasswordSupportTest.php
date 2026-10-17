@@ -3,6 +3,7 @@
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Password\AppTests\PasswordSupport;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 
 it('gives the contract AppTests the test support of the installed password type', function () {
     $names = collect($this->supportsFor(Surface::SIGN_IN))
@@ -54,3 +55,12 @@ it('arranges a hash as an import stores it', function (string $hash) {
     'argon2i' => '$argon2i$v=19$m=64,t=1,p=1$IrW0nsDpJZrqdbYmMziCzg$YSqcH2r6IgQX0q4MznxMzeFZUddAYo45B54bxeAC+k8',
     'argon2id' => '$argon2id$v=19$m=64,t=1,p=1$7p5AJIiGU/s4B8u3C0BzRQ$dp62vgHDAzSqqWqMbm2PNYOIA2p3iVYazdlUPeaDSg8',
 ]);
+
+it('makes a driver fail to hash while it still checks', function () {
+    $hash = Hash::make('odd horse');
+
+    (new PasswordSupport)->failHashingWith('bcrypt');
+
+    expect(Hash::check('odd horse', $hash))->toBeTrue()
+        ->and(fn () => Hash::make('odd horse'))->toThrow(RuntimeException::class, 'The hasher failed to hash.');
+});
