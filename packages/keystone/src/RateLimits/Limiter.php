@@ -83,13 +83,11 @@ class Limiter
             $this->trip(Limit::REQUEST, $account);
         }
 
-        throw ThrottledException::retryAfter($this->secondsUntil($spent->max->availableAt));
+        throw ThrottledException::retryAfter($this->secondsUntil($spent->max('availableAt')));
     }
 
     /**
      * Count a failed attempt of the type before it verifies anything, and refuse it once the account's count is spent.
-     *
-     * An identifier that names no account is counted by its address as the account lookup compares it.
      *
      * A store failure is reported and refuses the attempt.
      *
@@ -162,7 +160,7 @@ class Limiter
     {
         $secondsLeft = $this->counts->availableIn($attempt->key);
 
-        if ($secondsLeft === 0 || ! $attempt->endsAt(Date::now()->getTimestamp() + $secondsLeft)) {
+        if ($secondsLeft === 0 || ! $attempt->isInWindowEndingAt(Date::now()->getTimestamp() + $secondsLeft)) {
             return;
         }
 

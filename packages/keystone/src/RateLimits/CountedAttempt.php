@@ -40,7 +40,7 @@ readonly class CountedAttempt
     /**
      * Determine if the window the attempt was counted in ends at the timestamp.
      */
-    public function endsAt(int $timestamp): bool
+    public function isInWindowEndingAt(int $timestamp): bool
     {
         return $this->availableAt === $timestamp;
     }
