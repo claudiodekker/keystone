@@ -14,10 +14,14 @@ it('answers an unknown address exactly like a wrong secret', function () {
         ...$support->rejectedProof(Surface::SIGN_IN),
     ]);
 
-    $unknown = $this->withoutCookies()->post(route('login.submit', $support->type()->name()), [
+    $this->assertSignInRefused($wrongSecret, __('keystone::messages.credentials-rejected'));
+
+    $unknown = $this->flushSession()->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'grace@example.com',
         ...$support->rejectedProof(Surface::SIGN_IN),
     ]);
+
+    $this->assertSignInRefused($unknown, __('keystone::messages.credentials-rejected'));
 
     $this->assertIndistinguishable($wrongSecret, $unknown);
     Sleep::assertSequence([Sleep::for(300)->milliseconds(), Sleep::for(300)->milliseconds()]);
@@ -36,10 +40,14 @@ it('answers an address two accounts count as verified exactly like a wrong secre
         ...$support->rejectedProof(Surface::SIGN_IN),
     ]);
 
-    $unresolved = $this->withoutCookies()->post(route('login.submit', $support->type()->name()), [
+    $this->assertSignInRefused($wrongSecret, __('keystone::messages.credentials-rejected'));
+
+    $unresolved = $this->flushSession()->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'shared@example.com',
         ...$support->rejectedProof(Surface::SIGN_IN),
     ]);
+
+    $this->assertSignInRefused($unresolved, __('keystone::messages.credentials-rejected'));
 
     $this->assertIndistinguishable($wrongSecret, $unresolved);
     Sleep::assertSequence([Sleep::for(300)->milliseconds(), Sleep::for(300)->milliseconds()]);
@@ -76,10 +84,14 @@ it('answers an identifier that is not valid UTF-8 exactly like a wrong secret', 
         ...$support->rejectedProof(Surface::SIGN_IN),
     ]);
 
-    $malformed = $this->withoutCookies()->post(route('login.submit', $support->type()->name()), [
+    $this->assertSignInRefused($wrongSecret, __('keystone::messages.credentials-rejected'));
+
+    $malformed = $this->flushSession()->post(route('login.submit', $support->type()->name()), [
         'identifier' => "ada\xFF@example.com",
         ...$support->rejectedProof(Surface::SIGN_IN),
     ]);
+
+    $this->assertSignInRefused($malformed, __('keystone::messages.credentials-rejected'));
 
     $this->assertIndistinguishable($wrongSecret, $malformed);
     Sleep::assertSequence([Sleep::for(300)->milliseconds(), Sleep::for(300)->milliseconds()]);

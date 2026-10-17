@@ -31,17 +31,17 @@ it('ends the whole session, so nothing it held outlives signing out', function (
     $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::SIGN_IN);
     $support->arrangeCredential(Surface::SIGN_IN, $user);
-    $this->post(route('login.submit', $support->type()->name()), [
+    $cookie = config('session.cookie');
+    $signedIn = $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada@example.com',
         ...$support->validProof(Surface::SIGN_IN, $user),
-    ]);
+    ])->getCookie($cookie)->getValue();
 
     $this->withSession(['url.intended' => url('/reports')]);
-    $signedIn = $this->cookies();
 
-    $this->post(route('logout'));
+    $this->withCookie($cookie, $signedIn)->post(route('logout'));
 
-    $next = $this->withCookies($signedIn)->post(route('login.submit', $support->type()->name()), [
+    $next = $this->flushSession()->withCookie($cookie, $signedIn)->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada@example.com',
         ...$support->validProof(Surface::SIGN_IN, $user),
     ]);

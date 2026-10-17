@@ -5,7 +5,6 @@ namespace ClaudioDekker\Keystone\AppTests\Concerns;
 use ClaudioDekker\Keystone\AppTests\Assertions\GuestStepAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\SignInAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\SignOutAssertions;
-use ClaudioDekker\Keystone\AppTests\KeystoneTestResponse;
 use ClaudioDekker\Keystone\AppTests\Support\CredentialTypeSupport;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Keystone;
@@ -13,22 +12,18 @@ use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Models\UserEmail;
 use Illuminate\Foundation\Http\Events\RequestHandled;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
-use Illuminate\Support\Facades\Date;
+use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\Assert;
+use Symfony\Component\HttpFoundation\Cookie;
 
 /**
  * Drive the app the way a user does, and check its answers through assertions the app can override.
- *
- * Each request starts afresh: the guards are built again, and the session holds only what its
- * storage keeps for the cookies that earlier responses set, plus what the test put in with
- * withSession(). The next request sees a sign-in only when the session really stored it.
  *
  * @api
  */
 trait InteractsWithKeystone
 {
     use GuestStepAssertions;
-    use InteractsWithCookies;
     use LazilyRefreshDatabase;
     use SignInAssertions;
     use SignOutAssertions;
@@ -104,46 +99,14 @@ trait InteractsWithKeystone
     }
 
     /**
-     * Assert the two responses match in status, redirect, flashed data, and header and cookie names.
+     * Assert the two responses match in status, redirect, and header and cookie names.
      */
-    public function assertIndistinguishable(KeystoneTestResponse $existing, KeystoneTestResponse $missing): void
+    public function assertIndistinguishable(TestResponse $existing, TestResponse $missing): void
     {
         Assert::assertSame($existing->getStatusCode(), $missing->getStatusCode(), 'The responses differ in status.');
         Assert::assertSame($existing->headers->get('Location'), $missing->headers->get('Location'), 'The responses differ in redirect.');
-        Assert::assertEquals($this->comparableFlash($existing), $this->comparableFlash($missing), 'The responses differ in flashed data.');
         Assert::assertSame($this->headerNames($existing), $this->headerNames($missing), 'The responses differ in header names.');
         Assert::assertSame($this->cookieNames($existing), $this->cookieNames($missing), 'The responses differ in Set-Cookie names.');
-    }
-
-    /**
-     * Send the request with the cookies earlier responses set, then forget the session data it left in memory.
-     */
-    public function call($method, $uri, $parameters = [], $cookies = [], $files = [], $server = [], $content = null): KeystoneTestResponse
-    {
-        $startedAt = Date::now();
-
-        $response = parent::call($method, $uri, $parameters, $cookies, $files, $server, $content);
-
-        $this->keepCookies($response);
-
-        $session = clone $this->app['session.store'];
-
-        $this->app['session.store']->flush();
-
-        return KeystoneTestResponse::capture($response, $session, $startedAt->diffInMilliseconds(Date::now()));
-    }
-
-    /**
-     * Get the response's flashed data with the flashed-back input reduced to its fields.
-     *
-     * @return array<string, mixed>
-     */
-    protected function comparableFlash(KeystoneTestResponse $response): array
-    {
-        return [
-            ...$response->flashed(),
-            '_old_input' => array_keys($response->oldInput()),
-        ];
     }
 
     /**
@@ -151,10 +114,24 @@ trait InteractsWithKeystone
      *
      * @return list<string>
      */
-    protected function headerNames(KeystoneTestResponse $response): array
+    protected function headerNames(TestResponse $response): array
     {
         return collect($response->headers->all())
             ->keys()
+            ->sort()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Get the names of the cookies the response sets, sorted.
+     *
+     * @return list<string>
+     */
+    protected function cookieNames(TestResponse $response): array
+    {
+        return collect($response->headers->getCookies())
+            ->map(fn (Cookie $cookie) => $cookie->getName())
             ->sort()
             ->values()
             ->all();

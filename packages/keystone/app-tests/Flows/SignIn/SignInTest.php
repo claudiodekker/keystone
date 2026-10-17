@@ -44,15 +44,15 @@ it('gives the session a new id on sign-in', function () {
     $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::SIGN_IN);
     $support->arrangeCredential(Surface::SIGN_IN, $user);
-    $this->get(route('login'));
-    $beforeSigningIn = $this->cookies();
+    $cookie = config('session.cookie');
+    $beforeSigningIn = $this->get(route('login'))->getCookie($cookie)->getValue();
 
-    $this->post(route('login.submit', $support->type()->name()), [
+    $this->withCookie($cookie, $beforeSigningIn)->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada@example.com',
         ...$support->validProof(Surface::SIGN_IN, $user),
     ]);
 
-    $response = $this->withCookies($beforeSigningIn)->get(route('login'));
+    $response = $this->flushSession()->withCookie($cookie, $beforeSigningIn)->get(route('login'));
 
     $this->assertSignInPage($response);
 });
@@ -131,8 +131,9 @@ it('refuses a wrong secret, flashing back only the identifier', function () {
         ...$support->rejectedProof(Surface::SIGN_IN),
     ]);
 
+    $this->assertSignInRefused($response, __('keystone::messages.credentials-rejected'));
+
     $next = $this->get(route('login'));
 
-    $this->assertSignInRefused($response, __('keystone::messages.credentials-rejected'));
     $this->assertSignInPage($next);
 });

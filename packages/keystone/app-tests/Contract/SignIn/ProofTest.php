@@ -15,7 +15,7 @@ it('signs in with a valid proof of every installed type that serves sign-in', fu
         $address = $this->addVerifiedAddress($user);
         $support->arrangeCredential(Surface::SIGN_IN, $user);
 
-        $response = $this->withoutCookies()->post(route('login.submit', $support->type()->name()), [
+        $response = $this->flushSession()->post(route('login.submit', $support->type()->name()), [
             'identifier' => $address,
             ...$support->validProof(Surface::SIGN_IN, $user),
         ]);
@@ -30,7 +30,7 @@ it('refuses a rejected proof of every installed type that serves sign-in', funct
         $address = $this->addVerifiedAddress($user);
         $support->arrangeCredential(Surface::SIGN_IN, $user);
 
-        $response = $this->withoutCookies()->post(route('login.submit', $support->type()->name()), [
+        $response = $this->flushSession()->post(route('login.submit', $support->type()->name()), [
             'identifier' => $address,
             ...$support->rejectedProof(Surface::SIGN_IN),
         ]);
@@ -45,15 +45,19 @@ it('answers no account exactly like a rejected proof, for every installed type t
         $address = $this->addVerifiedAddress($user);
         $support->arrangeCredential(Surface::SIGN_IN, $user);
 
-        $rejected = $this->withoutCookies()->post(route('login.submit', $support->type()->name()), [
+        $rejected = $this->flushSession()->post(route('login.submit', $support->type()->name()), [
             'identifier' => $address,
             ...$support->rejectedProof(Surface::SIGN_IN),
         ]);
 
-        $missing = $this->withoutCookies()->post(route('login.submit', $support->type()->name()), [
+        $this->assertSignInRefused($rejected, __('keystone::messages.credentials-rejected'));
+
+        $missing = $this->flushSession()->post(route('login.submit', $support->type()->name()), [
             'identifier' => 'nobody.'.$address,
             ...$support->rejectedProof(Surface::SIGN_IN),
         ]);
+
+        $this->assertSignInRefused($missing, __('keystone::messages.credentials-rejected'));
 
         $this->assertIndistinguishable($rejected, $missing);
     }

@@ -2,7 +2,7 @@
 
 namespace ClaudioDekker\Keystone\AppTests\Assertions;
 
-use ClaudioDekker\Keystone\AppTests\KeystoneTestResponse;
+use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\Assert;
 
 /**
@@ -17,7 +17,7 @@ trait SignInAssertions
      *
      * @param  array<string, mixed>  $fields
      */
-    public function assertSignInPage(KeystoneTestResponse $response, array $fields = []): void
+    public function assertSignInPage(TestResponse $response, array $fields = []): void
     {
         $response->assertOk();
 
@@ -29,12 +29,12 @@ trait SignInAssertions
     /**
      * Assert the response refused the sign-in with the message on the identifier, flashing back only the identifier.
      */
-    public function assertSignInRefused(KeystoneTestResponse $response, string $message): void
+    public function assertSignInRefused(TestResponse $response, string $message): void
     {
         $response->assertRedirectToRoute('login');
         $response->assertSessionHasErrors(['identifier' => $message]);
 
-        Assert::assertArrayHasKey('identifier', $response->oldInput(), 'The response flashed back no identifier.');
+        Assert::assertArrayHasKey('identifier', $this->app['session.store']->getOldInput(), 'The response flashed back no identifier.');
 
         $this->assertFlashedOnlyTheIdentifier($response);
     }
@@ -44,7 +44,7 @@ trait SignInAssertions
      *
      * @param  array<int|string, string>  $fields  Field names, or a field's expected message by its name.
      */
-    public function assertSignInInvalid(KeystoneTestResponse $response, array $fields): void
+    public function assertSignInInvalid(TestResponse $response, array $fields): void
     {
         $response->assertInvalid($fields);
 
@@ -54,7 +54,7 @@ trait SignInAssertions
     /**
      * Assert the response answered a credential type the sign-in page doesn't offer as not found.
      */
-    public function assertSignInTypeNotFound(KeystoneTestResponse $response): void
+    public function assertSignInTypeNotFound(TestResponse $response): void
     {
         $response->assertNotFound();
     }
@@ -62,7 +62,7 @@ trait SignInAssertions
     /**
      * Assert the response sent the signed-in user on to the given path.
      */
-    public function assertSignedIn(KeystoneTestResponse $response, string $redirectTo): void
+    public function assertSignedIn(TestResponse $response, string $redirectTo): void
     {
         $response->assertRedirect($redirectTo);
     }
@@ -70,9 +70,9 @@ trait SignInAssertions
     /**
      * Assert the response flashed back no input but the identifier.
      */
-    protected function assertFlashedOnlyTheIdentifier(KeystoneTestResponse $response): void
+    protected function assertFlashedOnlyTheIdentifier(TestResponse $response): void
     {
-        $others = array_diff(array_keys($response->oldInput()), ['identifier']);
+        $others = array_diff(array_keys($this->app['session.store']->getOldInput()), ['identifier']);
 
         Assert::assertSame([], array_values($others), 'The response flashed back more than the identifier.');
     }
