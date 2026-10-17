@@ -45,6 +45,22 @@ it('passes assertions called on the test case and on facades', function () {
     expect((new ResponsesThroughAssertionTraits)->check($file))->toBe([]);
 });
 
+it('passes assertions called on anything but a response', function () {
+    $file = new File('packages/keystone/app-tests/Flows/ExampleTest.php', <<<'PHP'
+        <?php
+
+        it('signs in', function () {
+            $bus = Bus::fake();
+            $mailable = new SignInAlert;
+
+            $bus->assertNotDispatched(SendSignInAlert::class);
+            $mailable->assertHasSubject('New sign-in');
+        });
+        PHP);
+
+    expect((new ResponsesThroughAssertionTraits)->check($file))->toBe([]);
+});
+
 it('reads only the AppTests themselves', function (string $path) {
     $file = new File($path, "<?php\n\n\$response->assertRedirect('/');\n");
 
