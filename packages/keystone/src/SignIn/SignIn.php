@@ -92,6 +92,13 @@ class SignIn
         $owner = $this->decision->decide($proof, $type, $account);
 
         if ($owner === null) {
+            $this->recorder->record(
+                SecurityEventType::PROOF_REJECTED,
+                account: $account,
+                surface: Surface::SIGN_IN,
+                credentialType: $type,
+            );
+
             return new Refused;
         }
 
