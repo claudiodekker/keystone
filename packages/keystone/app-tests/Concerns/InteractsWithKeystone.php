@@ -42,21 +42,27 @@ trait InteractsWithKeystone
     protected ?Authenticatable $actor = null;
 
     /**
-     * Create a user from the app's own factory.
+     * Create a user from the app's own factory, naming the fix when the app has none.
      *
      * @param  array<string, mixed>  $attributes
      */
     public function createUser(array $attributes = []): KeystoneUser
     {
-        return Keystone::userModel()::factory()->create($attributes);
+        $model = Keystone::userModel();
+
+        if (! method_exists($model, 'factory')) {
+            Assert::fail("The user model [{$model}] has no factory. Give it HasFactory and a factory, as Keystone takes its users from the app.");
+        }
+
+        return $model::factory()->create($attributes);
     }
 
     /**
-     * Get the test support of the first installed type that serves the surface.
+     * Get the test support of the first installed type that serves the surface, naming the fix when none does.
      */
     public function supportFor(Surface $surface): CredentialTypeSupport
     {
-        return $this->supportsFor($surface)[0];
+        return $this->supportsFor($surface)[0] ?? Assert::fail("No installed credential type with test support serves [{$surface->value}]. Install a method package that does.");
     }
 
     /**
