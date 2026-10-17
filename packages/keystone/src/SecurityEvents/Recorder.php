@@ -40,6 +40,11 @@ class Recorder
     protected const string COOLDOWN_PURPOSE = 'keystone.security_event.cooldown';
 
     /**
+     * The most characters a reason may hold.
+     */
+    protected const int REASON_LENGTH = 64;
+
+    /**
      * Create the recorder.
      */
     public function __construct(
@@ -60,8 +65,13 @@ class Recorder
         ?Surface $surface = null,
         ?CredentialType $credentialType = null,
         int|string|null $credential = null,
+        ?string $reason = null,
     ): void {
-        $entry = rescue(fn () => $this->makeEntry($type, $account, $surface, $credentialType, $credential));
+        if ($this->config->get('keystone.events.enabled') === false) {
+            return;
+        }
+
+        $entry = rescue(fn () => $this->makeEntry($type, $account, $surface, $credentialType, $credential, $reason));
 
         if ($entry === null) {
             return;
@@ -87,6 +97,7 @@ class Recorder
         ?Surface $surface,
         ?CredentialType $credentialType,
         int|string|null $credential,
+        ?string $reason,
     ): UserSecurityEvent {
         $context = RequestContext::of($this->request);
 
@@ -100,13 +111,32 @@ class Recorder
             'credential_type' => $credentialType?->name(),
             'credential_id' => $credential,
             'credential_label' => null,
-            'reason' => null,
+            'reason' => $reason === null ? null : $this->reason($reason, $credentialType),
             'ip_address' => $context?->ipAddress,
             'location' => null,
             'user_agent' => $context?->userAgent,
             'known_device' => null,
             'request_id' => $context?->requestId,
         ]);
+    }
+
+    /**
+     * Get the reason as stored, bounded to a short prefixed code.
+     */
+    protected function reason(string $reason, ?CredentialType $credentialType): string
+    {
+        $prefix = $credentialType?->name() ?? 'keystone';
+        $code = Str::chopStart($reason, [$prefix.'.', 'keystone.']);
+
+        if (
+            $code !== $reason
+            && strlen($reason) <= static::REASON_LENGTH
+            && preg_match('/^[a-z0-9._]+\z/', $code) === 1
+        ) {
+            return $reason;
+        }
+
+        return $prefix.'.invalid_reason';
     }
 
     /**

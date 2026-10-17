@@ -112,6 +112,44 @@ it('logs every refusal for a made-up address while the cache fails', function ()
     Exceptions::assertReported(InvalidArgumentException::class);
 });
 
+it('records nothing when keystone.events.enabled is false', function () {
+    Event::fake([SecurityEventRecorded::class]);
+    config(['keystone.events.enabled' => false]);
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $response = $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $this->assertSignedIn($response, '/');
+    expect($this->securityEvents()->stored())->toBeEmpty()
+        ->and($this->securityEvents()->logged())->toBe([]);
+
+    Event::assertNotDispatched(SecurityEventRecorded::class);
+});
+
+it('keeps recording for any value of keystone.events.enabled but false', function (mixed $enabled) {
+    config(['keystone.events.enabled' => $enabled]);
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    expect($this->securityEvents()->for($user))->toHaveCount(1);
+})->with([
+    'true' => true,
+    'the string false' => 'false',
+    'zero' => 0,
+    'null' => null,
+]);
+
 it('dispatches SecurityEventRecorded with the whole entry', function () {
     Event::fake([SecurityEventRecorded::class]);
     $user = $this->createUser();
