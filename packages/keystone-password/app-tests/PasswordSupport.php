@@ -8,6 +8,7 @@ use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Models\UserCredential;
+use ClaudioDekker\Keystone\Password\AppTests\Support\RefusingHasher;
 use Illuminate\Support\Facades\Hash;
 use PHPUnit\Framework\Assert;
 
@@ -37,12 +38,7 @@ class PasswordSupport implements CredentialTypeSupport
      */
     public function arrangeCredential(Surface $surface, KeystoneUser $user): static
     {
-        UserCredential::factory()->for($user, 'user')->create([
-            'type' => 'password',
-            'secret' => Hash::make(static::PASSWORD),
-        ]);
-
-        return $this;
+        return $this->arrangePassword($user, static::PASSWORD);
     }
 
     /**
@@ -63,5 +59,31 @@ class PasswordSupport implements CredentialTypeSupport
     public function rejectedProof(Surface $surface): array
     {
         return ['password' => 'wrong horse battery staple'];
+    }
+
+    /**
+     * Give the user a password hashed by the given driver, the app's own unless named, as an import would store it.
+     */
+    public function arrangePassword(KeystoneUser $user, string $password, ?string $driver = null): static
+    {
+        UserCredential::factory()->for($user, 'user')->create([
+            'type' => 'password',
+            'secret' => Hash::driver($driver)->make($password),
+        ]);
+
+        return $this;
+    }
+
+    /**
+     * Make the driver refuse every hash from now on, as an app that no longer verifies its hashes would.
+     */
+    public function refuseHashesOf(string $driver): static
+    {
+        $real = Hash::driver($driver);
+
+        Hash::extend($driver, fn () => new RefusingHasher($real));
+        Hash::forgetDrivers();
+
+        return $this;
     }
 }

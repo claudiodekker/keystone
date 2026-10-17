@@ -3,6 +3,7 @@
 namespace ClaudioDekker\Keystone\Password;
 
 use ClaudioDekker\Keystone\AppTests\Support\UseTestSupport;
+use ClaudioDekker\Keystone\Methods\Credential;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\InitiateShape;
 use ClaudioDekker\Keystone\Methods\Proof;
@@ -11,15 +12,27 @@ use ClaudioDekker\Keystone\Methods\Verification;
 use ClaudioDekker\Keystone\Password\AppTests\PasswordSupport;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Support\Facades\Hash;
+use SensitiveParameter;
 
 /**
- * A password, hashed with the app's own hasher.
+ * A password, hashed with the app's own hasher and checked by the driver of the algorithm that made the hash.
  *
  * @internal
  */
 #[UseTestSupport(PasswordSupport::class)]
 class PasswordType implements CredentialType
 {
+    /**
+     * The Hash driver that checks each algorithm password_get_info() names.
+     *
+     * @var array<string, string>
+     */
+    protected const array DRIVERS = [
+        'argon2i' => 'argon',
+        'argon2id' => 'argon2id',
+        'bcrypt' => 'bcrypt',
+    ];
+
     /**
      * Create the type, reading the app's hashing config when it verifies, so a change at runtime takes effect.
      */
@@ -76,11 +89,38 @@ class PasswordType implements CredentialType
         $password = (string) $verification->input['password'];
 
         foreach ($verification->credentials as $credential) {
-            if (Hash::check($password, (string) $credential->secret)) {
-                return Proof::proven($credential);
+            if ($this->matches($password, $credential)) {
+                return $this->proven($credential, $password);
             }
         }
 
         return Proof::rejected();
+    }
+
+    /**
+     * Determine if the password matches the credential's hash, checked by the driver of the hash's own algorithm.
+     *
+     * The driver's verify option stays on: a bcrypt hash goes to the bcrypt driver, so HASH_VERIFY never has to be off.
+     */
+    protected function matches(#[SensitiveParameter] string $password, Credential $credential): bool
+    {
+        $hash = (string) $credential->secret;
+        $driver = static::DRIVERS[Hash::info($hash)['algoName']] ?? null;
+
+        return Hash::driver($driver)->check($password, $hash);
+    }
+
+    /**
+     * Prove the credential, carrying a rehash when its hash is not of the app's driver and cost.
+     *
+     * Only the cheap needsRehash() runs here. Hash::make() waits in the closure until core has signed the account in.
+     */
+    protected function proven(Credential $credential, #[SensitiveParameter] string $password): Proof
+    {
+        if (! Hash::needsRehash((string) $credential->secret)) {
+            return Proof::proven($credential);
+        }
+
+        return Proof::proven($credential, fn () => Hash::make($password));
     }
 }
