@@ -49,6 +49,10 @@ class FakeFormType implements CredentialType, CredentialTypeSupport
      */
     public function initiateShape(Surface $surface): ?InitiateShape
     {
+        if ($surface !== Surface::SIGN_IN) {
+            return null;
+        }
+
         return InitiateShape::FORM;
     }
 
