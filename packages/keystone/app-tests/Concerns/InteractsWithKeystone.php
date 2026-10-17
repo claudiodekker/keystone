@@ -114,7 +114,7 @@ trait InteractsWithKeystone
     }
 
     /**
-     * Assert the two responses match in status, redirect, flashed data, header and cookie names, and the time they took.
+     * Assert the two responses match in status, redirect, flashed data, and header and cookie names.
      */
     public function assertIndistinguishable(KeystoneTestResponse $existing, KeystoneTestResponse $missing): void
     {
@@ -123,15 +123,6 @@ trait InteractsWithKeystone
         Assert::assertEquals($this->comparableFlash($existing), $this->comparableFlash($missing), 'The responses differ in flashed data.');
         Assert::assertSame($this->headerNames($existing), $this->headerNames($missing), 'The responses differ in header names.');
         Assert::assertSame($this->cookieNames($existing), $this->cookieNames($missing), 'The responses differ in Set-Cookie names.');
-        Assert::assertSame($existing->milliseconds(), $missing->milliseconds(), 'The responses differ in the time they took on the test clock.');
-    }
-
-    /**
-     * Assert the request took at least the given time on the test clock.
-     */
-    public function assertTookAtLeast(KeystoneTestResponse $response, int $milliseconds): void
-    {
-        Assert::assertGreaterThanOrEqual($milliseconds, $response->milliseconds(), "The request took {$response->milliseconds()} ms on the test clock.");
     }
 
     /**

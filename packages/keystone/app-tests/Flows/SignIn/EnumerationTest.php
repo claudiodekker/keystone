@@ -1,6 +1,7 @@
 <?php
 
 use ClaudioDekker\Keystone\Methods\Surface;
+use Illuminate\Support\Sleep;
 
 it('answers an unknown address exactly like a wrong secret', function () {
     $user = $this->createUser();
@@ -19,6 +20,7 @@ it('answers an unknown address exactly like a wrong secret', function () {
     ]);
 
     $this->assertIndistinguishable($wrongSecret, $unknown);
+    Sleep::assertSequence([Sleep::for(300)->milliseconds(), Sleep::for(300)->milliseconds()]);
 });
 
 it('answers an address two accounts count as verified exactly like a wrong secret', function () {
@@ -40,9 +42,10 @@ it('answers an address two accounts count as verified exactly like a wrong secre
     ]);
 
     $this->assertIndistinguishable($wrongSecret, $unresolved);
+    Sleep::assertSequence([Sleep::for(300)->milliseconds(), Sleep::for(300)->milliseconds()]);
 });
 
-it('takes at least 300 ms to refuse', function (string $identifier) {
+it('waits 300 ms before it refuses', function (string $identifier) {
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
     $this->addUnverifiedAddress($this->createUser(), 'shared@example.com');
@@ -55,7 +58,7 @@ it('takes at least 300 ms to refuse', function (string $identifier) {
         ...$support->rejectedProof(Surface::SIGN_IN),
     ]);
 
-    $this->assertTookAtLeast($response, 300);
+    Sleep::assertSequence([Sleep::for(300)->milliseconds()]);
 })->with([
     'a wrong secret' => 'ada@example.com',
     'an unknown address' => 'grace@example.com',
@@ -79,4 +82,5 @@ it('answers an identifier that is not valid UTF-8 exactly like a wrong secret', 
     ]);
 
     $this->assertIndistinguishable($wrongSecret, $malformed);
+    Sleep::assertSequence([Sleep::for(300)->milliseconds(), Sleep::for(300)->milliseconds()]);
 });

@@ -1,6 +1,7 @@
 <?php
 
 use ClaudioDekker\Keystone\Methods\Surface;
+use Illuminate\Support\Sleep;
 
 beforeEach(function () {
     if ($this->supportsFor(Surface::SIGN_IN) === []) {
@@ -55,6 +56,7 @@ it('answers no account exactly like a rejected proof, for every installed type t
         ]);
 
         $this->assertIndistinguishable($rejected, $missing);
-        $this->assertTookAtLeast($missing, 300);
     }
+
+    Sleep::assertSequence(array_fill(0, 2 * count($this->supportsFor(Surface::SIGN_IN)), Sleep::for(300)->milliseconds()));
 });

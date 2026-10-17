@@ -92,11 +92,3 @@ it('fails on a different Set-Cookie name', function () {
 
     expect(fn () => $this->assertIndistinguishable($existing, $missing))->toThrow(AssertionFailedError::class, 'The responses differ in Set-Cookie names.');
 });
-
-it('fails on a different time taken on the test clock', function () {
-    $session = new Store('session', new ArraySessionHandler(1));
-    $existing = KeystoneTestResponse::capture(TestResponse::fromBaseResponse(new Response('', 302)), $session, 300);
-    $missing = KeystoneTestResponse::capture(TestResponse::fromBaseResponse(new Response('', 302)), $session, 0);
-
-    expect(fn () => $this->assertIndistinguishable($existing, $missing))->toThrow(AssertionFailedError::class, 'The responses differ in the time they took on the test clock.');
-});
