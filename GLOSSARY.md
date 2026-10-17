@@ -64,6 +64,22 @@ A protected `send*` method of a core controller that turns one outcome into a re
 
 The readonly value a show step hands its page, with field names both frontend adapters pass on unchanged. Its messages arrive already translated.
 
+## Security event
+
+One entry of the audit trail: something that happened to an account's security, such as a sign-in, a refused proof or a sign-out. Every event has the same fixed fields and a type from one closed list. It is a row of `user_security_events` when it is for an account, and a log line only when it is anonymous.
+
+## Recorder
+
+The one place that records security events. Core calls it inline from the code that made the event happen, and it writes the log line, the row and the `SecurityEventRecorded` event, each rescued on its own.
+
+## Request context
+
+Who is asking: the request's IP address, its subnet, its cleaned user agent, its path and a request id, captured once per request by core's global middleware after the app's trusted-proxy middleware. It is the only code in core that reads the client's address or user agent.
+
+## Flow
+
+The part of the flows a request is in, such as sign-in, derived from the session's phase and the surface. No caller passes it.
+
 ## AppTest
 
 A test in a package's `app-tests/` that drives the app's own routes and published controllers, and checks each answer through an assertion the app can override. AppTests are the feature suite.
