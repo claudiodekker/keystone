@@ -12,6 +12,7 @@ use ClaudioDekker\Keystone\Session\SessionState;
 use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -27,6 +28,16 @@ class Recorder
      * The message of every log line.
      */
     protected const string MESSAGE = 'keystone.security_event';
+
+    /**
+     * The seconds during which identical anonymous events are logged once.
+     */
+    protected const int COOLDOWN_SECONDS = 60;
+
+    /**
+     * The label of the app key's subkey for cooldown keys.
+     */
+    protected const string COOLDOWN_PURPOSE = 'keystone.security_event.cooldown';
 
     /**
      * Create the recorder.
@@ -56,12 +67,13 @@ class Recorder
             return;
         }
 
-        rescue(fn () => $this->log($entry));
-
         if ($entry->isAnonymous()) {
+            $this->logAnonymous($entry);
+
             return;
         }
 
+        rescue(fn () => $this->log($entry));
         rescue(fn () => $entry->saveQuietly());
         rescue(fn () => $this->events->dispatch(new SecurityEventRecorded($entry)));
     }
@@ -107,5 +119,33 @@ class Recorder
         $context = $entry->toLogContext();
 
         $logger->info(static::MESSAGE, $context);
+    }
+
+    /**
+     * Log an anonymous event once per cooldown.
+     */
+    protected function logAnonymous(UserSecurityEvent $entry): void
+    {
+        $add = fn () => Cache::add($this->cooldownKey($entry), true, static::COOLDOWN_SECONDS);
+        $first = rescue($add, rescue: true);
+
+        if ($first) {
+            rescue(fn () => $this->log($entry));
+        }
+    }
+
+    /**
+     * Get the cache key that identical anonymous events share.
+     */
+    protected function cooldownKey(UserSecurityEvent $entry): string
+    {
+        $path = RequestContext::of($this->request)?->path;
+
+        $identity = $entry->type->value.'|'.$entry->ip_address.'|'.$path;
+
+        $appKey = (string) $this->config->get('app.key');
+        $subkey = hash_hmac('sha256', static::COOLDOWN_PURPOSE, $appKey);
+
+        return 'keystone:security_event:'.hash_hmac('sha256', $identity, $subkey);
     }
 }

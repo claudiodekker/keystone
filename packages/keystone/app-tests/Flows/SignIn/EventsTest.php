@@ -79,6 +79,39 @@ it('writes only a log line for a refused sign-in with a made-up address, and sto
     Event::assertNotDispatched(SecurityEventRecorded::class);
 });
 
+it('logs identical refusals for made-up addresses once per 60 seconds, per type, address and path', function () {
+    $support = $this->supportFor(Surface::SIGN_IN);
+    $refuse = fn (string $ipAddress) => $this->withServerVariables(['REMOTE_ADDR' => $ipAddress])->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'grace@example.com',
+        ...$support->rejectedProof(Surface::SIGN_IN),
+    ]);
+
+    $refuse('203.0.113.9');
+    $refuse('203.0.113.9');
+    $refuse('203.0.113.10');
+    $this->travel(59)->seconds();
+    $refuse('203.0.113.9');
+    $this->travel(1)->seconds();
+    $refuse('203.0.113.9');
+
+    expect(array_column($this->securityEvents()->logged(), 'ip_address'))->toBe(['203.0.113.9', '203.0.113.10', '203.0.113.9']);
+});
+
+it('logs every refusal for a made-up address while the cache fails', function () {
+    config(['cache.default' => 'broken', 'cache.stores.broken' => ['driver' => 'nonexistent']]);
+    $support = $this->supportFor(Surface::SIGN_IN);
+    $refuse = fn () => $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'grace@example.com',
+        ...$support->rejectedProof(Surface::SIGN_IN),
+    ]);
+
+    $refuse();
+    $refuse();
+
+    expect($this->securityEvents()->logged())->toHaveCount(2);
+    Exceptions::assertReported(InvalidArgumentException::class);
+});
+
 it('dispatches SecurityEventRecorded with the whole entry', function () {
     Event::fake([SecurityEventRecorded::class]);
     $user = $this->createUser();
