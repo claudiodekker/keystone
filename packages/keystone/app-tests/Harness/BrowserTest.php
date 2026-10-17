@@ -114,6 +114,16 @@ it('puts nothing of an earlier browser in the session when it puts the intended 
     $this->assertSignInPage($response);
 });
 
+it('keeps what app code leaves in the session for the next request', function () {
+    $user = $this->createUser();
+
+    $this->duringRequest(fn () => session()->put(Keystone::guard()->getName(), $user->getAuthIdentifier()));
+
+    $response = $this->get(route('login'));
+
+    $this->assertAlreadySignedIn($response);
+});
+
 it('keeps what each request flashed after a later request', function () {
     $refused = $this->post(route('login.submit', 'form'), [
         'identifier' => 'ada@example.com',

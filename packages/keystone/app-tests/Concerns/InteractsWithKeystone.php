@@ -11,6 +11,7 @@ use ClaudioDekker\Keystone\AppTests\Support\CredentialTypeSupport;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\Surface;
+use Closure;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Date;
@@ -119,12 +120,26 @@ trait InteractsWithKeystone
     /**
      * Keep the URL as intended in the browser's session, where Laravel's guest redirect keeps it before sending a guest to sign in.
      *
-     * AppTests can't count on a page of the app that sends guests to sign in, so this puts
-     * the URL where that redirect would have. It is the one place an AppTest writes the session.
+     * AppTests can't count on a page of the app that sends guests to sign in, so this puts the URL where that redirect would have.
      *
      * @return $this
      */
     public function arrivingFrom(string $url): static
+    {
+        $this->duringRequest(fn () => $this->app['session.store']->put('url.intended', $url));
+
+        return $this;
+    }
+
+    /**
+     * Run app code inside a request from the browser, so whatever it leaves in the session reaches the next request.
+     *
+     * @template TResult
+     *
+     * @param  Closure(): TResult  $code
+     * @return TResult
+     */
+    public function duringRequest(Closure $code): mixed
     {
         $this->startRequest();
 
@@ -132,12 +147,14 @@ trait InteractsWithKeystone
 
         $session->setId($this->defaultCookies[$session->getName()] ?? null);
         $session->start();
-        $session->put('url.intended', $url);
+
+        $result = $code();
+
         $session->save();
 
         $this->defaultCookies[$session->getName()] = $session->getId();
 
-        return $this;
+        return $result;
     }
 
     /**
