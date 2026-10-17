@@ -59,13 +59,18 @@ class SessionState
     }
 
     /**
-     * End the session and leave the signed-out status for the sign-in page.
+     * End the session and leave the signed-out status for the sign-in page, and get who was signed in, if anyone.
      */
-    public function signOut(): void
+    public function signOut(): ?KeystoneUser
     {
-        Keystone::guard()->logout();
+        $guard = Keystone::guard();
+        $user = $guard->user();
+
+        $guard->logout();
 
         $this->session->flash(static::STATUS, Status::SIGNED_OUT->value);
+
+        return $user instanceof KeystoneUser ? $user : null;
     }
 
     /**

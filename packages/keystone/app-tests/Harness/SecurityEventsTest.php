@@ -47,7 +47,10 @@ it('reads every event, oldest first, when given no user', function () {
         ...$support->validProof(Surface::SIGN_IN, $user),
     ]);
 
-    expect($this->securityEvents()->stored()->pluck('user_id')->all())->toBe([$other->getAuthIdentifier(), $user->getAuthIdentifier()]);
+    $events = $this->securityEvents()->stored();
+
+    expect($events->pluck('user_id')->all())->toBe([$other->getAuthIdentifier(), $other->getAuthIdentifier(), $user->getAuthIdentifier()])
+        ->and($events->pluck('type')->all())->toBe([SecurityEventType::SIGNED_IN, SecurityEventType::SIGNED_OUT, SecurityEventType::SIGNED_IN]);
 });
 
 it('reads the context of every security event log line, and no other line', function () {

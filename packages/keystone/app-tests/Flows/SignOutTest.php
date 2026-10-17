@@ -1,6 +1,7 @@
 <?php
 
 use ClaudioDekker\Keystone\Methods\Surface;
+use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use Illuminate\Auth\Events\Logout;
 use Illuminate\Support\Facades\Event;
 
@@ -63,6 +64,31 @@ it("dispatches Laravel's Logout event for the user who signed out", function () 
     $this->post(route('logout'));
 
     Event::assertDispatched(Logout::class, fn (Logout $event) => $event->user->is($user));
+});
+
+it('records signed_out for the account when the user signs out', function () {
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $this->post(route('logout'));
+
+    $events = $this->securityEvents()->for($user);
+
+    expect($events->pluck('type')->all())->toBe([SecurityEventType::SIGNED_IN, SecurityEventType::SIGNED_OUT])
+        ->and($events[1]->flow)->toBeNull();
+});
+
+it('records nothing when a guest signs out', function () {
+    $this->post(route('logout'));
+
+    expect($this->securityEvents()->stored())->toBeEmpty()
+        ->and($this->securityEvents()->logged())->toBe([]);
 });
 
 it('signs out a guest the same way', function () {
