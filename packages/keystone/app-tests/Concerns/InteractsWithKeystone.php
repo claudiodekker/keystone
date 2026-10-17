@@ -4,6 +4,7 @@ namespace ClaudioDekker\Keystone\AppTests\Concerns;
 
 use ClaudioDekker\Keystone\AppTests\Assertions\GuestStepAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\SignInAssertions;
+use ClaudioDekker\Keystone\AppTests\Assertions\SignOutAssertions;
 use ClaudioDekker\Keystone\AppTests\KeystoneTestResponse;
 use ClaudioDekker\Keystone\AppTests\Support\Browser;
 use ClaudioDekker\Keystone\AppTests\Support\CredentialTypeSupport;
@@ -31,6 +32,7 @@ trait InteractsWithKeystone
     use GuestStepAssertions;
     use LazilyRefreshDatabase;
     use SignInAssertions;
+    use SignOutAssertions;
 
     /**
      * Create a user from the app's own factory.

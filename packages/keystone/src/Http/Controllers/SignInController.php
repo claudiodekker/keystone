@@ -31,6 +31,7 @@ abstract class SignInController
 
         $page = new SignInPage(
             types: Keystone::credentialTypes()->shapes(Surface::SIGN_IN),
+            status: $session->status()?->label(),
         );
 
         return $this->sendSignInPage($request, $page);

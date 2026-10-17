@@ -2,6 +2,12 @@
 
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Models\UserEmail;
+use Illuminate\Auth\Events\Login;
+use Illuminate\Support\Facades\Event;
+
+beforeEach(function () {
+    Event::fake([Login::class]);
+});
 
 it('signs a user in with their email address and secret', function () {
     $user = $this->createUser();
@@ -18,6 +24,20 @@ it('signs a user in with their email address and secret', function () {
 
     $this->assertSignedIn($response, '/');
     $this->assertAlreadySignedIn($next);
+});
+
+it("dispatches Laravel's Login event for the user who signed in", function () {
+    $user = $this->createUser();
+    UserEmail::factory()->for($user, 'user')->verified()->create(['address' => 'ada@example.com']);
+    $support = $this->supportFor(Surface::SIGN_IN);
+    $support->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    Event::assertDispatched(Login::class, fn (Login $event) => $event->user->is($user) && ! $event->remember);
 });
 
 it('gives the session a new id on sign-in', function () {

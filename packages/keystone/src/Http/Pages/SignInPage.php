@@ -14,8 +14,10 @@ readonly class SignInPage
      *
      * @param  list<array{name: string, shape: string}>  $types
      */
-    public function __construct(public array $types)
-    {
+    public function __construct(
+        public array $types,
+        public ?string $status,
+    ) {
         //
     }
 }

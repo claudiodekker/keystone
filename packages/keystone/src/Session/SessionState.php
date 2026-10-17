@@ -4,12 +4,15 @@ namespace ClaudioDekker\Keystone\Session;
 
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Keystone;
+use ClaudioDekker\Keystone\Status;
+use Illuminate\Auth\Events\Login;
+use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Contracts\Routing\UrlGenerator;
 use Illuminate\Contracts\Session\Session;
 use Illuminate\Support\Str;
 
 /**
- * Own Keystone's side of the session: who is signed in.
+ * Own Keystone's side of the session: who is signed in, and the status the next page shows.
  *
  * Every change of auth level goes through here, so the session rotates in one place. Controllers never touch the session or the guard.
  *
@@ -18,11 +21,17 @@ use Illuminate\Support\Str;
 class SessionState
 {
     /**
+     * The session key that holds the status the next page shows.
+     */
+    protected const string STATUS = 'keystone.status';
+
+    /**
      * Create the session state over the request's session.
      */
     public function __construct(
         protected Session $session,
         protected UrlGenerator $urls,
+        protected Dispatcher $events,
     ) {
         //
     }
@@ -49,6 +58,24 @@ class SessionState
     }
 
     /**
+     * End the session and leave the signed-out status for the sign-in page.
+     */
+    public function signOut(): void
+    {
+        Keystone::guard()->logout();
+
+        $this->session->flash(static::STATUS, Status::SIGNED_OUT->value);
+    }
+
+    /**
+     * Get the status the previous request left for this page.
+     */
+    public function status(): ?Status
+    {
+        return Status::tryFrom($this->session->get(static::STATUS, ''));
+    }
+
+    /**
      * Give the session a new id and CSRF token, so nothing that knew the old id reaches the new level.
      */
     protected function changeAuthLevel(): void
@@ -65,6 +92,8 @@ class SessionState
 
         $this->session->put($guard->getName(), $account->getAuthIdentifier());
         $guard->setUser($account);
+
+        $this->events->dispatch(new Login($guard->getName(), $account, false));
     }
 
     /**

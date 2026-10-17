@@ -18,6 +18,7 @@ class SignInController extends BaseSignInController
     protected function sendSignInPage(Request $request, SignInPage $page): Response
     {
         return response()->view('fixtures::sign-in', [
+            'status' => $page->status,
             'types' => $page->types,
         ]);
     }

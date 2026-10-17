@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Lang;
 enum Status: string
 {
     case CREDENTIALS_REJECTED = 'credentials-rejected';
+    case SIGNED_OUT = 'signed-out';
 
     /**
      * Get the status's message in the app's locale.

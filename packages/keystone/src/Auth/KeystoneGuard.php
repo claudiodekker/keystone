@@ -11,5 +11,14 @@ use Illuminate\Auth\SessionGuard;
  */
 class KeystoneGuard extends SessionGuard
 {
-    //
+    /**
+     * Sign the user out and end the whole session, so nothing it held outlives them, Auth::logout() included.
+     */
+    public function logout(): void
+    {
+        parent::logout();
+
+        $this->session->invalidate();
+        $this->session->regenerateToken();
+    }
 }
