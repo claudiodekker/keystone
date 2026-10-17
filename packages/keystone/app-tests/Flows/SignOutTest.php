@@ -1,6 +1,7 @@
 <?php
 
 use ClaudioDekker\Keystone\Methods\Surface;
+use ClaudioDekker\Keystone\RateLimits\StepKind;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use Illuminate\Auth\Events\Logout;
 use Illuminate\Support\Facades\Event;
@@ -89,6 +90,16 @@ it('records nothing when a guest signs out', function () {
 
     expect($this->securityEvents()->stored())->toBeEmpty()
         ->and($this->securityEvents()->logged())->toBe([]);
+});
+
+it('refuses signing out over the change allowance', function () {
+    foreach (range(1, $this->requestAllowance(StepKind::CHANGE)) as $i) {
+        $this->post(route('logout'));
+    }
+
+    $response = $this->post(route('logout'));
+
+    $this->assertSignOutThrottled($response);
 });
 
 it('signs out a guest the same way', function () {

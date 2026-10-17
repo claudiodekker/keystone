@@ -5,18 +5,20 @@ namespace ClaudioDekker\Keystone\RateLimits;
 use ClaudioDekker\Keystone\Accounts\EmailAddress;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Exceptions\ThrottledException;
+use ClaudioDekker\Keystone\Http\RequestContext;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Session\SessionState;
 use Illuminate\Cache\RateLimiter;
 use Illuminate\Config\Repository as Config;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Date;
 use LogicException;
 
 /**
- * Count failed attempts against their allowance in Laravel's rate-limiter store, and refuse a spent one as throttled.
+ * Count requests and failed attempts against their allowances in Laravel's rate-limiter store, and refuse a spent one as throttled.
  *
- * Keys are hashed under a subkey of the app key, so the store holds no identifier in clear.
+ * Keys are hashed under a subkey of the app key, so the store holds no identifier or address in clear.
  *
  * @internal
  */
@@ -28,14 +30,46 @@ class Limiter
     protected const string PURPOSE = 'keystone.rate_limit';
 
     /**
+     * The key part every request without a usable IP address shares.
+     */
+    protected const string UNKNOWN_ADDRESS = 'unknown';
+
+    /**
      * Create the limiter.
      */
     public function __construct(
         protected Config $config,
         protected RateLimiter $counts,
+        protected Request $request,
         protected SessionState $session,
     ) {
         //
+    }
+
+    /**
+     * Count a request of the step kind against the IP address and, separately, the signed-in account, and refuse it once either count is spent.
+     *
+     * @throws ThrottledException
+     */
+    public function takeRequest(StepKind $kind): void
+    {
+        $allowance = $this->config->integer('keystone.rate_limits.requests_per_minute.'.$kind->value);
+        $keys = [$this->key(Limit::REQUEST, $kind->value, 'address', $this->address())];
+        $account = $this->session->account();
+
+        if ($account !== null) {
+            $keys[] = $this->key(Limit::REQUEST, $kind->value, 'account', (string) $account->getAuthIdentifier());
+        }
+
+        $spent = collect($keys)
+            ->map(fn (string $key) => $this->take($key, Limit::REQUEST))
+            ->filter(fn (CountedAttempt $attempt) => $attempt->isOver($allowance));
+
+        if ($spent->isEmpty()) {
+            return;
+        }
+
+        throw ThrottledException::retryAfter($this->secondsUntil($spent->max->availableAt));
     }
 
     /**
@@ -105,6 +139,16 @@ class Limiter
         }
 
         return ['identifier', EmailAddress::normalize($identifier)];
+    }
+
+    /**
+     * Get the request's IP address, or the part every request without a usable one shares.
+     */
+    protected function address(): string
+    {
+        $ipAddress = RequestContext::of($this->request)?->ipAddress;
+
+        return $ipAddress ?? static::UNKNOWN_ADDRESS;
     }
 
     /**

@@ -13,6 +13,7 @@ use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Models\UserEmail;
+use ClaudioDekker\Keystone\RateLimits\StepKind;
 use Illuminate\Cache\ArrayStore;
 use Illuminate\Cache\RateLimiter;
 use Illuminate\Contracts\Cache\Repository;
@@ -68,6 +69,14 @@ trait InteractsWithKeystone
     public function failedAttemptAllowance(): int
     {
         return config()->integer('keystone.rate_limits.failed_attempts_per_hour');
+    }
+
+    /**
+     * Get how many requests of the step kind one IP address or one signed-in account gets in a minute, as the app configures it.
+     */
+    public function requestAllowance(StepKind $kind): int
+    {
+        return config()->integer('keystone.rate_limits.requests_per_minute.'.$kind->value);
     }
 
     /**

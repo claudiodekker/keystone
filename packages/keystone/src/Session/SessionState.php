@@ -46,6 +46,16 @@ class SessionState
     }
 
     /**
+     * Get the signed-in account, if any.
+     */
+    public function account(): ?KeystoneUser
+    {
+        $user = Keystone::guard()->user();
+
+        return $user instanceof KeystoneUser ? $user : null;
+    }
+
+    /**
      * Complete a sign-in for the account, and get the path to send the user to.
      */
     public function signIn(KeystoneUser $account): string
@@ -63,14 +73,13 @@ class SessionState
      */
     public function signOut(): ?KeystoneUser
     {
-        $guard = Keystone::guard();
-        $user = $guard->user();
+        $account = $this->account();
 
-        $guard->logout();
+        Keystone::guard()->logout();
 
         $this->session->flash(static::STATUS, Status::SIGNED_OUT->value);
 
-        return $user instanceof KeystoneUser ? $user : null;
+        return $account;
     }
 
     /**
