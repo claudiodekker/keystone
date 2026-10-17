@@ -45,6 +45,7 @@ it('gives the session a new id on sign-in', function () {
     $support = $this->supportFor(Surface::SIGN_IN);
     $support->arrangeCredential(Surface::SIGN_IN, $user);
     $cookie = config('session.cookie');
+
     $beforeSigningIn = $this->get(route('login'))->getCookie($cookie)->getValue();
 
     $this->withCookie($cookie, $beforeSigningIn)->post(route('login.submit', $support->type()->name()), [

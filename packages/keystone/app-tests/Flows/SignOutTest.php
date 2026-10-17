@@ -13,13 +13,13 @@ it('signs the user out, and the next request is a guest again', function () {
     $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::SIGN_IN);
     $support->arrangeCredential(Surface::SIGN_IN, $user);
+
     $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada@example.com',
         ...$support->validProof(Surface::SIGN_IN, $user),
     ]);
 
     $response = $this->post(route('logout'));
-
     $next = $this->get(route('login'));
 
     $this->assertSignedOut($response);
@@ -32,6 +32,7 @@ it('ends the whole session, so nothing it held outlives signing out', function (
     $support = $this->supportFor(Surface::SIGN_IN);
     $support->arrangeCredential(Surface::SIGN_IN, $user);
     $cookie = config('session.cookie');
+
     $signedIn = $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada@example.com',
         ...$support->validProof(Surface::SIGN_IN, $user),
@@ -54,6 +55,7 @@ it("dispatches Laravel's Logout event for the user who signed out", function () 
     $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::SIGN_IN);
     $support->arrangeCredential(Surface::SIGN_IN, $user);
+
     $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada@example.com',
         ...$support->validProof(Surface::SIGN_IN, $user),
@@ -66,7 +68,6 @@ it("dispatches Laravel's Logout event for the user who signed out", function () 
 
 it('signs out a guest the same way', function () {
     $response = $this->post(route('logout'));
-
     $next = $this->get(route('login'));
 
     $this->assertSignedOut($response);
