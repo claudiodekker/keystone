@@ -62,7 +62,7 @@ it('lands on the intended URL after signing in', function (string $intended) {
     $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::SIGN_IN);
     $support->arrangeCredential(Surface::SIGN_IN, $user);
-    $this->arrivingFrom($intended);
+    $this->withSession(['url.intended' => $intended]);
 
     $response = $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada@example.com',
@@ -80,7 +80,7 @@ it('lands on / when the intended URL is not a path on the app', function (string
     $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::SIGN_IN);
     $support->arrangeCredential(Surface::SIGN_IN, $user);
-    $this->arrivingFrom($intended);
+    $this->withSession(['url.intended' => $intended]);
 
     $response = $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada@example.com',

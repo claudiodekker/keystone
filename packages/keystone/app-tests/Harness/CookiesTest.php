@@ -63,56 +63,6 @@ it('sends the cookies it held earlier again with withCookies()', function () {
     $this->assertAlreadySignedIn($response);
 });
 
-it('puts the intended URL where the next sign-in reads it', function () {
-    $user = $this->createUser();
-    $this->addVerifiedAddress($user, 'ada@example.com');
-    $support = $this->supportFor(Surface::SIGN_IN);
-    $support->arrangeCredential(Surface::SIGN_IN, $user);
-
-    $this->arrivingFrom(url('/reports'));
-
-    $response = $this->post(route('login.submit', $support->type()->name()), [
-        'identifier' => 'ada@example.com',
-        ...$support->validProof(Surface::SIGN_IN, $user),
-    ]);
-
-    $this->assertSignedIn($response, '/reports');
-});
-
-it('keeps the rest of the session when it puts the intended URL', function () {
-    $user = $this->createUser();
-    $this->addVerifiedAddress($user, 'ada@example.com');
-    $support = $this->supportFor(Surface::SIGN_IN);
-    $support->arrangeCredential(Surface::SIGN_IN, $user);
-    $this->post(route('login.submit', $support->type()->name()), [
-        'identifier' => 'ada@example.com',
-        ...$support->validProof(Surface::SIGN_IN, $user),
-    ]);
-
-    $this->arrivingFrom(url('/reports'));
-
-    $response = $this->get(route('login'));
-
-    $this->assertAlreadySignedIn($response);
-});
-
-it('starts a new session without cookies when it puts the intended URL', function () {
-    $user = $this->createUser();
-    $this->addVerifiedAddress($user, 'ada@example.com');
-    $support = $this->supportFor(Surface::SIGN_IN);
-    $support->arrangeCredential(Surface::SIGN_IN, $user);
-    $this->post(route('login.submit', $support->type()->name()), [
-        'identifier' => 'ada@example.com',
-        ...$support->validProof(Surface::SIGN_IN, $user),
-    ]);
-
-    $this->withoutCookies()->arrivingFrom(url('/reports'));
-
-    $response = $this->get(route('login'));
-
-    $this->assertSignInPage($response);
-});
-
 it('keeps what the test puts in the session for the next request', function () {
     $user = $this->createUser();
 

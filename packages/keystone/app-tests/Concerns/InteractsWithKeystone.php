@@ -138,18 +138,6 @@ trait InteractsWithKeystone
     }
 
     /**
-     * Keep the URL as intended in the session, where Laravel's guest redirect keeps it before sending a guest to sign in.
-     *
-     * @return $this
-     */
-    public function arrivingFrom(string $url): static
-    {
-        $this->duringRequest(fn () => $this->app['session.store']->put('url.intended', $url));
-
-        return $this;
-    }
-
-    /**
      * Run app code inside a request, so whatever it leaves in the session reaches the next request.
      *
      * @template TResult

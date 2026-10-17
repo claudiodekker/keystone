@@ -36,7 +36,7 @@ it('ends the whole session, so nothing it held outlives signing out', function (
         ...$support->validProof(Surface::SIGN_IN, $user),
     ]);
 
-    $this->arrivingFrom(url('/reports'));
+    $this->withSession(['url.intended' => url('/reports')]);
     $signedIn = $this->cookies();
 
     $this->post(route('logout'));

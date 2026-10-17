@@ -47,7 +47,7 @@ it('fails assertSignedIn on a sign-in that lands somewhere else', function () {
     $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::SIGN_IN);
     $support->arrangeCredential(Surface::SIGN_IN, $user);
-    $this->arrivingFrom(url('/reports'));
+    $this->withSession(['url.intended' => url('/reports')]);
 
     $response = $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada@example.com',
