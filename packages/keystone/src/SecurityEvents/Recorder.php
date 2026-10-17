@@ -7,7 +7,9 @@ use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Models\UserSecurityEvent;
 use ClaudioDekker\Keystone\Session\SessionState;
+use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 /**
@@ -18,15 +20,20 @@ use Illuminate\Support\Str;
 class Recorder
 {
     /**
+     * The message of every log line.
+     */
+    protected const string MESSAGE = 'keystone.security_event';
+
+    /**
      * Create the recorder.
      */
-    public function __construct(protected SessionState $session)
+    public function __construct(protected Config $config, protected SessionState $session)
     {
         //
     }
 
     /**
-     * Record an event of the type for the account, or anonymously.
+     * Record the security event, as a log line alone when it is anonymous.
      */
     public function record(
         SecurityEventType $type,
@@ -36,6 +43,12 @@ class Recorder
         int|string|null $credential = null,
     ): void {
         $entry = $this->makeEntry($type, $account, $surface, $credentialType, $credential);
+
+        $this->log($entry);
+
+        if ($entry->isAnonymous()) {
+            return;
+        }
 
         $entry->saveQuietly();
     }
@@ -67,5 +80,17 @@ class Recorder
             'known_device' => null,
             'request_id' => null,
         ]);
+    }
+
+    /**
+     * Write the entry's log line.
+     */
+    protected function log(UserSecurityEvent $entry): void
+    {
+        $channel = $this->config->get('keystone.log_channel');
+        $logger = Log::channel($channel);
+        $context = $entry->toLogContext();
+
+        $logger->info(static::MESSAGE, $context);
     }
 }

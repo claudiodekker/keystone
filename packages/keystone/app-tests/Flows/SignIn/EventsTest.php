@@ -41,3 +41,23 @@ it('records proof.rejected for the account when its sign-in is refused', functio
         ->and($events[0]->credential_type)->toBe($support->type()->name())
         ->and($events[0]->credential_id)->toBeNull();
 });
+
+it('writes only a log line for a refused sign-in with a made-up address, and stores the typed address nowhere', function () {
+    $support = $this->supportFor(Surface::SIGN_IN);
+
+    $response = $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'grace@example.com',
+        ...$support->rejectedProof(Surface::SIGN_IN),
+    ]);
+
+    $this->assertSignInRefused($response, __('keystone::messages.credentials-rejected'));
+
+    $lines = $this->securityEvents()->logged();
+
+    expect($this->securityEvents()->stored())->toBeEmpty()
+        ->and($lines)->toHaveCount(1)
+        ->and($lines[0]['type'])->toBe('proof.rejected')
+        ->and($lines[0]['user_id'])->toBeNull()
+        ->and($lines[0]['credential_type'])->toBe($support->type()->name())
+        ->and(json_encode($lines, JSON_THROW_ON_ERROR))->not->toContain('grace');
+});

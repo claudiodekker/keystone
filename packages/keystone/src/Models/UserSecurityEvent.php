@@ -17,6 +17,8 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * A security event: one entry of the audit trail, with the same fixed fields whatever its type.
  *
+ * @property int|string|null $user_id
+ *
  * @api
  */
 #[UseFactory(UserSecurityEventFactory::class)]
@@ -33,6 +35,24 @@ class UserSecurityEvent extends Model
      * @var bool
      */
     public $timestamps = false;
+
+    /**
+     * Determine if the event names no account.
+     */
+    public function isAnonymous(): bool
+    {
+        return $this->user_id === null;
+    }
+
+    /**
+     * Get every field for the log line, which is the operator's record of the event.
+     *
+     * @return array<string, mixed>
+     */
+    public function toLogContext(): array
+    {
+        return $this->attributesToArray();
+    }
 
     /**
      * Get the time of the event, kept and read in UTC whatever the app's timezone is.
