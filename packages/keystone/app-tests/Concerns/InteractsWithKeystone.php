@@ -221,17 +221,11 @@ trait InteractsWithKeystone
     }
 
     /**
-     * Keep the cookies the response set for the browser's next request, and drop the ones it cleared.
+     * Keep the cookies the response set for the browser's next request.
      */
     protected function keepCookies(TestResponse $response): void
     {
         foreach ($response->headers->getCookies() as $cookie) {
-            if ($cookie->isCleared()) {
-                unset($this->defaultCookies[$cookie->getName()]);
-
-                continue;
-            }
-
             $this->defaultCookies[$cookie->getName()] = $response->getCookie($cookie->getName())->getValue();
         }
     }
