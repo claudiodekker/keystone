@@ -26,7 +26,7 @@ readonly class CredentialTypes
     {
         $type = $this->types[$name] ?? null;
 
-        if ($type?->initiateShape($surface) === null) {
+        if ($type === null || ! $this->serves($type, $surface)) {
             return null;
         }
 
@@ -42,27 +42,30 @@ readonly class CredentialTypes
     {
         return array_values(array_filter(
             $this->types,
-            fn (CredentialType $type) => $type->initiateShape($surface) !== null,
+            fn (CredentialType $type) => $this->serves($type, $surface),
         ));
     }
 
     /**
      * Get the name and initiate shape of each type that serves the surface, as a page lists them.
      *
-     * @return list<array{name: string, shape: string}>
+     * @return array<int, array{name: string, shape: string}>
      */
     public function shapes(Surface $surface): array
     {
-        $shapes = [];
+        return collect($this->types)
+            ->map(fn (CredentialType $type) => $type->initiateShape($surface))
+            ->filter()
+            ->map(fn (InitiateShape $shape, string $name) => ['name' => $name, 'shape' => $shape->value])
+            ->values()
+            ->all();
+    }
 
-        foreach ($this->types as $type) {
-            $shape = $type->initiateShape($surface);
-
-            if ($shape !== null) {
-                $shapes[] = ['name' => $type->name(), 'shape' => $shape->value];
-            }
-        }
-
-        return $shapes;
+    /**
+     * Determine if the type serves the surface.
+     */
+    protected function serves(CredentialType $type, Surface $surface): bool
+    {
+        return $type->initiateShape($surface) !== null;
     }
 }

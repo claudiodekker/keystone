@@ -15,7 +15,7 @@ readonly class Verification
      * Create the verification.
      *
      * @param  array<string, mixed>  $input
-     * @param  list<Credential>  $credentials
+     * @param  array<int, Credential>  $credentials
      */
     public function __construct(
         public Surface $surface,

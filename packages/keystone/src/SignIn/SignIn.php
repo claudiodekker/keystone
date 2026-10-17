@@ -99,7 +99,7 @@ class SignIn
     /**
      * Get the account's credentials of the type, none when there is no account.
      *
-     * @return list<Credential>
+     * @return array<int, Credential>
      */
     protected function credentials(CredentialType $type, ?KeystoneUser $account): array
     {
