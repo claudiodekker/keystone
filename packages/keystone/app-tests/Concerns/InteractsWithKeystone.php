@@ -9,8 +9,10 @@ use ClaudioDekker\Keystone\AppTests\Assertions\SignOutAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\ThrottledAssertions;
 use ClaudioDekker\Keystone\AppTests\Support\CredentialTypeSupport;
 use ClaudioDekker\Keystone\AppTests\Support\RecordedSecurityEvents;
+use ClaudioDekker\Keystone\AppTests\Support\UseTestSupport;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Keystone;
+use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Models\UserEmail;
 use ClaudioDekker\Keystone\RateLimits\StepKind;
@@ -23,6 +25,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Testing\TestResponse;
 use Monolog\Handler\TestHandler;
 use PHPUnit\Framework\Assert;
+use ReflectionClass;
 use Symfony\Component\HttpFoundation\Cookie;
 
 /**
@@ -179,16 +182,31 @@ trait InteractsWithKeystone
     }
 
     /**
-     * Get the test support of every installed type that serves the surface.
+     * Get the test support of every installed type that serves the surface, in the order the types were registered.
      *
      * @return list<CredentialTypeSupport>
      */
     public function supportsFor(Surface $surface): array
     {
         return collect(Keystone::credentialTypes()->serving($surface))
-            ->whereInstanceOf(CredentialTypeSupport::class)
+            ->map(fn (CredentialType $type) => $this->supportOf($type))
+            ->filter()
             ->values()
             ->all();
+    }
+
+    /**
+     * Get the type's test support: the type itself when it is its own, else the support its attribute names.
+     */
+    protected function supportOf(CredentialType $type): ?CredentialTypeSupport
+    {
+        if ($type instanceof CredentialTypeSupport) {
+            return $type;
+        }
+
+        $attribute = (new ReflectionClass($type))->getAttributes(UseTestSupport::class)[0] ?? null;
+
+        return $attribute?->newInstance()->support();
     }
 
     /**

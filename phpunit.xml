@@ -8,9 +8,17 @@
     <testsuites>
         <testsuite name="app-tests">
             <directory>packages/keystone/app-tests</directory>
+            <exclude>packages/keystone/app-tests/Contract</exclude>
+        </testsuite>
+        <testsuite name="contract">
+            <directory>packages/keystone/app-tests/Contract</directory>
         </testsuite>
         <testsuite name="keystone">
             <directory>packages/keystone/tests</directory>
+        </testsuite>
+        <testsuite name="keystone-password">
+            <directory>packages/keystone-password/app-tests</directory>
+            <directory>packages/keystone-password/tests</directory>
         </testsuite>
         <testsuite name="tooling">
             <directory>tests</directory>
@@ -18,6 +26,9 @@
     </testsuites>
     <php>
         <env name="APP_KEY" value="base64:iO0Xn7B30kWbdkuR2r8eRk0EXwfrXFfXcRAJCU6AXrs="/>
+        <env name="ARGON_MEMORY" value="64"/>
+        <env name="ARGON_TIME" value="1"/>
+        <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="DB_CONNECTION" value="sqlite"/>
         <env name="DB_DATABASE" value=":memory:"/>
     </php>
