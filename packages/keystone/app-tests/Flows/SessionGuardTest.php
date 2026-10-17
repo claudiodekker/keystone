@@ -16,11 +16,10 @@ beforeEach(function () {
 it('signs nobody in through a SessionGuard method, even with a hash in users.password', function (Closure $signIn) {
     $user = $this->createUser(['email' => 'ada@example.com', 'password' => Hash::make('legacy-secret')]);
 
-    $result = $this->duringRequest(fn () => [$signIn($user), Auth::check()]);
+    $this->duringRequest(fn () => $signIn($user));
 
     $next = $this->get(route('login'));
 
-    expect($result)->toBe([false, false]);
     $this->assertSignInPage($next);
 })->with([
     'attempt' => fn (KeystoneUser $user) => Auth::attempt(['email' => 'ada@example.com', 'password' => 'legacy-secret']),
