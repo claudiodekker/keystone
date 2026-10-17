@@ -11,7 +11,7 @@ use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Models\UserEmail;
-use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Foundation\Http\Events\RequestHandled;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Date;
 use PHPUnit\Framework\Assert;
@@ -34,9 +34,12 @@ trait InteractsWithKeystone
     use SignOutAssertions;
 
     /**
-     * The user actingAs() puts on every request of the test, without a session.
+     * Forget the guards after each request, so the next request sees a sign-in only when the session stored it.
      */
-    protected ?Authenticatable $actor = null;
+    protected function setUpInteractsWithKeystone(): void
+    {
+        $this->app['events']->listen(RequestHandled::class, fn () => $this->app['auth']->forgetGuards());
+    }
 
     /**
      * Create a user from the app's own factory, naming the fix when the app has none.
@@ -101,19 +104,6 @@ trait InteractsWithKeystone
     }
 
     /**
-     * Put the user on every request of the test without a session, as Laravel's actingAs() does.
-     *
-     * @param  string|null  $guard
-     * @return $this
-     */
-    public function be(Authenticatable $user, $guard = null)
-    {
-        $this->actor = $user;
-
-        return parent::be($user, $guard);
-    }
-
-    /**
      * Assert the two responses match in status, redirect, flashed data, and header and cookie names.
      */
     public function assertIndistinguishable(KeystoneTestResponse $existing, KeystoneTestResponse $missing): void
@@ -126,16 +116,10 @@ trait InteractsWithKeystone
     }
 
     /**
-     * Send the request with fresh guards and the cookies earlier responses set, then forget the session data it left in memory.
+     * Send the request with the cookies earlier responses set, then forget the session data it left in memory.
      */
     public function call($method, $uri, $parameters = [], $cookies = [], $files = [], $server = [], $content = null): KeystoneTestResponse
     {
-        $this->app['auth']->forgetGuards();
-
-        if ($this->actor !== null) {
-            $this->app['auth']->guard()->setUser($this->actor);
-        }
-
         $startedAt = Date::now();
 
         $response = parent::call($method, $uri, $parameters, $cookies, $files, $server, $content);

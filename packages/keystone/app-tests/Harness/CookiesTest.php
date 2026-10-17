@@ -4,9 +4,9 @@ use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\Surface;
 use Illuminate\Support\Sleep;
 
-it('starts each request without the user an earlier one held only in memory', function () {
+it('forgets a user an earlier request held only in memory', function () {
     $user = $this->createUser();
-    Keystone::guard()->setUser($user);
+    $this->actingAs($user)->get(route('login'));
 
     $response = $this->get(route('login'));
 
