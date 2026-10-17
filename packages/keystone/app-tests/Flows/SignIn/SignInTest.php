@@ -99,6 +99,28 @@ it('lands on / when the intended URL is not a path on the app', function (string
     'a delete character' => "/reports\x7F",
 ]);
 
+it('refuses a signed-in user on the sign-in page', function () {
+    $user = $this->createUser();
+
+    $response = $this->actingAs($user)->get(route('login'));
+
+    $this->assertAlreadySignedIn($response);
+});
+
+it('refuses a signed-in user at the sign-in submit before checking the proof', function () {
+    $user = $this->createUser();
+    UserEmail::factory()->for($user, 'user')->verified()->create(['address' => 'ada@example.com']);
+    $support = $this->supportFor(Surface::SIGN_IN);
+    $support->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $response = $this->actingAs($user)->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->rejectedProof(Surface::SIGN_IN),
+    ]);
+
+    $this->assertAlreadySignedIn($response);
+});
+
 it('refuses a wrong secret, flashing back only the identifier', function () {
     $user = $this->createUser();
     UserEmail::factory()->for($user, 'user')->verified()->create(['address' => 'ada@example.com']);

@@ -11,6 +11,7 @@ use ClaudioDekker\Keystone\AppTests\Support\CredentialTypeSupport;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\Surface;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Testing\TestResponse;
@@ -33,6 +34,11 @@ trait InteractsWithKeystone
     use LazilyRefreshDatabase;
     use SignInAssertions;
     use SignOutAssertions;
+
+    /**
+     * The user actingAs() puts on every request of the test, without a session.
+     */
+    protected ?Authenticatable $actor = null;
 
     /**
      * Create a user from the app's own factory.
@@ -63,6 +69,19 @@ trait InteractsWithKeystone
             ->whereInstanceOf(CredentialTypeSupport::class)
             ->values()
             ->all();
+    }
+
+    /**
+     * Put the user on every request of the test without a session, as Laravel's actingAs() does.
+     *
+     * @param  string|null  $guard
+     * @return $this
+     */
+    public function be(Authenticatable $user, $guard = null)
+    {
+        $this->actor = $user;
+
+        return parent::be($user, $guard);
     }
 
     /**
@@ -172,6 +191,10 @@ trait InteractsWithKeystone
     {
         $this->app['auth']->forgetGuards();
         $this->app['session.store']->flush();
+
+        if ($this->actor !== null) {
+            $this->app['auth']->guard()->setUser($this->actor);
+        }
     }
 
     /**

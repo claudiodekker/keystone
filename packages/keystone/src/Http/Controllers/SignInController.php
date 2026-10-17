@@ -40,8 +40,12 @@ abstract class SignInController
     /**
      * Take a guest's proof of the credential type the route names.
      */
-    public function store(Request $request, string $type, SignIn $signIn): Response|Responsable
+    public function store(Request $request, string $type, SessionState $session, SignIn $signIn): Response|Responsable
     {
+        if ($session->isSignedIn()) {
+            return $this->sendAlreadySignedIn($request);
+        }
+
         $outcome = $signIn->attempt($type, $request->all());
 
         if ($outcome instanceof Refused) {
