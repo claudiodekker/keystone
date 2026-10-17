@@ -8,7 +8,7 @@ use PhpParser\Node;
 use PhpParser\Node\Expr;
 
 /**
- * Refuse a package file that points at the repository's decision records or tags a test with a group.
+ * Refuse a package file that points at the repository's decision records or tags a test with a spec id.
  */
 class NoInternalReferences extends Check
 {
@@ -28,7 +28,7 @@ class NoInternalReferences extends Check
     }
 
     /**
-     * Get the lines that name a decision record or tag a test with a group.
+     * Get the lines that name a decision record or tag a test with a spec id.
      *
      * @return list<int>
      */
@@ -50,7 +50,7 @@ class NoInternalReferences extends Check
     }
 
     /**
-     * Determine if the node calls group() on a test, such as it(...)->group('SI-3').
+     * Determine if the node tags a test with a spec id, such as it(...)->group('SI-3').
      */
     protected function isTestGroup(Node $node): bool
     {
@@ -70,6 +70,16 @@ class NoInternalReferences extends Check
 
         return $receiver instanceof Expr\FuncCall
             && $receiver->name instanceof Node\Name
-            && in_array($receiver->name->toLowerString(), ['describe', 'it', 'test'], true);
+            && in_array($receiver->name->toLowerString(), ['describe', 'it', 'test'], true)
+            && collect($node->getArgs())->contains(fn (Node\Arg $arg) => $this->isSpecId($arg->value));
+    }
+
+    /**
+     * Determine if the value is a string shaped like a spec id, such as 'SI-3' or 'H2'.
+     */
+    protected function isSpecId(Expr $value): bool
+    {
+        return $value instanceof Node\Scalar\String_
+            && preg_match('/^[A-Z]+-?\d+$/', $value->value) === 1;
     }
 }

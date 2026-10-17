@@ -3,7 +3,7 @@
 use ClaudioDekker\Keystone\Lint\Checks\NoInternalReferences;
 use ClaudioDekker\Keystone\Lint\File;
 
-it('fails a test tagged with a group', function () {
+it('fails a test tagged with an internal id', function () {
     $file = new File('packages/keystone/app-tests/Flows/ExampleTest.php', <<<'PHP'
         <?php
 
@@ -21,6 +21,18 @@ it('fails a decision record named in a package', function () {
     $file = new File('packages/keystone/src/Example.php', "<?php\n\n// Kept in place, as ADR 0003 decided.\n\$a = 1;\n");
 
     expect((new NoInternalReferences)->check($file))->toBe([3]);
+});
+
+it('passes groups that are not internal ids', function () {
+    $file = new File('packages/keystone/app-tests/Flows/ExampleTest.php', <<<'PHP'
+        <?php
+
+        it('signs in', function () {
+            //
+        })->group('slow', 'database');
+        PHP);
+
+    expect((new NoInternalReferences)->check($file))->toBe([]);
 });
 
 it('passes route groups', function () {
