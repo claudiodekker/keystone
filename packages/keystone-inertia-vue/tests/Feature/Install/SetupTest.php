@@ -39,6 +39,21 @@ it('finishes the setup of an app whose entry files were moved aside already', fu
         ->and($this->fresh->has('resources/js/app.js'))->toBeFalse();
 });
 
+it('prints what to remove when the Vite entry file is still there beside its .bak, and fails', function (string $path) {
+    $this->fresh->put($path.'.bak', "// a copy the app made\n");
+    $before = $this->fresh->contents($path);
+
+    $this->artisan('keystone:install')
+        ->expectsOutputToContain("Remove {$path} by hand")
+        ->assertFailed();
+
+    expect($this->fresh->contents($path))->toBe($before)
+        ->and($this->fresh->contents($path.'.bak'))->toBe("// a copy the app made\n");
+})->with([
+    'the Vite config' => ['vite.config.js'],
+    'the script' => ['resources/js/app.js'],
+]);
+
 it('keeps the setup of an app that has its own, and prints what to set up', function (string $path, string $contents) {
     $this->fresh->put($path, $contents);
     $before = $this->fresh->contents($path);
@@ -74,7 +89,8 @@ describe('bootstrap/app.php', function () {
     });
 
     it('prints the registration when the middleware closure is not the skeleton\'s, and fails', function () {
-        $this->fresh->put('bootstrap/app.php', $before = str_replace('        //', "        \$middleware->trustProxies(at: '*');", $this->fresh->contents('bootstrap/app.php')));
+        $before = str_replace('        //', "        \$middleware->trustProxies(at: '*');", $this->fresh->contents('bootstrap/app.php'));
+        $this->fresh->put('bootstrap/app.php', $before);
 
         $this->artisan('keystone:install')
             ->expectsOutputToContain('$middleware->web(append: [HandleInertiaRequests::class]);')
@@ -94,7 +110,8 @@ describe('the welcome page', function () {
     });
 
     it('prints the edit when the page loads app.js another way, and fails', function () {
-        $this->fresh->put('resources/views/welcome.blade.php', $before = "@vite('resources/js/app.js')\n");
+        $before = "@vite('resources/js/app.js')\n";
+        $this->fresh->put('resources/views/welcome.blade.php', $before);
 
         $this->artisan('keystone:install')
             ->expectsOutputToContain('resources/js/app.js')
@@ -104,9 +121,12 @@ describe('the welcome page', function () {
         expect($this->fresh->contents('resources/views/welcome.blade.php'))->toBe($before);
     });
 
-    it('is not missed by an app that deleted it', function () {
+    it('is left out of an app that has none, which is set up all the same', function () {
         unlink($this->fresh->path('resources/views/welcome.blade.php'));
 
         $this->artisan('keystone:install')->assertSuccessful();
+
+        expect($this->fresh->has('resources/views/welcome.blade.php'))->toBeFalse()
+            ->and($this->fresh->has('resources/js/app.ts'))->toBeTrue();
     });
 });

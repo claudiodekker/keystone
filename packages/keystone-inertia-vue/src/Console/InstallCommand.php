@@ -68,12 +68,13 @@ class InstallCommand extends Command
 
         $frontend = new Frontend($this->laravel->basePath(), $stubs, $files);
         $edits = $this->edits($manifest, $config, $files);
+        $entriesMoved = true;
 
         if ($frontend->hasOwnSetup()) {
             $this->printOwnSetup($stubs);
         } else {
-            $this->setUpInertia($stubs, $files);
-            $edits = [...$edits, ...$this->setupEdits($files)];
+            $entriesMoved = $this->setUpInertia($stubs, $files);
+            $edits = [...$edits, ...$this->setupEdits($frontend)];
         }
 
         $everyEditApplied = collect($edits)
@@ -82,7 +83,11 @@ class InstallCommand extends Command
 
         $everyCommandSucceeded = $this->runCommands();
 
-        return $everyEditApplied && $everyCommandSucceeded ? self::SUCCESS : self::FAILURE;
+        $installed = $entriesMoved
+            && $everyEditApplied
+            && $everyCommandSucceeded;
+
+        return $installed ? self::SUCCESS : self::FAILURE;
     }
 
     /**
@@ -160,18 +165,19 @@ class InstallCommand extends Command
     }
 
     /**
-     * Get the edits that wire the setup stubs into a bare app.
+     * Get the edits that wire the setup stubs into the app.
      *
      * @return list<Edit>
      */
-    protected function setupEdits(Filesystem $files): array
+    protected function setupEdits(Frontend $frontend): array
     {
-        $welcome = $files->exists($this->laravel->basePath('resources/views/welcome.blade.php'));
+        $edits = [new RegisterInertiaMiddleware];
 
-        return [
-            new RegisterInertiaMiddleware,
-            ...$welcome ? [new RemoveAppJsFromWelcome] : [],
-        ];
+        if ($frontend->hasWelcomeView()) {
+            $edits[] = new RemoveAppJsFromWelcome;
+        }
+
+        return $edits;
     }
 
     /**
@@ -281,34 +287,49 @@ class InstallCommand extends Command
     }
 
     /**
-     * Move the skeleton's Vite entry files aside and copy the files that set Inertia and Vue up.
+     * Set Inertia and Vue up from the setup stubs, keeping the skeleton's Vite entry files as .bak.
+     *
+     * @return bool Whether every Vite entry file is out of the way.
      */
-    protected function setUpInertia(Stubs $stubs, Filesystem $files): void
+    protected function setUpInertia(Stubs $stubs, Filesystem $files): bool
     {
-        foreach (['vite.config.js', 'resources/js/app.js'] as $path) {
-            $this->moveAside($path, $files);
-        }
+        $everyEntryMoved = collect(Frontend::VITE_ENTRIES)
+            ->map(fn (string $path) => $this->moveAside($path, $files))
+            ->every(fn (bool $moved) => $moved);
 
         $this->copy($stubs->setup(), $stubs, $files);
+
+        return $everyEntryMoved;
     }
 
     /**
-     * Move the file aside to .bak.
+     * Move the file aside to .bak, and determine if it is out of the way.
      */
-    protected function moveAside(string $path, Filesystem $files): void
+    protected function moveAside(string $path, Filesystem $files): bool
     {
         $source = $this->laravel->basePath($path);
 
-        if (! $files->exists($source) || $files->exists($source.'.bak')) {
-            return;
+        if (! $files->exists($source)) {
+            return true;
+        }
+
+        if ($files->exists($source.'.bak')) {
+            $this->components->twoColumnDetail($path, 'drifted');
+            $this->newLine();
+            $this->line("Remove {$path} by hand, because {$path}.bak keeps the skeleton's copy and the setup replaces this file.");
+            $this->newLine();
+
+            return false;
         }
 
         $files->move($source, $source.'.bak');
         $this->components->twoColumnDetail($path, "moved to {$path}.bak");
+
+        return true;
     }
 
     /**
-     * Print what an app with a frontend setup of its own sets up by hand.
+     * Print the setup stubs for the app to follow by hand.
      */
     protected function printOwnSetup(Stubs $stubs): void
     {
@@ -317,9 +338,9 @@ class InstallCommand extends Command
     }
 
     /**
-     * Copy the stubs the app lacks, or every one when forced.
+     * Copy the given stubs into the app.
      *
-     * @param  array<int, string>  $paths
+     * @param  list<string>  $paths
      */
     protected function copy(array $paths, Stubs $stubs, Filesystem $files): void
     {

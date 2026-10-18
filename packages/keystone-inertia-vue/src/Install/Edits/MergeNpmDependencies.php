@@ -5,7 +5,7 @@ namespace ClaudioDekker\Keystone\InertiaVue\Install\Edits;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edit;
 
 /**
- * Add the npm packages the pages need to the app's devDependencies, keeping the version the app pins.
+ * Add the given npm packages to the app's devDependencies, keeping any version the app pins.
  *
  * @internal
  */
@@ -47,7 +47,7 @@ class MergeNpmDependencies extends Edit
             return $contents;
         }
 
-        return $this->insert($contents, $missing);
+        return $this->insert($contents, $missing, array_keys($manifest['devDependencies'] ?? []));
     }
 
     /**
@@ -61,13 +61,14 @@ class MergeNpmDependencies extends Edit
     }
 
     /**
-     * Get the contents with the packages added to devDependencies in sorted order.
+     * Get the contents with each package added before the first devDependency that sorts after it, or last.
      *
      * @param  array<string, string>  $packages
+     * @param  list<int|string>  $existing  The app's devDependencies, in the order the file has them.
      */
-    protected function insert(string $contents, array $packages): ?string
+    protected function insert(string $contents, array $packages, array $existing): ?string
     {
-        $pattern = '/"devDependencies": \{(?<entries>(?:\n(?<indent>[ \t]+)"[^"\n]+": "[^"\n]*",?)+)\n/';
+        $pattern = '/"devDependencies": \{'.static::OBJECT_ENTRIES.'/';
 
         if (preg_match($pattern, $contents, $match, PREG_OFFSET_CAPTURE) !== 1) {
             return null;
@@ -76,22 +77,32 @@ class MergeNpmDependencies extends Edit
         [$entries, $offset] = $match['entries'];
         $indent = $match['indent'][0];
 
-        $added = collect($packages)->map(fn (string $version, string $package) => $indent.$this->entry($package, $version));
-        $lines = collect(explode(",\n", trim($entries, "\n")))
-            ->keyBy(fn (string $line): string => (string) json_decode(explode(':', trim($line), 2)[0]))
-            ->merge($added)
-            ->sortKeys();
+        ksort($packages, SORT_STRING);
 
-        return substr_replace($contents, "\n".$lines->implode(",\n"), $offset, strlen($entries));
-    }
+        $lines = explode(",\n", ltrim($entries, "\n"));
 
-    /**
-     * Get the package's entry line, as npm writes it.
-     */
-    protected function entry(string $package, string $version): string
-    {
-        $flags = JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR;
+        if (count($lines) !== count($existing)) {
+            return null;
+        }
 
-        return json_encode($package, $flags).': '.json_encode($version, $flags);
+        $lines = array_combine($existing, $lines);
+        $merged = [];
+
+        foreach ($lines as $key => $line) {
+            foreach ($packages as $package => $version) {
+                if ($package < $key) {
+                    $merged[] = $indent.$this->entry($package, $version);
+                    unset($packages[$package]);
+                }
+            }
+
+            $merged[] = $line;
+        }
+
+        foreach ($packages as $package => $version) {
+            $merged[] = $indent.$this->entry($package, $version);
+        }
+
+        return substr_replace($contents, "\n".implode(",\n", $merged), $offset, strlen($entries));
     }
 }

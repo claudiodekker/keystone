@@ -12,19 +12,30 @@ use ClaudioDekker\Keystone\InertiaVue\Install\Edit;
 class RegisterInertiaMiddleware extends Edit
 {
     /**
+     * The class name of the middleware the setup stubs put in the app.
+     */
+    protected const string NAME = 'HandleInertiaRequests';
+
+    /**
      * The middleware the setup stubs put in the app.
      */
-    protected const string MIDDLEWARE = 'App\\Http\\Middleware\\HandleInertiaRequests';
+    protected const string MIDDLEWARE = 'App\\Http\\Middleware\\'.self::NAME;
 
     /**
      * The skeleton's middleware closure, with nothing registered.
      */
-    protected const string EMPTY_CLOSURE = "->withMiddleware(function (Middleware \$middleware): void {\n        //\n    })";
+    protected const string EMPTY_CLOSURE = '->withMiddleware(function (Middleware $middleware): void {'."\n"
+        .'        //'."\n"
+        .'    })';
 
     /**
      * The middleware closure with the middleware appended to the web group.
      */
-    protected const string APPENDING_CLOSURE = "->withMiddleware(function (Middleware \$middleware): void {\n        \$middleware->web(append: [\n            HandleInertiaRequests::class,\n        ]);\n    })";
+    protected const string APPENDING_CLOSURE = '->withMiddleware(function (Middleware $middleware): void {'."\n"
+        .'        $middleware->web(append: ['."\n"
+        .'            '.self::NAME.'::class,'."\n"
+        .'        ]);'."\n"
+        .'    })';
 
     /**
      * Get the file the edit changes, relative to the app's base path.
@@ -39,7 +50,7 @@ class RegisterInertiaMiddleware extends Edit
      */
     public function apply(string $contents): ?string
     {
-        if (str_contains($contents, 'HandleInertiaRequests::class')) {
+        if (str_contains($contents, static::NAME.'::class')) {
             return $this->import($contents, static::MIDDLEWARE);
         }
 
@@ -57,6 +68,6 @@ class RegisterInertiaMiddleware extends Edit
      */
     public function instructions(): string
     {
-        return 'Append '.static::MIDDLEWARE." to the web middleware group in bootstrap/app.php:\n\n    \$middleware->web(append: [HandleInertiaRequests::class]);";
+        return 'Append '.static::MIDDLEWARE." to the web middleware group in bootstrap/app.php:\n\n    \$middleware->web(append: [".static::NAME.'::class]);';
     }
 }

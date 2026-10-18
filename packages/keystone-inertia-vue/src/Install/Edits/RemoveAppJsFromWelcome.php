@@ -3,9 +3,10 @@
 namespace ClaudioDekker\Keystone\InertiaVue\Install\Edits;
 
 use ClaudioDekker\Keystone\InertiaVue\Install\Edit;
+use ClaudioDekker\Keystone\InertiaVue\Install\Frontend;
 
 /**
- * Stop the welcome page loading resources/js/app.js, which the setup moved aside.
+ * Stop the welcome page loading resources/js/app.js.
  *
  * @internal
  */
@@ -14,7 +15,7 @@ class RemoveAppJsFromWelcome extends Edit
     /**
      * The skeleton's assets directive.
      */
-    protected const string LOADING = "@vite(['resources/css/app.css', 'resources/js/app.js'])";
+    protected const string SKELETON_DIRECTIVE = "@vite(['resources/css/app.css', '".Frontend::APP_JS."'])";
 
     /**
      * The assets directive without the script.
@@ -26,7 +27,7 @@ class RemoveAppJsFromWelcome extends Edit
      */
     public function path(): string
     {
-        return 'resources/views/welcome.blade.php';
+        return Frontend::WELCOME_VIEW;
     }
 
     /**
@@ -34,11 +35,11 @@ class RemoveAppJsFromWelcome extends Edit
      */
     public function apply(string $contents): ?string
     {
-        if (str_contains($contents, static::LOADING)) {
-            return str_replace(static::LOADING, static::STYLESHEET_ONLY, $contents);
+        if (str_contains($contents, static::SKELETON_DIRECTIVE)) {
+            return str_replace(static::SKELETON_DIRECTIVE, static::STYLESHEET_ONLY, $contents);
         }
 
-        return str_contains($contents, 'resources/js/app.js') ? null : $contents;
+        return str_contains($contents, Frontend::APP_JS) ? null : $contents;
     }
 
     /**
@@ -46,6 +47,6 @@ class RemoveAppJsFromWelcome extends Edit
      */
     public function instructions(): string
     {
-        return 'Stop loading resources/js/app.js in resources/views/welcome.blade.php, which is resources/js/app.js.bak now.';
+        return 'Stop loading '.Frontend::APP_JS.' in '.Frontend::WELCOME_VIEW.', which is '.Frontend::APP_JS.'.bak now.';
     }
 }

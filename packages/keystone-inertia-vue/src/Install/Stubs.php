@@ -39,30 +39,32 @@ class Stubs
      * Get the path in the app of each stub to copy, with a type partial only for the named credential types.
      *
      * @param  list<string>  $types
-     * @return array<int, string>
+     * @return list<string>
      */
     public function for(array $types): array
     {
         $partials = collect($types)->map(fn (string $type) => Str::studly($type));
 
-        return $this->paths()
-            ->reject(fn (string $path) => in_array($path, static::INERTIA_SETUP, true))
-            ->filter(fn (string $path) => $this->isCopiedFor($path, $partials))
-            ->values()
-            ->all();
+        return array_values(
+            $this->paths()
+                ->reject(fn (string $path) => in_array($path, static::INERTIA_SETUP, true))
+                ->filter(fn (string $path) => $this->isCopiedFor($path, $partials))
+                ->all(),
+        );
     }
 
     /**
      * Get the path in the app of each stub that sets up Inertia and Vue.
      *
-     * @return array<int, string>
+     * @return list<string>
      */
     public function setup(): array
     {
-        return $this->paths()
-            ->filter(fn (string $path) => in_array($path, static::INERTIA_SETUP, true))
-            ->values()
-            ->all();
+        return array_values(
+            $this->paths()
+                ->filter(fn (string $path) => in_array($path, static::INERTIA_SETUP, true))
+                ->all(),
+        );
     }
 
     /**

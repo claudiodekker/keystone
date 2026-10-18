@@ -2,7 +2,7 @@
 
 namespace ClaudioDekker\Keystone\InertiaVue\Tests;
 
-use Closure;
+use Composer\Autoload\ClassLoader;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Route;
@@ -22,10 +22,10 @@ trait InstallsIntoFreshApp
     /**
      * The loader of the copy's App classes, once mounted.
      */
-    protected ?Closure $loader = null;
+    protected ?ClassLoader $loader = null;
 
     /**
-     * Copy the skeleton, point the app at it, and keep the installer's commands from running for real.
+     * Point the app at a fresh copy of the skeleton, with processes faked.
      */
     protected function setUpInstallsIntoFreshApp(): void
     {
@@ -42,30 +42,20 @@ trait InstallsIntoFreshApp
     protected function tearDownInstallsIntoFreshApp(): void
     {
         if ($this->loader !== null) {
-            spl_autoload_unregister($this->loader);
+            $this->loader->unregister();
         }
 
         $this->fresh->delete();
     }
 
     /**
-     * Serve the copy's pages from the running app: its App classes, auth config, routes, views and Inertia pages.
+     * Serve the copy's pages from the running app.
      */
     protected function mountFreshApp(): void
     {
-        $this->loader = function (string $class): void {
-            if (! str_starts_with($class, 'App\\')) {
-                return;
-            }
-
-            $file = $this->fresh->path('app/'.str_replace('\\', '/', substr($class, strlen('App\\'))).'.php');
-
-            if (is_file($file)) {
-                require $file;
-            }
-        };
-
-        spl_autoload_register($this->loader, prepend: true);
+        $this->loader = new ClassLoader;
+        $this->loader->addPsr4('App\\', $this->fresh->path('app'));
+        $this->loader->register(true);
         $this->app->register(InertiaServiceProvider::class);
 
         config([
