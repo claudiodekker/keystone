@@ -2,6 +2,7 @@
 
 namespace ClaudioDekker\Keystone\InertiaVue\Tests;
 
+use ClaudioDekker\Keystone\Tests\Monorepo;
 use Composer\InstalledVersions;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Str;
@@ -21,7 +22,7 @@ class FreshApp
     }
 
     /**
-     * Copy the skeleton Composer installed to a new directory, with Pest in place of PHPUnit.
+     * Copy the skeleton Composer installed to a new directory, with Pest in place of PHPUnit and every Keystone package in vendor, and its composer.json as the skeleton lays it out.
      */
     public static function copy(): static
     {
@@ -31,9 +32,51 @@ class FreshApp
         $files->copyDirectory(InstalledVersions::getInstallPath('laravel/laravel'), $path);
         $files->copy(InstalledVersions::getInstallPath('pestphp/pest').'/stubs/init-laravel/Pest.php.stub', $path.'/tests/Pest.php');
 
+        $manifest = $files->get($path.'/composer.json');
+        $files->put($path.'/composer.json', preg_replace('/"phpunit\/phpunit": "[^"]*"/', implode(",\n        ", [
+            '"pestphp/pest": "*"',
+            '"pestphp/pest-plugin-laravel": "*"',
+        ]), $manifest));
+
         $app = new static($path, $files);
 
-        return $app->remove('phpunit/phpunit')->requireDev('pestphp/pest')->requireDev('pestphp/pest-plugin-laravel');
+        foreach (Monorepo::packages() as $package) {
+            $app->install($package);
+        }
+
+        return $app;
+    }
+
+    /**
+     * Lay a package of this repository down in the copy's vendor as Composer would, with its manifest and AppTests.
+     *
+     * @return $this
+     */
+    public function install(string $package): static
+    {
+        $source = dirname(__DIR__, 2).'/'.$package;
+        $target = $this->path('vendor/'.Monorepo::manifest($package)['name']);
+
+        $this->files->ensureDirectoryExists($target);
+        $this->files->copy($source.'/composer.json', $target.'/composer.json');
+
+        if ($this->files->isDirectory($source.'/app-tests')) {
+            $this->files->ensureDirectoryExists($target.'/app-tests');
+        }
+
+        return $this;
+    }
+
+    /**
+     * Take a package of this repository out of the copy's vendor.
+     *
+     * @return $this
+     */
+    public function uninstall(string $package): static
+    {
+        $this->files->deleteDirectory($this->path('vendor/'.Monorepo::manifest($package)['name']));
+
+        return $this;
     }
 
     /**

@@ -2,8 +2,12 @@
 
 namespace ClaudioDekker\Keystone\InertiaVue\Console;
 
+use ClaudioDekker\Keystone\InertiaVue\Install\AppTests;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edit;
+use ClaudioDekker\Keystone\InertiaVue\Install\Edits\BindKeystoneTestCase;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\ImplementKeystoneUser;
+use ClaudioDekker\Keystone\InertiaVue\Install\Edits\MapAppTests;
+use ClaudioDekker\Keystone\InertiaVue\Install\Edits\RegisterKeystoneTestsuite;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\RequireRouteFile;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\SetSessionCookie;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\UseKeystoneGuard;
@@ -43,14 +47,16 @@ class InstallCommand extends Command
      */
     public function handle(Stubs $stubs, Filesystem $files, Repository $config): int
     {
-        $manifest = $files->json($this->laravel->basePath('composer.json'));
+        $manifest = json_decode($files->get($this->laravel->basePath('composer.json')), true);
+
+        if (! is_array($manifest)) {
+            return $this->refuse(['Fix composer.json first, because it is not valid JSON.']);
+        }
+
         $refusals = $this->refusals($manifest, $files);
 
         if ($refusals !== []) {
-            $this->components->error('Keystone was not installed, and nothing in the app changed.');
-            $this->components->bulletList($refusals);
-
-            return self::FAILURE;
+            return $this->refuse($refusals);
         }
 
         $this->copy($stubs, $files);
@@ -60,6 +66,19 @@ class InstallCommand extends Command
             ->every(fn (bool $applied) => $applied);
 
         return $everyEditApplied ? self::SUCCESS : self::FAILURE;
+    }
+
+    /**
+     * Print why Keystone was not installed, and fail.
+     *
+     * @param  list<string>  $reasons
+     */
+    protected function refuse(array $reasons): int
+    {
+        $this->components->error('Keystone was not installed, and nothing in the app changed.');
+        $this->components->bulletList($reasons);
+
+        return self::FAILURE;
     }
 
     /**
@@ -74,19 +93,38 @@ class InstallCommand extends Command
         $model = $this->userModel($config, $guard);
         $modelFile = $model === null ? null : $this->classFile($manifest, $model);
         $appName = $config->get('app.name');
+        $envs = $files->exists($this->laravel->basePath('.env')) ? ['.env.example', '.env'] : ['.env.example'];
 
-        $edits = [
+        return [
             new RequireRouteFile,
             new ImplementKeystoneUser($model, $modelFile),
             new UseKeystoneGuard($guard),
-            new SetSessionCookie('.env.example', $appName),
+            ...array_map(fn (string $env) => new SetSessionCookie($env, $appName), $envs),
+            new RegisterKeystoneTestsuite,
+            new BindKeystoneTestCase,
+            new MapAppTests($this->appTests($files)),
         ];
+    }
 
-        if ($files->exists($this->laravel->basePath('.env'))) {
-            $edits[] = new SetSessionCookie('.env', $appName);
+    /**
+     * Get the AppTests path of every Keystone package in the app's vendor, by the namespace its manifest gives them.
+     *
+     * @return array<string, string>
+     */
+    protected function appTests(Filesystem $files): array
+    {
+        $namespaces = [];
+
+        foreach ($files->glob($this->laravel->basePath(AppTests::GLOB), GLOB_ONLYDIR) as $directory) {
+            $package = dirname($directory);
+            $namespace = array_key_first($files->json($package.'/composer.json')['autoload']['psr-4']);
+
+            $namespaces[$namespace.'AppTests\\'] = 'vendor/claudiodekker/'.basename($package).'/app-tests/';
         }
 
-        return $edits;
+        ksort($namespaces);
+
+        return $namespaces;
     }
 
     /**
