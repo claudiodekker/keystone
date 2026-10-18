@@ -4,7 +4,19 @@ providers:
   - ClaudioDekker\Keystone\KeystoneServiceProvider
   - Workbench\App\Providers\WorkbenchServiceProvider
 
+env:
+  - SESSION_DRIVER=file
+
 workbench:
+  build:
+    - create-sqlite-db
+    - migrate:fresh:
+        --seeder: Workbench\Database\Seeders\DatabaseSeeder
+
   discovers:
     views: true
     web: true
+
+  sync:
+    - from: workbench/public/build
+      to: public/build

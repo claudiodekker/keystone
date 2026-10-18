@@ -48,7 +48,8 @@
                 "packages/keystone/tests/"
             ],
             "Tests\\Keystone\\": "packages/keystone-inertia-vue/stubs/tests/Keystone/",
-            "Workbench\\App\\": "workbench/app/"
+            "Workbench\\App\\": "workbench/app/",
+            "Workbench\\Database\\Seeders\\": "workbench/database/seeders/"
         }
     },
     "scripts": {
