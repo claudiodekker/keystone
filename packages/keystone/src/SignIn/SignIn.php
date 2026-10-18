@@ -173,19 +173,19 @@ class SignIn
      */
     protected function rehash(Proof $proof, Collection $credentials): void
     {
-        $proven = $credentials->find($proof->credential);
+        $credential = $credentials->find($proof->credential);
 
-        if ($proven === null) {
+        if ($credential === null) {
             return;
         }
 
-        rescue(fn () => $this->writeRehash($proof, $proven));
+        rescue(fn () => $this->writeRehash($proof, $credential));
     }
 
     /**
      * Make the proof's rehash and write it over the proven credential, unless its secret changed meanwhile.
      */
-    protected function writeRehash(Proof $proof, UserCredential $proven): void
+    protected function writeRehash(Proof $proof, UserCredential $credential): void
     {
         $secret = $proof->rehashed();
 
@@ -193,6 +193,6 @@ class SignIn
             return;
         }
 
-        $proven->updateSecretUnlessChanged($secret);
+        $credential->updateSecretUnlessChanged($secret);
     }
 }
