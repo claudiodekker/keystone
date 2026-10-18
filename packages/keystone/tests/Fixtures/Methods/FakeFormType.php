@@ -80,7 +80,7 @@ class FakeFormType implements CredentialType, CredentialTypeSupport
     /**
      * Determine if a proof proves two factors on its own, which it doesn't.
      */
-    public function isMultiFactorOnItsOwn(): bool
+    public function isMultiFactor(): bool
     {
         return false;
     }

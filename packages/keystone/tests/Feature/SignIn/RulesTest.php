@@ -21,7 +21,7 @@ it("keeps core's identifier rule when a type's rules loosen it", function () {
             return InitiateShape::FORM;
         }
 
-        public function isMultiFactorOnItsOwn(): bool
+        public function isMultiFactor(): bool
         {
             return false;
         }

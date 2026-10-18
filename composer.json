@@ -9,11 +9,13 @@
         "laravel/framework": "^13.0"
     },
     "require-dev": {
+        "claudiodekker/keystone-password": "self.version",
         "larastan/larastan": "^3.13",
         "laravel/pint": "^1.32",
         "nikic/php-parser": "^5.9",
         "orchestra/testbench": "^11.0",
-        "pestphp/pest": "^5.3"
+        "pestphp/pest": "^5.3",
+        "symfony/yaml": "^7.4 || ^8.0"
     },
     "replace": {
         "claudiodekker/keystone": "self.version"
@@ -34,6 +36,7 @@
         "psr-4": {
             "ClaudioDekker\\Keystone\\AppTests\\": "packages/keystone/app-tests/",
             "ClaudioDekker\\Keystone\\Lint\\": "lint/",
+            "ClaudioDekker\\Keystone\\Password\\AppTests\\": "packages/keystone-password/app-tests/",
             "ClaudioDekker\\Keystone\\Tests\\": [
                 "tests/",
                 "packages/keystone/tests/"

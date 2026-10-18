@@ -36,7 +36,7 @@ class FakeChallengeType implements CredentialType
     /**
      * Determine if a proof proves two factors on its own, which it doesn't.
      */
-    public function isMultiFactorOnItsOwn(): bool
+    public function isMultiFactor(): bool
     {
         return false;
     }
