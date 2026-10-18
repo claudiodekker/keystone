@@ -5,6 +5,7 @@ namespace ClaudioDekker\Keystone\InertiaVue\Console;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edit;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\ImplementKeystoneUser;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\RequireRouteFile;
+use ClaudioDekker\Keystone\InertiaVue\Install\Edits\SetSessionCookie;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\UseKeystoneGuard;
 use ClaudioDekker\Keystone\InertiaVue\Install\Stubs;
 use ClaudioDekker\Keystone\Keystone;
@@ -54,7 +55,7 @@ class InstallCommand extends Command
 
         $this->copy($stubs, $files);
 
-        $everyEditApplied = collect($this->edits($manifest, $config))
+        $everyEditApplied = collect($this->edits($manifest, $config, $files))
             ->map(fn (Edit $edit) => $this->applyEdit($edit, $files))
             ->every(fn (bool $applied) => $applied);
 
@@ -67,17 +68,25 @@ class InstallCommand extends Command
      * @param  array<string, mixed>  $manifest
      * @return list<Edit>
      */
-    protected function edits(array $manifest, Repository $config): array
+    protected function edits(array $manifest, Repository $config, Filesystem $files): array
     {
         $guard = $config->get('auth.defaults.guard');
         $model = $this->userModel($config, $guard);
         $modelFile = $model === null ? null : $this->classFile($manifest, $model);
+        $appName = $config->get('app.name');
 
-        return [
+        $edits = [
             new RequireRouteFile,
             new ImplementKeystoneUser($model, $modelFile),
             new UseKeystoneGuard($guard),
+            new SetSessionCookie('.env.example', $appName),
         ];
+
+        if ($files->exists($this->laravel->basePath('.env'))) {
+            $edits[] = new SetSessionCookie('.env', $appName);
+        }
+
+        return $edits;
     }
 
     /**

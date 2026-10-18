@@ -151,3 +151,44 @@ describe('config/auth.php', function () {
         expect($this->fresh->contents('config/auth.php'))->not->toContain("'driver' => 'keystone'");
     });
 });
+
+describe('the session cookie', function () {
+    it('is named __Host-<app>-session and marked secure in .env.example, after the session block', function () {
+        config(['app.name' => 'Acme Shop']);
+
+        $this->artisan('keystone:install')->assertSuccessful();
+
+        expect($this->fresh->contents('.env.example'))
+            ->toContain("SESSION_DOMAIN=null\nSESSION_COOKIE=__Host-acme-shop-session\nSESSION_SECURE_COOKIE=true\n")
+            ->and($this->fresh->has('.env'))->toBeFalse();
+    });
+
+    it('is set in .env too when the app has one', function () {
+        $this->fresh->put('.env', $this->fresh->contents('.env.example'));
+
+        $this->artisan('keystone:install')->assertSuccessful();
+
+        expect($this->fresh->contents('.env'))->toContain("SESSION_DOMAIN=null\nSESSION_COOKIE=__Host-laravel-session\nSESSION_SECURE_COOKIE=true\n");
+    });
+
+    it('prints the edit when the app names its cookie already, and fails', function () {
+        $this->fresh->put('.env.example', $this->fresh->contents('.env.example')."SESSION_COOKIE=acme\n");
+
+        $this->artisan('keystone:install')
+            ->expectsOutputToContain('Set SESSION_COOKIE=__Host-laravel-session and SESSION_SECURE_COOKIE=true in .env.example, with SESSION_DOMAIN=null.')
+            ->assertFailed();
+
+        expect($this->fresh->contents('.env.example'))->toContain("SESSION_COOKIE=acme\n")
+            ->not->toContain('SESSION_SECURE_COOKIE');
+    });
+
+    it('prints the edit when the session domain is set, because a __Host- cookie takes no domain, and fails', function () {
+        $this->fresh->put('.env.example', str_replace('SESSION_DOMAIN=null', 'SESSION_DOMAIN=acme.test', $this->fresh->contents('.env.example')));
+
+        $this->artisan('keystone:install')
+            ->expectsOutputToContain('with SESSION_DOMAIN=null.')
+            ->assertFailed();
+
+        expect($this->fresh->contents('.env.example'))->not->toContain('SESSION_COOKIE');
+    });
+});
