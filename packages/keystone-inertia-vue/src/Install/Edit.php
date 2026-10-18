@@ -12,9 +12,9 @@ namespace ClaudioDekker\Keystone\InertiaVue\Install;
 abstract class Edit
 {
     /**
-     * Get the file the edit changes, relative to the app's base path.
+     * Get the file the edit changes, relative to the app's base path, or null when it can't be found.
      */
-    abstract public function path(): string;
+    abstract public function path(): ?string;
 
     /**
      * Get the file's contents with the edit made, or null when the file no longer has the shape the edit recognises.

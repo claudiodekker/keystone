@@ -3,11 +3,14 @@
 namespace ClaudioDekker\Keystone\InertiaVue\Console;
 
 use ClaudioDekker\Keystone\InertiaVue\Install\Edit;
+use ClaudioDekker\Keystone\InertiaVue\Install\Edits\ImplementKeystoneUser;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\RequireRouteFile;
 use ClaudioDekker\Keystone\InertiaVue\Install\Stubs;
 use ClaudioDekker\Keystone\Keystone;
 use Illuminate\Console\Command;
+use Illuminate\Contracts\Config\Repository;
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 
 /**
@@ -36,9 +39,10 @@ class InstallCommand extends Command
     /**
      * Install, after refusing an app that can't take Keystone before anything changes.
      */
-    public function handle(Stubs $stubs, Filesystem $files): int
+    public function handle(Stubs $stubs, Filesystem $files, Repository $config): int
     {
-        $refusals = $this->refusals($files->json($this->laravel->basePath('composer.json')), $files);
+        $manifest = $files->json($this->laravel->basePath('composer.json'));
+        $refusals = $this->refusals($manifest, $files);
 
         if ($refusals !== []) {
             $this->components->error('Keystone was not installed, and nothing in the app changed.');
@@ -49,7 +53,7 @@ class InstallCommand extends Command
 
         $this->copy($stubs, $files);
 
-        $everyEditApplied = collect($this->edits())
+        $everyEditApplied = collect($this->edits($manifest, $config))
             ->map(fn (Edit $edit) => $this->applyEdit($edit, $files))
             ->every(fn (bool $applied) => $applied);
 
@@ -59,13 +63,62 @@ class InstallCommand extends Command
     /**
      * Get the edits that wire the app up, in the order they are printed.
      *
+     * @param  array<string, mixed>  $manifest
      * @return list<Edit>
      */
-    protected function edits(): array
+    protected function edits(array $manifest, Repository $config): array
     {
+        $model = $this->userModel($config);
+        $modelFile = $model === null ? null : $this->classFile($manifest, $model);
+
         return [
             new RequireRouteFile,
+            new ImplementKeystoneUser($model, $modelFile),
         ];
+    }
+
+    /**
+     * Get the user model of the default guard's provider, or null when there is none.
+     */
+    protected function userModel(Repository $config): ?string
+    {
+        $guard = $config->get('auth.defaults.guard');
+
+        if ($guard === null) {
+            return null;
+        }
+
+        $provider = $config->get("auth.guards.{$guard}.provider");
+
+        if ($provider === null) {
+            return null;
+        }
+
+        return $config->get("auth.providers.{$provider}.model");
+    }
+
+    /**
+     * Get the file of a class through the PSR-4 roots of the app's composer.json, or null when none holds it.
+     *
+     * @param  array<string, mixed>  $manifest
+     */
+    protected function classFile(array $manifest, string $class): ?string
+    {
+        /** @var array<string, string|list<string>> $roots */
+        $roots = $manifest['autoload']['psr-4'] ?? [];
+
+        uksort($roots, fn (string $a, string $b) => strlen($b) <=> strlen($a));
+
+        foreach ($roots as $namespace => $directory) {
+            if (str_starts_with($class, $namespace)) {
+                $root = rtrim(Arr::wrap($directory)[0], '/');
+                $relative = str_replace('\\', '/', substr($class, strlen($namespace)));
+
+                return "{$root}/{$relative}.php";
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -73,9 +126,10 @@ class InstallCommand extends Command
      */
     protected function applyEdit(Edit $edit, Filesystem $files): bool
     {
-        $path = $this->laravel->basePath($edit->path());
+        $relative = $edit->path();
+        $path = $relative === null ? null : $this->laravel->basePath($relative);
 
-        if (! $files->exists($path)) {
+        if ($path === null || ! $files->exists($path)) {
             $this->printNotApplied($edit, 'missing');
 
             return false;
@@ -94,7 +148,7 @@ class InstallCommand extends Command
             $files->put($path, $edited);
         }
 
-        $this->components->twoColumnDetail($edit->path(), $edited === $contents ? 'unchanged' : 'edited');
+        $this->components->twoColumnDetail($relative, $edited === $contents ? 'unchanged' : 'edited');
 
         return true;
     }
@@ -104,8 +158,10 @@ class InstallCommand extends Command
      */
     protected function printNotApplied(Edit $edit, string $reason): void
     {
-        $this->components->twoColumnDetail($edit->path(), $reason);
-        $this->components->bulletList([$edit->instructions()]);
+        $this->components->twoColumnDetail($edit->path() ?? 'unknown file', $reason);
+        $this->newLine();
+        $this->line($edit->instructions());
+        $this->newLine();
     }
 
     /**

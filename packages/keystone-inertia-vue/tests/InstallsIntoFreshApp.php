@@ -13,12 +13,14 @@ trait InstallsIntoFreshApp
     protected FreshApp $fresh;
 
     /**
-     * Copy the skeleton and point the app at it.
+     * Copy the skeleton and point the app at it, with the skeleton's own user model as the provider's.
      */
     protected function setUpInstallsIntoFreshApp(): void
     {
         $this->fresh = FreshApp::copy();
         $this->app->setBasePath($this->fresh->path());
+
+        config(['auth.providers.users.model' => 'App\\Models\\User']);
     }
 
     /**
