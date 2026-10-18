@@ -21,7 +21,7 @@ class ImplementKeystoneUser extends Edit
     }
 
     /**
-     * Get the model's file, or null when the app's PSR-4 roots map none.
+     * Get the model's file, relative to the app's base path, or null when it can't be found.
      */
     public function path(): ?string
     {

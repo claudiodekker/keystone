@@ -22,7 +22,7 @@ abstract class Edit
     abstract public function apply(string $contents): ?string;
 
     /**
-     * Get the change to make by hand, printed when the file drifted too far to edit.
+     * Get the change to make by hand.
      */
     abstract public function instructions(): string;
 }

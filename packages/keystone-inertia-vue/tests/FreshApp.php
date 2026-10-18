@@ -22,7 +22,7 @@ class FreshApp
     }
 
     /**
-     * Copy the skeleton Composer installed to a new directory, with Pest in place of PHPUnit and every Keystone package in vendor, and its composer.json as the skeleton lays it out.
+     * Copy the skeleton to a new directory, with every Keystone package in vendor.
      */
     public static function copy(): static
     {
@@ -48,7 +48,7 @@ class FreshApp
     }
 
     /**
-     * Lay a package of this repository down in the copy's vendor as Composer would, with its manifest and AppTests.
+     * Lay a package of this repository down in the copy's vendor.
      *
      * @return $this
      */

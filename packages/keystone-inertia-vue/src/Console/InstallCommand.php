@@ -82,7 +82,7 @@ class InstallCommand extends Command
     }
 
     /**
-     * Get the edits that wire the app up, in the order they are printed.
+     * Get the edits that wire the app up.
      *
      * @param  array<string, mixed>  $manifest
      * @return list<Edit>
@@ -107,7 +107,7 @@ class InstallCommand extends Command
     }
 
     /**
-     * Get the AppTests path of every Keystone package in the app's vendor, by the namespace its manifest gives them.
+     * Get the AppTests path of every Keystone package in the app's vendor, by namespace.
      *
      * @return array<string, string>
      */

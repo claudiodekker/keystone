@@ -6,7 +6,7 @@ use ClaudioDekker\Keystone\InertiaVue\Install\AppTests;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edit;
 
 /**
- * Register the Keystone testsuite in phpunit.xml, which reads every installed Keystone package's AppTests from vendor.
+ * Register the Keystone testsuite in phpunit.xml.
  *
  * @internal
  */
