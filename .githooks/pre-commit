@@ -1,0 +1,38 @@
+#!/bin/sh
+
+tab=$(printf '\t')
+
+offenders=$(
+    git -c core.quotePath=false diff --cached --numstat --no-renames --diff-filter=d |
+    while IFS=$tab read -r added deleted path; do
+        [ "$added" = - ] && continue
+        # A bare `linguist-generated` attribute prints "set", `linguist-generated=true` prints "true".
+        git check-attr linguist-generated -- "$path" | grep -Eq ': (set|true)$' && continue
+
+        tokens=$(( ($(git cat-file -s ":$path") + 3) / 4 ))
+
+        [ "$tokens" -gt 5000 ] && printf '  %s  %s tokens\n' "$path" "$tokens"
+    done
+)
+
+[ -z "$offenders" ] && exit 0
+
+cat >&2 <<MESSAGE
+These staged files are over 5000 tokens (bytes / 4):
+
+$offenders
+
+Split each one before you commit:
+
+1. Group the file's contents by the one job each part does.
+2. Move each group into its own file, named after that job:
+   - A PHP class: move a set of methods that belong together, and the properties only they use, into a new class, and call it from the original.
+   - A test file: move each group of related tests into its own test file beside the original, with the setup those tests need.
+   - A Markdown document: move each top-level section into its own page, and link to it from the original.
+3. Keep each new file under 5000 tokens (20000 bytes), and keep the behaviour the same.
+4. Stage the new files and the shortened original, then commit again.
+
+Do not shrink a file by deleting docblocks, comments or blank lines, or by joining lines.
+MESSAGE
+
+exit 1
