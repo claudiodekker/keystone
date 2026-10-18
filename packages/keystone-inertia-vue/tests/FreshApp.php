@@ -5,6 +5,7 @@ namespace ClaudioDekker\Keystone\InertiaVue\Tests;
 use Composer\InstalledVersions;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Str;
+use Symfony\Component\Finder\SplFileInfo;
 
 /**
  * A copy of the Laravel skeleton as `laravel new --pest` leaves it, for the installer to install into.
@@ -60,6 +61,19 @@ class FreshApp
     }
 
     /**
+     * Get a hash of every file in the copy by its path, to tell whether a run changed anything.
+     *
+     * @return array<string, string>
+     */
+    public function fingerprint(): array
+    {
+        return collect($this->files->allFiles($this->path, hidden: true))
+            ->mapWithKeys(fn (SplFileInfo $file) => [$file->getRelativePathname() => $this->files->hash($file->getPathname())])
+            ->sortKeys()
+            ->all();
+    }
+
+    /**
      * Write a file in the copy.
      *
      * @return $this
@@ -96,6 +110,20 @@ class FreshApp
         $manifest['require-dev'][$package] = '*';
 
         return $this->putManifest($manifest);
+    }
+
+    /**
+     * Record a package in the copy's vendor/composer/installed.json, as Composer does for one another package pulled in.
+     *
+     * @return $this
+     */
+    public function withInstalled(string $package): static
+    {
+        $path = 'vendor/composer/installed.json';
+        $installed = $this->has($path) ? json_decode($this->contents($path), true, flags: JSON_THROW_ON_ERROR) : ['packages' => []];
+        $installed['packages'][] = ['name' => $package];
+
+        return $this->put($path, json_encode($installed, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)."\n");
     }
 
     /**
