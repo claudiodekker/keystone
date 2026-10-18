@@ -11,6 +11,7 @@ use ClaudioDekker\Keystone\InertiaVue\Install\Edits\RegisterKeystoneTestsuite;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\RequireRouteFile;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\SetSessionCookie;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\UseKeystoneGuard;
+use ClaudioDekker\Keystone\InertiaVue\Install\Frontend;
 use ClaudioDekker\Keystone\InertiaVue\Install\Stubs;
 use ClaudioDekker\Keystone\Keystone;
 use Illuminate\Console\Command;
@@ -59,7 +60,15 @@ class InstallCommand extends Command
             return $this->refuse($refusals);
         }
 
-        $this->copy($stubs, $files);
+        $this->copy($stubs->for(Keystone::credentialTypes()->names()), $stubs, $files);
+
+        $frontend = new Frontend($this->laravel->basePath(), $stubs, $files);
+
+        if ($frontend->hasOwnSetup()) {
+            $this->printOwnSetup($stubs);
+        } else {
+            $this->setUpInertia($stubs, $files);
+        }
 
         $everyEditApplied = collect($this->edits($manifest, $config, $files))
             ->map(fn (Edit $edit) => $this->applyEdit($edit, $files))
@@ -213,13 +222,51 @@ class InstallCommand extends Command
     }
 
     /**
-     * Copy the stubs the app lacks, or every stub when forced.
+     * Move the skeleton's Vite entry files aside and copy the files that set Inertia and Vue up.
      */
-    protected function copy(Stubs $stubs, Filesystem $files): void
+    protected function setUpInertia(Stubs $stubs, Filesystem $files): void
+    {
+        foreach (['vite.config.js', 'resources/js/app.js'] as $path) {
+            $this->moveAside($path, $files);
+        }
+
+        $this->copy($stubs->setup(), $stubs, $files);
+    }
+
+    /**
+     * Keep the file as a .bak next to where it was, unless that was done already.
+     */
+    protected function moveAside(string $path, Filesystem $files): void
+    {
+        $source = $this->laravel->basePath($path);
+
+        if (! $files->exists($source) || $files->exists($source.'.bak')) {
+            return;
+        }
+
+        $files->move($source, $source.'.bak');
+        $this->components->twoColumnDetail($path, "moved to {$path}.bak");
+    }
+
+    /**
+     * Print what an app with a frontend setup of its own sets up by hand.
+     */
+    protected function printOwnSetup(Stubs $stubs): void
+    {
+        $this->components->warn('The app has its own frontend setup, which Keystone keeps. Set Inertia and Vue up in it the way these files do:');
+        $this->components->bulletList(array_map($stubs->path(...), $stubs->setup()));
+    }
+
+    /**
+     * Copy the stubs the app lacks, or every one when forced.
+     *
+     * @param  array<int, string>  $paths
+     */
+    protected function copy(array $paths, Stubs $stubs, Filesystem $files): void
     {
         $skipped = [];
 
-        foreach ($stubs->for(Keystone::credentialTypes()->names()) as $path) {
+        foreach ($paths as $path) {
             $target = $this->laravel->basePath($path);
 
             if ($files->exists($target) && ! $this->option('force')) {

@@ -53,6 +53,19 @@ class Stubs
     }
 
     /**
+     * Get the path in the app of each stub that sets up Inertia and Vue.
+     *
+     * @return array<int, string>
+     */
+    public function setup(): array
+    {
+        return $this->paths()
+            ->filter(fn (string $path) => in_array($path, static::INERTIA_SETUP, true))
+            ->values()
+            ->all();
+    }
+
+    /**
      * Get the stub's absolute path.
      */
     public function path(string $path): string
