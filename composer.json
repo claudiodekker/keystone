@@ -12,6 +12,7 @@
         "claudiodekker/keystone-inertia-vue": "self.version",
         "claudiodekker/keystone-password": "self.version",
         "larastan/larastan": "^3.13",
+        "laravel/laravel": "^13.0",
         "laravel/pint": "^1.32",
         "nikic/php-parser": "^5.9",
         "orchestra/testbench": "^11.0",
