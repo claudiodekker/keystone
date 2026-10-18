@@ -8,7 +8,7 @@ use Illuminate\Support\Str;
 use Symfony\Component\Finder\SplFileInfo;
 
 /**
- * A copy of the Laravel skeleton as `laravel new --pest` leaves it, for the installer to install into.
+ * A copy of the Laravel skeleton as `laravel new --pest` leaves it.
  */
 class FreshApp
 {
@@ -61,7 +61,7 @@ class FreshApp
     }
 
     /**
-     * Get a hash of every file in the copy by its path, to tell whether a run changed anything.
+     * Get a hash of every file in the copy by its path.
      *
      * @return array<string, string>
      */
@@ -113,7 +113,7 @@ class FreshApp
     }
 
     /**
-     * Record a package in the copy's vendor/composer/installed.json, as Composer does for one another package pulled in.
+     * Record a package as installed in the copy's vendor/composer/installed.json.
      *
      * @return $this
      */

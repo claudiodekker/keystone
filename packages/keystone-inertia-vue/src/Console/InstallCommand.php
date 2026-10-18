@@ -77,7 +77,7 @@ class InstallCommand extends Command
     }
 
     /**
-     * Get the reasons the app can't take Keystone, read from its own composer.json and the packages Composer installed.
+     * Get the reasons the app can't take Keystone.
      *
      * @param  array<string, mixed>  $manifest
      * @return list<string>
@@ -99,7 +99,7 @@ class InstallCommand extends Command
     }
 
     /**
-     * Get the name of every package the app requires or has installed, whoever required it.
+     * Get the name of every package the app requires or has installed.
      *
      * @param  array<string, mixed>  $manifest
      * @return Collection<int, string>

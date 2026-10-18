@@ -8,18 +8,18 @@ use Illuminate\Support\Str;
 use Symfony\Component\Finder\SplFileInfo;
 
 /**
- * The adapter's stubs, by their path in the app, with a credential type's partial only for the types in use.
+ * The adapter's stubs, by their path in the app.
  *
  * @internal
  */
 class Stubs
 {
     /**
-     * The stubs for() leaves out.
+     * The stubs that set up Inertia and Vue, which are not copied with the rest.
      *
      * @var list<string>
      */
-    protected const array SETUP = [
+    protected const array INERTIA_SETUP = [
         'app/Http/Middleware/HandleInertiaRequests.php',
         'resources/js/app.ts',
         'resources/views/app.blade.php',
@@ -46,7 +46,7 @@ class Stubs
         $partials = collect($types)->map(fn (string $type) => Str::studly($type));
 
         return $this->paths()
-            ->reject(fn (string $path) => in_array($path, static::SETUP, true))
+            ->reject(fn (string $path) => in_array($path, static::INERTIA_SETUP, true))
             ->filter(fn (string $path) => $this->isCopiedFor($path, $partials))
             ->values()
             ->all();

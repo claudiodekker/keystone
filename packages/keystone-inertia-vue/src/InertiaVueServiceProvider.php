@@ -6,7 +6,7 @@ use ClaudioDekker\Keystone\InertiaVue\Console\InstallCommand;
 use Illuminate\Support\ServiceProvider;
 
 /**
- * Offer keystone:install to the app, whose runtime code is the stubs it owns once installed.
+ * Offer keystone:install to the app.
  *
  * @internal
  */
