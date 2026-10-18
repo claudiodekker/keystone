@@ -37,6 +37,13 @@ jobs:
 
       - run: composer update --prefer-stable --no-interaction --no-progress ${{ matrix.dependencies == 'lowest' && '--prefer-lowest' || '' }}
 
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
       - run: composer check
 
   pgsql:
@@ -75,6 +82,13 @@ jobs:
 
       - run: composer update --prefer-stable --no-interaction --no-progress
 
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
       - run: composer check
 
   mysql:
@@ -111,6 +125,13 @@ jobs:
           coverage: none
 
       - run: composer update --prefer-stable --no-interaction --no-progress
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
 
       - run: composer check
 
@@ -153,6 +174,15 @@ jobs:
       - run: composer update --prefer-stable --no-interaction --no-progress
 
       - run: composer remove --dev --no-interaction --no-progress claudiodekker/keystone-password
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run check
 
       - run: vendor/bin/pest --testsuite=keystone-inertia-vue
 

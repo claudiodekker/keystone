@@ -10,7 +10,7 @@ use function Orchestra\Testbench\workbench_path;
 beforeEach(function () {
     $this->app->register(InertiaServiceProvider::class);
 
-    config(['inertia.testing.ensure_pages_exist' => false]);
+    config(['inertia.pages.paths' => [dirname(__DIR__, 2).'/stubs/resources/js/pages']]);
 
     View::addLocation(workbench_path('resources', 'views'));
 

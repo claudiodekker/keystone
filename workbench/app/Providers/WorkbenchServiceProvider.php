@@ -11,15 +11,16 @@ use Illuminate\Support\ServiceProvider;
 class WorkbenchServiceProvider extends ServiceProvider
 {
     /**
-     * Point the guard at the keystone driver and the fixture user, as the installer's edits do. Page-existence checks
-     * stay off until the pages exist.
+     * Point the guard at the keystone driver and the fixture user, as the installer's edits do, and the page checks at
+     * the stubs' pages.
      */
     public function register(): void
     {
         config([
             'auth.guards.web.driver' => 'keystone',
             'auth.providers.users.model' => User::class,
-            'inertia.testing.ensure_pages_exist' => false,
+            'inertia.pages.paths' => [dirname(__DIR__, 3).'/packages/keystone-inertia-vue/stubs/resources/js/pages'],
+            'inertia.testing.ensure_pages_exist' => true,
         ]);
     }
 
