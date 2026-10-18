@@ -10,7 +10,7 @@ A package that adds ways to prove identity. The method packages are `keystone-pa
 
 ## Frontend adapter
 
-A package that gives core its pages. The frontend adapters are `keystone-inertia-vue` and `keystone-blade`. An adapter installs controllers, pages, routes and translations into the app, and the app then owns them.
+A package that gives core its pages. The frontend adapters are `keystone-inertia-vue` and `keystone-blade`. An adapter installs controllers, pages, routes and assertion overrides into the app, and the app then owns them. Core's messages stay in its `keystone::` translations.
 
 ## Credential type
 

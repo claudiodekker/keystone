@@ -2,6 +2,7 @@
 
 namespace ClaudioDekker\Keystone\Tests;
 
+use Composer\InstalledVersions;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Collection;
 use SimpleXMLElement;
@@ -30,10 +31,49 @@ class Monorepo
      *
      * @return list<string>
      */
-    public static function methodPackages(): array
+    public static function packagesExceptCore(): array
     {
         return collect(static::packages())
             ->reject(fn (string $package) => $package === 'keystone')
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Get the directory name of every frontend adapter, which is every package with stubs to install.
+     *
+     * @return list<string>
+     */
+    public static function adapters(): array
+    {
+        return collect(static::packages())
+            ->filter(fn (string $package) => is_dir(static::path("packages/{$package}/stubs")))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Get the directory name of every frontend adapter Composer installed, whose stubs can therefore load.
+     *
+     * @return list<string>
+     */
+    public static function installedAdapters(): array
+    {
+        return collect(static::adapters())
+            ->filter(fn (string $adapter) => InstalledVersions::isInstalled(static::manifest($adapter)['name']))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Get the directory name of every method package, which is every package but core and the adapters.
+     *
+     * @return list<string>
+     */
+    public static function methodPackages(): array
+    {
+        return collect(static::packagesExceptCore())
+            ->diff(static::adapters())
             ->values()
             ->all();
     }
@@ -46,6 +86,16 @@ class Monorepo
     public static function manifest(?string $package = null): array
     {
         return (new Filesystem)->json(static::path($package === null ? 'composer.json' : "packages/{$package}/composer.json"));
+    }
+
+    /**
+     * Get the namespace the repository's autoload-dev maps the package's AppTests to, or null when it maps none.
+     */
+    public static function appTestsNamespace(string $package): ?string
+    {
+        $namespace = array_search("packages/{$package}/app-tests/", static::manifest()['autoload-dev']['psr-4'], true);
+
+        return $namespace === false ? null : $namespace;
     }
 
     /**

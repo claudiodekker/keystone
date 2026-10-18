@@ -1,0 +1,11 @@
+{
+    "name": "claudiodekker/keystone-inertia-vue",
+    "description": "Inertia and Vue pages for Keystone, installed as the app's own files.",
+    "license": "MIT",
+    "require": {
+        "php": "^8.4",
+        "claudiodekker/keystone": "self.version",
+        "inertiajs/inertia-laravel": "^3.5",
+        "laravel/framework": "^13.0"
+    }
+}
