@@ -47,12 +47,13 @@ class ImplementKeystoneUser extends Edit
         $interfaces = isset($match['interfaces']) ? explode(', ', $match['interfaces'][0]) : [];
 
         if (in_array('KeystoneUser', $interfaces, true)) {
-            return $this->import($contents);
+            return $this->import($contents, KeystoneUser::class);
         }
 
         $implemented = $interfaces === [] ? $line.' implements KeystoneUser' : $line.', KeystoneUser';
+        $declared = substr_replace($contents, $implemented, $offset, strlen($line));
 
-        return $this->import(substr_replace($contents, $implemented, $offset, strlen($line)));
+        return $this->import($declared, KeystoneUser::class);
     }
 
     /**
@@ -63,33 +64,5 @@ class ImplementKeystoneUser extends Edit
         $model = $this->class ?? 'your user model';
 
         return 'Add implements '.KeystoneUser::class." to {$model}.";
-    }
-
-    /**
-     * Get the contents with the KeystoneUser import in its sorted place.
-     */
-    protected function import(string $contents): ?string
-    {
-        $import = 'use '.KeystoneUser::class.';';
-
-        if (str_contains($contents, $import)) {
-            return $contents;
-        }
-
-        if (preg_match_all('/^use [^;]+;$/m', $contents, $matches, PREG_OFFSET_CAPTURE) === 0) {
-            return null;
-        }
-
-        $end = 0;
-
-        foreach ($matches[0] as [$line, $offset]) {
-            if (strcmp($line, $import) > 0) {
-                return substr_replace($contents, $import."\n", $offset, 0);
-            }
-
-            $end = $offset + strlen($line);
-        }
-
-        return substr_replace($contents, "\n".$import, $end, 0);
     }
 }
