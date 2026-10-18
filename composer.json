@@ -49,12 +49,15 @@
         }
     },
     "scripts": {
+        "post-autoload-dump": "@php vendor/bin/testbench package:discover --ansi",
         "post-install-cmd": "git config core.hooksPath .githooks",
         "check": [
             "@composer validate --strict",
             "pint --test",
-            "phpstan analyse --no-progress --memory-limit=1G packages/*/src packages/*/tests/Fixtures packages/*/stubs/app",
+            "phpstan analyse --no-progress --memory-limit=1G packages/*/src packages/*/tests/Fixtures packages/*/stubs/app workbench/app",
             "pest",
+            "@putenv KEYSTONE_ADAPTER=keystone-inertia-vue",
+            "pest packages/*/app-tests",
             "@composer audit"
         ]
     },

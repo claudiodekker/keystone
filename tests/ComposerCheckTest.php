@@ -20,7 +20,11 @@ it('fails when one of its steps fails', function (string $step) {
 
     expect($result->failed())->toBeTrue()
         ->and($result->errorOutput())->toContain("Script {$step} handling the check event returned with error code");
-})->with(fn () => array_combine(CheckScript::steps(), CheckScript::steps()));
+})->with(function () {
+    $steps = array_filter(CheckScript::steps(), fn (string $step) => ! str_starts_with($step, '@putenv'));
+
+    return array_combine($steps, $steps);
+});
 
 it('passes when every step passes', function () {
     $tools = CheckScript::makeStandInTools(null);

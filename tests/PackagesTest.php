@@ -1,5 +1,6 @@
 <?php
 
+use ClaudioDekker\Keystone\Tests\CheckScript;
 use ClaudioDekker\Keystone\Tests\Monorepo;
 use Illuminate\Support\Str;
 
@@ -57,6 +58,14 @@ it("keeps core's flow AppTests out of every testsuite but app-tests", function (
         ->and(Monorepo::excluded($flows))->toBe(['packages/keystone/app-tests/Contract'])
         ->and($readsOfCore->keys()->all())->toBe([]);
 });
+
+it("runs every package's AppTests through every adapter's stubs in composer check", function (string $adapter) {
+    $steps = CheckScript::steps();
+    $switch = array_search("@putenv KEYSTONE_ADAPTER={$adapter}", $steps, true);
+
+    expect($switch)->not->toBeFalse()
+        ->and($steps[$switch + 1])->toBe('pest packages/*/app-tests');
+})->with(fn () => Monorepo::adapters());
 
 it('runs only the contract AppTests and its own suite in the CI job of every method package', function (string $package) {
     expect(Monorepo::commands($package))->toContain("vendor/bin/pest --testsuite=contract,{$package}");

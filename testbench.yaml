@@ -1,0 +1,10 @@
+laravel: '@testbench'
+
+providers:
+  - ClaudioDekker\Keystone\KeystoneServiceProvider
+  - Workbench\App\Providers\WorkbenchServiceProvider
+
+workbench:
+  discovers:
+    views: true
+    web: true
