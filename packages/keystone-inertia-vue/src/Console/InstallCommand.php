@@ -7,6 +7,7 @@ use ClaudioDekker\Keystone\InertiaVue\Install\Edit;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\BindKeystoneTestCase;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\ImplementKeystoneUser;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\MapAppTests;
+use ClaudioDekker\Keystone\InertiaVue\Install\Edits\MergeNpmDependencies;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\RegisterInertiaMiddleware;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\RegisterKeystoneTestsuite;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\RemoveAppJsFromWelcome;
@@ -116,7 +117,18 @@ class InstallCommand extends Command
             new RegisterKeystoneTestsuite,
             new BindKeystoneTestCase,
             new MapAppTests($this->appTests($files)),
+            new MergeNpmDependencies($this->npmPackages($files)),
         ];
+    }
+
+    /**
+     * Get the npm packages the pages need, by name, at the versions this package builds them with.
+     *
+     * @return array<string, string>
+     */
+    protected function npmPackages(Filesystem $files): array
+    {
+        return $files->json(dirname(__DIR__, 2).'/package.json')['dependencies'];
     }
 
     /**
