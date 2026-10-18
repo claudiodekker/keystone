@@ -1,7 +1,5 @@
 <?php
 
-// Class loading, no parser: each core controller is found by its file, its hooks are its send* methods.
-
 use ClaudioDekker\Keystone\Tests\Fixtures\AppTestCase;
 use ClaudioDekker\Keystone\Tests\Monorepo;
 

@@ -28,7 +28,7 @@ class KeystoneServiceProvider extends ServiceProvider
     }
 
     /**
-     * Register the keystone guard driver, the request context middleware, the migrations and the translations.
+     * Boot Keystone in the app.
      */
     public function boot(): void
     {

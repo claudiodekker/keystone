@@ -27,7 +27,7 @@ class FixtureServiceProvider extends ServiceProvider
     }
 
     /**
-     * Register the fake types, the fixture routes, views and user table.
+     * Boot the fixture app.
      */
     public function boot(): void
     {

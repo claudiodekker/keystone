@@ -6,7 +6,7 @@ use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\Assert;
 
 /**
- * Check the one refusal every spent rate limit gives, which each area's throttled assertion defaults to.
+ * Check the one refusal every spent rate limit gives.
  *
  * @api
  */
