@@ -57,3 +57,56 @@ it('keeps the setup of an app that has its own, and prints what to set up', func
     'a script of its own' => ['resources/js/app.js', "import './bootstrap';\n"],
     'a layout of its own loading the script' => ['resources/views/layouts/app.blade.php', "@vite(['resources/js/app.js'])\n"],
 ]);
+
+describe('bootstrap/app.php', function () {
+    it('appends HandleInertiaRequests to the web middleware of a bare app, with its import', function () {
+        $this->artisan('keystone:install')->assertSuccessful();
+
+        expect($this->fresh->contents('bootstrap/app.php'))
+            ->toContain("\nuse App\\Http\\Middleware\\HandleInertiaRequests;\nuse Illuminate\\Foundation\\Application;\n")
+            ->toContain(implode("\n", [
+                '    ->withMiddleware(function (Middleware $middleware): void {',
+                '        $middleware->web(append: [',
+                '            HandleInertiaRequests::class,',
+                '        ]);',
+                '    })',
+            ]));
+    });
+
+    it('prints the registration when the middleware closure is not the skeleton\'s, and fails', function () {
+        $this->fresh->put('bootstrap/app.php', $before = str_replace('        //', "        \$middleware->trustProxies(at: '*');", $this->fresh->contents('bootstrap/app.php')));
+
+        $this->artisan('keystone:install')
+            ->expectsOutputToContain('$middleware->web(append: [HandleInertiaRequests::class]);')
+            ->assertFailed();
+
+        expect($this->fresh->contents('bootstrap/app.php'))->toBe($before);
+    });
+});
+
+describe('the welcome page', function () {
+    it('stops loading app.js on a bare app, keeping its stylesheet', function () {
+        $this->artisan('keystone:install')->assertSuccessful();
+
+        expect($this->fresh->contents('resources/views/welcome.blade.php'))
+            ->toContain("@vite(['resources/css/app.css'])")
+            ->not->toContain('app.js');
+    });
+
+    it('prints the edit when the page loads app.js another way, and fails', function () {
+        $this->fresh->put('resources/views/welcome.blade.php', $before = "@vite('resources/js/app.js')\n");
+
+        $this->artisan('keystone:install')
+            ->expectsOutputToContain('resources/js/app.js')
+            ->expectsOutputToContain('resources/views/welcome.blade.php')
+            ->assertFailed();
+
+        expect($this->fresh->contents('resources/views/welcome.blade.php'))->toBe($before);
+    });
+
+    it('is not missed by an app that deleted it', function () {
+        unlink($this->fresh->path('resources/views/welcome.blade.php'));
+
+        $this->artisan('keystone:install')->assertSuccessful();
+    });
+});

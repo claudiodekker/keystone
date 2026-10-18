@@ -7,7 +7,9 @@ use ClaudioDekker\Keystone\InertiaVue\Install\Edit;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\BindKeystoneTestCase;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\ImplementKeystoneUser;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\MapAppTests;
+use ClaudioDekker\Keystone\InertiaVue\Install\Edits\RegisterInertiaMiddleware;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\RegisterKeystoneTestsuite;
+use ClaudioDekker\Keystone\InertiaVue\Install\Edits\RemoveAppJsFromWelcome;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\RequireRouteFile;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\SetSessionCookie;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\UseKeystoneGuard;
@@ -63,14 +65,16 @@ class InstallCommand extends Command
         $this->copy($stubs->for(Keystone::credentialTypes()->names()), $stubs, $files);
 
         $frontend = new Frontend($this->laravel->basePath(), $stubs, $files);
+        $edits = $this->edits($manifest, $config, $files);
 
         if ($frontend->hasOwnSetup()) {
             $this->printOwnSetup($stubs);
         } else {
             $this->setUpInertia($stubs, $files);
+            $edits = [...$edits, ...$this->setupEdits($files)];
         }
 
-        $everyEditApplied = collect($this->edits($manifest, $config, $files))
+        $everyEditApplied = collect($edits)
             ->map(fn (Edit $edit) => $this->applyEdit($edit, $files))
             ->every(fn (bool $applied) => $applied);
 
@@ -112,6 +116,21 @@ class InstallCommand extends Command
             new RegisterKeystoneTestsuite,
             new BindKeystoneTestCase,
             new MapAppTests($this->appTests($files)),
+        ];
+    }
+
+    /**
+     * Get the edits that wire the setup stubs into a bare app.
+     *
+     * @return list<Edit>
+     */
+    protected function setupEdits(Filesystem $files): array
+    {
+        $welcome = $files->exists($this->laravel->basePath('resources/views/welcome.blade.php'));
+
+        return [
+            new RegisterInertiaMiddleware,
+            ...$welcome ? [new RemoveAppJsFromWelcome] : [],
         ];
     }
 
