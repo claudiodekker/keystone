@@ -55,10 +55,12 @@
             "@composer validate --strict",
             "pint --test",
             "phpstan analyse --no-progress --memory-limit=1G packages/*/src packages/*/tests/Fixtures packages/*/stubs/app workbench/app",
+            "npm run check",
             "pest",
             "@putenv KEYSTONE_ADAPTER=keystone-inertia-vue",
             "pest packages/*/app-tests",
-            "@composer audit"
+            "@composer audit",
+            "npm audit"
         ]
     },
     "config": {

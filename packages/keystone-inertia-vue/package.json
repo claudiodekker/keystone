@@ -1,0 +1,13 @@
+{
+  "name": "@claudiodekker/keystone-inertia-vue",
+  "private": true,
+  "description": "The dependencies keystone:install merges into an app's package.json. The monorepo builds and type-checks the stubs against these same versions.",
+  "dependencies": {
+    "@inertiajs/vue3": "^3.9",
+    "@laravel/vite-plugin-wayfinder": "^0.1",
+    "@vitejs/plugin-vue": "^6.0",
+    "typescript": "^6",
+    "vue": "^3.5",
+    "vue-tsc": "^3.3"
+  }
+}

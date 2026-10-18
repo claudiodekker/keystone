@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "types": ["vite/client", "node"],
+    "paths": {
+      "@/routes": ["./workbench/resources/js/routes/index.ts"],
+      "@/routes/*": ["./workbench/resources/js/routes/*"],
+      "@/actions/*": ["./workbench/resources/js/actions/*"],
+      "@/wayfinder": ["./workbench/resources/js/wayfinder/index.ts"],
+      "@/*": ["./packages/keystone-inertia-vue/stubs/resources/js/*"]
+    }
+  },
+  "include": [
+    "packages/*/stubs/resources/js/**/*",
+    "packages/*/stubs/vite.config.ts",
+    "workbench/resources/js/**/*",
+    "workbench/vite.config.ts"
+  ]
+}

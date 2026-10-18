@@ -6,6 +6,7 @@
         "php": "^8.4",
         "claudiodekker/keystone": "self.version",
         "inertiajs/inertia-laravel": "^3.5",
-        "laravel/framework": "^13.0"
+        "laravel/framework": "^13.0",
+        "laravel/wayfinder": "^0.1.23"
     }
 }
