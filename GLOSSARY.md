@@ -36,6 +36,8 @@ The account a typed identifier names, if any. A credential type checks a proof a
 
 What a credential type's verify step returns: proven, naming one of the credentials it was given, or rejected. A proof never names a user. Core reads the proven credential again and derives its owner itself.
 
+A proven proof may also carry a rehash: the work that remakes the credential's secret under the type's current settings, such as a password hashed at an old cost. Core runs it only after the proof signed the account in, and writes the result only if nothing else changed the secret meanwhile. A failed rehash is reported and the sign-in stands. A rejection carries none.
+
 ## Sign-in decision
 
 The one place core decides what a proof earns. Today a proof signs in its credential's owner when the owner is the subject; holds join it later.

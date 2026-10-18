@@ -28,6 +28,7 @@ class NoHttpInFeatureTests extends Check
      */
     protected array $allowed = [
         'packages/keystone/tests/Feature/RateLimits/ReplacedActionTest.php' => "An app's AppTests run through its own controllers, so only core can arrange one that replaces an action outright.",
+        'packages/keystone/tests/Feature/SignIn/RehashTest.php' => "Only core's fake type hands back a rehash on demand, or one that throws, so no app can arrange one.",
     ];
 
     /**
