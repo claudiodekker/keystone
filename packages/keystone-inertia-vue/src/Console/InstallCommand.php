@@ -2,6 +2,8 @@
 
 namespace ClaudioDekker\Keystone\InertiaVue\Console;
 
+use ClaudioDekker\Keystone\InertiaVue\Install\Edit;
+use ClaudioDekker\Keystone\InertiaVue\Install\Edits\RequireRouteFile;
 use ClaudioDekker\Keystone\InertiaVue\Install\Stubs;
 use ClaudioDekker\Keystone\Keystone;
 use Illuminate\Console\Command;
@@ -9,7 +11,9 @@ use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Collection;
 
 /**
- * Install Keystone's sign-in pages into the app as its own files.
+ * Install Keystone's sign-in pages into the app as its own files, and wire the app up to run them and their AppTests.
+ *
+ * Every step converges, so a second run changes nothing and a run that stopped part way is finished by running again.
  *
  * @internal
  */
@@ -45,7 +49,63 @@ class InstallCommand extends Command
 
         $this->copy($stubs, $files);
 
-        return self::SUCCESS;
+        $everyEditApplied = collect($this->edits())
+            ->map(fn (Edit $edit) => $this->applyEdit($edit, $files))
+            ->every(fn (bool $applied) => $applied);
+
+        return $everyEditApplied ? self::SUCCESS : self::FAILURE;
+    }
+
+    /**
+     * Get the edits that wire the app up, in the order they are printed.
+     *
+     * @return list<Edit>
+     */
+    protected function edits(): array
+    {
+        return [
+            new RequireRouteFile,
+        ];
+    }
+
+    /**
+     * Apply the edit and determine if the app has it now.
+     */
+    protected function applyEdit(Edit $edit, Filesystem $files): bool
+    {
+        $path = $this->laravel->basePath($edit->path());
+
+        if (! $files->exists($path)) {
+            $this->printNotApplied($edit, 'missing');
+
+            return false;
+        }
+
+        $contents = $files->get($path);
+        $edited = $edit->apply($contents);
+
+        if ($edited === null) {
+            $this->printNotApplied($edit, 'drifted');
+
+            return false;
+        }
+
+        if ($edited !== $contents) {
+            $files->put($path, $edited);
+        }
+
+        $this->components->twoColumnDetail($edit->path(), $edited === $contents ? 'unchanged' : 'edited');
+
+        return true;
+    }
+
+    /**
+     * Print why the edit is not in the app, with the change to make by hand.
+     */
+    protected function printNotApplied(Edit $edit, string $reason): void
+    {
+        $this->components->twoColumnDetail($edit->path(), $reason);
+        $this->components->bulletList([$edit->instructions()]);
     }
 
     /**
