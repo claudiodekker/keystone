@@ -1,6 +1,6 @@
 <?php
 
-// Fault injection and pinned formats of the recorder, which no flow exercises yet and no app can change.
+// Fault injection and pinned formats of the recorder, which no app can change.
 
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\Surface;
