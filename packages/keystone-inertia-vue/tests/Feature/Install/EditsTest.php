@@ -112,3 +112,42 @@ describe('the user model', function () {
         expect($this->fresh->contents('app/Models/User.php'))->not->toContain('KeystoneUser');
     });
 });
+
+describe('config/auth.php', function () {
+    it("sets the default guard's driver to keystone", function () {
+        $this->artisan('keystone:install')->assertSuccessful();
+
+        expect($this->fresh->contents('config/auth.php'))->toContain("'web' => [\n            'driver' => 'keystone',\n            'provider' => 'users',\n");
+    });
+
+    it('prints the edit when the guard uses a driver of its own, and fails', function () {
+        $this->fresh->put('config/auth.php', str_replace("'driver' => 'session'", "'driver' => 'token'", $this->fresh->contents('config/auth.php')));
+
+        $this->artisan('keystone:install')
+            ->expectsOutputToContain("Set auth.guards.web.driver to 'keystone' in config/auth.php.")
+            ->assertFailed();
+
+        expect($this->fresh->contents('config/auth.php'))->toContain("'driver' => 'token'")
+            ->not->toContain('keystone');
+    });
+
+    it('prints the edit when there is no default guard, and fails', function () {
+        config(['auth.defaults.guard' => null]);
+
+        $this->artisan('keystone:install')
+            ->expectsOutputToContain("Set the driver of your default guard to 'keystone' in config/auth.php.")
+            ->assertFailed();
+
+        expect($this->fresh->contents('config/auth.php'))->not->toContain("'driver' => 'keystone'");
+    });
+
+    it('prints the edit, with the guard name quoted, when the guard name has regex characters', function () {
+        config(['auth.defaults.guard' => 'web.*']);
+
+        $this->artisan('keystone:install')
+            ->expectsOutputToContain("Set auth.guards.web.*.driver to 'keystone' in config/auth.php.")
+            ->assertFailed();
+
+        expect($this->fresh->contents('config/auth.php'))->not->toContain("'driver' => 'keystone'");
+    });
+});

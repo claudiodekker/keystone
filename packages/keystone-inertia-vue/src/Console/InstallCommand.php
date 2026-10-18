@@ -5,6 +5,7 @@ namespace ClaudioDekker\Keystone\InertiaVue\Console;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edit;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\ImplementKeystoneUser;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\RequireRouteFile;
+use ClaudioDekker\Keystone\InertiaVue\Install\Edits\UseKeystoneGuard;
 use ClaudioDekker\Keystone\InertiaVue\Install\Stubs;
 use ClaudioDekker\Keystone\Keystone;
 use Illuminate\Console\Command;
@@ -68,22 +69,22 @@ class InstallCommand extends Command
      */
     protected function edits(array $manifest, Repository $config): array
     {
-        $model = $this->userModel($config);
+        $guard = $config->get('auth.defaults.guard');
+        $model = $this->userModel($config, $guard);
         $modelFile = $model === null ? null : $this->classFile($manifest, $model);
 
         return [
             new RequireRouteFile,
             new ImplementKeystoneUser($model, $modelFile),
+            new UseKeystoneGuard($guard),
         ];
     }
 
     /**
-     * Get the user model of the default guard's provider, or null when there is none.
+     * Get the user model of the guard's provider, or null when there is none.
      */
-    protected function userModel(Repository $config): ?string
+    protected function userModel(Repository $config, ?string $guard): ?string
     {
-        $guard = $config->get('auth.defaults.guard');
-
         if ($guard === null) {
             return null;
         }
