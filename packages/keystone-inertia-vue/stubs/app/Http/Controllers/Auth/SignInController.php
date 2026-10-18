@@ -15,10 +15,12 @@ use Inertia\Response;
 class SignInController extends KeystoneSignInController
 {
     /**
-     * Render the sign-in page with the page value's fields as props.
+     * Render the sign-in page, with the browser history encrypted, and the page value's fields as props.
      */
     protected function sendSignInPage(Request $request, SignInPage $page): Response
     {
+        Inertia::encryptHistory();
+
         return Inertia::render('auth/Login', [
             'status' => $page->status,
             'types' => $page->types,

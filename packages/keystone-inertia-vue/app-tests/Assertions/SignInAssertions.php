@@ -5,9 +5,10 @@ namespace ClaudioDekker\Keystone\InertiaVue\AppTests\Assertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\SignInAssertions as KeystoneSignInAssertions;
 use Illuminate\Testing\TestResponse;
 use Inertia\Testing\AssertableInertia;
+use PHPUnit\Framework\Assert as PHPUnit;
 
 /**
- * Check how an Inertia app answers each outcome of signing in. Only the sign-in page differs from Keystone's default.
+ * Check how an Inertia app answers each outcome of signing in.
  *
  * @api
  */
@@ -28,5 +29,7 @@ trait SignInAssertions
             ->component('auth/Login')
             ->hasAll(['status', 'types'])
             ->whereAll($fields));
+
+        PHPUnit::assertArrayHasKey('encryptHistory', $response->inertiaPage(), 'The browser history is not encrypted.');
     }
 }
