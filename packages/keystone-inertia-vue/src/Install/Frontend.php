@@ -22,27 +22,27 @@ class Frontend
     }
 
     /**
-     * Determine if the app set its frontend up itself, rather than it being the skeleton's or Keystone's.
+     * Determine if the app set its frontend up itself.
      */
     public function hasOwnSetup(): bool
     {
-        return ! $this->isSkeletons() && ! $this->isKeystones();
+        return ! $this->isBare() && ! $this->isSetUpByKeystone();
     }
 
     /**
-     * Determine if the frontend is still the one `laravel new` made, part way through Keystone's setup or not.
+     * Determine if the frontend is still the one `laravel new` made.
      */
-    protected function isSkeletons(): bool
+    protected function isBare(): bool
     {
         return ! $this->files->exists($this->path('resources/js/app.ts'))
-            && $this->isAppJsSkeletons()
+            && $this->hasSkeletonAppJs()
             && $this->viewsLoadingAppJs()->every(fn (string $view) => $view === 'welcome.blade.php');
     }
 
     /**
      * Determine if resources/js/app.ts is the one Keystone set up.
      */
-    protected function isKeystones(): bool
+    protected function isSetUpByKeystone(): bool
     {
         $appTs = $this->path('resources/js/app.ts');
 
@@ -51,9 +51,9 @@ class Frontend
     }
 
     /**
-     * Determine if resources/js/app.js is the skeleton's one line, or was moved aside to app.js.bak already.
+     * Determine if the app never replaced the skeleton's resources/js/app.js.
      */
-    protected function isAppJsSkeletons(): bool
+    protected function hasSkeletonAppJs(): bool
     {
         $appJs = $this->path('resources/js/app.js');
 

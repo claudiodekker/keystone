@@ -293,7 +293,7 @@ class InstallCommand extends Command
     }
 
     /**
-     * Keep the file as a .bak next to where it was, unless that was done already.
+     * Move the file aside to .bak.
      */
     protected function moveAside(string $path, Filesystem $files): void
     {
