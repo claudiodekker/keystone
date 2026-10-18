@@ -3,7 +3,7 @@
 use ClaudioDekker\Keystone\Password\AppTests\PasswordSupport;
 use Illuminate\Support\Facades\Auth;
 
-it('signs in with surrounding spaces only with those spaces', function () {
+it('treats surrounding spaces as part of the password', function () {
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
     (new PasswordSupport)->arrangePassword($user, '  odd horse  ');

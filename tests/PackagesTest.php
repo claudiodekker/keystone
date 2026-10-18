@@ -18,7 +18,7 @@ it('maps the AppTests of every package in autoload-dev', function (string $packa
     ]);
 })->with(fn () => Monorepo::packages());
 
-it('names a testsuite after every package that reads its tests', function (string $package) {
+it('gives every package a testsuite of its own tests, named after it', function (string $package) {
     $suite = Monorepo::suites()->get($package);
 
     expect($suite)->not->toBeNull()
@@ -29,7 +29,7 @@ it('gives a method package its AppTests in its own testsuite', function (string 
     expect(Monorepo::directories(Monorepo::suites()->get($package)))->toContain("packages/{$package}/app-tests");
 })->with(fn () => Monorepo::methodPackages());
 
-it("keeps core's flow AppTests out of every other testsuite than app-tests", function () {
+it("keeps core's flow AppTests out of every testsuite but app-tests", function () {
     $flows = Monorepo::suites()->get('app-tests');
     $readsOfCore = Monorepo::suites()
         ->except('app-tests')

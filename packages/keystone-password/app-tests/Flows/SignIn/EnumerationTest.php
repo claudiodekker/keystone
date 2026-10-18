@@ -22,7 +22,7 @@ it('answers an account without a password exactly like a wrong password', functi
     Sleep::assertSequence([Sleep::for(300)->milliseconds(), Sleep::for(300)->milliseconds()]);
 });
 
-it('answers an account whose stored secret is no hash exactly like a wrong password', function (?string $stored) {
+it('answers an account whose stored secret is not a hash exactly like a wrong password', function (?string $stored) {
     $ada = $this->createUser();
     $this->addVerifiedAddress($ada, 'ada@example.com');
     $support = (new PasswordSupport)->arrangeCredential(Surface::SIGN_IN, $ada);
