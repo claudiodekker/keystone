@@ -19,7 +19,7 @@ class InstallCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'keystone:install';
+    protected $signature = 'keystone:install {--force : Overwrite the Keystone files the app already has}';
 
     /**
      * The console command description.
@@ -42,8 +42,26 @@ class InstallCommand extends Command
             return self::FAILURE;
         }
 
+        $this->copy($stubs, $files);
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * Copy the stubs the app lacks, or every stub when forced.
+     */
+    protected function copy(Stubs $stubs, Filesystem $files): void
+    {
+        $skipped = [];
+
         foreach ($stubs->paths() as $path) {
             $target = $this->laravel->basePath($path);
+
+            if ($files->exists($target) && ! $this->option('force')) {
+                $skipped[] = $path;
+
+                continue;
+            }
 
             $files->ensureDirectoryExists(dirname($target));
             $files->copy($stubs->path($path), $target);
@@ -51,7 +69,10 @@ class InstallCommand extends Command
             $this->components->twoColumnDetail($path, 'created');
         }
 
-        return self::SUCCESS;
+        if ($skipped !== []) {
+            $this->components->warn('Skipped, because the app has them already (run with --force to overwrite):');
+            $this->components->bulletList($skipped);
+        }
     }
 
     /**
