@@ -22,6 +22,7 @@ use Illuminate\Contracts\Config\Repository;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Process;
 
 /**
  * Install Keystone's sign-in pages into the app as its own files, and wire the app up to run them and their AppTests.
@@ -79,7 +80,34 @@ class InstallCommand extends Command
             ->map(fn (Edit $edit) => $this->applyEdit($edit, $files))
             ->every(fn (bool $applied) => $applied);
 
-        return $everyEditApplied ? self::SUCCESS : self::FAILURE;
+        $everyCommandSucceeded = $this->runCommands();
+
+        return $everyEditApplied && $everyCommandSucceeded ? self::SUCCESS : self::FAILURE;
+    }
+
+    /**
+     * Run the commands that make the install take effect, and determine if every one succeeded.
+     */
+    protected function runCommands(): bool
+    {
+        $commands = ['composer dump-autoload', 'npm install', 'npm run build'];
+
+        foreach ($commands as $index => $command) {
+            $result = Process::path($this->laravel->basePath())
+                ->forever()
+                ->run($command, fn (string $type, string $output) => $this->output->write($output));
+
+            $this->components->twoColumnDetail($command, $result->successful() ? 'done' : 'failed');
+
+            if ($result->failed()) {
+                $this->components->error('Run these yourself once that is fixed:');
+                $this->components->bulletList(array_slice($commands, $index));
+
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

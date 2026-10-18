@@ -4,6 +4,7 @@ namespace ClaudioDekker\Keystone\InertiaVue\Tests;
 
 use Closure;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\View;
 use Inertia\ServiceProvider as InertiaServiceProvider;
@@ -24,7 +25,7 @@ trait InstallsIntoFreshApp
     protected ?Closure $loader = null;
 
     /**
-     * Copy the skeleton and point the app at it.
+     * Copy the skeleton, point the app at it, and keep the installer's commands from running for real.
      */
     protected function setUpInstallsIntoFreshApp(): void
     {
@@ -32,6 +33,7 @@ trait InstallsIntoFreshApp
         $this->app->setBasePath($this->fresh->path());
 
         config(['auth.providers.users.model' => 'App\\Models\\User']);
+        Process::fake();
     }
 
     /**

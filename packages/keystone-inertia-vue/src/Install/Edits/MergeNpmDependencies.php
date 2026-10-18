@@ -76,11 +76,22 @@ class MergeNpmDependencies extends Edit
         [$entries, $offset] = $match['entries'];
         $indent = $match['indent'][0];
 
+        $added = collect($packages)->map(fn (string $version, string $package) => $indent.$this->entry($package, $version));
         $lines = collect(explode(",\n", trim($entries, "\n")))
             ->keyBy(fn (string $line): string => (string) json_decode(explode(':', trim($line), 2)[0]))
-            ->merge(collect($packages)->map(fn (string $version, string $package) => $indent.json_encode($package).': '.json_encode($version)))
+            ->merge($added)
             ->sortKeys();
 
         return substr_replace($contents, "\n".$lines->implode(",\n"), $offset, strlen($entries));
+    }
+
+    /**
+     * Get the package's entry line, as npm writes it.
+     */
+    protected function entry(string $package, string $version): string
+    {
+        $flags = JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR;
+
+        return json_encode($package, $flags).': '.json_encode($version, $flags);
     }
 }

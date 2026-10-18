@@ -4,10 +4,9 @@ use ClaudioDekker\Keystone\InertiaVue\Tests\InstallsIntoFreshApp;
 
 uses(InstallsIntoFreshApp::class);
 
-function adapterDependencies(): array
-{
-    return json_decode(file_get_contents(dirname(__DIR__, 3).'/package.json'), true)['dependencies'];
-}
+beforeEach(function () {
+    $this->adapterPackages = json_decode(file_get_contents(dirname(__DIR__, 3).'/package.json'), true)['dependencies'];
+});
 
 it("adds the adapter's npm packages to devDependencies, TypeScript 6 among them, sorted with the skeleton's", function () {
     $this->artisan('keystone:install')->assertSuccessful();
@@ -16,9 +15,10 @@ it("adds the adapter's npm packages to devDependencies, TypeScript 6 among them,
 
     expect($devDependencies)->toHaveKey('typescript', '^6')
         ->toHaveKey('vite')
-        ->and(array_keys($devDependencies))->toBe(collect($devDependencies)->keys()->sort()->values()->all());
+        ->and(array_keys($devDependencies))->toBe(collect($devDependencies)->keys()->sort()->values()->all())
+        ->and($this->fresh->contents('package.json'))->toContain('"@inertiajs/vue3": ');
 
-    foreach (adapterDependencies() as $package => $version) {
+    foreach ($this->adapterPackages as $package => $version) {
         expect($devDependencies)->toHaveKey($package, $version);
     }
 });
@@ -34,7 +34,7 @@ it('keeps the version the app pins', function (string $section) {
     $packages = array_merge($manifest['dependencies'] ?? [], $manifest['devDependencies']);
 
     expect($packages)->toHaveKey('typescript', '^5.9')
-        ->toHaveKey('vue', adapterDependencies()['vue'])
+        ->toHaveKey('vue', $this->adapterPackages['vue'])
         ->and(array_intersect_key($manifest['dependencies'] ?? [], $manifest['devDependencies']))->toBe([]);
 })->with([
     'in dependencies' => ['dependencies'],
@@ -53,7 +53,7 @@ it('adds the packages and leaves every other line as the skeleton has it', funct
 
     expect($removed)->toHaveCount(1)
         ->and($added)->toContain($removed[0].',')
-        ->and($added)->toHaveCount(count(adapterDependencies()) + 1);
+        ->and($added)->toHaveCount(count($this->adapterPackages) + 1);
 });
 
 it('prints the packages when devDependencies is laid out differently, and fails', function () {
