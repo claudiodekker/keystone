@@ -28,7 +28,7 @@ it('gives the attempt back when the type throws', function () {
             return InitiateShape::FORM;
         }
 
-        public function isMultiFactorOnItsOwn(): bool
+        public function isMultiFactor(): bool
         {
             return false;
         }

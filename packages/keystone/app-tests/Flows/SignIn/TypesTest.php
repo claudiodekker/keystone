@@ -20,7 +20,7 @@ beforeEach(function () {
             return null;
         }
 
-        public function isMultiFactorOnItsOwn(): bool
+        public function isMultiFactor(): bool
         {
             return false;
         }

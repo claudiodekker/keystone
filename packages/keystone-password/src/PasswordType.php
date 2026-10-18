@@ -69,7 +69,7 @@ class PasswordType implements CredentialType
     /**
      * Determine if a proof proves two factors on its own, which a password never does.
      */
-    public function isMultiFactorOnItsOwn(): bool
+    public function isMultiFactor(): bool
     {
         return false;
     }

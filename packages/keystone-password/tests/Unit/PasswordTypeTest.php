@@ -19,8 +19,8 @@ it('serves sign-in, registration and enrollment with a form, and not the challen
         ->and($this->type->initiateShape(Surface::CHALLENGE))->toBeNull();
 });
 
-it('is not multi-factor on its own', function () {
-    expect($this->type->isMultiFactorOnItsOwn())->toBeFalse();
+it('is not multi-factor', function () {
+    expect($this->type->isMultiFactor())->toBeFalse();
 });
 
 it('costs an unknown account what a wrong password costs', function () {

@@ -22,7 +22,7 @@ interface CredentialType
     /**
      * Determine if one proof of the type proves two factors on its own.
      */
-    public function isMultiFactorOnItsOwn(): bool;
+    public function isMultiFactor(): bool;
 
     /**
      * Get the rules for the type's own fields on the surface; core passes on only the fields they name.
