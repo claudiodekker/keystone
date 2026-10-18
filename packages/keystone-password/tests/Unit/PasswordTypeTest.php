@@ -23,7 +23,7 @@ it('is not multi-factor', function () {
     expect($this->type->isMultiFactor())->toBeFalse();
 });
 
-it('costs an unknown account what a wrong password costs', function () {
+it('takes as long to refuse an unknown account as a wrong password', function () {
     config(['hashing.bcrypt.rounds' => 10]);
     Hash::forgetDrivers();
     $type = new PasswordType(config(), new DummyHash(config()));
