@@ -41,6 +41,7 @@
         }
     },
     "scripts": {
+        "post-install-cmd": "git config core.hooksPath .githooks",
         "check": [
             "@composer validate --strict",
             "pint --test",
