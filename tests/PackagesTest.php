@@ -12,13 +12,13 @@ it('requires every package but core in require-dev, at the version of the reposi
     expect(Monorepo::manifest()['require-dev'])->toMatchArray($required);
 });
 
-it('maps the AppTests of core and every method package in autoload-dev', function (string $package) {
+it("maps every package's AppTests in autoload-dev, under the package's own namespace", function (string $package) {
     $namespace = array_key_first(Monorepo::manifest($package)['autoload']['psr-4']);
 
     expect(Monorepo::manifest()['autoload-dev']['psr-4'])->toMatchArray([
         $namespace.'AppTests\\' => "packages/{$package}/app-tests/",
     ]);
-})->with(fn () => ['keystone', ...Monorepo::methodPackages()]);
+})->with(fn () => Monorepo::packages());
 
 it("maps every adapter's AppTests in autoload-dev, under Keystone's namespace and named after the adapter", function (string $adapter) {
     $name = Str::studly(Str::after($adapter, 'keystone-'));

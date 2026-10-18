@@ -8,5 +8,17 @@
         "inertiajs/inertia-laravel": "^3.5",
         "laravel/framework": "^13.0",
         "laravel/wayfinder": "^0.1.23"
+    },
+    "autoload": {
+        "psr-4": {
+            "ClaudioDekker\\Keystone\\InertiaVue\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "ClaudioDekker\\Keystone\\InertiaVue\\InertiaVueServiceProvider"
+            ]
+        }
     }
 }

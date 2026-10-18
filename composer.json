@@ -39,6 +39,7 @@
             "App\\": "packages/keystone-inertia-vue/stubs/app/",
             "ClaudioDekker\\Keystone\\AppTests\\": "packages/keystone/app-tests/",
             "ClaudioDekker\\Keystone\\InertiaVue\\AppTests\\": "packages/keystone-inertia-vue/app-tests/",
+            "ClaudioDekker\\Keystone\\InertiaVue\\Tests\\": "packages/keystone-inertia-vue/tests/",
             "ClaudioDekker\\Keystone\\Lint\\": "lint/",
             "ClaudioDekker\\Keystone\\Password\\AppTests\\": "packages/keystone-password/app-tests/",
             "ClaudioDekker\\Keystone\\Tests\\": [
