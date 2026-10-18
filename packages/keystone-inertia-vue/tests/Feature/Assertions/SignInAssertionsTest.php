@@ -39,3 +39,10 @@ it('fails assertSignInPage on a wrong page', function (string $component, array 
     'a page given the page value as one object' => ['auth/Login', ['page' => new SignInPage(types: [], status: null)], [], 'Property [status] does not exist.'],
     'a page showing another status' => ['auth/Login', ['status' => 'Signed out.', 'types' => []], ['status' => 'Too many attempts.'], 'Property [status] does not match the expected value.'],
 ]);
+
+it('fails assertSignInPage on a page that leaves the history unencrypted', function () {
+    $inertia = Inertia::render('auth/Login', ['status' => null, 'types' => []])->toResponse(Request::create('/login'));
+    $response = TestResponse::fromBaseResponse($inertia);
+
+    expect(fn () => $this->assertSignInPage($response))->toThrow(AssertionFailedError::class, 'encrypted');
+});
