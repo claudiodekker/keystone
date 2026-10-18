@@ -21,9 +21,11 @@ it('signs the user out, and the next request is a guest again', function () {
     ]);
 
     $response = $this->post(route('logout'));
-    $next = $this->get(route('login'));
 
     $this->assertSignedOut($response);
+
+    $next = $this->get(route('login'));
+
     $this->assertSignInPage($next, ['status' => __('keystone::messages.signed-out')]);
 });
 
@@ -104,8 +106,10 @@ it('refuses signing out over the change allowance', function () {
 
 it('signs out a guest the same way', function () {
     $response = $this->post(route('logout'));
-    $next = $this->get(route('login'));
 
     $this->assertSignedOut($response);
+
+    $next = $this->get(route('login'));
+
     $this->assertSignInPage($next, ['status' => __('keystone::messages.signed-out')]);
 });
