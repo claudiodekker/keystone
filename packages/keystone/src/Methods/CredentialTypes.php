@@ -34,6 +34,16 @@ readonly class CredentialTypes
     }
 
     /**
+     * Get the name of every registered type.
+     *
+     * @return list<string>
+     */
+    public function names(): array
+    {
+        return array_keys($this->types);
+    }
+
+    /**
      * Get the types that serve the surface.
      *
      * @return list<CredentialType>

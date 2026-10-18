@@ -3,6 +3,7 @@
 namespace ClaudioDekker\Keystone\InertiaVue\Console;
 
 use ClaudioDekker\Keystone\InertiaVue\Install\Stubs;
+use ClaudioDekker\Keystone\Keystone;
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Collection;
@@ -54,7 +55,7 @@ class InstallCommand extends Command
     {
         $skipped = [];
 
-        foreach ($stubs->paths() as $path) {
+        foreach ($stubs->for(Keystone::credentialTypes()->names()) as $path) {
             $target = $this->laravel->basePath($path);
 
             if ($files->exists($target) && ! $this->option('force')) {

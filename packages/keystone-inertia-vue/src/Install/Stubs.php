@@ -3,15 +3,30 @@
 namespace ClaudioDekker\Keystone\InertiaVue\Install;
 
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Symfony\Component\Finder\SplFileInfo;
 
 /**
- * The adapter's stubs, by their path in the app.
+ * The adapter's stubs, by their path in the app, with a credential type's partial only for the types in use.
  *
  * @internal
  */
 class Stubs
 {
+    /**
+     * The stubs for() leaves out.
+     *
+     * @var list<string>
+     */
+    protected const array SETUP = [
+        'app/Http/Middleware/HandleInertiaRequests.php',
+        'resources/js/app.ts',
+        'resources/views/app.blade.php',
+        'tsconfig.json',
+        'vite.config.ts',
+    ];
+
     /**
      * Create the listing of the stubs directory.
      */
@@ -21,16 +36,20 @@ class Stubs
     }
 
     /**
-     * Get the path of each stub in the app.
+     * Get the path in the app of each stub to copy, with a type partial only for the named credential types.
      *
-     * @return list<string>
+     * @param  list<string>  $types
+     * @return array<int, string>
      */
-    public function paths(): array
+    public function for(array $types): array
     {
-        return array_values(array_map(
-            fn (SplFileInfo $file) => $file->getRelativePathname(),
-            $this->files->allFiles($this->directory),
-        ));
+        $partials = collect($types)->map(fn (string $type) => Str::studly($type));
+
+        return $this->paths()
+            ->reject(fn (string $path) => in_array($path, static::SETUP, true))
+            ->filter(fn (string $path) => $this->isCopiedFor($path, $partials))
+            ->values()
+            ->all();
     }
 
     /**
@@ -39,5 +58,30 @@ class Stubs
     public function path(string $path): string
     {
         return $this->directory.'/'.$path;
+    }
+
+    /**
+     * Determine if the stub is copied for the given type partials.
+     *
+     * @param  Collection<int, string>  $partials
+     */
+    protected function isCopiedFor(string $path, Collection $partials): bool
+    {
+        if (preg_match('#^resources/js/partials/([^/]+)\.vue$#', $path, $match) !== 1) {
+            return true;
+        }
+
+        return $partials->contains($match[1]);
+    }
+
+    /**
+     * Get the path in the app of every stub.
+     *
+     * @return Collection<int, string>
+     */
+    protected function paths(): Collection
+    {
+        return collect($this->files->allFiles($this->directory))
+            ->map(fn (SplFileInfo $file) => $file->getRelativePathname());
     }
 }
