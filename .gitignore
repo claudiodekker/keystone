@@ -1,3 +1,8 @@
 /.phpunit.cache
 /composer.lock
 /vendor
+/node_modules
+/packages/*/node_modules
+/workbench/public/build
+/workbench/public/hot
+/workbench/resources/js
