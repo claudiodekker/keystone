@@ -10,7 +10,7 @@ A package that adds ways to prove identity. The method packages are `keystone-pa
 
 ## Frontend adapter
 
-A package that gives core its pages. The frontend adapters are `keystone-inertia-vue` and `keystone-blade`. An adapter installs controllers, pages, routes and translations into the app, and the app then owns them.
+A package that gives core its pages. The frontend adapters are `keystone-inertia-vue` and `keystone-blade`. An adapter installs controllers, pages, routes and assertion overrides into the app, and the app then owns them. Core's messages stay in its `keystone::` translations.
 
 ## Credential type
 
@@ -117,3 +117,7 @@ A trait of `assert*` methods, one per response hook, that AppTests check answers
 ## Test support
 
 What a credential type gives AppTests: arrange a credential, give a valid proof and give a rejected proof. Core's fake types in its `tests/` are their own test support. A method package's type names its test support with the `UseTestSupport` attribute, as a model names its factory.
+
+## Workbench
+
+The one Testbench app at the repository root that wires core, every installed method package and the inertia-vue stubs together, as `keystone:install` wires an app. `KEYSTONE_ADAPTER` names the adapter whose stub test case the AppTests then run on.
