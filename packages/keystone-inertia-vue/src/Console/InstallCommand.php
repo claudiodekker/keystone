@@ -5,10 +5,8 @@ namespace ClaudioDekker\Keystone\InertiaVue\Console;
 use ClaudioDekker\Keystone\InertiaVue\Install\AppTests;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edit;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\BindKeystoneTestCase;
-use ClaudioDekker\Keystone\InertiaVue\Install\Edits\ImplementKeystoneUser;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\MapAppTests;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\MergeNpmDependencies;
-use ClaudioDekker\Keystone\InertiaVue\Install\Edits\RegisterInertiaMiddleware;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\RegisterKeystoneTestsuite;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\RequireRouteFile;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\SetSessionCookie;
@@ -18,7 +16,6 @@ use ClaudioDekker\Keystone\Keystone;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Filesystem\Filesystem;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Process;
 
@@ -63,9 +60,9 @@ class InstallCommand extends Command
         }
 
         $this->copy($stubs, $files);
-        $this->replaceSkeletonFrontend($files);
+        $this->replaceSkeletonFiles($stubs, $files);
 
-        $everyEditApplied = collect($this->edits($manifest, $config, $files))
+        $everyEditApplied = collect($this->edits($config, $files))
             ->map(fn (Edit $edit) => $this->applyEdit($edit, $files))
             ->every(fn (bool $applied) => $applied);
 
@@ -115,27 +112,22 @@ class InstallCommand extends Command
     /**
      * Get the edits that wire the app up.
      *
-     * @param  array<string, mixed>  $manifest
      * @return list<Edit>
      */
-    protected function edits(array $manifest, Repository $config, Filesystem $files): array
+    protected function edits(Repository $config, Filesystem $files): array
     {
         $guard = $config->get('auth.defaults.guard');
-        $model = $this->userModel($config, $guard);
-        $modelFile = $model === null ? null : $this->classFile($manifest, $model);
         $appName = $config->get('app.name');
         $envs = $files->exists($this->laravel->basePath('.env')) ? ['.env.example', '.env'] : ['.env.example'];
 
         return [
             new RequireRouteFile,
-            new ImplementKeystoneUser($model, $modelFile),
             new UseKeystoneGuard($guard),
             ...array_map(fn (string $env) => new SetSessionCookie($env, $appName), $envs),
             new RegisterKeystoneTestsuite,
             new BindKeystoneTestCase,
             new MapAppTests($this->appTests($files)),
             new MergeNpmDependencies($this->npmPackages($files)),
-            new RegisterInertiaMiddleware,
         ];
     }
 
@@ -168,48 +160,6 @@ class InstallCommand extends Command
         ksort($namespaces);
 
         return $namespaces;
-    }
-
-    /**
-     * Get the user model of the guard's provider, or null when there is none.
-     */
-    protected function userModel(Repository $config, ?string $guard): ?string
-    {
-        if ($guard === null) {
-            return null;
-        }
-
-        $provider = $config->get("auth.guards.{$guard}.provider");
-
-        if ($provider === null) {
-            return null;
-        }
-
-        return $config->get("auth.providers.{$provider}.model");
-    }
-
-    /**
-     * Get the file of a class through the PSR-4 roots of the app's composer.json, or null when none holds it.
-     *
-     * @param  array<string, mixed>  $manifest
-     */
-    protected function classFile(array $manifest, string $class): ?string
-    {
-        /** @var array<string, string|list<string>> $roots */
-        $roots = $manifest['autoload']['psr-4'] ?? [];
-
-        uksort($roots, fn (string $a, string $b) => strlen($b) <=> strlen($a));
-
-        foreach ($roots as $namespace => $directory) {
-            if (str_starts_with($class, $namespace)) {
-                $root = rtrim(Arr::wrap($directory)[0], '/');
-                $relative = str_replace('\\', '/', substr($class, strlen($namespace)));
-
-                return "{$root}/{$relative}.php";
-            }
-        }
-
-        return null;
     }
 
     /**
@@ -284,10 +234,23 @@ class InstallCommand extends Command
     }
 
     /**
-     * Delete the skeleton's Vite config and script, which the stubs replace, and stop the welcome page loading the script.
+     * Replace the skeleton's files that Keystone needs changed, and delete the frontend files the stubs replace.
      */
-    protected function replaceSkeletonFrontend(Filesystem $files): void
+    protected function replaceSkeletonFiles(Stubs $stubs, Filesystem $files): void
     {
+        foreach ($stubs->replacements() as $path => $name) {
+            $target = $this->laravel->basePath($path);
+
+            if ($files->exists($target) && str_contains($files->get($target), $name)) {
+                continue;
+            }
+
+            $files->ensureDirectoryExists(dirname($target));
+            $files->copy($stubs->path($path), $target);
+
+            $this->components->twoColumnDetail($path, 'replaced');
+        }
+
         foreach (['vite.config.js', 'resources/js/app.js'] as $path) {
             if ($files->delete($this->laravel->basePath($path))) {
                 $this->components->twoColumnDetail($path, 'deleted');

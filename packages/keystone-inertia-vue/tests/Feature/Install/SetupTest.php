@@ -36,29 +36,33 @@ it('replaces a Vite config and script the app changed', function () {
 });
 
 describe('bootstrap/app.php', function () {
-    it('appends HandleInertiaRequests to the web middleware, with its import', function () {
+    it('is replaced with one that appends HandleInertiaRequests to the web middleware', function () {
         $this->artisan('keystone:install')->assertSuccessful();
 
         expect($this->fresh->contents('bootstrap/app.php'))
-            ->toContain("\nuse App\\Http\\Middleware\\HandleInertiaRequests;\nuse Illuminate\\Foundation\\Application;\n")
-            ->toContain(implode("\n", [
-                '    ->withMiddleware(function (Middleware $middleware): void {',
-                '        $middleware->web(append: [',
-                '            HandleInertiaRequests::class,',
-                '        ]);',
-                '    })',
-            ]));
+            ->toBe(file_get_contents(app(Stubs::class)->path('bootstrap/app.php')))
+            ->toContain('HandleInertiaRequests::class');
     });
 
-    it('prints the registration when the middleware closure is not the skeleton\'s, and fails', function () {
-        $before = str_replace('        //', "        \$middleware->trustProxies(at: '*');", $this->fresh->contents('bootstrap/app.php'));
-        $this->fresh->put('bootstrap/app.php', $before);
+    it('is replaced when the app changed it', function () {
+        $changed = str_replace('        //', "        \$middleware->trustProxies(at: '*');", $this->fresh->contents('bootstrap/app.php'));
+        $this->fresh->put('bootstrap/app.php', $changed);
+
+        $this->artisan('keystone:install')->assertSuccessful();
+
+        expect($this->fresh->contents('bootstrap/app.php'))->toBe(file_get_contents(app(Stubs::class)->path('bootstrap/app.php')));
+    });
+
+    it('is kept once it registers HandleInertiaRequests', function () {
+        $this->artisan('keystone:install')->assertSuccessful();
+        $changed = str_replace('->create();', '->withSchedule(fn () => null)->create();', $this->fresh->contents('bootstrap/app.php'));
+        $this->fresh->put('bootstrap/app.php', $changed);
 
         $this->artisan('keystone:install')
-            ->expectsOutputToContain('$middleware->web(append: [HandleInertiaRequests::class]);')
-            ->assertFailed();
+            ->doesntExpectOutputToContain('bootstrap/app.php')
+            ->assertSuccessful();
 
-        expect($this->fresh->contents('bootstrap/app.php'))->toBe($before);
+        expect($this->fresh->contents('bootstrap/app.php'))->toBe($changed);
     });
 });
 

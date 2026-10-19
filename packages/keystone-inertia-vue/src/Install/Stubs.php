@@ -15,6 +15,16 @@ use Symfony\Component\Finder\SplFileInfo;
 class Stubs
 {
     /**
+     * The stubs that replace the app's file until it names what the stub adds, by that name.
+     *
+     * @var array<string, string>
+     */
+    protected const array REPLACEMENTS = [
+        'app/Models/User.php' => 'KeystoneUser',
+        'bootstrap/app.php' => 'HandleInertiaRequests',
+    ];
+
+    /**
      * Create the listing of the stubs directory.
      */
     public function __construct(protected string $directory = __DIR__.'/../../stubs', protected Filesystem $files = new Filesystem)
@@ -33,9 +43,20 @@ class Stubs
         $partials = collect($types)->map(fn (string $type) => Str::studly($type));
 
         return $this->paths()
+            ->reject(fn (string $path) => array_key_exists($path, static::REPLACEMENTS))
             ->filter(fn (string $path) => $this->isCopiedFor($path, $partials))
             ->values()
             ->all();
+    }
+
+    /**
+     * Get the stubs that replace the app's file until it names what the stub adds, by that name.
+     *
+     * @return array<string, string>
+     */
+    public function replacements(): array
+    {
+        return static::REPLACEMENTS;
     }
 
     /**
