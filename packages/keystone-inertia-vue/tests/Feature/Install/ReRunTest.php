@@ -59,25 +59,3 @@ it('maps the AppTests of a Keystone package installed since', function () {
     expect(json_decode($this->fresh->contents('composer.json'), true)['autoload-dev']['psr-4'])
         ->toHaveKey('ClaudioDekker\\Keystone\\Password\\AppTests\\', 'vendor/claudiodekker/keystone-password/app-tests/');
 });
-
-it("treats an entry the developer edited since as the app's own setup, and still adds the partials of methods installed since", function () {
-    $this->app->instance(Stubs::class, new Stubs(dirname(__DIR__, 2).'/Fixtures/stubs'));
-    $this->artisan('keystone:install')->assertSuccessful();
-    $this->fresh->put('resources/js/app.ts', $this->fresh->contents('resources/js/app.ts')."import './bootstrap'\n");
-    $edited = $this->fresh->contents('resources/js/app.ts');
-
-    Keystone::credentialType(new class extends FakePinType
-    {
-        public function name(): string
-        {
-            return 'totp';
-        }
-    });
-
-    $this->artisan('keystone:install')
-        ->expectsOutputToContain(app(Stubs::class)->path('resources/js/app.ts'))
-        ->assertSuccessful();
-
-    expect($this->fresh->contents('resources/js/app.ts'))->toBe($edited)
-        ->and($this->fresh->has('resources/js/partials/Totp.vue'))->toBeTrue();
-});

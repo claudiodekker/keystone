@@ -15,19 +15,6 @@ use Symfony\Component\Finder\SplFileInfo;
 class Stubs
 {
     /**
-     * The stubs that set up Inertia and Vue, which are not copied with the rest.
-     *
-     * @var list<string>
-     */
-    protected const array INERTIA_SETUP = [
-        'app/Http/Middleware/HandleInertiaRequests.php',
-        'resources/js/app.ts',
-        'resources/views/app.blade.php',
-        'tsconfig.json',
-        'vite.config.ts',
-    ];
-
-    /**
      * Create the listing of the stubs directory.
      */
     public function __construct(protected string $directory = __DIR__.'/../../stubs', protected Filesystem $files = new Filesystem)
@@ -39,32 +26,16 @@ class Stubs
      * Get the path in the app of each stub to copy, with a type partial only for the named credential types.
      *
      * @param  list<string>  $types
-     * @return list<string>
+     * @return array<int, string>
      */
     public function for(array $types): array
     {
         $partials = collect($types)->map(fn (string $type) => Str::studly($type));
 
-        return array_values(
-            $this->paths()
-                ->reject(fn (string $path) => in_array($path, static::INERTIA_SETUP, true))
-                ->filter(fn (string $path) => $this->isCopiedFor($path, $partials))
-                ->all(),
-        );
-    }
-
-    /**
-     * Get the path in the app of each stub that sets up Inertia and Vue.
-     *
-     * @return list<string>
-     */
-    public function setup(): array
-    {
-        return array_values(
-            $this->paths()
-                ->filter(fn (string $path) => in_array($path, static::INERTIA_SETUP, true))
-                ->all(),
-        );
+        return $this->paths()
+            ->filter(fn (string $path) => $this->isCopiedFor($path, $partials))
+            ->values()
+            ->all();
     }
 
     /**

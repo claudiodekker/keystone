@@ -78,7 +78,7 @@ class MapAppTests extends Edit
      */
     protected function insert(string $contents, array $mappings): ?string
     {
-        $pattern = '/"autoload-dev": \{\s*"psr-4": \{'.static::OBJECT_ENTRIES.'/';
+        $pattern = '/"autoload-dev": \{\s*"psr-4": \{(?<entries>(?:\n(?<indent>[ \t]+)"[^"\n]+": "[^"\n]*",?)+)\n/';
 
         if (preg_match($pattern, $contents, $match, PREG_OFFSET_CAPTURE) !== 1) {
             return null;
@@ -88,9 +88,9 @@ class MapAppTests extends Edit
         $indent = $match['indent'][0];
 
         $added = collect($mappings)
-            ->map(fn (string $path, string $namespace) => $indent.$this->entry($namespace, $path))
-            ->implode(",\n");
+            ->map(fn (string $path, string $namespace) => "\n{$indent}".json_encode($namespace, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR).': '.json_encode($path, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR))
+            ->implode(',');
 
-        return substr_replace($contents, $entries.",\n".$added, $offset, strlen($entries));
+        return substr_replace($contents, $entries.','.$added, $offset, strlen($entries));
     }
 }

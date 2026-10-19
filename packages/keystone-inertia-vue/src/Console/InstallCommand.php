@@ -10,11 +10,9 @@ use ClaudioDekker\Keystone\InertiaVue\Install\Edits\MapAppTests;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\MergeNpmDependencies;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\RegisterInertiaMiddleware;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\RegisterKeystoneTestsuite;
-use ClaudioDekker\Keystone\InertiaVue\Install\Edits\RemoveAppJsFromWelcome;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\RequireRouteFile;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\SetSessionCookie;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\UseKeystoneGuard;
-use ClaudioDekker\Keystone\InertiaVue\Install\Frontend;
 use ClaudioDekker\Keystone\InertiaVue\Install\Stubs;
 use ClaudioDekker\Keystone\Keystone;
 use Illuminate\Console\Command;
@@ -64,30 +62,16 @@ class InstallCommand extends Command
             return $this->refuse($refusals);
         }
 
-        $this->copy($stubs->for(Keystone::credentialTypes()->names()), $stubs, $files);
+        $this->copy($stubs, $files);
+        $this->replaceSkeletonFrontend($files);
 
-        $frontend = new Frontend($this->laravel->basePath(), $stubs, $files);
-        $edits = $this->edits($manifest, $config, $files);
-        $entriesMoved = true;
-
-        if ($frontend->hasOwnSetup()) {
-            $this->printOwnSetup($stubs);
-        } else {
-            $entriesMoved = $this->setUpInertia($stubs, $files);
-            $edits = [...$edits, ...$this->setupEdits($frontend)];
-        }
-
-        $everyEditApplied = collect($edits)
+        $everyEditApplied = collect($this->edits($manifest, $config, $files))
             ->map(fn (Edit $edit) => $this->applyEdit($edit, $files))
             ->every(fn (bool $applied) => $applied);
 
         $everyCommandSucceeded = $this->runCommands();
 
-        $installed = $entriesMoved
-            && $everyEditApplied
-            && $everyCommandSucceeded;
-
-        return $installed ? self::SUCCESS : self::FAILURE;
+        return $everyEditApplied && $everyCommandSucceeded ? self::SUCCESS : self::FAILURE;
     }
 
     /**
@@ -151,6 +135,7 @@ class InstallCommand extends Command
             new BindKeystoneTestCase,
             new MapAppTests($this->appTests($files)),
             new MergeNpmDependencies($this->npmPackages($files)),
+            new RegisterInertiaMiddleware,
         ];
     }
 
@@ -162,22 +147,6 @@ class InstallCommand extends Command
     protected function npmPackages(Filesystem $files): array
     {
         return $files->json(dirname(__DIR__, 2).'/package.json')['dependencies'];
-    }
-
-    /**
-     * Get the edits that wire the setup stubs into the app.
-     *
-     * @return list<Edit>
-     */
-    protected function setupEdits(Frontend $frontend): array
-    {
-        $edits = [new RegisterInertiaMiddleware];
-
-        if ($frontend->hasWelcomeView()) {
-            $edits[] = new RemoveAppJsFromWelcome;
-        }
-
-        return $edits;
     }
 
     /**
@@ -287,66 +256,13 @@ class InstallCommand extends Command
     }
 
     /**
-     * Set Inertia and Vue up from the setup stubs, keeping the skeleton's Vite entry files as .bak.
-     *
-     * @return bool Whether every Vite entry file is out of the way.
+     * Copy the stubs the app lacks, or every stub when forced.
      */
-    protected function setUpInertia(Stubs $stubs, Filesystem $files): bool
-    {
-        $everyEntryMoved = collect(Frontend::VITE_ENTRIES)
-            ->map(fn (string $path) => $this->moveAside($path, $files))
-            ->every(fn (bool $moved) => $moved);
-
-        $this->copy($stubs->setup(), $stubs, $files);
-
-        return $everyEntryMoved;
-    }
-
-    /**
-     * Move the file aside to .bak, and determine if it is out of the way.
-     */
-    protected function moveAside(string $path, Filesystem $files): bool
-    {
-        $source = $this->laravel->basePath($path);
-
-        if (! $files->exists($source)) {
-            return true;
-        }
-
-        if ($files->exists($source.'.bak')) {
-            $this->components->twoColumnDetail($path, 'drifted');
-            $this->newLine();
-            $this->line("Remove {$path} by hand, because {$path}.bak keeps the skeleton's copy and the setup replaces this file.");
-            $this->newLine();
-
-            return false;
-        }
-
-        $files->move($source, $source.'.bak');
-        $this->components->twoColumnDetail($path, "moved to {$path}.bak");
-
-        return true;
-    }
-
-    /**
-     * Print the setup stubs for the app to follow by hand.
-     */
-    protected function printOwnSetup(Stubs $stubs): void
-    {
-        $this->components->warn('The app has its own frontend setup, which Keystone keeps. Set Inertia and Vue up in it the way these files do:');
-        $this->components->bulletList(array_map($stubs->path(...), $stubs->setup()));
-    }
-
-    /**
-     * Copy the given stubs into the app.
-     *
-     * @param  list<string>  $paths
-     */
-    protected function copy(array $paths, Stubs $stubs, Filesystem $files): void
+    protected function copy(Stubs $stubs, Filesystem $files): void
     {
         $skipped = [];
 
-        foreach ($paths as $path) {
+        foreach ($stubs->for(Keystone::credentialTypes()->names()) as $path) {
             $target = $this->laravel->basePath($path);
 
             if ($files->exists($target) && ! $this->option('force')) {
@@ -364,6 +280,24 @@ class InstallCommand extends Command
         if ($skipped !== []) {
             $this->components->warn('Skipped, because the app has them already (run with --force to overwrite):');
             $this->components->bulletList($skipped);
+        }
+    }
+
+    /**
+     * Delete the skeleton's Vite config and script, which the stubs replace, and stop the welcome page loading the script.
+     */
+    protected function replaceSkeletonFrontend(Filesystem $files): void
+    {
+        foreach (['vite.config.js', 'resources/js/app.js'] as $path) {
+            if ($files->delete($this->laravel->basePath($path))) {
+                $this->components->twoColumnDetail($path, 'deleted');
+            }
+        }
+
+        $welcome = $this->laravel->basePath('resources/views/welcome.blade.php');
+
+        if ($files->exists($welcome)) {
+            $files->replaceInFile("'resources/css/app.css', 'resources/js/app.js'", "'resources/css/app.css'", $welcome);
         }
     }
 

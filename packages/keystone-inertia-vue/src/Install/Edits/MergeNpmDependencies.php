@@ -5,7 +5,7 @@ namespace ClaudioDekker\Keystone\InertiaVue\Install\Edits;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edit;
 
 /**
- * Add the given npm packages to the app's devDependencies, keeping any version the app pins.
+ * Add the given npm packages to the app's devDependencies, at the given versions.
  *
  * @internal
  */
@@ -30,7 +30,7 @@ class MergeNpmDependencies extends Edit
     }
 
     /**
-     * Get the file's contents with every package the app lacks added.
+     * Get the file's contents with every package set in devDependencies, sorted by name.
      */
     public function apply(string $contents): ?string
     {
@@ -40,14 +40,11 @@ class MergeNpmDependencies extends Edit
             return null;
         }
 
-        $pinned = ($manifest['dependencies'] ?? []) + ($manifest['devDependencies'] ?? []);
-        $missing = array_diff_key($this->packages, $pinned);
+        $manifest['devDependencies'] = $this->packages + ($manifest['devDependencies'] ?? []);
 
-        if ($missing === []) {
-            return $contents;
-        }
+        ksort($manifest['devDependencies']);
 
-        return $this->insert($contents, $missing, array_keys($manifest['devDependencies'] ?? []));
+        return json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR).PHP_EOL;
     }
 
     /**
@@ -57,52 +54,6 @@ class MergeNpmDependencies extends Edit
     {
         $packages = json_encode($this->packages, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
 
-        return "Add these packages to devDependencies in package.json, keeping any version you pin:\n\n".$packages;
-    }
-
-    /**
-     * Get the contents with each package added before the first devDependency that sorts after it, or last.
-     *
-     * @param  array<string, string>  $packages
-     * @param  list<int|string>  $existing  The app's devDependencies, in the order the file has them.
-     */
-    protected function insert(string $contents, array $packages, array $existing): ?string
-    {
-        $pattern = '/"devDependencies": \{'.static::OBJECT_ENTRIES.'/';
-
-        if (preg_match($pattern, $contents, $match, PREG_OFFSET_CAPTURE) !== 1) {
-            return null;
-        }
-
-        [$entries, $offset] = $match['entries'];
-        $indent = $match['indent'][0];
-
-        ksort($packages, SORT_STRING);
-
-        $lines = explode(",\n", ltrim($entries, "\n"));
-
-        if (count($lines) !== count($existing)) {
-            return null;
-        }
-
-        $lines = array_combine($existing, $lines);
-        $merged = [];
-
-        foreach ($lines as $key => $line) {
-            foreach ($packages as $package => $version) {
-                if ($package < $key) {
-                    $merged[] = $indent.$this->entry($package, $version);
-                    unset($packages[$package]);
-                }
-            }
-
-            $merged[] = $line;
-        }
-
-        foreach ($packages as $package => $version) {
-            $merged[] = $indent.$this->entry($package, $version);
-        }
-
-        return substr_replace($contents, "\n".implode(",\n", $merged), $offset, strlen($entries));
+        return "Add these packages to devDependencies in package.json:\n\n".$packages;
     }
 }

@@ -12,11 +12,6 @@ namespace ClaudioDekker\Keystone\InertiaVue\Install;
 abstract class Edit
 {
     /**
-     * The entry lines of a JSON object laid out one per line, with the indent they share.
-     */
-    protected const string OBJECT_ENTRIES = '(?<entries>(?:\n(?<indent>[ \t]+)"[^"\n]+": "[^"\n]*",?)+)\n';
-
-    /**
      * Get the file the edit changes, relative to the app's base path, or null when it can't be found.
      */
     abstract public function path(): ?string;
@@ -57,15 +52,5 @@ abstract class Edit
         }
 
         return substr_replace($contents, "\n".$import, $end, 0);
-    }
-
-    /**
-     * Get the entry line of a key and its string value, as npm and Composer write it.
-     */
-    protected function entry(string $key, string $value): string
-    {
-        $flags = JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR;
-
-        return json_encode($key, $flags).': '.json_encode($value, $flags);
     }
 }
