@@ -3,12 +3,12 @@
 namespace ClaudioDekker\Keystone\InertiaVue\Tests;
 
 /**
- * Point the app at a fresh copy of the Laravel skeleton for keystone:install to install into.
+ * Point the app at a fresh copy of the Laravel skeleton.
  */
 trait InstallsIntoFreshApp
 {
     /**
-     * The skeleton copy the installer installs into.
+     * The skeleton copy the app points at.
      */
     protected FreshApp $fresh;
 
@@ -19,6 +19,8 @@ trait InstallsIntoFreshApp
     {
         $this->fresh = FreshApp::copy();
         $this->app->setBasePath($this->fresh->path());
+
+        config(['auth.providers.users.model' => 'App\\Models\\User']);
     }
 
     /**

@@ -2,14 +2,27 @@
 
 namespace ClaudioDekker\Keystone\InertiaVue\Console;
 
+use ClaudioDekker\Keystone\InertiaVue\Install\AppTests;
+use ClaudioDekker\Keystone\InertiaVue\Install\Edit;
+use ClaudioDekker\Keystone\InertiaVue\Install\Edits\BindKeystoneTestCase;
+use ClaudioDekker\Keystone\InertiaVue\Install\Edits\ImplementKeystoneUser;
+use ClaudioDekker\Keystone\InertiaVue\Install\Edits\MapAppTests;
+use ClaudioDekker\Keystone\InertiaVue\Install\Edits\RegisterKeystoneTestsuite;
+use ClaudioDekker\Keystone\InertiaVue\Install\Edits\RequireRouteFile;
+use ClaudioDekker\Keystone\InertiaVue\Install\Edits\SetSessionCookie;
+use ClaudioDekker\Keystone\InertiaVue\Install\Edits\UseKeystoneGuard;
 use ClaudioDekker\Keystone\InertiaVue\Install\Stubs;
 use ClaudioDekker\Keystone\Keystone;
 use Illuminate\Console\Command;
+use Illuminate\Contracts\Config\Repository;
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 
 /**
- * Install Keystone's sign-in pages into the app as its own files.
+ * Install Keystone's sign-in pages into the app as its own files, and wire the app up to run them and their AppTests.
+ *
+ * Every step converges, so a second run changes nothing and a run that stopped part way is finished by running again.
  *
  * @internal
  */
@@ -32,20 +45,171 @@ class InstallCommand extends Command
     /**
      * Install, after refusing an app that can't take Keystone before anything changes.
      */
-    public function handle(Stubs $stubs, Filesystem $files): int
+    public function handle(Stubs $stubs, Filesystem $files, Repository $config): int
     {
-        $refusals = $this->refusals($files->json($this->laravel->basePath('composer.json')), $files);
+        $manifest = json_decode($files->get($this->laravel->basePath('composer.json')), true);
+
+        if (! is_array($manifest)) {
+            return $this->refuse(['Fix composer.json first, because it is not valid JSON.']);
+        }
+
+        $refusals = $this->refusals($manifest, $files);
 
         if ($refusals !== []) {
-            $this->components->error('Keystone was not installed, and nothing in the app changed.');
-            $this->components->bulletList($refusals);
-
-            return self::FAILURE;
+            return $this->refuse($refusals);
         }
 
         $this->copy($stubs, $files);
 
-        return self::SUCCESS;
+        $everyEditApplied = collect($this->edits($manifest, $config, $files))
+            ->map(fn (Edit $edit) => $this->applyEdit($edit, $files))
+            ->every(fn (bool $applied) => $applied);
+
+        return $everyEditApplied ? self::SUCCESS : self::FAILURE;
+    }
+
+    /**
+     * Print why Keystone was not installed, and fail.
+     *
+     * @param  list<string>  $reasons
+     */
+    protected function refuse(array $reasons): int
+    {
+        $this->components->error('Keystone was not installed, and nothing in the app changed.');
+        $this->components->bulletList($reasons);
+
+        return self::FAILURE;
+    }
+
+    /**
+     * Get the edits that wire the app up.
+     *
+     * @param  array<string, mixed>  $manifest
+     * @return list<Edit>
+     */
+    protected function edits(array $manifest, Repository $config, Filesystem $files): array
+    {
+        $guard = $config->get('auth.defaults.guard');
+        $model = $this->userModel($config, $guard);
+        $modelFile = $model === null ? null : $this->classFile($manifest, $model);
+        $appName = $config->get('app.name');
+        $envs = $files->exists($this->laravel->basePath('.env')) ? ['.env.example', '.env'] : ['.env.example'];
+
+        return [
+            new RequireRouteFile,
+            new ImplementKeystoneUser($model, $modelFile),
+            new UseKeystoneGuard($guard),
+            ...array_map(fn (string $env) => new SetSessionCookie($env, $appName), $envs),
+            new RegisterKeystoneTestsuite,
+            new BindKeystoneTestCase,
+            new MapAppTests($this->appTests($files)),
+        ];
+    }
+
+    /**
+     * Get the AppTests path of every Keystone package in the app's vendor, by namespace.
+     *
+     * @return array<string, string>
+     */
+    protected function appTests(Filesystem $files): array
+    {
+        $namespaces = [];
+
+        foreach ($files->glob($this->laravel->basePath(AppTests::GLOB), GLOB_ONLYDIR) as $directory) {
+            $package = dirname($directory);
+            $namespace = array_key_first($files->json($package.'/composer.json')['autoload']['psr-4']);
+
+            $namespaces[$namespace.'AppTests\\'] = 'vendor/claudiodekker/'.basename($package).'/app-tests/';
+        }
+
+        ksort($namespaces);
+
+        return $namespaces;
+    }
+
+    /**
+     * Get the user model of the guard's provider, or null when there is none.
+     */
+    protected function userModel(Repository $config, ?string $guard): ?string
+    {
+        if ($guard === null) {
+            return null;
+        }
+
+        $provider = $config->get("auth.guards.{$guard}.provider");
+
+        if ($provider === null) {
+            return null;
+        }
+
+        return $config->get("auth.providers.{$provider}.model");
+    }
+
+    /**
+     * Get the file of a class through the PSR-4 roots of the app's composer.json, or null when none holds it.
+     *
+     * @param  array<string, mixed>  $manifest
+     */
+    protected function classFile(array $manifest, string $class): ?string
+    {
+        /** @var array<string, string|list<string>> $roots */
+        $roots = $manifest['autoload']['psr-4'] ?? [];
+
+        uksort($roots, fn (string $a, string $b) => strlen($b) <=> strlen($a));
+
+        foreach ($roots as $namespace => $directory) {
+            if (str_starts_with($class, $namespace)) {
+                $root = rtrim(Arr::wrap($directory)[0], '/');
+                $relative = str_replace('\\', '/', substr($class, strlen($namespace)));
+
+                return "{$root}/{$relative}.php";
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Apply the edit and determine if the app has it now.
+     */
+    protected function applyEdit(Edit $edit, Filesystem $files): bool
+    {
+        $relative = $edit->path();
+        $path = $relative === null ? null : $this->laravel->basePath($relative);
+
+        if ($path === null || ! $files->exists($path)) {
+            $this->printNotApplied($edit, 'missing');
+
+            return false;
+        }
+
+        $contents = $files->get($path);
+        $edited = $edit->apply($contents);
+
+        if ($edited === null) {
+            $this->printNotApplied($edit, 'drifted');
+
+            return false;
+        }
+
+        if ($edited !== $contents) {
+            $files->put($path, $edited);
+        }
+
+        $this->components->twoColumnDetail($relative, $edited === $contents ? 'unchanged' : 'edited');
+
+        return true;
+    }
+
+    /**
+     * Print why the edit is not in the app, with the change to make by hand.
+     */
+    protected function printNotApplied(Edit $edit, string $reason): void
+    {
+        $this->components->twoColumnDetail($edit->path() ?? 'unknown file', $reason);
+        $this->newLine();
+        $this->line($edit->instructions());
+        $this->newLine();
     }
 
     /**

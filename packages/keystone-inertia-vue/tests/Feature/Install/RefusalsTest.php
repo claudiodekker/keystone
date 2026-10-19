@@ -53,3 +53,14 @@ it('accepts Pest that only another package pulls in', function () {
 
     $this->artisan('keystone:install')->assertSuccessful();
 });
+
+it('refuses while composer.json is not valid JSON, changing nothing', function () {
+    $this->fresh->put('composer.json', "{\n");
+    $before = $this->fresh->fingerprint();
+
+    $this->artisan('keystone:install')
+        ->expectsOutputToContain('composer.json')
+        ->assertFailed();
+
+    expect($this->fresh->fingerprint())->toBe($before);
+});
