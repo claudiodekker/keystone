@@ -66,7 +66,5 @@ trait InstallsIntoFreshApp
         Auth::forgetGuards();
         View::prependLocation($this->fresh->path('resources/views'));
         Route::middleware('web')->group($this->fresh->path('routes/web.php'));
-
-        $this->withoutVite();
     }
 }
