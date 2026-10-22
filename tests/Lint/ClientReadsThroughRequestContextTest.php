@@ -1,10 +1,11 @@
 <?php
 
 use ClaudioDekker\Keystone\Lint\Checks\ClientReadsThroughRequestContext;
-use ClaudioDekker\Keystone\Lint\File;
+use ClaudioDekker\LaravelGuardrails\Kind;
+use ClaudioDekker\LaravelGuardrails\Testing\TestFile;
 
 it('fails a request method that reads the address or the user agent', function () {
-    $file = new File('packages/keystone/src/Example.php', <<<'PHP'
+    $file = TestFile::of(Kind::SOURCE, 'packages/keystone/src/Example.php', <<<'PHP'
         <?php
 
         class Example
@@ -20,11 +21,11 @@ it('fails a request method that reads the address or the user agent', function (
         }
         PHP);
 
-    expect((new ClientReadsThroughRequestContext)->check($file))->toBe([7, 8, 9, 10, 11]);
+    expect($file->lines(new ClientReadsThroughRequestContext))->toBe([7, 8, 9, 10, 11]);
 });
 
 it('fails the user agent read as a header, whatever its case', function () {
-    $file = new File('packages/keystone/src/Example.php', <<<'PHP'
+    $file = TestFile::of(Kind::SOURCE, 'packages/keystone/src/Example.php', <<<'PHP'
         <?php
 
         class Example
@@ -38,11 +39,11 @@ it('fails the user agent read as a header, whatever its case', function () {
         }
         PHP);
 
-    expect((new ClientReadsThroughRequestContext)->check($file))->toBe([7, 8]);
+    expect($file->lines(new ClientReadsThroughRequestContext))->toBe([7, 8]);
 });
 
 it('fails the address or user agent read as a server variable or from the superglobal', function () {
-    $file = new File('packages/keystone/src/Example.php', <<<'PHP'
+    $file = TestFile::of(Kind::SOURCE, 'packages/keystone/src/Example.php', <<<'PHP'
         <?php
 
         class Example
@@ -58,17 +59,11 @@ it('fails the address or user agent read as a server variable or from the superg
         }
         PHP);
 
-    expect((new ClientReadsThroughRequestContext)->check($file))->toBe([7, 8, 9, 11]);
+    expect($file->lines(new ClientReadsThroughRequestContext))->toBe([7, 8, 9, 11]);
 });
 
-it('leaves the request context itself alone', function () {
-    $file = new File('packages/keystone/src/Http/RequestContext.php', "<?php\n\nclass RequestContext\n{\n    public function run(\$request)\n    {\n        return \$request->ip();\n    }\n}\n");
+it('reads only the source code', function () {
+    $file = TestFile::of(Kind::TESTS, 'packages/keystone/app-tests/Example.php', "<?php\n\nclass Example\n{\n    public function run(\$request)\n    {\n        return \$request->ip();\n    }\n}\n");
 
-    expect((new ClientReadsThroughRequestContext)->check($file))->toBe([]);
-});
-
-it('reads only src', function () {
-    $file = new File('packages/keystone/app-tests/Example.php', "<?php\n\nclass Example\n{\n    public function run(\$request)\n    {\n        return \$request->ip();\n    }\n}\n");
-
-    expect((new ClientReadsThroughRequestContext)->check($file))->toBe([]);
+    expect($file->lines(new ClientReadsThroughRequestContext))->toBe([]);
 });

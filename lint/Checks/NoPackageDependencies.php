@@ -2,10 +2,12 @@
 
 namespace ClaudioDekker\Keystone\Lint\Checks;
 
-use ClaudioDekker\Keystone\Lint\Check;
-use ClaudioDekker\Keystone\Lint\File;
-use Illuminate\Filesystem\Filesystem;
+use ClaudioDekker\LaravelGuardrails\Check;
+use ClaudioDekker\LaravelGuardrails\File;
+use ClaudioDekker\LaravelGuardrails\Kind;
+use ClaudioDekker\LaravelGuardrails\Violation;
 use PhpParser\Node;
+use PhpParser\Node\Name;
 
 /**
  * Refuse core that depends on a method or adapter package.
@@ -13,27 +15,29 @@ use PhpParser\Node;
 class NoPackageDependencies extends Check
 {
     /**
-     * The paths the check reads, as fnmatch patterns from the repository root.
-     *
-     * @var list<string>
+     * Get the one-line description of the rule, shown when the checks are chosen.
      */
-    protected array $paths = ['packages/keystone/src/*.php'];
-
-    /**
-     * The namespaces of the packages core must not use.
-     *
-     * @var list<string>
-     */
-    protected array $namespaces;
-
-    /**
-     * Create the check, reading the other packages' namespaces from their manifests unless they are given.
-     *
-     * @param  list<string>|null  $namespaces
-     */
-    public function __construct(?array $namespaces = null)
+    public function description(): string
     {
-        $this->namespaces = $namespaces ?? $this->packageNamespaces();
+        return 'No name from another package in the source code of core.';
+    }
+
+    /**
+     * Get the kinds of code the check reads.
+     *
+     * @return list<Kind>
+     */
+    public function kinds(): array
+    {
+        return [Kind::SOURCE];
+    }
+
+    /**
+     * Get the one-line description of the files the check reads.
+     */
+    public function scope(): string
+    {
+        return 'the source code of packages/keystone';
     }
 
     /**
@@ -41,25 +45,43 @@ class NoPackageDependencies extends Check
      */
     public function message(): string
     {
-        return 'Move the shared code into core; core never depends on a method or adapter package.';
+        return 'Move the shared code into core, because core never depends on a method or adapter package.';
     }
 
     /**
-     * Get the lines that name a class from another package.
+     * Determine if the file belongs to core.
+     */
+    protected function reads(File $file): bool
+    {
+        return parent::reads($file) && str_starts_with($file->path, 'packages/keystone/');
+    }
+
+    /**
+     * Get a violation at each name from the namespace of another package.
      *
-     * @return list<int>
+     * @return list<Violation>
      */
-    protected function lines(File $file): array
+    protected function violations(File $file): array
     {
-        return $file->lines($file->find(fn (Node $node) => $node instanceof Node\Name && $this->isOtherPackage($node)));
+        $namespaces = $this->packageNamespaces($file);
+
+        return array_map(Violation::at(...), $file->find(fn (Node $node) => $node instanceof Name && $this->isUnder($node, $namespaces)));
     }
 
     /**
-     * Determine if the name is in the namespace of another package.
+     * Determine if the name sits under one of the namespaces.
+     *
+     * @param  list<string>  $namespaces
      */
-    protected function isOtherPackage(Node\Name $name): bool
+    private function isUnder(Name $name, array $namespaces): bool
     {
-        return collect($this->namespaces)->contains(fn (string $namespace) => str_starts_with($name->toString().'\\', $namespace));
+        foreach ($namespaces as $namespace) {
+            if (str_starts_with($name->toString().'\\', $namespace)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -67,14 +89,20 @@ class NoPackageDependencies extends Check
      *
      * @return list<string>
      */
-    protected function packageNamespaces(): array
+    private function packageNamespaces(File $file): array
     {
-        $files = new Filesystem;
+        $namespaces = [];
 
-        return collect($files->glob(dirname(__DIR__, 2).'/packages/*/composer.json'))
-            ->reject(fn (string $path) => basename(dirname($path)) === 'keystone')
-            ->flatMap(fn (string $path) => array_keys($files->json($path)['autoload']['psr-4'] ?? []))
-            ->values()
-            ->all();
+        foreach ($file->project->files('packages/*/composer.json') as $path) {
+            if ($path === 'packages/keystone/composer.json') {
+                continue;
+            }
+
+            $manifest = json_decode((string) $file->project->read($path), true);
+
+            array_push($namespaces, ...array_keys($manifest['autoload']['psr-4'] ?? []));
+        }
+
+        return $namespaces;
     }
 }

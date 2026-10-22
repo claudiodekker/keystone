@@ -11,6 +11,7 @@
     "require-dev": {
         "claudiodekker/keystone-inertia-vue": "self.version",
         "claudiodekker/keystone-password": "self.version",
+        "claudiodekker/laravel-guardrails": "^1.0",
         "larastan/larastan": "^3.13",
         "laravel/laravel": "^13.0",
         "laravel/pint": "^1.32",
@@ -52,10 +53,10 @@
     },
     "scripts": {
         "post-autoload-dump": "@php vendor/bin/testbench package:discover --ansi",
-        "post-install-cmd": "git config core.hooksPath .githooks",
         "check": [
             "@composer validate --strict",
             "pint --test",
+            "guardrails --all",
             "phpstan analyse --no-progress --memory-limit=1G packages/*/src packages/*/tests/Fixtures packages/*/stubs/app workbench/app",
             "npm run check",
             "pest",
@@ -67,6 +68,7 @@
     },
     "config": {
         "allow-plugins": {
+            "claudiodekker/laravel-guardrails": true,
             "pestphp/pest-plugin": true
         },
         "sort-packages": true

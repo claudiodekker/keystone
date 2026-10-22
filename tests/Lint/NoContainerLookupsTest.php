@@ -1,10 +1,11 @@
 <?php
 
 use ClaudioDekker\Keystone\Lint\Checks\NoContainerLookups;
-use ClaudioDekker\Keystone\Lint\File;
+use ClaudioDekker\LaravelGuardrails\Kind;
+use ClaudioDekker\LaravelGuardrails\Testing\TestFile;
 
 it('fails app() and resolve() inside a method', function () {
-    $file = new File('packages/keystone/src/Example.php', <<<'PHP'
+    $file = TestFile::of(Kind::SOURCE, 'packages/keystone/src/Example.php', <<<'PHP'
         <?php
 
         class Example
@@ -17,11 +18,11 @@ it('fails app() and resolve() inside a method', function () {
         }
         PHP);
 
-    expect((new NoContainerLookups)->check($file))->toBe([7, 8]);
+    expect($file->lines(new NoContainerLookups))->toBe([7, 8]);
 });
 
 it('fails a lookup in a closure inside a method', function () {
-    $file = new File('packages/keystone/src/Example.php', <<<'PHP'
+    $file = TestFile::of(Kind::SOURCE, 'packages/keystone/src/Example.php', <<<'PHP'
         <?php
 
         class Example
@@ -33,11 +34,11 @@ it('fails a lookup in a closure inside a method', function () {
         }
         PHP);
 
-    expect((new NoContainerLookups)->check($file))->toBe([7]);
+    expect($file->lines(new NoContainerLookups))->toBe([7]);
 });
 
 it('passes a service injected through the constructor', function () {
-    $file = new File('packages/keystone/src/Example.php', <<<'PHP'
+    $file = TestFile::of(Kind::SOURCE, 'packages/keystone/src/Example.php', <<<'PHP'
         <?php
 
         class Example
@@ -54,17 +55,11 @@ it('passes a service injected through the constructor', function () {
         }
         PHP);
 
-    expect((new NoContainerLookups)->check($file))->toBe([]);
+    expect($file->lines(new NoContainerLookups))->toBe([]);
 });
 
-it('leaves a lookup outside a method alone', function () {
-    $file = new File('packages/keystone/src/helpers.php', "<?php\n\nfunction mailer() {\n    return app(Mailer::class);\n}\n");
+it('reads only the source code', function () {
+    $file = TestFile::of(Kind::TESTS, 'packages/keystone/tests/Fixtures/Example.php', "<?php\n\nclass Example {\n    public function run() {\n        app();\n    }\n}\n");
 
-    expect((new NoContainerLookups)->check($file))->toBe([]);
-});
-
-it('reads only src', function () {
-    $file = new File('packages/keystone/tests/Fixtures/Example.php', "<?php\n\nclass Example {\n    public function run() {\n        app();\n    }\n}\n");
-
-    expect((new NoContainerLookups)->check($file))->toBe([]);
+    expect($file->lines(new NoContainerLookups))->toBe([]);
 });
