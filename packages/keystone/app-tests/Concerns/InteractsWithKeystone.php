@@ -9,7 +9,6 @@ use ClaudioDekker\Keystone\AppTests\Assertions\SignOutAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\ThrottledAssertions;
 use ClaudioDekker\Keystone\AppTests\Support\CredentialTypeSupport;
 use ClaudioDekker\Keystone\AppTests\Support\RecordedSecurityEvents;
-use ClaudioDekker\Keystone\AppTests\Support\UseTestSupport;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\CredentialType;
@@ -22,10 +21,10 @@ use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Monolog\Handler\TestHandler;
 use PHPUnit\Framework\Assert;
-use ReflectionClass;
 use Symfony\Component\HttpFoundation\Cookie;
 
 /**
@@ -196,7 +195,7 @@ trait InteractsWithKeystone
     }
 
     /**
-     * Get the type's test support: the type itself when it is its own, else the support its attribute names.
+     * Get the type's test support: the type itself when it is its own, else the support named after it in its package's AppTests.
      */
     protected function supportOf(CredentialType $type): ?CredentialTypeSupport
     {
@@ -204,9 +203,20 @@ trait InteractsWithKeystone
             return $type;
         }
 
-        $attribute = (new ReflectionClass($type))->getAttributes(UseTestSupport::class)[0] ?? null;
+        $support = $this->supportClassOf($type);
 
-        return $attribute?->newInstance()->support();
+        return is_subclass_of($support, CredentialTypeSupport::class) ? new $support : null;
+    }
+
+    /**
+     * Get the name of the type's test support class, as PasswordType has AppTests\PasswordSupport beside it.
+     */
+    protected function supportClassOf(CredentialType $type): string
+    {
+        $namespace = Str::beforeLast($type::class, '\\');
+        $name = Str::chopEnd(class_basename($type), 'Type');
+
+        return "{$namespace}\\AppTests\\{$name}Support";
     }
 
     /**

@@ -2,14 +2,12 @@
 
 namespace ClaudioDekker\Keystone\Password;
 
-use ClaudioDekker\Keystone\AppTests\Support\UseTestSupport;
 use ClaudioDekker\Keystone\Methods\Credential;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\InitiateShape;
 use ClaudioDekker\Keystone\Methods\Proof;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Methods\Verification;
-use ClaudioDekker\Keystone\Password\AppTests\PasswordSupport;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Support\Facades\Hash;
 use SensitiveParameter;
@@ -19,7 +17,6 @@ use SensitiveParameter;
  *
  * @internal
  */
-#[UseTestSupport(PasswordSupport::class)]
 class PasswordType implements CredentialType
 {
     /**
