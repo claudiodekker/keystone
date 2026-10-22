@@ -80,6 +80,7 @@ it('fails assertSignInRefused on a refusal with another message', function () {
 });
 
 it('fails assertSignInRefused on a refusal that flashes back the secret', function () {
+    $this->startSession();
     $session = $this->app['session.store'];
     $session->flash('errors', (new ViewErrorBag)->put('default', new MessageBag(['identifier' => [__('keystone::messages.credentials-rejected')]])));
     $session->flashInput(['identifier' => 'ada@example.com', 'secret' => 'wrong horse']);
@@ -89,6 +90,7 @@ it('fails assertSignInRefused on a refusal that flashes back the secret', functi
 });
 
 it('fails assertSignInRefused on a refusal that flashes back no identifier', function () {
+    $this->startSession();
     $session = $this->app['session.store'];
     $session->flash('errors', (new ViewErrorBag)->put('default', new MessageBag(['identifier' => [__('keystone::messages.credentials-rejected')]])));
     $response = TestResponse::fromBaseResponse(new RedirectResponse(route('login')));
@@ -110,6 +112,7 @@ it('fails assertSignInInvalid on a refusal', function () {
 });
 
 it('fails assertSignInInvalid on a validation failure that flashes back the secret', function () {
+    $this->startSession();
     $session = $this->app['session.store'];
     $session->flash('errors', (new ViewErrorBag)->put('default', new MessageBag(['identifier' => ['The identifier field is required.']])));
     $session->flashInput(['secret' => 'wrong horse']);

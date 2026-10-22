@@ -14,7 +14,8 @@ class WorkbenchServiceProvider extends ServiceProvider
 {
     /**
      * Point the guard at the keystone driver and the fixture user, as the installer's edits do, and the page checks at
-     * the stubs' pages. Outside tests, keep the data in the skeleton's SQLite file rather than in memory.
+     * the stubs' pages. Serialize the session as the skeleton does. Outside tests, keep the data in the skeleton's SQLite
+     * file rather than in memory.
      */
     public function register(): void
     {
@@ -27,6 +28,7 @@ class WorkbenchServiceProvider extends ServiceProvider
             'auth.providers.users.model' => User::class,
             'inertia.pages.paths' => [dirname(__DIR__, 3).'/packages/keystone-inertia-vue/stubs/resources/js/pages'],
             'inertia.testing.ensure_pages_exist' => true,
+            'session.serialization' => 'json',
         ]);
     }
 
