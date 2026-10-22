@@ -22,7 +22,7 @@ use Illuminate\Support\ServiceProvider;
 class KeystoneServiceProvider extends ServiceProvider
 {
     /**
-     * The console commands that run without the boot checks, so a refused config can always be cleared or rebuilt.
+     * The console commands that run without the boot checks.
      *
      * @var list<string>
      */
@@ -57,8 +57,6 @@ class KeystoneServiceProvider extends ServiceProvider
 
     /**
      * Merge the app's config over the file at the path, so a key added later keeps its default.
-     *
-     * A cached config was merged when it was cached, so it is left as cached.
      */
     protected function mergeConfigRecursivelyFrom(string $path, string $key): void
     {
