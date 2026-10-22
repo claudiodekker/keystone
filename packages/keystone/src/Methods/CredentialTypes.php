@@ -74,6 +74,14 @@ readonly class CredentialTypes
     }
 
     /**
+     * Get the allow-list the set was built with.
+     */
+    public function allowList(): MethodAllowList
+    {
+        return $this->allowList;
+    }
+
+    /**
      * Determine if the type is offered on any surface.
      */
     protected function isOfferedAnywhere(string $name): bool

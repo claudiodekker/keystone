@@ -31,4 +31,14 @@ class CredentialTypeRegistry
     {
         return array_map(fn (array $types) => $types[0], $this->registrations);
     }
+
+    /**
+     * Get every type registered under each name that more than one package registers.
+     *
+     * @return array<string, list<CredentialType>>
+     */
+    public function clashes(): array
+    {
+        return array_filter($this->registrations, fn (array $types) => count($types) > 1);
+    }
 }
