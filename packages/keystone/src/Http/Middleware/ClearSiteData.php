@@ -2,9 +2,9 @@
 
 namespace ClaudioDekker\Keystone\Http\Middleware;
 
+use ClaudioDekker\Keystone\Http\HardeningSettings;
 use ClaudioDekker\Keystone\Http\SiteData;
 use Closure;
-use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Request as SymfonyRequest;
 use Symfony\Component\HttpFoundation\Response;
@@ -30,7 +30,7 @@ class ClearSiteData
      * Create the middleware.
      */
     public function __construct(
-        protected Config $config,
+        protected HardeningSettings $settings,
     ) {
         //
     }
@@ -72,19 +72,7 @@ class ClearSiteData
      */
     protected function kinds(): array
     {
-        $kinds = $this->config->get('keystone.clear_site_data');
-
-        if (! is_array($kinds) || ! array_is_list($kinds)) {
-            return static::DEFAULT_KINDS;
-        }
-
-        $parsed = array_map(fn (mixed $kind) => is_string($kind) ? SiteData::tryFrom($kind) : null, $kinds);
-
-        if (in_array(null, $parsed, true)) {
-            return static::DEFAULT_KINDS;
-        }
-
-        return array_values(array_unique($parsed, SORT_REGULAR));
+        return $this->settings->siteData() ?? static::DEFAULT_KINDS;
     }
 
     /**

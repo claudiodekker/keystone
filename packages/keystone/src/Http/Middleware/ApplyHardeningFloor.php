@@ -4,8 +4,8 @@ namespace ClaudioDekker\Keystone\Http\Middleware;
 
 use ClaudioDekker\Keystone\Http\ContentSecurityPolicy;
 use ClaudioDekker\Keystone\Http\Controllers\KeystoneController;
+use ClaudioDekker\Keystone\Http\HardeningSettings;
 use Closure;
-use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -34,7 +34,7 @@ class ApplyHardeningFloor
      * Create the middleware.
      */
     public function __construct(
-        protected Config $config,
+        protected HardeningSettings $settings,
     ) {
         //
     }
@@ -129,30 +129,12 @@ class ApplyHardeningFloor
     }
 
     /**
-     * Get the CSP sources the config lets frame Keystone's pages.
+     * Get the CSP sources the config lets frame Keystone's pages, none when the key isn't well formed.
      *
      * @return list<string>
      */
     protected function frameAncestors(): array
     {
-        $sources = $this->config->get('keystone.hardening.frame_ancestors');
-
-        if (! is_array($sources) || ! array_is_list($sources)) {
-            return [];
-        }
-
-        if (! array_all($sources, $this->isSource(...))) {
-            return [];
-        }
-
-        return $sources;
-    }
-
-    /**
-     * Determine if the value is a single CSP source expression.
-     */
-    protected function isSource(mixed $value): bool
-    {
-        return is_string($value) && preg_match('/^[^\s;,]+$/D', $value) === 1;
+        return $this->settings->frameAncestors() ?? [];
     }
 }

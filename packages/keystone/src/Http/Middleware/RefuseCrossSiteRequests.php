@@ -2,10 +2,10 @@
 
 namespace ClaudioDekker\Keystone\Http\Middleware;
 
+use ClaudioDekker\Keystone\Http\HardeningSettings;
 use ClaudioDekker\Keystone\SecurityEvents\Recorder;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use Closure;
-use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Contracts\Encryption\Encrypter;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
@@ -26,7 +26,7 @@ class RefuseCrossSiteRequests extends PreventRequestForgery
     public function __construct(
         Application $app,
         Encrypter $encrypter,
-        protected Config $config,
+        protected HardeningSettings $settings,
         protected Recorder $recorder,
     ) {
         parent::__construct($app, $encrypter);
@@ -90,30 +90,12 @@ class RefuseCrossSiteRequests extends PreventRequestForgery
     }
 
     /**
-     * Get the other origins the config trusts.
+     * Get the other origins the config trusts, none when the key isn't well formed.
      *
      * @return list<string>
      */
     protected function trustedOrigins(): array
     {
-        $origins = $this->config->get('keystone.trusted_origins');
-
-        if (! is_array($origins) || ! array_is_list($origins)) {
-            return [];
-        }
-
-        if (! array_all($origins, $this->isOrigin(...))) {
-            return [];
-        }
-
-        return $origins;
-    }
-
-    /**
-     * Determine if the value is a serialized origin: a scheme and a host, with nothing after them.
-     */
-    protected function isOrigin(mixed $value): bool
-    {
-        return is_string($value) && preg_match('~^https?://[^\s/?#@\\\\]+$~D', $value) === 1;
+        return $this->settings->trustedOrigins() ?? [];
     }
 }
