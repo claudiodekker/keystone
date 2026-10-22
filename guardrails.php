@@ -79,7 +79,5 @@ return [
     (new NoHttpInFeatureTests)->allowing([
         'packages/keystone/tests/Feature/RateLimits/ReplacedActionTest.php' => "An app's AppTests run through its own controllers, so only core can arrange one that replaces an action outright.",
         'packages/keystone/tests/Feature/SignIn/RehashTest.php' => "Only core's fake type hands back a rehash on demand, or one that throws, so no app can arrange one.",
-        'packages/keystone-inertia-vue/tests/Feature/SignInPagePropsTest.php' => "AppTests run on the app's page, so only the adapter's own tests can load its stub routes to check the props they pass.",
-        'packages/keystone-inertia-vue/tests/Feature/SignOutHistoryTest.php' => "AppTests only see the session flag sign-out leaves, so only the adapter's own tests can load its stub routes to check the next page carries it.",
     ]),
 ];
