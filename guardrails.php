@@ -45,9 +45,7 @@ return [
     OneClassPerFile::class,
     NoFinal::class,
     NoReflection::class,
-    (new NoTestCodeInApp)->allowing([
-        'guardrails.php' => 'The guardrails run only in development, where the repository\'s own checks autoload.',
-    ]),
+    NoTestCodeInApp::class,
     SortedEnumCases::class,
     EnumCasesDocumentedAlike::class,
     NoDebugCalls::class,
