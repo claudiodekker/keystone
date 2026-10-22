@@ -15,16 +15,13 @@ use Symfony\Component\Finder\SplFileInfo;
 class Stubs
 {
     /**
-     * The stubs that set up Inertia and Vue, which are not copied with the rest.
+     * The stubs that replace the app's file until it names what the stub adds, by that name.
      *
-     * @var list<string>
+     * @var array<string, string>
      */
-    protected const array INERTIA_SETUP = [
-        'app/Http/Middleware/HandleInertiaRequests.php',
-        'resources/js/app.ts',
-        'resources/views/app.blade.php',
-        'tsconfig.json',
-        'vite.config.ts',
+    protected const array REPLACEMENTS = [
+        'app/Models/User.php' => 'KeystoneUser',
+        'bootstrap/app.php' => 'HandleInertiaRequests',
     ];
 
     /**
@@ -46,10 +43,20 @@ class Stubs
         $partials = collect($types)->map(fn (string $type) => Str::studly($type));
 
         return $this->paths()
-            ->reject(fn (string $path) => in_array($path, static::INERTIA_SETUP, true))
+            ->reject(fn (string $path) => array_key_exists($path, static::REPLACEMENTS))
             ->filter(fn (string $path) => $this->isCopiedFor($path, $partials))
             ->values()
             ->all();
+    }
+
+    /**
+     * Get the stubs that replace the app's file until it names what the stub adds, by that name.
+     *
+     * @return array<string, string>
+     */
+    public function replacements(): array
+    {
+        return static::REPLACEMENTS;
     }
 
     /**

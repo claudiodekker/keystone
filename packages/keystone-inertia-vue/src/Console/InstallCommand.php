@@ -5,8 +5,8 @@ namespace ClaudioDekker\Keystone\InertiaVue\Console;
 use ClaudioDekker\Keystone\InertiaVue\Install\AppTests;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edit;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\BindKeystoneTestCase;
-use ClaudioDekker\Keystone\InertiaVue\Install\Edits\ImplementKeystoneUser;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\MapAppTests;
+use ClaudioDekker\Keystone\InertiaVue\Install\Edits\MergeNpmDependencies;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\RegisterKeystoneTestsuite;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\RequireRouteFile;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\SetSessionCookie;
@@ -15,9 +15,15 @@ use ClaudioDekker\Keystone\InertiaVue\Install\Stubs;
 use ClaudioDekker\Keystone\Keystone;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Config\Repository;
+use Illuminate\Contracts\Process\ProcessResult;
 use Illuminate\Filesystem\Filesystem;
-use Illuminate\Support\Arr;
+use Illuminate\Process\PendingProcess;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Process;
+use Laravel\Prompts\Support\Logger;
+use Symfony\Component\Console\Output\OutputInterface;
+
+use function Laravel\Prompts\task;
 
 /**
  * Install Keystone's sign-in pages into the app as its own files, and wire the app up to run them and their AppTests.
@@ -60,12 +66,98 @@ class InstallCommand extends Command
         }
 
         $this->copy($stubs, $files);
+        $this->replaceSkeletonFiles($stubs, $files);
 
-        $everyEditApplied = collect($this->edits($manifest, $config, $files))
+        $everyEditApplied = collect($this->edits($config, $files))
             ->map(fn (Edit $edit) => $this->applyEdit($edit, $files))
             ->every(fn (bool $applied) => $applied);
 
-        return $everyEditApplied ? self::SUCCESS : self::FAILURE;
+        $everyCommandSucceeded = $this->runCommands();
+
+        return $everyEditApplied && $everyCommandSucceeded ? self::SUCCESS : self::FAILURE;
+    }
+
+    /**
+     * Run the commands that make the install take effect, and determine if every one succeeded.
+     */
+    protected function runCommands(): bool
+    {
+        $commands = ['composer dump-autoload', 'npm install', 'npm run build'];
+
+        foreach ($commands as $index => $command) {
+            $result = $this->runsAsTasks() ? $this->runAsTask($command) : $this->runStreaming($command);
+
+            if ($result->failed()) {
+                $this->components->error('Run these yourself once that is fixed:');
+                $this->components->bulletList(array_slice($commands, $index));
+
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Determine if the commands run as tasks, which needs a terminal that redraws, a fork for the spinner and normal verbosity.
+     */
+    protected function runsAsTasks(): bool
+    {
+        return $this->output->isDecorated()
+            && $this->output->getVerbosity() === OutputInterface::VERBOSITY_NORMAL
+            && function_exists('pcntl_fork');
+    }
+
+    /**
+     * Run the command as a task that shows the tail of its output, and print all of it when the command fails.
+     */
+    protected function runAsTask(string $command): ProcessResult
+    {
+        $result = task(
+            label: $command,
+            callback: fn (Logger $logger) => $this->runLogging($command, $logger),
+            keepSummary: true,
+        );
+
+        if ($result->failed()) {
+            $this->output->write($result->output().$result->errorOutput());
+        }
+
+        return $result;
+    }
+
+    /**
+     * Run the command in the app, sending its output to the task's log, and marking the task failed when it fails.
+     */
+    protected function runLogging(string $command, Logger $logger): ProcessResult
+    {
+        $result = $this->process()->run($command, fn (string $type, string $output) => $logger->line($output));
+
+        if ($result->failed()) {
+            $logger->error("{$command} failed");
+        }
+
+        return $result;
+    }
+
+    /**
+     * Run the command in the app, writing its output as it comes, and then how it ended.
+     */
+    protected function runStreaming(string $command): ProcessResult
+    {
+        $result = $this->process()->run($command, fn (string $type, string $output) => $this->output->write($output));
+
+        $this->components->twoColumnDetail($command, $result->successful() ? 'done' : 'failed');
+
+        return $result;
+    }
+
+    /**
+     * Get a process that runs in the app for as long as it needs.
+     */
+    protected function process(): PendingProcess
+    {
+        return Process::path($this->laravel->basePath())->forever();
     }
 
     /**
@@ -84,26 +176,33 @@ class InstallCommand extends Command
     /**
      * Get the edits that wire the app up.
      *
-     * @param  array<string, mixed>  $manifest
      * @return list<Edit>
      */
-    protected function edits(array $manifest, Repository $config, Filesystem $files): array
+    protected function edits(Repository $config, Filesystem $files): array
     {
         $guard = $config->get('auth.defaults.guard');
-        $model = $this->userModel($config, $guard);
-        $modelFile = $model === null ? null : $this->classFile($manifest, $model);
         $appName = $config->get('app.name');
         $envs = $files->exists($this->laravel->basePath('.env')) ? ['.env.example', '.env'] : ['.env.example'];
 
         return [
             new RequireRouteFile,
-            new ImplementKeystoneUser($model, $modelFile),
             new UseKeystoneGuard($guard),
             ...array_map(fn (string $env) => new SetSessionCookie($env, $appName), $envs),
             new RegisterKeystoneTestsuite,
             new BindKeystoneTestCase,
             new MapAppTests($this->appTests($files)),
+            new MergeNpmDependencies($this->npmPackages($files)),
         ];
+    }
+
+    /**
+     * Get the npm packages the pages need, by name, at the versions this package builds them with.
+     *
+     * @return array<string, string>
+     */
+    protected function npmPackages(Filesystem $files): array
+    {
+        return $files->json(dirname(__DIR__, 2).'/package.json')['dependencies'];
     }
 
     /**
@@ -125,48 +224,6 @@ class InstallCommand extends Command
         ksort($namespaces);
 
         return $namespaces;
-    }
-
-    /**
-     * Get the user model of the guard's provider, or null when there is none.
-     */
-    protected function userModel(Repository $config, ?string $guard): ?string
-    {
-        if ($guard === null) {
-            return null;
-        }
-
-        $provider = $config->get("auth.guards.{$guard}.provider");
-
-        if ($provider === null) {
-            return null;
-        }
-
-        return $config->get("auth.providers.{$provider}.model");
-    }
-
-    /**
-     * Get the file of a class through the PSR-4 roots of the app's composer.json, or null when none holds it.
-     *
-     * @param  array<string, mixed>  $manifest
-     */
-    protected function classFile(array $manifest, string $class): ?string
-    {
-        /** @var array<string, string|list<string>> $roots */
-        $roots = $manifest['autoload']['psr-4'] ?? [];
-
-        uksort($roots, fn (string $a, string $b) => strlen($b) <=> strlen($a));
-
-        foreach ($roots as $namespace => $directory) {
-            if (str_starts_with($class, $namespace)) {
-                $root = rtrim(Arr::wrap($directory)[0], '/');
-                $relative = str_replace('\\', '/', substr($class, strlen($namespace)));
-
-                return "{$root}/{$relative}.php";
-            }
-        }
-
-        return null;
     }
 
     /**
@@ -237,6 +294,37 @@ class InstallCommand extends Command
         if ($skipped !== []) {
             $this->components->warn('Skipped, because the app has them already (run with --force to overwrite):');
             $this->components->bulletList($skipped);
+        }
+    }
+
+    /**
+     * Replace the skeleton's files that Keystone needs changed, and delete the frontend files the stubs replace.
+     */
+    protected function replaceSkeletonFiles(Stubs $stubs, Filesystem $files): void
+    {
+        foreach ($stubs->replacements() as $path => $name) {
+            $target = $this->laravel->basePath($path);
+
+            if ($files->exists($target) && str_contains($files->get($target), $name)) {
+                continue;
+            }
+
+            $files->ensureDirectoryExists(dirname($target));
+            $files->copy($stubs->path($path), $target);
+
+            $this->components->twoColumnDetail($path, 'replaced');
+        }
+
+        foreach (['vite.config.js', 'resources/js/app.js'] as $path) {
+            if ($files->delete($this->laravel->basePath($path))) {
+                $this->components->twoColumnDetail($path, 'deleted');
+            }
+        }
+
+        $welcome = $this->laravel->basePath('resources/views/welcome.blade.php');
+
+        if ($files->exists($welcome)) {
+            $files->replaceInFile("'resources/css/app.css', 'resources/js/app.js'", "'resources/css/app.css'", $welcome);
         }
     }
 

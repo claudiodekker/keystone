@@ -21,6 +21,7 @@ it('finishes a run that stopped part way', function () {
     $this->artisan('keystone:install')->assertSuccessful();
     $installed = $this->fresh->fingerprint();
     unlink($this->fresh->path('routes/keystone.php'));
+    unlink($this->fresh->path('resources/views/app.blade.php'));
     $this->fresh->put('config/auth.php', file_get_contents(InstalledVersions::getInstallPath('laravel/laravel').'/config/auth.php'));
 
     $this->artisan('keystone:install')->assertSuccessful();

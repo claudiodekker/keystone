@@ -18,13 +18,6 @@ it('copies a partial only for each installed credential type', function () {
         ->and($this->fresh->has('resources/js/partials/Totp.vue'))->toBeFalse();
 });
 
-it('leaves the files that set Inertia and Vue up out of the copy', function () {
-    $this->artisan('keystone:install')->assertSuccessful();
-
-    expect($this->fresh->has('routes/keystone.php'))->toBeTrue()
-        ->and($this->fresh->has('resources/js/app.ts'))->toBeFalse();
-});
-
 it('installs without any credential type, copying no partial', function () {
     expect(Keystone::credentialTypes()->names())->not->toBeEmpty();
     Keystone::flushState();
