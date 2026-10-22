@@ -27,7 +27,7 @@ class HardeningSettings
      */
     public function frameAncestors(): ?array
     {
-        return $this->strings('keystone.hardening.frame_ancestors', $this->isSource(...));
+        return $this->strings($this->config->get('keystone.hardening.frame_ancestors'), $this->isSource(...));
     }
 
     /**
@@ -37,7 +37,7 @@ class HardeningSettings
      */
     public function trustedOrigins(): ?array
     {
-        return $this->strings('keystone.trusted_origins', $this->isOrigin(...));
+        return $this->strings($this->config->get('keystone.trusted_origins'), $this->isOrigin(...));
     }
 
     /**
@@ -47,7 +47,7 @@ class HardeningSettings
      */
     public function siteData(): ?array
     {
-        $kinds = $this->list('keystone.clear_site_data');
+        $kinds = $this->list($this->config->get('keystone.clear_site_data'));
 
         if ($kinds === null) {
             return null;
@@ -63,14 +63,14 @@ class HardeningSettings
     }
 
     /**
-     * Get the key's list when every item passes the test, or null.
+     * Get the value when it is a list and every item passes the test.
      *
      * @param  callable(mixed): bool  $isValid
      * @return list<string>|null
      */
-    protected function strings(string $key, callable $isValid): ?array
+    protected function strings(mixed $value, callable $isValid): ?array
     {
-        $values = $this->list($key);
+        $values = $this->list($value);
 
         if ($values === null || ! array_all($values, $isValid)) {
             return null;
@@ -80,19 +80,17 @@ class HardeningSettings
     }
 
     /**
-     * Get the key's value when it is a list, or null.
+     * Get the value when it is a list.
      *
      * @return list<mixed>|null
      */
-    protected function list(string $key): ?array
+    protected function list(mixed $value): ?array
     {
-        $values = $this->config->get($key);
-
-        if (! is_array($values) || ! array_is_list($values)) {
+        if (! is_array($value) || ! array_is_list($value)) {
             return null;
         }
 
-        return $values;
+        return $value;
     }
 
     /**

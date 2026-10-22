@@ -110,7 +110,7 @@ Listing the sources that may frame Keystone's pages in `hardening.frame_ancestor
 ],
 ```
 
-Each entry is one CSP source: a host, a scheme or `*`. `frame-ancestors` then lists them instead of `'none'`, and `X-Frame-Options` is dropped, since it can't name a source. A listed source can frame the sign-in page and trick a user into clicking on it, so list only sources you control. A value that isn't a list of single sources is ignored, and no one may frame.
+Each entry is one CSP source: a host, a scheme or `*`. `frame-ancestors` then lists them instead of `'none'`, and `X-Frame-Options` is dropped, since it can't name a source. A listed source can frame the sign-in page and trick a user into clicking on it, so list only sources you control. Keystone refuses to boot when the value isn't a list of single sources.
 
 ### Cross-site requests
 
@@ -130,7 +130,7 @@ Another origin of your own app can submit to Keystone's routes once you list it:
 'trusted_origins' => ['https://admin.example.com'],
 ```
 
-Each entry is a scheme and a host, with a port if it has one, and nothing after it. Any page on a listed origin can then sign users in and out. A value that isn't a list of origins is ignored, and no origin is trusted.
+Each entry is a scheme and a host, with a port if it has one, and nothing after it. Any page on a listed origin can then sign users in and out. Keystone refuses to boot when the value isn't a list of origins.
 
 ### Clearing site data
 
@@ -140,7 +140,7 @@ When Keystone ends a session, the response to that request carries `Clear-Site-D
 'clear_site_data' => ['cache', 'storage'],
 ```
 
-The kinds are `cache`, `cookies`, `storage` and `executionContexts`. Clearing `cookies` signs the browser out of everything it holds a cookie for on your domain. An empty list sends no header. A value that isn't a list of those kinds clears `cache` and `storage`.
+The kinds are `cache`, `cookies`, `storage` and `executionContexts`. Clearing `cookies` signs the browser out of everything it holds a cookie for on your domain. An empty list sends no header. Keystone refuses to boot when the value isn't a list of those kinds.
 
 ### Testing
 

@@ -52,4 +52,16 @@ class KeystoneMisconfiguredException extends LogicException
     {
         return new static("Keystone keeps its tables on MariaDB, MySQL, Postgres or SQLite, not [{$driver}].");
     }
+
+    /**
+     * Create the exception for an app that fails boot checks, listing every failure on a line of its own.
+     *
+     * @param  non-empty-list<string>  $failures
+     */
+    public static function bootFailures(array $failures): static
+    {
+        $lines = array_map(fn (string $failure) => "- {$failure}", $failures);
+
+        return new static("Keystone refused to boot:\n".implode("\n", $lines));
+    }
 }

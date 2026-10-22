@@ -3,6 +3,8 @@
 namespace ClaudioDekker\Keystone\Tests;
 
 use ClaudioDekker\Keystone\AppTests\Concerns\AppliesBootstrapRules;
+use ClaudioDekker\Keystone\Configuration\BootChecks;
+use ClaudioDekker\Keystone\Exceptions\KeystoneMisconfiguredException;
 use ClaudioDekker\Keystone\Tests\Fixtures\FixtureServiceProvider;
 use Composer\InstalledVersions;
 use Illuminate\Filesystem\Filesystem;
@@ -34,6 +36,24 @@ class TestCase extends BaseTestCase
     protected function defineEnvironment($app): void
     {
         $app['config']->set('session.serialization', 'json');
+    }
+
+    /**
+     * Run Keystone's boot checks against the live config and get every failure they refuse to boot for.
+     *
+     * @return list<string>
+     */
+    protected function bootFailures(): array
+    {
+        try {
+            $this->app->make(BootChecks::class)->run();
+        } catch (KeystoneMisconfiguredException $exception) {
+            $lines = explode("\n", $exception->getMessage());
+
+            return array_map(fn (string $line) => substr($line, 2), array_slice($lines, 1));
+        }
+
+        return [];
     }
 
     /**

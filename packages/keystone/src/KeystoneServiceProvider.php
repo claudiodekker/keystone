@@ -3,6 +3,7 @@
 namespace ClaudioDekker\Keystone;
 
 use ClaudioDekker\Keystone\Auth\KeystoneGuard;
+use ClaudioDekker\Keystone\Configuration\BootChecks;
 use ClaudioDekker\Keystone\Exceptions\KeystoneMisconfiguredException;
 use ClaudioDekker\Keystone\Http\Middleware\ApplyHardeningFloor;
 use ClaudioDekker\Keystone\Http\Middleware\CaptureRequestContext;
@@ -20,6 +21,13 @@ use Illuminate\Support\ServiceProvider;
  */
 class KeystoneServiceProvider extends ServiceProvider
 {
+    /**
+     * The console commands that run without the boot checks, so a refused config can always be cleared or rebuilt.
+     *
+     * @var list<string>
+     */
+    protected const array COMMANDS_WITHOUT_BOOT_CHECKS = ['config:clear', 'optimize:clear'];
+
     /**
      * Merge the config, and start the app from no registered credential types, so each app registers its own in boot().
      */
@@ -43,6 +51,8 @@ class KeystoneServiceProvider extends ServiceProvider
 
         $this->loadMigrationsFrom(dirname(__DIR__).'/database/migrations');
         $this->loadTranslationsFrom(dirname(__DIR__).'/lang', 'keystone');
+
+        $this->checkBoot();
     }
 
     /**
@@ -100,6 +110,24 @@ class KeystoneServiceProvider extends ServiceProvider
     protected function mergesIntoMap(mixed $value): bool
     {
         return $value === [] || $this->isMap($value);
+    }
+
+    /**
+     * Run the boot checks once the app has booted, unless the config comes from the cache, where they ran when it was cached, or the command clears it.
+     */
+    protected function checkBoot(): void
+    {
+        $this->app->booted(function () {
+            if ($this->app->configurationIsCached()) {
+                return;
+            }
+
+            if ($this->app->runningConsoleCommand(...static::COMMANDS_WITHOUT_BOOT_CHECKS)) {
+                return;
+            }
+
+            $this->app->make(BootChecks::class)->run();
+        });
     }
 
     /**
