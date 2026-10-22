@@ -15,10 +15,13 @@ use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Models\UserEmail;
 use ClaudioDekker\Keystone\RateLimits\StepKind;
+use Closure;
 use Illuminate\Cache\ArrayStore;
 use Illuminate\Cache\RateLimiter;
 use Illuminate\Contracts\Cache\Repository;
+use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -34,6 +37,7 @@ use Symfony\Component\HttpFoundation\Cookie;
  */
 trait InteractsWithKeystone
 {
+    use AssertsHardening;
     use GuestStepAssertions;
     use LazilyRefreshDatabase;
     use SignInAssertions;
@@ -63,6 +67,24 @@ trait InteractsWithKeystone
     public function countLimitsIn(Repository $store): void
     {
         $this->app->instance(RateLimiter::class, new RateLimiter($store));
+    }
+
+    /**
+     * Have the app put the headers on every response it gives, as an app's own global middleware does.
+     *
+     * @param  array<string, string|list<string>>  $headers
+     */
+    public function appSetsHeaders(array $headers): void
+    {
+        $this->app->make(Kernel::class)->pushMiddleware(function (Request $request, Closure $next) use ($headers) {
+            $response = $next($request);
+
+            foreach ($headers as $name => $values) {
+                $response->headers->set($name, $values);
+            }
+
+            return $response;
+        });
     }
 
     /**

@@ -14,7 +14,6 @@ use ClaudioDekker\Keystone\SignIn\SignIn;
 use ClaudioDekker\Keystone\Status;
 use Illuminate\Contracts\Support\Responsable;
 use Illuminate\Http\Request;
-use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -24,7 +23,7 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
  *
  * @api
  */
-abstract class SignInController implements HasMiddleware
+abstract class SignInController implements KeystoneController
 {
     /**
      * Get the middleware every sign-in action runs, whatever the app's subclass overrides.

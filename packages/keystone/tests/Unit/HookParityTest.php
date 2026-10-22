@@ -6,6 +6,7 @@ use ClaudioDekker\Keystone\Tests\Monorepo;
 dataset('controllers', function () {
     return collect(glob(dirname(__DIR__, 2).'/src/Http/Controllers/*.php'))
         ->map(fn (string $path) => basename($path, '.php'))
+        ->filter(fn (string $name) => class_exists("ClaudioDekker\\Keystone\\Http\\Controllers\\{$name}"))
         ->mapWithKeys(fn (string $name) => [$name => [$name]])
         ->all();
 });
