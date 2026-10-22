@@ -39,6 +39,13 @@ it('puts the hardening floor on a sign-in for a credential type the page does no
     $this->assertHardened($response);
 });
 
+it('puts the hardening floor on a refused cross-site submit', function () {
+    $response = $this->fromAnotherSite()->post(route('logout'));
+
+    $this->assertCrossSiteRefused($response);
+    $this->assertHardened($response);
+});
+
 it('puts the hardening floor on the sign-out redirect', function () {
     $response = $this->post(route('logout'));
 
