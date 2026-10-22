@@ -9,7 +9,7 @@ dataset('config reads', function () {
     foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($source, FilesystemIterator::SKIP_DOTS)) as $file) {
         $code = file_get_contents($file->getPathname());
 
-        preg_match_all("/(?:\\bconfig\\(|->(?:get|has|string|integer|boolean|array|float)\\()\\s*'keystone\\.([^']+)'/", $code, $matches);
+        preg_match_all("/(?:\\bconfig\\(|Config::(?:get|has|string|integer|boolean|array|float)\\(|->(?:get|has|string|integer|boolean|array|float)\\()\\s*'keystone\\.([^']+)'/", $code, $matches);
 
         foreach ($matches[1] as $key) {
             $reads[$key] = [$key];

@@ -3,6 +3,7 @@
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\KeystoneServiceProvider;
 use ClaudioDekker\Keystone\Methods\Surface;
+use ClaudioDekker\Keystone\Tests\Fixtures\Methods\FakeSurfacesType;
 use ClaudioDekker\Keystone\Tests\Fixtures\Models\User;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Support\Facades\Auth;
@@ -13,6 +14,28 @@ it('starts each app from no registered credential types', function () {
     $provider->register();
 
     expect(Keystone::credentialTypes()->shapes(Surface::SIGN_IN))->toBe([]);
+});
+
+it('keeps the first type registered under a name, and records the clash', function () {
+    $first = new FakeSurfacesType('clash', [Surface::SIGN_IN]);
+    $second = new FakeSurfacesType('clash', [Surface::CHALLENGE]);
+
+    Keystone::credentialType($first);
+    Keystone::credentialType($second);
+
+    expect(Keystone::credentialTypes()->registered('clash'))->toBe($first)
+        ->and(Keystone::credentialTypes()->clashes())->toBe(['clash' => [FakeSurfacesType::class, FakeSurfacesType::class]]);
+});
+
+it('offers the types the methods config lists', function () {
+    Keystone::credentialType(new FakeSurfacesType('everywhere', [Surface::CHALLENGE, Surface::SIGN_IN]));
+    config(['keystone.methods' => ['everywhere' => ['challenge']]]);
+
+    $types = Keystone::credentialTypes();
+
+    expect($types->names())->toBe(['everywhere'])
+        ->and($types->find('everywhere', Surface::SIGN_IN))->toBeNull()
+        ->and($types->find('everywhere', Surface::CHALLENGE))->not->toBeNull();
 });
 
 it('reads the user model from the keystone guard', function () {
