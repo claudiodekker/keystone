@@ -104,3 +104,34 @@ it('passes assertContentSecurityPolicies on the same policies in another order',
         ['frame-ancestors' => "'none'", 'base-uri' => "'none'", 'default-src' => "'self'", 'object-src' => "'none'"],
     ]);
 });
+
+it('fails assertSiteDataCleared on a response that clears no site data', function () {
+    $response = $this->post(route('login.submit', 'unknown'));
+
+    expect(fn () => $this->assertSiteDataCleared($response, ['cache']))->toThrow(AssertionFailedError::class, 'does not clear any site data');
+});
+
+it('fails assertSiteDataCleared on a response that clears another kind', function () {
+    $response = $this->post(route('logout'));
+
+    expect(fn () => $this->assertSiteDataCleared($response, ['cache', 'cookies']))->toThrow(AssertionFailedError::class, 'other site data');
+});
+
+it('fails assertSiteDataCleared on a response that clears more kinds', function () {
+    $response = $this->post(route('logout'));
+
+    expect(fn () => $this->assertSiteDataCleared($response, ['cache']))->toThrow(AssertionFailedError::class, 'other site data');
+});
+
+it('fails assertSiteDataCleared on a header that is not a list of quoted kinds', function () {
+    $response = $this->post(route('logout'));
+    $response->headers->set('Clear-Site-Data', 'cache, storage');
+
+    expect(fn () => $this->assertSiteDataCleared($response, ['cache', 'storage']))->toThrow(AssertionFailedError::class, 'quoted kinds');
+});
+
+it('fails assertSiteDataKept on a response that clears site data', function () {
+    $response = $this->post(route('logout'));
+
+    expect(fn () => $this->assertSiteDataKept($response))->toThrow(AssertionFailedError::class, 'clears site data');
+});

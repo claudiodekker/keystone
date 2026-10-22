@@ -70,6 +70,35 @@ trait AssertsHardening
     }
 
     /**
+     * Assert the response tells the browser to clear exactly the given kinds of site data.
+     *
+     * @param  list<string>  $kinds
+     */
+    public function assertSiteDataCleared(TestResponse $response, array $kinds): void
+    {
+        $header = $response->headers->get('Clear-Site-Data');
+
+        Assert::assertNotNull($header, 'The response does not clear any site data.');
+        Assert::assertMatchesRegularExpression('/^"[A-Za-z]+"(, "[A-Za-z]+")*$/D', $header, 'The Clear-Site-Data header is not a list of quoted kinds.');
+
+        preg_match_all('/"([A-Za-z]+)"/', $header, $matches);
+
+        $cleared = $matches[1];
+        sort($cleared);
+        sort($kinds);
+
+        Assert::assertSame($kinds, $cleared, 'The response clears other site data.');
+    }
+
+    /**
+     * Assert the response tells the browser to clear no site data.
+     */
+    public function assertSiteDataKept(TestResponse $response): void
+    {
+        Assert::assertFalse($response->headers->has('Clear-Site-Data'), 'The response clears site data.');
+    }
+
+    /**
      * Assert the response carries a policy, and each policy it carries sets the directives to 'none'.
      *
      * @param  list<string>  $directives

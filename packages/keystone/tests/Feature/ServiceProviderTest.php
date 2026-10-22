@@ -2,6 +2,7 @@
 
 use ClaudioDekker\Keystone\Http\Middleware\ApplyHardeningFloor;
 use ClaudioDekker\Keystone\Http\Middleware\CaptureRequestContext;
+use ClaudioDekker\Keystone\Http\Middleware\ClearSiteData;
 use ClaudioDekker\Keystone\Http\Middleware\RefuseCrossSiteRequests;
 use ClaudioDekker\Keystone\KeystoneServiceProvider;
 use Illuminate\Contracts\Http\Kernel;
@@ -32,4 +33,11 @@ it("checks cross-site requests in the web group after Laravel's own CSRF check",
 
     expect($web)->toContain(RefuseCrossSiteRequests::class)
         ->and(array_search(RefuseCrossSiteRequests::class, $web, true))->toBeGreaterThan(array_search(PreventRequestForgery::class, $web, true));
+});
+
+it('clears site data from the start of the global middleware, before the trusted-proxy middleware', function () {
+    $middleware = $this->app->make(Kernel::class)->getGlobalMiddleware();
+
+    expect($middleware)->toContain(ClearSiteData::class)
+        ->and(array_search(ClearSiteData::class, $middleware, true))->toBeLessThan(array_search(TrustProxies::class, $middleware, true));
 });

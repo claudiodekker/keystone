@@ -4,6 +4,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Clear Site Data
+    |--------------------------------------------------------------------------
+    |
+    | What the browser clears when Keystone ends a session: any of cache,
+    | cookies, storage and executionContexts. An empty list sends none.
+    | Clearing cookies signs the browser out of everything it holds.
+    |
+    */
+
+    'clear_site_data' => ['cache', 'storage'],
+
+    /*
+    |--------------------------------------------------------------------------
     | Security Events
     |--------------------------------------------------------------------------
     |
