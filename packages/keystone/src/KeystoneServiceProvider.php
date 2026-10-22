@@ -25,7 +25,7 @@ class KeystoneServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->mergeConfigFrom(dirname(__DIR__).'/config/keystone.php', 'keystone');
+        $this->mergeConfigRecursivelyFrom(dirname(__DIR__).'/config/keystone.php', 'keystone');
 
         Keystone::flushState();
     }
@@ -43,6 +43,63 @@ class KeystoneServiceProvider extends ServiceProvider
 
         $this->loadMigrationsFrom(dirname(__DIR__).'/database/migrations');
         $this->loadTranslationsFrom(dirname(__DIR__).'/lang', 'keystone');
+    }
+
+    /**
+     * Merge the app's config over the file at the path, so a key added later keeps its default.
+     *
+     * A cached config was merged when it was cached, so it is left as cached.
+     */
+    protected function mergeConfigRecursivelyFrom(string $path, string $key): void
+    {
+        if ($this->app->configurationIsCached()) {
+            return;
+        }
+
+        $config = $this->app->make('config');
+        $core = require $path;
+
+        $config->set($key, $this->mergeRecursively($core, $config->get($key, [])));
+    }
+
+    /**
+     * Get core's array with the app's laid over it: maps merge key by key, and any other value of the app's replaces core's.
+     *
+     * @param  array<array-key, mixed>  $core
+     * @param  array<array-key, mixed>  $app
+     * @return array<array-key, mixed>
+     */
+    protected function mergeRecursively(array $core, array $app): array
+    {
+        foreach ($app as $name => $value) {
+            $default = $core[$name] ?? null;
+
+            $core[$name] = $this->isMap($default) && $this->mergesIntoMap($value)
+                ? $this->mergeRecursively($default, $value)
+                : $value;
+        }
+
+        return $core;
+    }
+
+    /**
+     * Determine if the value is an array with keys.
+     *
+     * @phpstan-assert-if-true array<array-key, mixed> $value
+     */
+    protected function isMap(mixed $value): bool
+    {
+        return is_array($value) && ! array_is_list($value);
+    }
+
+    /**
+     * Determine if the value is an array that can merge into a map, an empty one included.
+     *
+     * @phpstan-assert-if-true array<array-key, mixed> $value
+     */
+    protected function mergesIntoMap(mixed $value): bool
+    {
+        return $value === [] || $this->isMap($value);
     }
 
     /**
