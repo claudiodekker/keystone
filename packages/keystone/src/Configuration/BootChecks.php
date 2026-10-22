@@ -18,6 +18,7 @@ class BootChecks
         protected KeyChecks $keys,
         protected MethodChecks $methods,
         protected ModelChecks $models,
+        protected ServiceChecks $services,
     ) {
         //
     }
@@ -49,6 +50,7 @@ class BootChecks
             ...$this->keys->failures(),
             ...$this->methods->failures(),
             ...$this->models->failures(),
+            ...$this->services->failures(),
         ];
     }
 }
