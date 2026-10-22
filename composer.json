@@ -11,7 +11,7 @@
     "require-dev": {
         "claudiodekker/keystone-inertia-vue": "self.version",
         "claudiodekker/keystone-password": "self.version",
-        "claudiodekker/laravel-guardrails": "^1.0",
+        "claudiodekker/laravel-guardrails": "^1.0.1",
         "larastan/larastan": "^3.13",
         "laravel/laravel": "^13.0",
         "laravel/pint": "^1.32",

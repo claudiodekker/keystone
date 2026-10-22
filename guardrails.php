@@ -45,10 +45,7 @@ return [
     OneClassPerFile::class,
     NoFinal::class,
     NoReflection::class,
-    (new NoTestCodeInApp)->allowing([
-        'guardrails.php' => 'The guardrails run only in development, where the repository\'s own checks autoload.',
-        'packages/keystone-password/src/PasswordType.php' => 'The UseTestSupport attribute names the AppTests support class, which only the AppTests resolve.',
-    ]),
+    NoTestCodeInApp::class,
     SortedEnumCases::class,
     EnumCasesDocumentedAlike::class,
     NoDebugCalls::class,
