@@ -19,6 +19,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Hardening
+    |--------------------------------------------------------------------------
+    |
+    | The CSP sources that may frame Keystone's pages, such as the host of
+    | a white-labelled portal. Listing any drops X-Frame-Options, so the
+    | listed sources can frame the sign-in page and click on it.
+    |
+    */
+
+    'hardening' => [
+        'frame_ancestors' => [],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Log Channel
     |--------------------------------------------------------------------------
     |

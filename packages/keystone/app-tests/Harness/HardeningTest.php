@@ -61,3 +61,46 @@ it('fails assertHardened on a response with a loosened header', function (string
     'Cross-Origin-Resource-Policy' => ['Cross-Origin-Resource-Policy', 'cross-origin'],
     'X-Frame-Options' => ['X-Frame-Options', 'SAMEORIGIN'],
 ]);
+
+it('fails assertFramableBy on a response that sets X-Frame-Options', function () {
+    $response = $this->get(route('login'));
+
+    expect(fn () => $this->assertFramableBy($response, ['https://portal.example.com']))->toThrow(AssertionFailedError::class, 'X-Frame-Options');
+});
+
+it('fails assertFramableBy on a response other sources may frame', function () {
+    config(['keystone.hardening.frame_ancestors' => ['https://portal.example.com', 'https://other.example']]);
+
+    $response = $this->get(route('login'));
+
+    expect(fn () => $this->assertFramableBy($response, ['https://portal.example.com']))->toThrow(AssertionFailedError::class, 'other sources');
+});
+
+it('fails assertContentSecurityPolicies on a policy that lacks a directive', function () {
+    $response = $this->get(route('login'));
+
+    expect(fn () => $this->assertContentSecurityPolicies($response, [
+        ['base-uri' => "'none'", 'frame-ancestors' => "'none'"],
+    ]))->toThrow(AssertionFailedError::class);
+});
+
+it('fails assertContentSecurityPolicies on one policy fewer than the response carries', function () {
+    $this->appSetsHeaders(['Content-Security-Policy' => ["default-src 'self'", "img-src 'self'"]]);
+
+    $response = $this->get(route('login'));
+
+    expect(fn () => $this->assertContentSecurityPolicies($response, [
+        ['base-uri' => "'none'", 'default-src' => "'self'", 'frame-ancestors' => "'none'", 'object-src' => "'none'"],
+    ]))->toThrow(AssertionFailedError::class);
+});
+
+it('passes assertContentSecurityPolicies on the same policies in another order', function () {
+    $this->appSetsHeaders(['Content-Security-Policy' => ["default-src 'self'", "img-src 'self'"]]);
+
+    $response = $this->get(route('login'));
+
+    $this->assertContentSecurityPolicies($response, [
+        ['object-src' => "'none'", 'img-src' => "'self'", 'frame-ancestors' => "'none'", 'base-uri' => "'none'"],
+        ['frame-ancestors' => "'none'", 'base-uri' => "'none'", 'default-src' => "'self'", 'object-src' => "'none'"],
+    ]);
+});

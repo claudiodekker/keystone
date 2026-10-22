@@ -36,6 +36,40 @@ trait AssertsHardening
     }
 
     /**
+     * Assert the response lets exactly the given sources frame it, with no X-Frame-Options.
+     *
+     * @param  list<string>  $sources
+     */
+    public function assertFramableBy(TestResponse $response, array $sources): void
+    {
+        Assert::assertFalse($response->headers->has('X-Frame-Options'), 'The response sets X-Frame-Options, which stops the sources framing it.');
+
+        $policies = $this->contentSecurityPolicies($response);
+
+        Assert::assertNotEmpty($policies, 'The response carries no Content-Security-Policy.');
+
+        foreach ($policies as $policy) {
+            Assert::assertSame(implode(' ', $sources), $policy['frame-ancestors'] ?? null, 'A Content-Security-Policy of the response lets other sources frame it.');
+        }
+    }
+
+    /**
+     * Assert the response carries exactly these policies, each given as its directives by name, in any order.
+     *
+     * @param  list<array<string, string>>  $expected
+     */
+    public function assertContentSecurityPolicies(TestResponse $response, array $expected): void
+    {
+        $policies = array_map($this->canonicalPolicy(...), $this->contentSecurityPolicies($response));
+        $expected = array_map($this->canonicalPolicy(...), $expected);
+
+        sort($policies);
+        sort($expected);
+
+        Assert::assertSame($expected, $policies, 'The response carries other Content-Security-Policy headers.');
+    }
+
+    /**
      * Assert the response carries a policy, and each policy it carries sets the directives to 'none'.
      *
      * @param  list<string>  $directives
@@ -51,6 +85,18 @@ trait AssertsHardening
                 Assert::assertSame("'none'", $policy[$directive] ?? null, "A Content-Security-Policy of the response does not close [{$directive}].");
             }
         }
+    }
+
+    /**
+     * Get the policy's directives as one string that does not depend on their order.
+     *
+     * @param  array<string, string>  $directives
+     */
+    protected function canonicalPolicy(array $directives): string
+    {
+        ksort($directives);
+
+        return json_encode($directives, JSON_THROW_ON_ERROR);
     }
 
     /**
