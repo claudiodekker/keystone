@@ -4,6 +4,7 @@ namespace ClaudioDekker\Keystone\Tests\Fixtures\Database\Factories;
 
 use ClaudioDekker\Keystone\Tests\Fixtures\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Facades\Hash;
 
 /**
  * Make fixture users, as an app's own user factory does.
@@ -13,6 +14,11 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 class UserFactory extends Factory
 {
     /**
+     * The password every user made in this process shares, hashed once as the skeleton's factory does.
+     */
+    protected static ?string $password;
+
+    /**
      * Get the default state.
      *
      * @return array<string, mixed>
@@ -21,6 +27,7 @@ class UserFactory extends Factory
     {
         return [
             'name' => fake()->name(),
+            'password' => static::$password ??= Hash::make('password'),
         ];
     }
 }

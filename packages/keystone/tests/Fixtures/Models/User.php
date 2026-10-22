@@ -30,4 +30,16 @@ class User extends Authenticatable implements KeystoneUser
      * @var string
      */
     protected $primaryKey = 'member_id';
+
+    /**
+     * Get the attributes that should be cast, as the skeleton's user model casts them.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'password' => 'hashed',
+        ];
+    }
 }
