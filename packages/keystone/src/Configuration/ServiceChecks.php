@@ -46,6 +46,7 @@ class ServiceChecks
         Limiter::class,
         MethodChecks::class,
         ModelChecks::class,
+        ProductionChecks::class,
         Recorder::class,
         RefuseCrossSiteRequests::class,
         ServiceChecks::class,

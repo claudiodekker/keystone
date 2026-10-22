@@ -43,7 +43,7 @@ class KeystoneServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        Auth::extend('keystone', $this->createGuard(...));
+        Auth::extend(KeystoneGuard::DRIVER, $this->createGuard(...));
 
         $this->captureRequestContext();
         $this->hardenResponses();

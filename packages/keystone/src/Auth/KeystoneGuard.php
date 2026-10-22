@@ -19,6 +19,11 @@ use Symfony\Component\HttpFoundation\Request;
 class KeystoneGuard extends SessionGuard
 {
     /**
+     * The driver name the app's auth config selects the guard with.
+     */
+    public const string DRIVER = 'keystone';
+
+    /**
      * The request the guard serves, which Keystone's provider always sets.
      *
      * @var Request
