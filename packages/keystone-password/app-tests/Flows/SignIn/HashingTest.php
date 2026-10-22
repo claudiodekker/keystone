@@ -5,8 +5,8 @@ use ClaudioDekker\Keystone\Password\AppTests\PasswordSupport;
 use Illuminate\Support\Facades\Auth;
 
 it('signs in with a stored hash of another driver, and rehashes it to the app driver', function (string $stored, string $app) {
-    config(['hashing.driver' => $app, 'hashing.bcrypt.verify' => true, 'hashing.argon.verify' => true]);
     $user = $this->createUser();
+    config(['hashing.driver' => $app, 'hashing.bcrypt.verify' => true, 'hashing.argon.verify' => true]);
     $this->addVerifiedAddress($user, 'ada@example.com');
     $support = (new PasswordSupport)->arrangePassword($user, PasswordSupport::PASSWORD, $stored);
     $fields = ['identifier' => 'ada@example.com', ...$support->validProof(Surface::SIGN_IN, $user)];
