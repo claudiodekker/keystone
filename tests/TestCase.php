@@ -18,6 +18,16 @@ class TestCase extends BaseTestCase
     use LazilyRefreshDatabase;
 
     /**
+     * Set the app up, rendering pages without the workbench's built assets.
+     */
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->withoutVite();
+    }
+
+    /**
      * Get the fixture app's provider, then the providers of every package Composer installed.
      *
      * @return list<class-string>

@@ -2,7 +2,9 @@
 
 namespace Workbench\App\Providers;
 
+use App\Http\Middleware\HandleInertiaRequests;
 use ClaudioDekker\Keystone\Tests\Fixtures\Models\User;
+use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -12,10 +14,14 @@ class WorkbenchServiceProvider extends ServiceProvider
 {
     /**
      * Point the guard at the keystone driver and the fixture user, as the installer's edits do, and the page checks at
-     * the stubs' pages.
+     * the stubs' pages. Outside tests, keep the data in the skeleton's SQLite file rather than in memory.
      */
     public function register(): void
     {
+        if (! $this->app->runningUnitTests()) {
+            config(['database.default' => 'sqlite']);
+        }
+
         config([
             'auth.guards.web.driver' => 'keystone',
             'auth.providers.users.model' => User::class,
@@ -25,10 +31,12 @@ class WorkbenchServiceProvider extends ServiceProvider
     }
 
     /**
-     * Load the fixture user table.
+     * Serve the workbench as an installed app is served.
      */
     public function boot(): void
     {
+        $this->app->usePublicPath(dirname(__DIR__, 2).'/public');
+        $this->app->make(Kernel::class)->appendMiddlewareToGroup('web', HandleInertiaRequests::class);
         $this->loadMigrationsFrom(dirname(__DIR__, 3).'/packages/keystone/tests/Fixtures/Database/Migrations');
     }
 }
