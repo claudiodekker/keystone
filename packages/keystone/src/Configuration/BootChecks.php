@@ -16,6 +16,7 @@ class BootChecks
      */
     public function __construct(
         protected KeyChecks $keys,
+        protected MethodChecks $methods,
     ) {
         //
     }
@@ -45,6 +46,7 @@ class BootChecks
     {
         return [
             ...$this->keys->failures(),
+            ...$this->methods->failures(),
         ];
     }
 }
