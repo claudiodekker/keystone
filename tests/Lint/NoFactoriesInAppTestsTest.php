@@ -1,10 +1,11 @@
 <?php
 
 use ClaudioDekker\Keystone\Lint\Checks\NoFactoriesInAppTests;
-use ClaudioDekker\Keystone\Lint\File;
+use ClaudioDekker\LaravelGuardrails\Kind;
+use ClaudioDekker\LaravelGuardrails\Testing\TestFile;
 
 it('fails a model factory called in an AppTest', function () {
-    $file = new File('packages/keystone/app-tests/Flows/ExampleTest.php', <<<'PHP'
+    $file = TestFile::of(Kind::TESTS, 'packages/keystone/app-tests/Flows/ExampleTest.php', <<<'PHP'
         <?php
 
         it('signs in', function () {
@@ -13,11 +14,11 @@ it('fails a model factory called in an AppTest', function () {
         });
         PHP);
 
-    expect((new NoFactoriesInAppTests)->check($file))->toBe([4, 5]);
+    expect($file->lines(new NoFactoriesInAppTests))->toBe([4, 5]);
 });
 
 it('passes the harness helpers that call the factories', function () {
-    $file = new File('packages/keystone/app-tests/Concerns/Example.php', <<<'PHP'
+    $file = TestFile::of(Kind::TESTS, 'packages/keystone/app-tests/Concerns/Example.php', <<<'PHP'
         <?php
 
         trait Example
@@ -29,11 +30,11 @@ it('passes the harness helpers that call the factories', function () {
         }
         PHP);
 
-    expect((new NoFactoriesInAppTests)->check($file))->toBe([]);
+    expect($file->lines(new NoFactoriesInAppTests))->toBe([]);
 });
 
 it('reads only the AppTests', function () {
-    $file = new File('packages/keystone/tests/Feature/ExampleTest.php', "<?php\n\nUserEmail::factory()->create();\n");
+    $file = TestFile::of(Kind::TESTS, 'packages/keystone/tests/Feature/ExampleTest.php', "<?php\n\nUserEmail::factory()->create();\n");
 
-    expect((new NoFactoriesInAppTests)->check($file))->toBe([]);
+    expect($file->lines(new NoFactoriesInAppTests))->toBe([]);
 });

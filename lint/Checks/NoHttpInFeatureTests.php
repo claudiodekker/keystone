@@ -2,68 +2,24 @@
 
 namespace ClaudioDekker\Keystone\Lint\Checks;
 
-use ClaudioDekker\Keystone\Lint\Check;
-use ClaudioDekker\Keystone\Lint\File;
-use PhpParser\Node;
-use PhpParser\Node\Expr;
+use ClaudioDekker\LaravelGuardrails\Checks\Php\Tests\NoHttpInUnitTests;
 
 /**
- * Refuse an HTTP request in a package's tests/Feature, unless the allowlist names the file and why it can't be an AppTest.
- *
- * Endpoint behaviour is proven by AppTests, which run through the app's own controllers.
+ * Refuse an HTTP request in a Feature test, because AppTests prove endpoint behaviour.
  */
-class NoHttpInFeatureTests extends Check
+class NoHttpInFeatureTests extends NoHttpInUnitTests
 {
     /**
-     * The paths the check reads, as fnmatch patterns from the repository root.
-     *
-     * @var list<string>
+     * The name of the test folder the rule holds in, at any depth.
      */
-    protected array $paths = ['packages/*/tests/Feature/*.php'];
+    protected string $folder = 'Feature';
 
     /**
-     * The Feature tests that may make an HTTP request, each with the reason it can't be an AppTest.
-     *
-     * @var array<string, string>
+     * Get the one-line description of the rule, shown when the checks are chosen.
      */
-    protected array $allowed = [
-        'packages/keystone/tests/Feature/RateLimits/ReplacedActionTest.php' => "An app's AppTests run through its own controllers, so only core can arrange one that replaces an action outright.",
-        'packages/keystone/tests/Feature/SignIn/RehashTest.php' => "Only core's fake type hands back a rehash on demand, or one that throws, so no app can arrange one.",
-        'packages/keystone-inertia-vue/tests/Feature/SignInPagePropsTest.php' => "AppTests run on the app's page, so only the adapter's own tests can load its stub routes to check the props they pass.",
-        'packages/keystone-inertia-vue/tests/Feature/SignOutHistoryTest.php' => "AppTests only see the session flag sign-out leaves, so only the adapter's own tests can load its stub routes to check the next page carries it.",
-    ];
-
-    /**
-     * The request methods of Laravel's test case, lowercase.
-     *
-     * @var list<string>
-     */
-    protected array $requests = [
-        'call',
-        'delete',
-        'deletejson',
-        'get',
-        'getjson',
-        'json',
-        'options',
-        'optionsjson',
-        'patch',
-        'patchjson',
-        'post',
-        'postjson',
-        'put',
-        'putjson',
-    ];
-
-    /**
-     * Create the check, skipping every file the allowlist names.
-     *
-     * @param  array<string, string>|null  $allowed
-     */
-    public function __construct(?array $allowed = null)
+    public function description(): string
     {
-        $this->allowed = $allowed ?? $this->allowed;
-        $this->except = array_keys($this->allowed);
+        return 'No HTTP request in a Feature test, through the test case or Pest\'s Laravel functions.';
     }
 
     /**
@@ -71,33 +27,6 @@ class NoHttpInFeatureTests extends Check
      */
     public function message(): string
     {
-        return 'Write it as an AppTest, or allowlist the file in NoHttpInFeatureTests with the reason it cannot be one.';
-    }
-
-    /**
-     * Get the lines that make a request through the test case or Pest's Laravel functions.
-     *
-     * @return list<int>
-     */
-    protected function lines(File $file): array
-    {
-        return $file->lines($file->find(fn (Node $node) => $this->isRequest($node)));
-    }
-
-    /**
-     * Determine if the node sends a request, as $this->post() or Pest\Laravel\post() does.
-     */
-    protected function isRequest(Node $node): bool
-    {
-        if ($node instanceof Expr\FuncCall) {
-            return $node->name instanceof Node\Name
-                && str_starts_with($node->name->toLowerString(), 'pest\\laravel\\')
-                && in_array(strtolower($node->name->getLast()), $this->requests, true);
-        }
-
-        return $node instanceof Expr\MethodCall
-            && $this->isThis($node->var)
-            && $node->name instanceof Node\Identifier
-            && in_array($node->name->toLowerString(), $this->requests, true);
+        return 'Write it as an AppTest, or allow the file in guardrails.php with the reason it cannot be one.';
     }
 }

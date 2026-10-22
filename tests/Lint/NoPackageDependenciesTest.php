@@ -1,10 +1,11 @@
 <?php
 
 use ClaudioDekker\Keystone\Lint\Checks\NoPackageDependencies;
-use ClaudioDekker\Keystone\Lint\File;
+use ClaudioDekker\LaravelGuardrails\Kind;
+use ClaudioDekker\LaravelGuardrails\Testing\TestFile;
 
-it('fails core when it uses a class from another package', function () {
-    $file = new File('packages/keystone/src/Example.php', <<<'PHP'
+it('fails core when it uses a class from a package its manifest maps', function () {
+    $file = TestFile::of(Kind::SOURCE, 'packages/keystone/src/Example.php', <<<'PHP'
         <?php
 
         namespace ClaudioDekker\Keystone;
@@ -15,13 +16,13 @@ it('fails core when it uses a class from another package', function () {
         {
             //
         }
-        PHP);
+        PHP)->in(dirname(__DIR__, 2));
 
-    expect((new NoPackageDependencies(['ClaudioDekker\\Keystone\\Password\\']))->check($file))->toBe([5]);
+    expect($file->lines(new NoPackageDependencies))->toBe([5]);
 });
 
 it('passes core when it only uses core', function () {
-    $file = new File('packages/keystone/src/Example.php', <<<'PHP'
+    $file = TestFile::of(Kind::SOURCE, 'packages/keystone/src/Example.php', <<<'PHP'
         <?php
 
         namespace ClaudioDekker\Keystone;
@@ -33,25 +34,19 @@ it('passes core when it only uses core', function () {
         {
             //
         }
-        PHP);
+        PHP)->in(dirname(__DIR__, 2));
 
-    expect((new NoPackageDependencies(['ClaudioDekker\\Keystone\\Password\\']))->check($file))->toBe([]);
+    expect($file->lines(new NoPackageDependencies))->toBe([]);
 });
 
 it('lets another package use itself', function () {
-    $file = new File('packages/password/src/Example.php', <<<'PHP'
+    $file = TestFile::of(Kind::SOURCE, 'packages/password/src/Example.php', <<<'PHP'
         <?php
 
         namespace ClaudioDekker\Keystone\Password;
 
         use ClaudioDekker\Keystone\Password\Rules\PasswordRule;
-        PHP);
+        PHP)->in(dirname(__DIR__, 2));
 
-    expect((new NoPackageDependencies(['ClaudioDekker\\Keystone\\Password\\']))->check($file))->toBe([]);
-});
-
-it('reads the namespaces of the other packages from their manifests', function () {
-    $file = new File('packages/keystone/src/Example.php', "<?php\n\nuse ClaudioDekker\\Keystone\\Password\\PasswordType;\n");
-
-    expect((new NoPackageDependencies)->check($file))->toBe([3]);
+    expect($file->lines(new NoPackageDependencies))->toBe([]);
 });

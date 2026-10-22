@@ -1,10 +1,11 @@
 <?php
 
 use ClaudioDekker\Keystone\Lint\Checks\NoHttpInFeatureTests;
-use ClaudioDekker\Keystone\Lint\File;
+use ClaudioDekker\LaravelGuardrails\Kind;
+use ClaudioDekker\LaravelGuardrails\Testing\TestFile;
 
 it('fails a request through the test case in a Feature test', function () {
-    $file = new File('packages/keystone/tests/Feature/ExampleTest.php', <<<'PHP'
+    $file = TestFile::of(Kind::TESTS, 'packages/keystone/tests/Feature/ExampleTest.php', <<<'PHP'
         <?php
 
         it('signs in', function () {
@@ -14,11 +15,11 @@ it('fails a request through the test case in a Feature test', function () {
         });
         PHP);
 
-    expect((new NoHttpInFeatureTests)->check($file))->toBe([4, 5, 6]);
+    expect($file->lines(new NoHttpInFeatureTests))->toBe([4, 5, 6]);
 });
 
 it("fails a request through Pest's Laravel functions in a Feature test", function () {
-    $file = new File('packages/keystone/tests/Feature/ExampleTest.php', <<<'PHP'
+    $file = TestFile::of(Kind::TESTS, 'packages/keystone/tests/Feature/ExampleTest.php', <<<'PHP'
         <?php
 
         use function Pest\Laravel\post;
@@ -28,11 +29,11 @@ it("fails a request through Pest's Laravel functions in a Feature test", functio
         });
         PHP);
 
-    expect((new NoHttpInFeatureTests)->check($file))->toBe([6]);
+    expect($file->lines(new NoHttpInFeatureTests))->toBe([6]);
 });
 
 it('passes calls that make no request', function () {
-    $file = new File('packages/keystone/tests/Feature/ExampleTest.php', <<<'PHP'
+    $file = TestFile::of(Kind::TESTS, 'packages/keystone/tests/Feature/ExampleTest.php', <<<'PHP'
         <?php
 
         it('calls the type', function () {
@@ -42,23 +43,13 @@ it('passes calls that make no request', function () {
         });
         PHP);
 
-    expect((new NoHttpInFeatureTests)->check($file))->toBe([]);
-});
-
-it('passes a Feature test the allowlist names with its reason', function () {
-    $file = new File('packages/keystone/tests/Feature/ExampleTest.php', "<?php\n\n\$this->post('/login/form');\n");
-
-    $check = new NoHttpInFeatureTests([
-        'packages/keystone/tests/Feature/ExampleTest.php' => 'It installs a route no app has.',
-    ]);
-
-    expect($check->check($file))->toBe([]);
+    expect($file->lines(new NoHttpInFeatureTests))->toBe([]);
 });
 
 it('reads only the Feature tests of packages', function (string $path) {
-    $file = new File($path, "<?php\n\n\$this->post('/login/form');\n");
+    $file = TestFile::of(Kind::TESTS, $path, "<?php\n\n\$this->post('/login/form');\n");
 
-    expect((new NoHttpInFeatureTests)->check($file))->toBe([]);
+    expect($file->lines(new NoHttpInFeatureTests))->toBe([]);
 })->with([
     'packages/keystone/app-tests/Flows/ExampleTest.php',
     'packages/keystone/tests/Unit/ExampleTest.php',

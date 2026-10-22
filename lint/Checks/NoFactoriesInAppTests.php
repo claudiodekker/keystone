@@ -2,10 +2,12 @@
 
 namespace ClaudioDekker\Keystone\Lint\Checks;
 
-use ClaudioDekker\Keystone\Lint\Check;
-use ClaudioDekker\Keystone\Lint\File;
-use PhpParser\Node;
-use PhpParser\Node\Expr;
+use ClaudioDekker\LaravelGuardrails\Check;
+use ClaudioDekker\LaravelGuardrails\File;
+use ClaudioDekker\LaravelGuardrails\Kind;
+use ClaudioDekker\LaravelGuardrails\Violation;
+use PhpParser\Node\Expr\StaticCall;
+use PhpParser\Node\Identifier;
 
 /**
  * Refuse a model factory called in an AppTest, which would skip the model the app swapped in.
@@ -13,11 +15,30 @@ use PhpParser\Node\Expr;
 class NoFactoriesInAppTests extends Check
 {
     /**
-     * The paths the check reads, as fnmatch patterns from the repository root.
-     *
-     * @var list<string>
+     * Get the one-line description of the rule, shown when the checks are chosen.
      */
-    protected array $paths = ['packages/*/app-tests/*Test.php'];
+    public function description(): string
+    {
+        return 'No model factory called in an AppTest.';
+    }
+
+    /**
+     * Get the kinds of code the check reads.
+     *
+     * @return list<Kind>
+     */
+    public function kinds(): array
+    {
+        return [Kind::TESTS];
+    }
+
+    /**
+     * Get the one-line description of the files the check reads.
+     */
+    public function scope(): string
+    {
+        return 'tests in an app-tests folder';
+    }
 
     /**
      * Get the failure message, naming the fix.
@@ -28,22 +49,32 @@ class NoFactoriesInAppTests extends Check
     }
 
     /**
-     * Get the lines that call factory() on a class.
+     * Get the file name patterns the check reads.
      *
-     * @return list<int>
+     * @return list<string>
      */
-    protected function lines(File $file): array
+    protected function files(): array
     {
-        return $file->lines($file->find(fn (Node $node) => $this->isFactoryCall($node)));
+        return ['*Test.php'];
     }
 
     /**
-     * Determine if the node calls factory() on a class, such as UserEmail::factory().
+     * Determine if the file is an AppTest.
      */
-    protected function isFactoryCall(Node $node): bool
+    protected function reads(File $file): bool
     {
-        return $node instanceof Expr\StaticCall
-            && $node->name instanceof Node\Identifier
-            && $node->name->toLowerString() === 'factory';
+        return parent::reads($file) && $file->isIn('app-tests');
+    }
+
+    /**
+     * Get a violation at each call to factory() on a class, such as UserEmail::factory().
+     *
+     * @return list<Violation>
+     */
+    protected function violations(File $file): array
+    {
+        $calls = array_filter($file->findInstanceOf(StaticCall::class), fn (StaticCall $call) => $call->name instanceof Identifier && $call->name->toLowerString() === 'factory');
+
+        return array_map(fn (StaticCall $call) => Violation::at($call->name), array_values($calls));
     }
 }

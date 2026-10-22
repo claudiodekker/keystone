@@ -1,10 +1,11 @@
 <?php
 
 use ClaudioDekker\Keystone\Lint\Checks\NoTableAccess;
-use ClaudioDekker\Keystone\Lint\File;
+use ClaudioDekker\LaravelGuardrails\Kind;
+use ClaudioDekker\LaravelGuardrails\Testing\TestFile;
 
 it('fails table access that skips the models', function () {
-    $file = new File('packages/keystone/src/Example.php', <<<'PHP'
+    $file = TestFile::of(Kind::SOURCE, 'packages/keystone/src/Example.php', <<<'PHP'
         <?php
 
         use Illuminate\Support\Facades\DB;
@@ -15,11 +16,11 @@ it('fails table access that skips the models', function () {
         $user?->getConnection();
         PHP);
 
-    expect((new NoTableAccess)->check($file))->toBe([5, 6, 7, 8]);
+    expect($file->lines(new NoTableAccess))->toBe([5, 6, 7, 8]);
 });
 
 it('fails the facade under an alias and the global alias', function () {
-    $file = new File('packages/keystone/src/Example.php', <<<'PHP'
+    $file = TestFile::of(Kind::SOURCE, 'packages/keystone/src/Example.php', <<<'PHP'
         <?php
 
         use Illuminate\Support\Facades\DB as Database;
@@ -28,26 +29,26 @@ it('fails the facade under an alias and the global alias', function () {
         \DB::table('users')->get();
         PHP);
 
-    expect((new NoTableAccess)->check($file))->toBe([5, 6]);
+    expect($file->lines(new NoTableAccess))->toBe([5, 6]);
 });
 
 it('fails table access in the tests of a package', function () {
-    $file = new File('packages/keystone/tests/Feature/ExampleTest.php', "<?php\n\nDB::table('users')->insert([]);\n");
+    $file = TestFile::of(Kind::TESTS, 'packages/keystone/tests/Feature/ExampleTest.php', "<?php\n\nDB::table('users')->insert([]);\n");
 
-    expect((new NoTableAccess)->check($file))->toBe([3]);
+    expect($file->lines(new NoTableAccess))->toBe([3]);
 });
 
 it('fails table access in the AppTests and database files of a package', function (string $path) {
-    $file = new File($path, "<?php\n\nDB::table('user_emails')->insert([]);\n");
+    $file = TestFile::of(Kind::TESTS, $path, "<?php\n\nDB::table('user_emails')->insert([]);\n");
 
-    expect((new NoTableAccess)->check($file))->toBe([3]);
+    expect($file->lines(new NoTableAccess))->toBe([3]);
 })->with([
     'packages/keystone/app-tests/Flows/ExampleTest.php',
     'packages/keystone/database/factories/ExampleFactory.php',
 ]);
 
 it('passes the other uses of the facade and queries through models', function () {
-    $file = new File('packages/keystone/src/Example.php', <<<'PHP'
+    $file = TestFile::of(Kind::SOURCE, 'packages/keystone/src/Example.php', <<<'PHP'
         <?php
 
         use Illuminate\Support\Facades\DB;
@@ -59,11 +60,5 @@ it('passes the other uses of the facade and queries through models', function ()
         $user->getConnectionName();
         PHP);
 
-    expect((new NoTableAccess)->check($file))->toBe([]);
-});
-
-it('reads the source and tests of packages only', function () {
-    $file = new File('tests/DatabaseTest.php', "<?php\n\nDB::table('users')->get();\n");
-
-    expect((new NoTableAccess)->check($file))->toBe([]);
+    expect($file->lines(new NoTableAccess))->toBe([]);
 });

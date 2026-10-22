@@ -1,10 +1,11 @@
 <?php
 
 use ClaudioDekker\Keystone\Lint\Checks\ResponsesThroughAssertionTraits;
-use ClaudioDekker\Keystone\Lint\File;
+use ClaudioDekker\LaravelGuardrails\Kind;
+use ClaudioDekker\LaravelGuardrails\Testing\TestFile;
 
 it('fails an assertion called on a response', function () {
-    $file = new File('packages/keystone/app-tests/Flows/ExampleTest.php', <<<'PHP'
+    $file = TestFile::of(Kind::TESTS, 'packages/keystone/app-tests/Flows/ExampleTest.php', <<<'PHP'
         <?php
 
         it('signs in', function () {
@@ -15,11 +16,11 @@ it('fails an assertion called on a response', function () {
         });
         PHP);
 
-    expect((new ResponsesThroughAssertionTraits)->check($file))->toBe([6, 7]);
+    expect($file->lines(new ResponsesThroughAssertionTraits))->toBe([6, 7]);
 });
 
 it('fails an assertion chained onto a request', function () {
-    $file = new File('packages/keystone/app-tests/Flows/ExampleTest.php', <<<'PHP'
+    $file = TestFile::of(Kind::TESTS, 'packages/keystone/app-tests/Flows/ExampleTest.php', <<<'PHP'
         <?php
 
         it('signs in', function () {
@@ -27,11 +28,11 @@ it('fails an assertion chained onto a request', function () {
         });
         PHP);
 
-    expect((new ResponsesThroughAssertionTraits)->check($file))->toBe([4]);
+    expect($file->lines(new ResponsesThroughAssertionTraits))->toBe([4]);
 });
 
 it('passes assertions called on the test case and on facades', function () {
-    $file = new File('packages/keystone/app-tests/Flows/ExampleTest.php', <<<'PHP'
+    $file = TestFile::of(Kind::TESTS, 'packages/keystone/app-tests/Flows/ExampleTest.php', <<<'PHP'
         <?php
 
         it('signs in', function () {
@@ -42,13 +43,13 @@ it('passes assertions called on the test case and on facades', function () {
         });
         PHP);
 
-    expect((new ResponsesThroughAssertionTraits)->check($file))->toBe([]);
+    expect($file->lines(new ResponsesThroughAssertionTraits))->toBe([]);
 });
 
 it('reads only the AppTests themselves', function (string $path) {
-    $file = new File($path, "<?php\n\n\$response->assertRedirect('/');\n");
+    $file = TestFile::of(Kind::TESTS, $path, "<?php\n\n\$response->assertRedirect('/');\n");
 
-    expect((new ResponsesThroughAssertionTraits)->check($file))->toBe([]);
+    expect($file->lines(new ResponsesThroughAssertionTraits))->toBe([]);
 })->with([
     'packages/keystone/app-tests/Assertions/SignInAssertions.php',
     'packages/keystone/tests/Feature/ExampleTest.php',

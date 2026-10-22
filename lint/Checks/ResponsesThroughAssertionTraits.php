@@ -2,10 +2,15 @@
 
 namespace ClaudioDekker\Keystone\Lint\Checks;
 
-use ClaudioDekker\Keystone\Lint\Check;
-use ClaudioDekker\Keystone\Lint\File;
+use ClaudioDekker\LaravelGuardrails\Check;
+use ClaudioDekker\LaravelGuardrails\File;
+use ClaudioDekker\LaravelGuardrails\Kind;
+use ClaudioDekker\LaravelGuardrails\Violation;
 use PhpParser\Node;
-use PhpParser\Node\Expr;
+use PhpParser\Node\Expr\MethodCall;
+use PhpParser\Node\Expr\NullsafeMethodCall;
+use PhpParser\Node\Expr\Variable;
+use PhpParser\Node\Identifier;
 
 /**
  * Refuse an AppTest that checks a response itself instead of through an assertion the app can override.
@@ -13,11 +18,30 @@ use PhpParser\Node\Expr;
 class ResponsesThroughAssertionTraits extends Check
 {
     /**
-     * The paths the check reads, as fnmatch patterns from the repository root.
-     *
-     * @var list<string>
+     * Get the one-line description of the rule, shown when the checks are chosen.
      */
-    protected array $paths = ['packages/*/app-tests/*Test.php'];
+    public function description(): string
+    {
+        return 'No assert* method called on anything but the test case in an AppTest.';
+    }
+
+    /**
+     * Get the kinds of code the check reads.
+     *
+     * @return list<Kind>
+     */
+    public function kinds(): array
+    {
+        return [Kind::TESTS];
+    }
+
+    /**
+     * Get the one-line description of the files the check reads.
+     */
+    public function scope(): string
+    {
+        return 'tests in an app-tests folder';
+    }
 
     /**
      * Get the failure message, naming the fix.
@@ -28,23 +52,43 @@ class ResponsesThroughAssertionTraits extends Check
     }
 
     /**
-     * Get the lines that call an assert* method on anything but the test case.
+     * Get the file name patterns the check reads.
      *
-     * @return list<int>
+     * @return list<string>
      */
-    protected function lines(File $file): array
+    protected function files(): array
     {
-        return $file->lines($file->find(fn (Node $node) => $this->isForeignAssertion($node)));
+        return ['*Test.php'];
     }
 
     /**
-     * Determine if the node calls assert* on a receiver other than $this, such as $response->assertRedirect().
+     * Determine if the file is an AppTest.
      */
-    protected function isForeignAssertion(Node $node): bool
+    protected function reads(File $file): bool
     {
-        return ($node instanceof Expr\MethodCall || $node instanceof Expr\NullsafeMethodCall)
-            && $node->name instanceof Node\Identifier
+        return parent::reads($file) && $file->isIn('app-tests');
+    }
+
+    /**
+     * Get a violation at each assert* call on a receiver other than $this, such as $response->assertRedirect().
+     *
+     * @return list<Violation>
+     */
+    protected function violations(File $file): array
+    {
+        $calls = $file->find(fn (Node $node) => $this->isForeignAssertion($node));
+
+        return array_map(fn (MethodCall|NullsafeMethodCall $call) => Violation::at($call->name), $calls);
+    }
+
+    /**
+     * Determine if the node calls assert* on a receiver other than $this.
+     */
+    private function isForeignAssertion(Node $node): bool
+    {
+        return ($node instanceof MethodCall || $node instanceof NullsafeMethodCall)
+            && $node->name instanceof Identifier
             && str_starts_with($node->name->toLowerString(), 'assert')
-            && ! $this->isThis($node->var);
+            && ! ($node->var instanceof Variable && $node->var->name === 'this');
     }
 }
