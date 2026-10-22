@@ -61,3 +61,24 @@ The checks set no ceilings. In every environment, they refuse a value of the wro
 | `trusted_origins` | A list of origins, each a scheme and a host with nothing after it. |
 
 It also refuses two packages that register one credential type name, and a user model on a database connection other than the default one, because Keystone's tables are migrated on the default connection.
+
+Keystone also refuses to boot an app that binds one of its internal services in the container, and an app whose HTTP kernel doesn't run Keystone's global middleware that captures the request context. Keystone makes its security decisions with its own services, so an app can't swap them.
+
+## What production also refuses
+
+These settings are fine while developing, so Keystone refuses them only when `APP_ENV` is `production`. A build that caches the config or boots the app with `APP_ENV=production`, for example to run `php artisan config:cache` or `php artisan package:discover`, needs the production settings too.
+
+| Setting | Refused in production |
+|---|---|
+| The default auth guard | Any driver but `keystone`. |
+| `methods` | A list that leaves no type offered on sign-in. |
+| `session.secure`, `session.http_only` | Anything but `true`. |
+| `session.same_site` | Anything but `lax` or `strict`. |
+| `session.cookie` | A name that doesn't start with `__Host-`, or with `__Secure-` when `session.domain` is set. |
+| `session.path` | Anything but `/`. |
+| The default cache store | The `array` or `null` driver, which keep nothing between requests. |
+| The rate limiter's store, which is `cache.limiter` or else the default cache store | The `file`, `array` or `null` driver, which can't count atomically. |
+| `app.url` | Anything but an `https` URL. |
+| The default mailer | The `log` or `array` transport, which deliver nothing. |
+| The default queue connection | The `null` driver, which drops every job. |
+

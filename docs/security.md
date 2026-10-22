@@ -144,4 +144,6 @@ The kinds are `cache`, `cookies`, `storage` and `executionContexts`. Clearing `c
 
 ### Testing
 
+Laravel's `withoutMiddleware()` skips every middleware, Keystone's included, so a test that calls it runs Keystone without its request context, its hardening floor, its cross-site check, Clear-Site-Data and its request limits. Without the request context, Keystone can't read the client's address, so every request counts as coming from the same address. The boot check that your HTTP kernel runs the context middleware can't see this, since the kernel still lists it.
+
 Keystone's AppTests send `Sec-Fetch-Site: same-origin` with every request, as a browser does from your app's own pages. Laravel skips its own CSRF check in tests, but Keystone's never does. `fromAnotherSite()` sends the requests after it as a page on another site would. A refusal is checked through `assertCrossSiteRefused()`, which expects a 419. Redefine it in your assertion traits when your app renders that refusal differently.
