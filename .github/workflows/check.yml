@@ -204,3 +204,68 @@ jobs:
       - run: composer update --prefer-stable --no-interaction --no-progress
 
       - run: vendor/bin/pest --testsuite=contract,keystone-password
+
+  inertia-vue-app:
+    name: PHP 8.5, keystone-inertia-vue in a fresh Laravel app, ${{ matrix.methods }}, SQLite
+    runs-on: ubuntu-24.04
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - methods: every method, AppTests
+            without: ''
+          - methods: without keystone-password, build and sign-in page
+            without: claudiodekker/keystone-password
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: keystone
+          persist-credentials: false
+
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: '8.5'
+          extensions: intl, pdo_sqlite
+          coverage: none
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - run: composer create-project laravel/laravel:^13.0 app --prefer-dist --no-interaction --no-progress
+
+      - name: Install Pest
+        working-directory: app
+        run: |
+          composer require pestphp/pest --dev --with-all-dependencies --no-interaction --no-progress
+          vendor/bin/pest --init
+
+      - name: Require Keystone, the adapter and the methods from the checkout
+        working-directory: app
+        env:
+          WITHOUT: ${{ matrix.without }}
+        run: |
+          packages=$(jq -r '.name' ../keystone/packages/*/composer.json | grep -vxF "$WITHOUT")
+          versions=$(jq -c -n '$ARGS.positional | map({(.): "dev-checkout"}) | add' --args $packages)
+          composer config repositories.keystone "{\"type\": \"path\", \"url\": \"../keystone/packages/*\", \"options\": {\"versions\": $versions}}"
+          composer require $(printf '%s:@dev ' $packages) --no-interaction --no-progress
+
+      - working-directory: app
+        run: php artisan keystone:install --no-interaction
+
+      - working-directory: app
+        run: php artisan migrate --no-interaction
+
+      - if: matrix.without == ''
+        working-directory: app
+        run: php artisan test --testsuite=Keystone
+
+      - if: matrix.without != ''
+        name: Type-check the pages and serve the sign-in page
+        working-directory: app
+        run: |
+          npx vue-tsc --noEmit
+          php artisan serve --no-reload > storage/logs/serve.log 2>&1 &
+          curl --fail --silent --show-error --retry 10 --retry-connrefused --retry-delay 1 --output /dev/null http://127.0.0.1:8000/login
