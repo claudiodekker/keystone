@@ -4,7 +4,10 @@ namespace ClaudioDekker\Keystone;
 
 use ClaudioDekker\Keystone\Auth\KeystoneGuard;
 use ClaudioDekker\Keystone\Exceptions\KeystoneMisconfiguredException;
+use ClaudioDekker\Keystone\Http\Middleware\ApplyHardeningFloor;
 use ClaudioDekker\Keystone\Http\Middleware\CaptureRequestContext;
+use ClaudioDekker\Keystone\Http\Middleware\ClearSiteData;
+use ClaudioDekker\Keystone\Http\Middleware\RefuseCrossSiteRequests;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Support\Facades\Auth;
@@ -35,6 +38,8 @@ class KeystoneServiceProvider extends ServiceProvider
         Auth::extend('keystone', $this->createGuard(...));
 
         $this->captureRequestContext();
+        $this->hardenResponses();
+        $this->refuseCrossSiteRequests();
 
         $this->loadMigrationsFrom(dirname(__DIR__).'/database/migrations');
         $this->loadTranslationsFrom(dirname(__DIR__).'/lang', 'keystone');
@@ -46,6 +51,25 @@ class KeystoneServiceProvider extends ServiceProvider
     protected function captureRequestContext(): void
     {
         $this->app->make(Kernel::class)->pushMiddleware(CaptureRequestContext::class);
+    }
+
+    /**
+     * Add the hardening floor and Clear-Site-Data to the start of the global middleware, so they see the final response of every other layer.
+     */
+    protected function hardenResponses(): void
+    {
+        $kernel = $this->app->make(Kernel::class);
+
+        $kernel->prependMiddleware(ApplyHardeningFloor::class);
+        $kernel->prependMiddleware(ClearSiteData::class);
+    }
+
+    /**
+     * Add the cross-site check to the end of the web group, so it runs once the session has started and after Laravel's own CSRF check.
+     */
+    protected function refuseCrossSiteRequests(): void
+    {
+        $this->app->make(Kernel::class)->appendMiddlewareToGroup('web', RefuseCrossSiteRequests::class);
     }
 
     /**

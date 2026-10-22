@@ -4,6 +4,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Clear Site Data
+    |--------------------------------------------------------------------------
+    |
+    | What the browser clears when Keystone ends a session: any of cache,
+    | cookies, storage and executionContexts. An empty list sends none.
+    | Clearing cookies signs the browser out of everything it holds.
+    |
+    */
+
+    'clear_site_data' => ['cache', 'storage'],
+
+    /*
+    |--------------------------------------------------------------------------
     | Security Events
     |--------------------------------------------------------------------------
     |
@@ -15,6 +28,21 @@ return [
 
     'events' => [
         'enabled' => true,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Hardening
+    |--------------------------------------------------------------------------
+    |
+    | The CSP sources that may frame Keystone's pages, such as the host of
+    | a white-labelled portal. Listing any drops X-Frame-Options, so the
+    | listed sources can frame the sign-in page and click on it.
+    |
+    */
+
+    'hardening' => [
+        'frame_ancestors' => [],
     ],
 
     /*
@@ -49,5 +77,18 @@ return [
             'view' => 60,
         ],
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Trusted Origins
+    |--------------------------------------------------------------------------
+    |
+    | Other origins of this app whose pages may submit to Keystone's routes,
+    | written as scheme and host, such as https://admin.example.com. Any
+    | page on a listed origin can then sign users in and out.
+    |
+    */
+
+    'trusted_origins' => [],
 
 ];

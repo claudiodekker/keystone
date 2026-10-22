@@ -18,13 +18,14 @@ class TestCase extends BaseTestCase
     use LazilyRefreshDatabase;
 
     /**
-     * Set the app up, rendering pages without the workbench's built assets.
+     * Set the app up, rendering pages without the workbench's built assets, and send what a browser sends from the app's own pages.
      */
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->withoutVite();
+        $this->withHeader('Sec-Fetch-Site', 'same-origin');
     }
 
     /**

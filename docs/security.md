@@ -71,3 +71,77 @@ The first refused attempt of each count's window records a `limit.tripped` secur
 ### Testing
 
 Keystone's AppTests count limits in a fresh in-memory store for each test, so the store your app limits in carries no counts from one test to the next. They read every allowance from your live config through `failedAttemptAllowance()` and `requestAllowance()`, so an app that tunes a limit still passes. A throttled answer is checked through `assertSignInThrottled()` and `assertSignOutThrottled()`. Redefine them in your assertion traits when your app renders a throttled refusal differently.
+
+## Hardening
+
+Keystone sets the same headers on every response of its routes, refuses a cross-site request that would change something, and tells the browser to clear its site data when a session ends. None of it needs setup. Three config keys loosen it where a real setup needs that.
+
+### Which routes
+
+A route is Keystone's when its controller is one of Keystone's controllers or your subclass of one. Overriding an action, or adding a method, changes nothing about that. Your other routes keep their own headers and get no cross-site check from Keystone.
+
+### The hardening floor
+
+Every response of a Keystone route carries these headers, whatever your app set, and a redirect, a throttled refusal, a rendered exception and a response from another middleware carry them too:
+
+| Header | Value |
+|---|---|
+| `Cache-Control` | `no-store, max-age=0, must-revalidate` |
+| `Pragma` | `no-cache` |
+| `X-Content-Type-Options` | `nosniff` |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` |
+| `Cross-Origin-Opener-Policy` | `same-origin` |
+| `Cross-Origin-Resource-Policy` | `same-origin` |
+| `X-Frame-Options` | `DENY` |
+
+Symfony adds `private` to the `Cache-Control` value when it sends the response.
+
+The `Content-Security-Policy` merges by directive instead. The directives your app set stay. Keystone sets `object-src`, `base-uri` and `frame-ancestors` to `'none'` in each policy the response carries, so an app policy with `frame-ancestors *` doesn't loosen it. A response with no policy gets one holding just those three directives. Keystone never writes `script-src`, so your app owns what scripts may run. A `Content-Security-Policy-Report-Only` header stays as it is.
+
+An app policy sent as several headers, or as one header with comma-separated policies, is merged policy by policy. A directive repeated in one policy keeps its first value, as a browser reads it.
+
+### Framing by another site
+
+Listing the sources that may frame Keystone's pages in `hardening.frame_ancestors` lets them, for a white-label host that shows your sign-in page in a frame:
+
+```php
+'hardening' => [
+    'frame_ancestors' => ['https://portal.example.com'],
+],
+```
+
+Each entry is one CSP source: a host, a scheme or `*`. `frame-ancestors` then lists them instead of `'none'`, and `X-Frame-Options` is dropped, since it can't name a source. A listed source can frame the sign-in page and trick a user into clicking on it, so list only sources you control. A value that isn't a list of single sources is ignored, and no one may frame.
+
+### Cross-site requests
+
+A request that is not `GET`, `HEAD` or `OPTIONS` to a Keystone route must come from your app's own pages. It passes when any of these holds:
+
+- `Sec-Fetch-Site` is `same-origin`.
+- It carries the session's CSRF token in `_token`, `X-CSRF-TOKEN` or the encrypted `X-XSRF-TOKEN`.
+- Its `Origin` is the request's own origin or one in `trusted_origins`.
+
+Anything else, a `same-site` request from another subdomain included, is refused with Laravel's `TokenMismatchException`, which your app renders as its usual 419 page. The check runs in the `web` group after the session starts, and after Laravel's own CSRF check. It reads none of the exemptions you gave Laravel's, so listing a Keystone route there doesn't open it.
+
+Each refusal records a `request.rejected` security event with the reason `keystone.cross_site_request`. The event is anonymous: a page on any site can make a browser send a request as the user, so the refusal is never recorded against the user's account. It is a log line, and identical ones are logged once per 60 seconds.
+
+Another origin of your own app can submit to Keystone's routes once you list it:
+
+```php
+'trusted_origins' => ['https://admin.example.com'],
+```
+
+Each entry is a scheme and a host, with a port if it has one, and nothing after it. Any page on a listed origin can then sign users in and out. A value that isn't a list of origins is ignored, and no origin is trusted.
+
+### Clearing site data
+
+When Keystone ends a session, the response to that request carries `Clear-Site-Data`, whatever route the request was for. Signing out does, and so does your own code calling `Auth::logout()`. The browser clears what `clear_site_data` lists:
+
+```php
+'clear_site_data' => ['cache', 'storage'],
+```
+
+The kinds are `cache`, `cookies`, `storage` and `executionContexts`. Clearing `cookies` signs the browser out of everything it holds a cookie for on your domain. An empty list sends no header. A value that isn't a list of those kinds clears `cache` and `storage`.
+
+### Testing
+
+Keystone's AppTests send `Sec-Fetch-Site: same-origin` with every request, as a browser does from your app's own pages. Laravel skips its own CSRF check in tests, but Keystone's never does. `fromAnotherSite()` sends the requests after it as a page on another site would. A refusal is checked through `assertCrossSiteRefused()`, which expects a 419. Redefine it in your assertion traits when your app renders that refusal differently.

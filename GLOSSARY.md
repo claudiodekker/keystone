@@ -106,6 +106,22 @@ What the request limit counts an endpoint as: `view` for a page, `submit` for a 
 
 The one refusal every spent limit gives: 429, `Retry-After` in seconds and one message, the same for a real account, a made-up one and an unknown credential type. It renders through the exception handler, never through a response hook.
 
+## Keystone route
+
+A route whose controller implements `KeystoneController`: one of core's controllers, or the app's subclass of one. The hardening floor and the cross-site check cover exactly these routes, whatever the subclass overrides.
+
+## Hardening floor
+
+The headers core sets over the app's on every response of a Keystone route, redirects and refusals included. The `Content-Security-Policy` merges by directive instead, closing `object-src`, `base-uri` and `frame-ancestors`. Only `hardening.frame_ancestors` loosens it.
+
+## Cross-site check
+
+Core's refusal of a request that changes something on a Keystone route and doesn't come from the app's own pages. It runs after Laravel's CSRF check, reads none of its exemptions and skips nothing in tests. A refusal is an anonymous `request.rejected` event and Laravel's 419.
+
+## Clear-Site-Data
+
+The header the response carries when Keystone ended the session during the request, on any route. The kinds come from `clear_site_data`.
+
 ## AppTest
 
 A test in a package's `app-tests/` that drives the app's own routes and published controllers, and checks each answer through an assertion the app can override. AppTests are the feature suite.

@@ -3,9 +3,11 @@
 namespace ClaudioDekker\Keystone\Auth;
 
 use ClaudioDekker\Keystone\Exceptions\SessionGuardSignInException;
+use ClaudioDekker\Keystone\Http\Middleware\ClearSiteData;
 use Illuminate\Auth\SessionGuard;
 use Illuminate\Contracts\Auth\Authenticatable;
 use SensitiveParameter;
+use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Resolve the signed-in account from the session, and sign nobody in through any SessionGuard method.
@@ -16,6 +18,13 @@ use SensitiveParameter;
  */
 class KeystoneGuard extends SessionGuard
 {
+    /**
+     * The request the guard serves, which Keystone's provider always sets.
+     *
+     * @var Request
+     */
+    protected $request;
+
     /**
      * Refuse to sign anyone in with credentials.
      *
@@ -80,7 +89,7 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Sign the user out and end the whole session, so nothing it held outlives them, Auth::logout() included.
+     * Sign the user out and end the whole session, so nothing it held outlives them, Auth::logout() included, and clear the browser's site data.
      */
     public function logout(): void
     {
@@ -88,6 +97,8 @@ class KeystoneGuard extends SessionGuard
 
         $this->session->invalidate();
         $this->session->regenerateToken();
+
+        ClearSiteData::forResponseTo($this->request);
     }
 
     /**

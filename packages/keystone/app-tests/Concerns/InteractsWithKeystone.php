@@ -3,6 +3,7 @@
 namespace ClaudioDekker\Keystone\AppTests\Concerns;
 
 use ClaudioDekker\Keystone\Accounts\EmailAddress;
+use ClaudioDekker\Keystone\AppTests\Assertions\CrossSiteAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\GuestStepAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\SignInAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\SignOutAssertions;
@@ -15,10 +16,13 @@ use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Models\UserEmail;
 use ClaudioDekker\Keystone\RateLimits\StepKind;
+use Closure;
 use Illuminate\Cache\ArrayStore;
 use Illuminate\Cache\RateLimiter;
 use Illuminate\Contracts\Cache\Repository;
+use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -34,6 +38,8 @@ use Symfony\Component\HttpFoundation\Cookie;
  */
 trait InteractsWithKeystone
 {
+    use AssertsHardening;
+    use CrossSiteAssertions;
     use GuestStepAssertions;
     use LazilyRefreshDatabase;
     use SignInAssertions;
@@ -46,7 +52,7 @@ trait InteractsWithKeystone
     protected TestHandler $securityLog;
 
     /**
-     * Keep the lines the security log channel writes, and count rate limits in a store of this test's own.
+     * Keep the lines the security log channel writes, count rate limits in a store of this test's own, and send what a browser sends from the app's own pages.
      */
     protected function setUpInteractsWithKeystone(): void
     {
@@ -55,6 +61,19 @@ trait InteractsWithKeystone
         Log::channel(config('keystone.log_channel'))->pushHandler($this->securityLog);
 
         $this->countLimitsIn(Cache::repository(new ArrayStore));
+
+        $this->withHeader('Sec-Fetch-Site', 'same-origin');
+    }
+
+    /**
+     * Send the requests from here on as a page on another site would, with that site's origin.
+     */
+    public function fromAnotherSite(): static
+    {
+        return $this->withHeaders([
+            'Origin' => 'https://elsewhere.example',
+            'Sec-Fetch-Site' => 'cross-site',
+        ]);
     }
 
     /**
@@ -63,6 +82,24 @@ trait InteractsWithKeystone
     public function countLimitsIn(Repository $store): void
     {
         $this->app->instance(RateLimiter::class, new RateLimiter($store));
+    }
+
+    /**
+     * Have the app put the headers on every response it gives, as an app's own global middleware does.
+     *
+     * @param  array<string, string|list<string>>  $headers
+     */
+    public function appSetsHeaders(array $headers): void
+    {
+        $this->app->make(Kernel::class)->pushMiddleware(function (Request $request, Closure $next) use ($headers) {
+            $response = $next($request);
+
+            foreach ($headers as $name => $values) {
+                $response->headers->set($name, $values);
+            }
+
+            return $response;
+        });
     }
 
     /**

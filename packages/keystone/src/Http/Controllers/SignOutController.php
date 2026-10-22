@@ -9,7 +9,6 @@ use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use ClaudioDekker\Keystone\Session\SessionState;
 use Illuminate\Contracts\Support\Responsable;
 use Illuminate\Http\Request;
-use Illuminate\Routing\Controllers\HasMiddleware;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -17,7 +16,7 @@ use Symfony\Component\HttpFoundation\Response;
  *
  * @api
  */
-abstract class SignOutController implements HasMiddleware
+abstract class SignOutController implements KeystoneController
 {
     /**
      * Get the middleware signing out runs, whatever the app's subclass overrides.
