@@ -74,8 +74,8 @@ return [
     NoFactoriesInAppTests::class,
     ResponsesThroughAssertionTraits::class,
     (new NoHttpInFeatureTests)->allowing([
-        'packages/keystone/tests/Feature/RateLimits/ReplacedActionTest.php' => "An app's AppTests run through its own controllers, so only core can arrange one that replaces an action outright.",
-        'packages/keystone/tests/Feature/SignIn/RehashTest.php' => "Only core's fake type hands back a rehash on demand, or one that throws, so no app can arrange one.",
-        'packages/keystone-inertia-vue/tests/Feature/Install/SignInPageTest.php' => "It runs keystone:install on a copy of the Laravel skeleton, then requests /login from what it installed. AppTests run in an app that is already installed, so none can run the installer first.",
+        'packages/keystone/tests/Feature/RateLimits/ReplacedActionTest.php' => "It checks that rate limiting still holds for a controller that overrides show() and store() without calling Keystone's. The stub controllers always call Keystone's, so no AppTest runs one that skips them.",
+        'packages/keystone/tests/Feature/SignIn/RehashTest.php' => "It needs core's fake credential type, which rehashes, throws or changes the secret mid-check on demand. A real app's type cannot be made to, so no AppTest can arrange it.",
+        'packages/keystone-inertia-vue/tests/Feature/Install/SignInPageTest.php' => 'It runs keystone:install on a copy of the Laravel skeleton, then requests /login from what it installed. AppTests run in an app that is already installed, so none can run the installer first.',
     ]),
 ];
