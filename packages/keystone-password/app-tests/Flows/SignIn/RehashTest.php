@@ -7,9 +7,9 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Exceptions;
 
 beforeEach(function () {
-    config(['hashing.driver' => 'argon2id']);
-
     $this->user = $this->createUser();
+
+    config(['hashing.driver' => 'argon2id']);
     $this->addVerifiedAddress($this->user, 'ada@example.com');
     $this->support = (new PasswordSupport)->arrangePassword($this->user, PasswordSupport::PASSWORD, 'bcrypt');
     $this->fields = ['identifier' => 'ada@example.com', ...$this->support->validProof(Surface::SIGN_IN, $this->user)];
