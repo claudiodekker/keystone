@@ -3,6 +3,7 @@
 namespace ClaudioDekker\Keystone\AppTests\Concerns;
 
 use ClaudioDekker\Keystone\Accounts\EmailAddress;
+use ClaudioDekker\Keystone\AppTests\Assertions\CrossSiteAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\GuestStepAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\SignInAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\SignOutAssertions;
@@ -38,6 +39,7 @@ use Symfony\Component\HttpFoundation\Cookie;
 trait InteractsWithKeystone
 {
     use AssertsHardening;
+    use CrossSiteAssertions;
     use GuestStepAssertions;
     use LazilyRefreshDatabase;
     use SignInAssertions;
@@ -50,7 +52,7 @@ trait InteractsWithKeystone
     protected TestHandler $securityLog;
 
     /**
-     * Keep the lines the security log channel writes, and count rate limits in a store of this test's own.
+     * Keep the lines the security log channel writes, count rate limits in a store of this test's own, and send what a browser sends from the app's own pages.
      */
     protected function setUpInteractsWithKeystone(): void
     {
@@ -59,6 +61,19 @@ trait InteractsWithKeystone
         Log::channel(config('keystone.log_channel'))->pushHandler($this->securityLog);
 
         $this->countLimitsIn(Cache::repository(new ArrayStore));
+
+        $this->withHeader('Sec-Fetch-Site', 'same-origin');
+    }
+
+    /**
+     * Send the requests from here on as a page on another site would, with that site's origin.
+     */
+    public function fromAnotherSite(): static
+    {
+        return $this->withHeaders([
+            'Origin' => 'https://elsewhere.example',
+            'Sec-Fetch-Site' => 'cross-site',
+        ]);
     }
 
     /**

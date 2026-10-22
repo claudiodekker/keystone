@@ -6,6 +6,7 @@ use ClaudioDekker\Keystone\Auth\KeystoneGuard;
 use ClaudioDekker\Keystone\Exceptions\KeystoneMisconfiguredException;
 use ClaudioDekker\Keystone\Http\Middleware\ApplyHardeningFloor;
 use ClaudioDekker\Keystone\Http\Middleware\CaptureRequestContext;
+use ClaudioDekker\Keystone\Http\Middleware\RefuseCrossSiteRequests;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Support\Facades\Auth;
@@ -37,6 +38,7 @@ class KeystoneServiceProvider extends ServiceProvider
 
         $this->captureRequestContext();
         $this->hardenResponses();
+        $this->refuseCrossSiteRequests();
 
         $this->loadMigrationsFrom(dirname(__DIR__).'/database/migrations');
         $this->loadTranslationsFrom(dirname(__DIR__).'/lang', 'keystone');
@@ -56,6 +58,14 @@ class KeystoneServiceProvider extends ServiceProvider
     protected function hardenResponses(): void
     {
         $this->app->make(Kernel::class)->prependMiddleware(ApplyHardeningFloor::class);
+    }
+
+    /**
+     * Add the cross-site check to the end of the web group, so it runs once the session has started and after Laravel's own CSRF check.
+     */
+    protected function refuseCrossSiteRequests(): void
+    {
+        $this->app->make(Kernel::class)->appendMiddlewareToGroup('web', RefuseCrossSiteRequests::class);
     }
 
     /**

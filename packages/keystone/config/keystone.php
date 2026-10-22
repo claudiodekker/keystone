@@ -65,4 +65,17 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Trusted Origins
+    |--------------------------------------------------------------------------
+    |
+    | Other origins of this app whose pages may submit to Keystone's routes,
+    | written as scheme and host, such as https://admin.example.com. Any
+    | page on a listed origin can then sign users in and out.
+    |
+    */
+
+    'trusted_origins' => [],
+
 ];

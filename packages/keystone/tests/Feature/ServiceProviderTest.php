@@ -2,9 +2,12 @@
 
 use ClaudioDekker\Keystone\Http\Middleware\ApplyHardeningFloor;
 use ClaudioDekker\Keystone\Http\Middleware\CaptureRequestContext;
+use ClaudioDekker\Keystone\Http\Middleware\RefuseCrossSiteRequests;
 use ClaudioDekker\Keystone\KeystoneServiceProvider;
 use Illuminate\Contracts\Http\Kernel;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Http\Middleware\TrustProxies;
+use Illuminate\Routing\Router;
 
 it('boots in an app that discovers it', function () {
     expect($this->app->providerIsLoaded(KeystoneServiceProvider::class))->toBeTrue();
@@ -22,4 +25,11 @@ it('hardens responses from the start of the global middleware, before the truste
 
     expect($middleware)->toContain(ApplyHardeningFloor::class)
         ->and(array_search(ApplyHardeningFloor::class, $middleware, true))->toBeLessThan(array_search(TrustProxies::class, $middleware, true));
+});
+
+it("checks cross-site requests in the web group after Laravel's own CSRF check", function () {
+    $web = $this->app->make(Router::class)->getMiddlewareGroups()['web'];
+
+    expect($web)->toContain(RefuseCrossSiteRequests::class)
+        ->and(array_search(RefuseCrossSiteRequests::class, $web, true))->toBeGreaterThan(array_search(PreventRequestForgery::class, $web, true));
 });
