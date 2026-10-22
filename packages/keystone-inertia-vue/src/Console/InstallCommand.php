@@ -15,9 +15,15 @@ use ClaudioDekker\Keystone\InertiaVue\Install\Stubs;
 use ClaudioDekker\Keystone\Keystone;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Config\Repository;
+use Illuminate\Contracts\Process\ProcessResult;
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Process\PendingProcess;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Process;
+use Laravel\Prompts\Support\Logger;
+use Symfony\Component\Console\Output\OutputInterface;
+
+use function Laravel\Prompts\task;
 
 /**
  * Install Keystone's sign-in pages into the app as its own files, and wire the app up to run them and their AppTests.
@@ -79,11 +85,7 @@ class InstallCommand extends Command
         $commands = ['composer dump-autoload', 'npm install', 'npm run build'];
 
         foreach ($commands as $index => $command) {
-            $result = Process::path($this->laravel->basePath())
-                ->forever()
-                ->run($command, fn (string $type, string $output) => $this->output->write($output));
-
-            $this->components->twoColumnDetail($command, $result->successful() ? 'done' : 'failed');
+            $result = $this->runsAsTasks() ? $this->runAsTask($command) : $this->runStreaming($command);
 
             if ($result->failed()) {
                 $this->components->error('Run these yourself once that is fixed:');
@@ -94,6 +96,68 @@ class InstallCommand extends Command
         }
 
         return true;
+    }
+
+    /**
+     * Determine if the commands run as tasks, which needs a terminal that redraws, a fork for the spinner and normal verbosity.
+     */
+    protected function runsAsTasks(): bool
+    {
+        return $this->output->isDecorated()
+            && $this->output->getVerbosity() === OutputInterface::VERBOSITY_NORMAL
+            && function_exists('pcntl_fork');
+    }
+
+    /**
+     * Run the command as a task that shows the tail of its output, and print all of it when the command fails.
+     */
+    protected function runAsTask(string $command): ProcessResult
+    {
+        $result = task(
+            label: $command,
+            callback: fn (Logger $logger) => $this->runLogging($command, $logger),
+            keepSummary: true,
+        );
+
+        if ($result->failed()) {
+            $this->output->write($result->output().$result->errorOutput());
+        }
+
+        return $result;
+    }
+
+    /**
+     * Run the command in the app, sending its output to the task's log, and marking the task failed when it fails.
+     */
+    protected function runLogging(string $command, Logger $logger): ProcessResult
+    {
+        $result = $this->process()->run($command, fn (string $type, string $output) => $logger->line($output));
+
+        if ($result->failed()) {
+            $logger->error("{$command} failed");
+        }
+
+        return $result;
+    }
+
+    /**
+     * Run the command in the app, writing its output as it comes, and then how it ended.
+     */
+    protected function runStreaming(string $command): ProcessResult
+    {
+        $result = $this->process()->run($command, fn (string $type, string $output) => $this->output->write($output));
+
+        $this->components->twoColumnDetail($command, $result->successful() ? 'done' : 'failed');
+
+        return $result;
+    }
+
+    /**
+     * Get a process that runs in the app for as long as it needs.
+     */
+    protected function process(): PendingProcess
+    {
+        return Process::path($this->laravel->basePath())->forever();
     }
 
     /**
