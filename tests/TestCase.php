@@ -28,6 +28,14 @@ class TestCase extends BaseTestCase
     }
 
     /**
+     * Serialize the session as Laravel's skeleton does, which Testbench's config leaves out.
+     */
+    protected function defineEnvironment($app): void
+    {
+        $app['config']->set('session.serialization', 'json');
+    }
+
+    /**
      * Get the fixture app's provider, then the providers of every package Composer installed.
      *
      * @return list<class-string>
