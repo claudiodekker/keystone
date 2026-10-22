@@ -76,6 +76,6 @@ return [
     (new NoHttpInFeatureTests)->allowing([
         'packages/keystone/tests/Feature/RateLimits/ReplacedActionTest.php' => "An app's AppTests run through its own controllers, so only core can arrange one that replaces an action outright.",
         'packages/keystone/tests/Feature/SignIn/RehashTest.php' => "Only core's fake type hands back a rehash on demand, or one that throws, so no app can arrange one.",
-        'packages/keystone-inertia-vue/tests/Feature/Install/SignInPageTest.php' => "AppTests run in the app that ships them, so only the adapter's own tests can install into a copy of the skeleton and request the page the installer wired up.",
+        'packages/keystone-inertia-vue/tests/Feature/Install/SignInPageTest.php' => "It runs keystone:install on a copy of the Laravel skeleton, then requests /login from what it installed. AppTests run in an app that is already installed, so none can run the installer first.",
     ]),
 ];
