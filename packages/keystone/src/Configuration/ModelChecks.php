@@ -36,8 +36,6 @@ class ModelChecks
     /**
      * Get the failure of the user model when it sits on a connection other than the default.
      *
-     * An app whose default guard doesn't use the keystone driver has no user model to check, and the production checks refuse that setup.
-     *
      * @return list<string>
      */
     protected function userModel(): array

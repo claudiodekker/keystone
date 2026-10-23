@@ -7,8 +7,6 @@ use Illuminate\Support\Arr;
 /**
  * The methods config key read as an allow-list: which credential types are offered on which surfaces, narrowing what the installed types declare.
  *
- * A value that is not well formed lists nothing, since boot refuses it and an allow-list only ever narrows.
- *
  * @internal
  *
  * @phpstan-consistent-constructor

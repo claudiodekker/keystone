@@ -37,8 +37,6 @@ class Keystone
     /**
      * Register a credential type, as a plain instance from a method package's boot().
      *
-     * A name that is taken keeps the first type and records the clash, which boot reports.
-     *
      * @internal
      */
     public static function credentialType(CredentialType $type): void

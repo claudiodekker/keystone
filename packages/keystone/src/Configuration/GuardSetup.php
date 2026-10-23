@@ -22,6 +22,16 @@ class GuardSetup
     }
 
     /**
+     * Get the driver of the default guard.
+     */
+    public function driver(): ?string
+    {
+        $driver = $this->config->get("auth.guards.{$this->name()}.driver");
+
+        return is_string($driver) ? $driver : null;
+    }
+
+    /**
      * Get the class of the Eloquent model the default guard's provider reads.
      *
      * @return class-string<Model>|null
@@ -37,7 +47,7 @@ class GuardSetup
     /**
      * Get the name of the default guard.
      */
-    protected function name(): string
+    public function name(): string
     {
         return $this->config->string('auth.defaults.guard');
     }
