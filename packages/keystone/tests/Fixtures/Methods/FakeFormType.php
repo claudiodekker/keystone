@@ -184,7 +184,8 @@ class FakeFormType implements CredentialType, CredentialTypeSupport
      */
     public function arrangeCredential(Surface $surface, KeystoneUser $user): static
     {
-        UserCredential::factory()->for($user, 'user')->create([
+        UserCredential::factory()->create([
+            'user_id' => $user->getAuthIdentifier(),
             'type' => $this->name(),
             'secret' => static::SECRET,
         ]);
