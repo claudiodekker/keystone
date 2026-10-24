@@ -8,27 +8,27 @@ namespace ClaudioDekker\Keystone\Methods;
 class CredentialTypeRegistry
 {
     /**
-     * The registered credential types, by name.
+     * Every type registered under each name, in the order the packages registered them.
      *
-     * @var array<string, CredentialType>
+     * @var array<string, list<CredentialType>>
      */
-    protected array $types = [];
+    protected array $registrations = [];
 
     /**
      * Register a credential type, as a plain instance from a method package's boot().
      */
     public function register(CredentialType $type): void
     {
-        $this->types[$type->name()] = $type;
+        $this->registrations[$type->name()][] = $type;
     }
 
     /**
-     * Get the registered credential types, by name.
+     * Get the first type registered under each name.
      *
      * @return array<string, CredentialType>
      */
     public function types(): array
     {
-        return $this->types;
+        return array_map(fn (array $types) => $types[0], $this->registrations);
     }
 }

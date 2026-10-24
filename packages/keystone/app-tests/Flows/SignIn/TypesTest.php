@@ -66,3 +66,32 @@ it('answers a type that serves no sign-in as not found', function () {
 
     $this->assertSignInTypeNotFound($response);
 });
+
+it('lists only the types the allow-list names', function () {
+    $type = app(CredentialTypes::class)->serving(Surface::SIGN_IN)[0];
+    $shape = $type->initiateShape(Surface::SIGN_IN)->value;
+    config(['keystone.methods' => [$type->name()]]);
+
+    $response = $this->get(route('login'));
+
+    $this->assertSignInPage($response, ['types' => [['name' => $type->name(), 'shape' => $shape]]]);
+});
+
+it('lists no type when the allow-list names none', function () {
+    config(['keystone.methods' => []]);
+
+    $response = $this->get(route('login'));
+
+    $this->assertSignInPage($response, ['types' => []]);
+});
+
+it('answers a type the allow-list leaves out as not found', function () {
+    $name = app(CredentialTypes::class)->serving(Surface::SIGN_IN)[0]->name();
+    config(['keystone.methods' => []]);
+
+    $response = $this->post(route('login.submit', $name), [
+        'identifier' => 'ada@example.com',
+    ]);
+
+    $this->assertSignInTypeNotFound($response);
+});

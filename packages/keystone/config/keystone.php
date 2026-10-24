@@ -60,6 +60,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Methods
+    |--------------------------------------------------------------------------
+    |
+    | The credential types to offer, by name. Null offers every installed
+    | type on every surface it serves. A name with a list of surfaces
+    | narrows it to those, and a type left out is offered nowhere.
+    |
+    */
+
+    'methods' => null,
+
+    /*
+    |--------------------------------------------------------------------------
     | Rate Limits
     |--------------------------------------------------------------------------
     |

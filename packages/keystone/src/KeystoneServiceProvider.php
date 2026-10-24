@@ -11,6 +11,7 @@ use ClaudioDekker\Keystone\Http\Middleware\ClearSiteData;
 use ClaudioDekker\Keystone\Http\Middleware\RefuseCrossSiteRequests;
 use ClaudioDekker\Keystone\Methods\CredentialTypeRegistry;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
+use ClaudioDekker\Keystone\Methods\MethodAllowList;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Support\Facades\Auth;
@@ -22,7 +23,7 @@ use Illuminate\Support\ServiceProvider;
 class KeystoneServiceProvider extends ServiceProvider
 {
     /**
-     * The console commands that run without the boot checks, so a refused config can always be cleared or rebuilt.
+     * The console commands that run without the boot checks.
      *
      * @var list<string>
      */
@@ -39,6 +40,7 @@ class KeystoneServiceProvider extends ServiceProvider
 
         $this->app->bind(CredentialTypes::class, fn (Application $app) => new CredentialTypes(
             $app->make(CredentialTypeRegistry::class)->types(),
+            MethodAllowList::from($app->make('config')->get('keystone.methods')),
         ));
     }
 
@@ -61,8 +63,6 @@ class KeystoneServiceProvider extends ServiceProvider
 
     /**
      * Merge the app's config over the file at the path, so a key added later keeps its default.
-     *
-     * A cached config was merged when it was cached, so it is left as cached.
      */
     protected function mergeConfigRecursivelyFrom(string $path, string $key): void
     {
