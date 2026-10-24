@@ -7,7 +7,9 @@ use ClaudioDekker\Keystone\Lint\Checks\NoHttpInFeatureTests;
 use ClaudioDekker\Keystone\Lint\Checks\NoPackageDependencies;
 use ClaudioDekker\Keystone\Lint\Checks\NoTableAccess;
 use ClaudioDekker\Keystone\Lint\Checks\ResponsesThroughAssertionTraits;
+use ClaudioDekker\LaravelGuardrails\Checks\Php\Comments\ClassDocblocksHoldOnlyTags;
 use ClaudioDekker\LaravelGuardrails\Checks\Php\Comments\DocumentedDeclarations;
+use ClaudioDekker\LaravelGuardrails\Checks\Php\Comments\PhpstanIgnoresNameIdentifier;
 use ClaudioDekker\LaravelGuardrails\Checks\Php\Comments\SingleCaveatDocblocks;
 use ClaudioDekker\LaravelGuardrails\Checks\Php\Comments\SlopedComments;
 use ClaudioDekker\LaravelGuardrails\Checks\Php\Config\DurationsAsProducts;
@@ -26,12 +28,14 @@ use ClaudioDekker\LaravelGuardrails\Checks\Php\Shape\NoBlankLineOpeningBlocks;
 use ClaudioDekker\LaravelGuardrails\Checks\Php\Shape\NoMatchOnCall;
 use ClaudioDekker\LaravelGuardrails\Checks\Php\Shape\NoNewThenCall;
 use ClaudioDekker\LaravelGuardrails\Checks\Php\Shape\OneClausePerLine;
+use ClaudioDekker\LaravelGuardrails\Checks\Php\Structure\ConcernsHoldOnlyTraits;
 use ClaudioDekker\LaravelGuardrails\Checks\Php\Structure\NoFinal;
 use ClaudioDekker\LaravelGuardrails\Checks\Php\Structure\NoReflection;
 use ClaudioDekker\LaravelGuardrails\Checks\Php\Structure\NoTestCodeInApp;
 use ClaudioDekker\LaravelGuardrails\Checks\Php\Structure\OneClassPerFile;
 use ClaudioDekker\LaravelGuardrails\Checks\Php\Tests\NoDocblocksInTests;
 use ClaudioDekker\LaravelGuardrails\Checks\Php\Tests\NoFunctionsInTests;
+use ClaudioDekker\LaravelGuardrails\Checks\Php\Tests\NoHttpInUnitTests;
 use ClaudioDekker\LaravelGuardrails\Checks\Php\Tests\TestsInUnitOrFeature;
 use ClaudioDekker\LaravelGuardrails\Checks\Text\FilesWithinTokenBudget;
 use ClaudioDekker\LaravelGuardrails\Checks\Text\NoEmDashes;
@@ -41,8 +45,10 @@ return [
     NoEmDashes::class,
     NoDocblocksInTests::class,
     NoFunctionsInTests::class,
+    NoHttpInUnitTests::class,
     (new TestsInUnitOrFeature)->only('packages/*/tests'),
     OneClassPerFile::class,
+    ConcernsHoldOnlyTraits::class,
     NoFinal::class,
     NoReflection::class,
     NoTestCodeInApp::class,
@@ -60,6 +66,8 @@ return [
     BlankLineAfterMultilineStatements::class,
     SlopedComments::class,
     SingleCaveatDocblocks::class,
+    ClassDocblocksHoldOnlyTags::class,
+    PhpstanIgnoresNameIdentifier::class,
     DocumentedDeclarations::class,
     NoEnvOutsideConfig::class,
     NoConfigDefaults::class,
