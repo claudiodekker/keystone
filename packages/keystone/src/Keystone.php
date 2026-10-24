@@ -7,9 +7,11 @@ use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Exceptions\KeystoneMisconfiguredException;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
+use ClaudioDekker\Keystone\Methods\MethodAllowList;
 use Illuminate\Auth\EloquentUserProvider;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Config;
 
 /**
  * Hold what the app and the method packages tell Keystone at boot.
@@ -26,33 +28,55 @@ class Keystone
     protected static array $credentialTypes = [];
 
     /**
+     * The classes that registered each name more than once, by name, in order.
+     *
+     * @var array<string, list<class-string<CredentialType>>>
+     */
+    protected static array $clashes = [];
+
+    /**
      * Register a credential type, as a plain instance from a method package's boot().
+     *
+     * A name that is taken keeps the first type and records the clash, which boot reports.
      *
      * @internal
      */
     public static function credentialType(CredentialType $type): void
     {
-        static::$credentialTypes[$type->name()] = $type;
+        $name = $type->name();
+        $taken = static::$credentialTypes[$name] ?? null;
+
+        if ($taken === null) {
+            static::$credentialTypes[$name] = $type;
+
+            return;
+        }
+
+        static::$clashes[$name] ??= [$taken::class];
+        static::$clashes[$name][] = $type::class;
     }
 
     /**
-     * Get the registered credential types.
+     * Get the registered credential types, limited to what the methods config allows.
      *
      * @internal
      */
     public static function credentialTypes(): CredentialTypes
     {
-        return new CredentialTypes(static::$credentialTypes);
+        $methods = MethodAllowList::from(Config::get('keystone.methods'));
+
+        return new CredentialTypes(static::$credentialTypes, $methods, static::$clashes);
     }
 
     /**
-     * Forget every registered credential type.
+     * Forget every registered credential type and every clash.
      *
      * @internal
      */
     public static function flushState(): void
     {
         static::$credentialTypes = [];
+        static::$clashes = [];
     }
 
     /**

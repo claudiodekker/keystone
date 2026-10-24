@@ -60,6 +60,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Methods
+    |--------------------------------------------------------------------------
+    |
+    | The credential types Keystone offers, narrowing what the installed
+    | method packages declare. Null offers every installed type on every
+    | surface it declares. A list names the types to offer: a bare name keeps
+    | every surface of its type, and a name with a list of surfaces, such as
+    | 'totp' => ['challenge'], narrows it. A type left out is offered nowhere.
+    |
+    */
+
+    'methods' => null,
+
+    /*
+    |--------------------------------------------------------------------------
     | Rate Limits
     |--------------------------------------------------------------------------
     |
