@@ -13,8 +13,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use SensitiveParameter;
 
 /**
- * A credential an account holds, of any type.
- *
  * @api
  */
 #[UseFactory(UserCredentialFactory::class)]

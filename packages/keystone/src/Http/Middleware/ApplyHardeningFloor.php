@@ -10,8 +10,6 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Set the hardening floor over whatever a Keystone route's response carries, a redirect, a throttle, a rendered exception or a middleware's own answer included.
- *
  * @internal
  */
 class ApplyHardeningFloor

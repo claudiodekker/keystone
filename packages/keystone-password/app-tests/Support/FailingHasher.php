@@ -7,8 +7,6 @@ use RuntimeException;
 use SensitiveParameter;
 
 /**
- * A driver that checks as the real one does but fails every hash it is asked to make.
- *
  * @internal
  */
 class FailingHasher implements Hasher

@@ -8,8 +8,6 @@ use Inertia\Testing\AssertableInertia;
 use PHPUnit\Framework\Assert as PHPUnit;
 
 /**
- * Check how an Inertia app answers each outcome of signing in.
- *
  * @api
  */
 trait SignInAssertions

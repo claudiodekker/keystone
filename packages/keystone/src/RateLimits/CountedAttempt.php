@@ -3,8 +3,6 @@
 namespace ClaudioDekker\Keystone\RateLimits;
 
 /**
- * An attempt the limiter counted: the count its key reached, and when the window it was counted in ends.
- *
  * @internal
  */
 readonly class CountedAttempt

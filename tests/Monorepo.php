@@ -8,9 +8,6 @@ use Illuminate\Support\Collection;
 use SimpleXMLElement;
 use Symfony\Component\Yaml\Yaml;
 
-/**
- * Read the files that wire the packages into one repository, so a test can check them against packages/*.
- */
 class Monorepo
 {
     /**

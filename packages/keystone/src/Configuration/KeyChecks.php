@@ -9,8 +9,6 @@ use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Support\Arr;
 
 /**
- * Check that each config key holds a value of the right form, and none that turns its control off.
- *
  * @internal
  */
 class KeyChecks

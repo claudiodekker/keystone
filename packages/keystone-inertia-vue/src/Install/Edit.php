@@ -3,10 +3,6 @@
 namespace ClaudioDekker\Keystone\InertiaVue\Install;
 
 /**
- * Change one of the app's files the way a fresh Laravel skeleton lays it out.
- *
- * apply() converges: applying it to its own result returns that result unchanged.
- *
  * @internal
  */
 abstract class Edit
@@ -18,6 +14,8 @@ abstract class Edit
 
     /**
      * Get the file's contents with the edit made, or null when the file no longer has the shape the edit recognises.
+     *
+     * Applying it to its own result returns that result unchanged.
      */
     abstract public function apply(string $contents): ?string;
 

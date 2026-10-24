@@ -3,8 +3,6 @@
 namespace ClaudioDekker\Keystone\Http;
 
 /**
- * The subnet an IP address sits in: the /24 for IPv4, the /64 for IPv6.
- *
  * @internal
  */
 class Subnet

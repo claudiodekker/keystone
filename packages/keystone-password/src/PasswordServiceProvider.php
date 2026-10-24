@@ -8,8 +8,6 @@ use Illuminate\Foundation\Http\Middleware\TrimStrings;
 use Illuminate\Support\ServiceProvider;
 
 /**
- * Register the password type with Keystone, and keep every password field untrimmed.
- *
  * @internal
  */
 class PasswordServiceProvider extends ServiceProvider

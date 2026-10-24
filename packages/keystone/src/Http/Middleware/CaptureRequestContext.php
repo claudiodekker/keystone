@@ -8,8 +8,6 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Capture the request context once per request.
- *
  * @internal
  */
 class CaptureRequestContext

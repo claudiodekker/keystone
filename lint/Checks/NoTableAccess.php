@@ -5,9 +5,6 @@ namespace ClaudioDekker\Keystone\Lint\Checks;
 use ClaudioDekker\LaravelGuardrails\ForbiddenCalls;
 use Illuminate\Support\Facades\DB;
 
-/**
- * Refuse table and connection access, so storage goes through models.
- */
 class NoTableAccess extends ForbiddenCalls
 {
     /**

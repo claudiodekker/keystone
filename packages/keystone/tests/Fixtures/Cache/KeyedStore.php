@@ -4,9 +4,6 @@ namespace ClaudioDekker\Keystone\Tests\Fixtures\Cache;
 
 use Illuminate\Cache\ArrayStore;
 
-/**
- * An in-memory cache store that tells which keys it holds.
- */
 class KeyedStore extends ArrayStore
 {
     /**

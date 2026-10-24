@@ -3,8 +3,6 @@
 namespace ClaudioDekker\Keystone\SecurityEvents;
 
 /**
- * Who made a security event happen.
- *
  * @api
  */
 enum Actor: string

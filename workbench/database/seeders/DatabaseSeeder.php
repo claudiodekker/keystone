@@ -8,9 +8,6 @@ use ClaudioDekker\Keystone\Password\AppTests\PasswordSupport;
 use ClaudioDekker\Keystone\Tests\Fixtures\Models\User;
 use Illuminate\Database\Seeder;
 
-/**
- * Seed the user the manual sign-in uses.
- */
 class DatabaseSeeder extends Seeder
 {
     /**

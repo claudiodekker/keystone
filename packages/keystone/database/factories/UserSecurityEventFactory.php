@@ -9,8 +9,6 @@ use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * Make security events for the app's users.
- *
  * @extends Factory<UserSecurityEvent>
  */
 class UserSecurityEventFactory extends Factory

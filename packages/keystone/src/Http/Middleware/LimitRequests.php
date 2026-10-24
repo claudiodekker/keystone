@@ -9,8 +9,6 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Take the request limit of a step kind before the action runs, so nothing the action does is reached once it is spent.
- *
  * @internal
  */
 class LimitRequests

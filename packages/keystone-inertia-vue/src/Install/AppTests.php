@@ -3,8 +3,6 @@
 namespace ClaudioDekker\Keystone\InertiaVue\Install;
 
 /**
- * Where the AppTests of the installed Keystone packages are.
- *
  * @internal
  */
 class AppTests

@@ -15,8 +15,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * An address an account holds, verified or not.
- *
  * @api
  */
 #[UseFactory(UserEmailFactory::class)]

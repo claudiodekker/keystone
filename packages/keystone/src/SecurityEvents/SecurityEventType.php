@@ -3,8 +3,6 @@
 namespace ClaudioDekker\Keystone\SecurityEvents;
 
 /**
- * The security event types.
- *
  * @api
  */
 enum SecurityEventType: string

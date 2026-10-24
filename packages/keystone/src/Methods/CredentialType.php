@@ -3,8 +3,6 @@
 namespace ClaudioDekker\Keystone\Methods;
 
 /**
- * A way to prove identity that a method package registers, which reaches core only through this contract.
- *
  * @internal
  */
 interface CredentialType

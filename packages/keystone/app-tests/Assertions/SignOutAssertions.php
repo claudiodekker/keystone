@@ -5,8 +5,6 @@ namespace ClaudioDekker\Keystone\AppTests\Assertions;
 use Illuminate\Testing\TestResponse;
 
 /**
- * Check how the app answers signing out, one method per response hook of the sign-out controller.
- *
  * @api
  */
 trait SignOutAssertions

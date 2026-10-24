@@ -5,8 +5,6 @@ namespace ClaudioDekker\Keystone\InertiaVue\Install\Edits;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edit;
 
 /**
- * Map every installed Keystone package's AppTests namespace in the app's autoload-dev, never in autoload.
- *
  * @internal
  */
 class MapAppTests extends Edit

@@ -3,8 +3,6 @@
 namespace ClaudioDekker\Keystone\Methods;
 
 /**
- * A place in the flows where a credential type can be used.
- *
  * @internal
  */
 enum Surface: string

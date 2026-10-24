@@ -8,8 +8,6 @@ use ClaudioDekker\Keystone\Methods\Proof;
 use ClaudioDekker\Keystone\Models\UserCredential;
 
 /**
- * Decide what a proof earns: core re-reads the proven credential, derives its owner itself, and decides.
- *
  * @internal
  */
 class SignInDecision

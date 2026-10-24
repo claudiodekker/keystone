@@ -6,8 +6,6 @@ use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\Assert;
 
 /**
- * Check how the app answers each outcome of signing in, one method per response hook of the sign-in controller.
- *
  * @api
  */
 trait SignInAssertions

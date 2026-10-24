@@ -7,8 +7,6 @@ use Illuminate\Contracts\Debug\ShouldntReport;
 use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 
 /**
- * Refuse a request whose rate limit is spent, which the app's exception handler renders as a 429 with Retry-After.
- *
  * @api
  *
  * @phpstan-consistent-constructor
