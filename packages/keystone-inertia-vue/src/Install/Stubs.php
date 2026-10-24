@@ -8,8 +8,6 @@ use Illuminate\Support\Str;
 use Symfony\Component\Finder\SplFileInfo;
 
 /**
- * The adapter's stubs, by their path in the app.
- *
  * @internal
  */
 class Stubs

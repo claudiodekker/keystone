@@ -10,9 +10,6 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
 
-/**
- * Run real artisan commands in a copy of the Laravel skeleton that boots Keystone with a published config file the test writes.
- */
 class ArtisanApp
 {
     /**

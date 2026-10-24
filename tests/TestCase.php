@@ -11,9 +11,6 @@ use Illuminate\Filesystem\Filesystem;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Orchestra\Testbench\TestCase as BaseTestCase;
 
-/**
- * Run a test in an app with every installed package, held to the suite's rules.
- */
 class TestCase extends BaseTestCase
 {
     use AppliesBootstrapRules;

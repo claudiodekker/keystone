@@ -5,8 +5,6 @@ namespace ClaudioDekker\Keystone\Exceptions;
 use LogicException;
 
 /**
- * Refuse a sign-in through a SessionGuard method that has no way to report a refusal.
- *
  * @internal
  *
  * @phpstan-consistent-constructor

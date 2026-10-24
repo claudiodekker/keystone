@@ -12,8 +12,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 
 /**
- * Hold what the app and the method packages tell Keystone at boot.
- *
  * @api
  */
 class Keystone

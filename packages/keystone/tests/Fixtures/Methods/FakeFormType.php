@@ -13,9 +13,6 @@ use ClaudioDekker\Keystone\Methods\Verification;
 use ClaudioDekker\Keystone\Models\UserCredential;
 use Closure;
 
-/**
- * A credential type of the form shape that compares a stored secret, and deliberately not a password.
- */
 class FakeFormType implements CredentialType, CredentialTypeSupport
 {
     /**

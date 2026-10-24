@@ -3,8 +3,6 @@
 namespace ClaudioDekker\Keystone\Http;
 
 /**
- * A kind of data Clear-Site-Data tells the browser to clear.
- *
  * @internal
  */
 enum SiteData: string

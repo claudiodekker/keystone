@@ -4,9 +4,6 @@ namespace ClaudioDekker\Keystone\Lint\Checks;
 
 use ClaudioDekker\LaravelGuardrails\Checks\Php\Tests\NoHttpInUnitTests;
 
-/**
- * Refuse an HTTP request in a Feature test, because AppTests prove endpoint behaviour.
- */
 class NoHttpInFeatureTests extends NoHttpInUnitTests
 {
     /**

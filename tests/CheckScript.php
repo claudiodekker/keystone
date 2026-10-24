@@ -8,9 +8,6 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
 
-/**
- * Run `composer check` against stand-in tools, so a test decides which step fails.
- */
 class CheckScript
 {
     /**

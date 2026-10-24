@@ -8,8 +8,6 @@ use Illuminate\Support\Arr;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Keep only the identifier in the input a Keystone action flashes back, whatever answered: a hook, a refusal or Laravel's validation.
- *
  * @internal
  */
 class FlashOnlyTheIdentifier

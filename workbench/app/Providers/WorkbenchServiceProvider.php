@@ -7,9 +7,6 @@ use ClaudioDekker\Keystone\Tests\Fixtures\Models\User;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Support\ServiceProvider;
 
-/**
- * Set the workbench up as keystone:install sets up an app, reading the adapter's stubs where they are.
- */
 class WorkbenchServiceProvider extends ServiceProvider
 {
     /**

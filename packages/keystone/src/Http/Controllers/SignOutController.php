@@ -12,8 +12,6 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * End the session, ending in one response hook.
- *
  * @api
  */
 abstract class SignOutController implements KeystoneController

@@ -3,8 +3,6 @@
 namespace ClaudioDekker\Keystone\Methods;
 
 /**
- * How a page starts a credential type; the page renders one component per shape.
- *
  * @internal
  */
 enum InitiateShape: string

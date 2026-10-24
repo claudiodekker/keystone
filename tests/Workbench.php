@@ -6,9 +6,6 @@ use InvalidArgumentException;
 
 use function Orchestra\Testbench\default_skeleton_path;
 
-/**
- * Boot the root workbench as the app the AppTests run against, which is the app `testbench serve` serves.
- */
 class Workbench
 {
     /**

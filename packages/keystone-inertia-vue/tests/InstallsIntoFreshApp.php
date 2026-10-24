@@ -9,9 +9,6 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\View;
 use Inertia\ServiceProvider as InertiaServiceProvider;
 
-/**
- * Point the app at a fresh copy of the Laravel skeleton.
- */
 trait InstallsIntoFreshApp
 {
     /**

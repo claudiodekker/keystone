@@ -5,8 +5,6 @@ namespace ClaudioDekker\Keystone\Configuration;
 use ClaudioDekker\Keystone\Exceptions\KeystoneMisconfiguredException;
 
 /**
- * Refuse to boot an app whose setup Keystone can't honour, naming every problem in one exception.
- *
  * @internal
  */
 class BootChecks

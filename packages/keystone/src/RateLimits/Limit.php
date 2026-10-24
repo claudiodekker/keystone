@@ -3,8 +3,6 @@
 namespace ClaudioDekker\Keystone\RateLimits;
 
 /**
- * One of the rate limiter's limits, each counted over its own fixed window.
- *
  * @internal
  */
 enum Limit: string
