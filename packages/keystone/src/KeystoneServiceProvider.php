@@ -3,6 +3,7 @@
 namespace ClaudioDekker\Keystone;
 
 use ClaudioDekker\Keystone\Auth\KeystoneGuard;
+use ClaudioDekker\Keystone\Configuration\BootChecks;
 use ClaudioDekker\Keystone\Exceptions\KeystoneMisconfiguredException;
 use ClaudioDekker\Keystone\Http\Middleware\ApplyHardeningFloor;
 use ClaudioDekker\Keystone\Http\Middleware\CaptureRequestContext;
@@ -21,11 +22,18 @@ use Illuminate\Support\ServiceProvider;
 class KeystoneServiceProvider extends ServiceProvider
 {
     /**
+     * The console commands that run without the boot checks, so a refused config can always be cleared or rebuilt.
+     *
+     * @var list<string>
+     */
+    protected const array COMMANDS_WITHOUT_BOOT_CHECKS = ['config:clear', 'optimize:clear'];
+
+    /**
      * Merge the config, and start the app from no registered credential types, so each app registers its own in boot().
      */
     public function register(): void
     {
-        $this->mergeConfigFrom(dirname(__DIR__).'/config/keystone.php', 'keystone');
+        $this->mergeConfigRecursivelyFrom(dirname(__DIR__).'/config/keystone.php', 'keystone');
 
         Keystone::flushState();
     }
@@ -43,6 +51,83 @@ class KeystoneServiceProvider extends ServiceProvider
 
         $this->loadMigrationsFrom(dirname(__DIR__).'/database/migrations');
         $this->loadTranslationsFrom(dirname(__DIR__).'/lang', 'keystone');
+
+        $this->checkBoot();
+    }
+
+    /**
+     * Merge the app's config over the file at the path, so a key added later keeps its default.
+     *
+     * A cached config was merged when it was cached, so it is left as cached.
+     */
+    protected function mergeConfigRecursivelyFrom(string $path, string $key): void
+    {
+        if ($this->app->configurationIsCached()) {
+            return;
+        }
+
+        $config = $this->app->make('config');
+        $core = require $path;
+
+        $config->set($key, $this->mergeRecursively($core, $config->get($key, [])));
+    }
+
+    /**
+     * Get core's array with the app's laid over it: maps merge key by key, and any other value of the app's replaces core's.
+     *
+     * @param  array<array-key, mixed>  $core
+     * @param  array<array-key, mixed>  $app
+     * @return array<array-key, mixed>
+     */
+    protected function mergeRecursively(array $core, array $app): array
+    {
+        foreach ($app as $name => $value) {
+            $default = $core[$name] ?? null;
+
+            $core[$name] = $this->isMap($default) && $this->mergesIntoMap($value)
+                ? $this->mergeRecursively($default, $value)
+                : $value;
+        }
+
+        return $core;
+    }
+
+    /**
+     * Determine if the value is an array with keys.
+     *
+     * @phpstan-assert-if-true array<array-key, mixed> $value
+     */
+    protected function isMap(mixed $value): bool
+    {
+        return is_array($value) && ! array_is_list($value);
+    }
+
+    /**
+     * Determine if the value is an array that can merge into a map, an empty one included.
+     *
+     * @phpstan-assert-if-true array<array-key, mixed> $value
+     */
+    protected function mergesIntoMap(mixed $value): bool
+    {
+        return $value === [] || $this->isMap($value);
+    }
+
+    /**
+     * Run the boot checks once the app has booted, unless the config comes from the cache, where they ran when it was cached, or the command clears it.
+     */
+    protected function checkBoot(): void
+    {
+        $this->app->booted(function () {
+            if ($this->app->configurationIsCached()) {
+                return;
+            }
+
+            if ($this->app->runningConsoleCommand(...static::COMMANDS_WITHOUT_BOOT_CHECKS)) {
+                return;
+            }
+
+            $this->app->make(BootChecks::class)->run();
+        });
     }
 
     /**
