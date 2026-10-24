@@ -2,7 +2,7 @@
 
 use ClaudioDekker\Keystone\InertiaVue\Install\Stubs;
 use ClaudioDekker\Keystone\InertiaVue\Tests\InstallsIntoFreshApp;
-use ClaudioDekker\Keystone\Keystone;
+use ClaudioDekker\Keystone\Methods\CredentialTypeRegistry;
 use ClaudioDekker\Keystone\Tests\Fixtures\Methods\FakePinType;
 use Composer\InstalledVersions;
 
@@ -34,7 +34,7 @@ it('adds the partial of a credential type installed since', function () {
     $this->artisan('keystone:install')->assertSuccessful();
     expect($this->fresh->has('resources/js/partials/Totp.vue'))->toBeFalse();
 
-    Keystone::credentialType(new class extends FakePinType
+    app(CredentialTypeRegistry::class)->register(new class extends FakePinType
     {
         public function name(): string
         {

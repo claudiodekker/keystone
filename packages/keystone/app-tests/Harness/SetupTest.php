@@ -1,7 +1,7 @@
 <?php
 
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
-use ClaudioDekker\Keystone\Keystone;
+use ClaudioDekker\Keystone\Methods\CredentialTypeRegistry;
 use ClaudioDekker\Keystone\Methods\Surface;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Support\Facades\Auth;
@@ -16,7 +16,7 @@ it('names the fix when the user model has no factory', function () {
 });
 
 it('names the fix when no installed type with test support serves the surface', function () {
-    Keystone::flushState();
+    $this->app->instance(CredentialTypeRegistry::class, new CredentialTypeRegistry);
 
     expect(fn () => $this->supportFor(Surface::SIGN_IN))->toThrow(AssertionFailedError::class, 'No installed credential type with test support serves [sign-in]. Install a method package that does.');
 });

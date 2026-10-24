@@ -2,12 +2,12 @@
 
 // Fault injection through the fake type: no installed type holds a request open while others arrive, so no AppTest can.
 
-use ClaudioDekker\Keystone\Keystone;
+use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\SignIn\SignIn;
 
 it('gives parallel wrong answers no more verify calls than the allowance', function () {
-    $type = Keystone::credentialTypes()->find('form', Surface::SIGN_IN);
+    $type = app(CredentialTypes::class)->find('form', Surface::SIGN_IN);
     $attempt = fn () => rescue(fn () => $this->app->make(SignIn::class)->attempt($type, [
         'identifier' => 'ada@example.com',
         'secret' => 'wrong horse',

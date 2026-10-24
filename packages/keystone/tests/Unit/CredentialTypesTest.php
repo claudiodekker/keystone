@@ -1,6 +1,5 @@
 <?php
 
-use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Tests\Fixtures\Methods\FakeChallengeType;
@@ -27,7 +26,7 @@ it('finds a type only on a surface it serves', function () {
 });
 
 it("offers the fixture app's types before any installed method package's", function () {
-    $types = Keystone::credentialTypes()->serving(Surface::SIGN_IN);
+    $types = app(CredentialTypes::class)->serving(Surface::SIGN_IN);
 
     expect($types[0])->toBeInstanceOf(FakeFormType::class);
 });

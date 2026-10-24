@@ -2,6 +2,7 @@
 
 namespace ClaudioDekker\Keystone\Tests\Fixtures\Http\Controllers;
 
+use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Session\SessionState;
 use ClaudioDekker\Keystone\SignIn\SignIn;
 use Illuminate\Contracts\Support\Responsable;
@@ -13,7 +14,7 @@ class ReplacedSignInController extends SignInController
     /**
      * Answer the page without Keystone's show().
      */
-    public function show(Request $request, SessionState $session): Response|Responsable
+    public function show(Request $request, SessionState $session, CredentialTypes $types): Response|Responsable
     {
         return response('replaced');
     }
@@ -21,7 +22,7 @@ class ReplacedSignInController extends SignInController
     /**
      * Answer the submit without Keystone's store().
      */
-    public function store(Request $request, string $type, SessionState $session, SignIn $signIn): Response|Responsable
+    public function store(Request $request, string $type, SessionState $session, SignIn $signIn, CredentialTypes $types): Response|Responsable
     {
         return response('replaced');
     }

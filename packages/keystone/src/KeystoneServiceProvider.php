@@ -9,6 +9,8 @@ use ClaudioDekker\Keystone\Http\Middleware\ApplyHardeningFloor;
 use ClaudioDekker\Keystone\Http\Middleware\CaptureRequestContext;
 use ClaudioDekker\Keystone\Http\Middleware\ClearSiteData;
 use ClaudioDekker\Keystone\Http\Middleware\RefuseCrossSiteRequests;
+use ClaudioDekker\Keystone\Methods\CredentialTypeRegistry;
+use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Support\Facades\Auth;
@@ -27,13 +29,17 @@ class KeystoneServiceProvider extends ServiceProvider
     protected const array COMMANDS_WITHOUT_BOOT_CHECKS = ['config:clear', 'optimize:clear'];
 
     /**
-     * Merge the config, and start the app from no registered credential types, so each app registers its own in boot().
+     * Merge the config, and bind the credential types the method packages register in boot().
      */
     public function register(): void
     {
         $this->mergeConfigRecursivelyFrom(dirname(__DIR__).'/config/keystone.php', 'keystone');
 
-        Keystone::flushState();
+        $this->app->singleton(CredentialTypeRegistry::class);
+
+        $this->app->bind(CredentialTypes::class, fn (Application $app) => new CredentialTypes(
+            $app->make(CredentialTypeRegistry::class)->types(),
+        ));
     }
 
     /**

@@ -3,8 +3,8 @@
 // Fault injection through the fake type: no installed type throws on demand or holds a request open, so no AppTest can.
 
 use ClaudioDekker\Keystone\Exceptions\ThrottledException;
-use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\CredentialType;
+use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\InitiateShape;
 use ClaudioDekker\Keystone\Methods\Proof;
 use ClaudioDekker\Keystone\Methods\Surface;
@@ -58,7 +58,7 @@ it('keeps an accepted proof that core refuses counted', function () {
     $grace = User::factory()->create();
     UserEmail::factory()->for($ada, 'user')->verified()->create(['address' => 'ada@example.com']);
     $graces = UserCredential::factory()->for($grace, 'user')->create(['type' => 'form', 'secret' => 'grace horse']);
-    $type = Keystone::credentialTypes()->find('form', Surface::SIGN_IN);
+    $type = app(CredentialTypes::class)->find('form', Surface::SIGN_IN);
     $type->forgeProofOf($graces);
     $attempt = fn () => $this->app->make(SignIn::class)->attempt($type, [
         'identifier' => 'ada@example.com',
@@ -76,7 +76,7 @@ it('gives nothing back once the window it was counted in has ended', function ()
     $ada = User::factory()->create();
     UserEmail::factory()->for($ada, 'user')->verified()->create(['address' => 'ada@example.com']);
     UserCredential::factory()->for($ada, 'user')->create(['type' => 'form', 'secret' => 'correct horse']);
-    $type = Keystone::credentialTypes()->find('form', Surface::SIGN_IN);
+    $type = app(CredentialTypes::class)->find('form', Surface::SIGN_IN);
     $wrong = fn () => $this->app->make(SignIn::class)->attempt($type, [
         'identifier' => 'ada@example.com',
         'secret' => 'wrong horse',

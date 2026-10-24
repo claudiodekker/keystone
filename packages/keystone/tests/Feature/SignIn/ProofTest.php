@@ -3,6 +3,7 @@
 // Fault injection through the fake type: no installed type hands back a credential it wasn't given, so no AppTest can.
 
 use ClaudioDekker\Keystone\Keystone;
+use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Models\UserCredential;
 use ClaudioDekker\Keystone\Models\UserEmail;
@@ -15,7 +16,7 @@ it("signs nobody in with a proof of another account's credential", function () {
     $grace = User::factory()->create();
     UserEmail::factory()->for($ada, 'user')->verified()->create(['address' => 'ada@example.com']);
     $graces = UserCredential::factory()->for($grace, 'user')->create(['type' => 'form', 'secret' => 'grace horse']);
-    $type = Keystone::credentialTypes()->find('form', Surface::SIGN_IN);
+    $type = app(CredentialTypes::class)->find('form', Surface::SIGN_IN);
     $type->forgeProofOf($graces);
 
     $outcome = $this->app->make(SignIn::class)->attempt($type, [
@@ -31,7 +32,7 @@ it("signs nobody in with a proof of the account's credential of another type", f
     $ada = User::factory()->create();
     UserEmail::factory()->for($ada, 'user')->verified()->create(['address' => 'ada@example.com']);
     $other = UserCredential::factory()->for($ada, 'user')->create(['type' => 'other', 'secret' => 'other horse']);
-    $type = Keystone::credentialTypes()->find('form', Surface::SIGN_IN);
+    $type = app(CredentialTypes::class)->find('form', Surface::SIGN_IN);
     $type->forgeProofOf($other);
 
     $outcome = $this->app->make(SignIn::class)->attempt($type, [
@@ -46,7 +47,7 @@ it("signs nobody in with a proof of the account's credential of another type", f
 it('signs nobody in with a proof when the identifier names no account', function () {
     $grace = User::factory()->create();
     $graces = UserCredential::factory()->for($grace, 'user')->create(['type' => 'form', 'secret' => 'grace horse']);
-    $type = Keystone::credentialTypes()->find('form', Surface::SIGN_IN);
+    $type = app(CredentialTypes::class)->find('form', Surface::SIGN_IN);
     $type->forgeProofOf($graces);
 
     $outcome = $this->app->make(SignIn::class)->attempt($type, [
@@ -59,7 +60,7 @@ it('signs nobody in with a proof when the identifier names no account', function
 });
 
 it('still calls the type, with no credentials, when the identifier names no account', function () {
-    $type = Keystone::credentialTypes()->find('form', Surface::SIGN_IN);
+    $type = app(CredentialTypes::class)->find('form', Surface::SIGN_IN);
 
     $this->app->make(SignIn::class)->attempt($type, [
         'identifier' => 'nobody@example.com',
@@ -72,7 +73,7 @@ it('still calls the type, with no credentials, when the identifier names no acco
 });
 
 it('makes the type compare against a decoy secret when the identifier names no account', function () {
-    $type = Keystone::credentialTypes()->find('form', Surface::SIGN_IN);
+    $type = app(CredentialTypes::class)->find('form', Surface::SIGN_IN);
 
     $this->app->make(SignIn::class)->attempt($type, [
         'identifier' => 'nobody@example.com',

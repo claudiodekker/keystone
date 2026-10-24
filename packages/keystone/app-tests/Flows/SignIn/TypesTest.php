@@ -1,14 +1,15 @@
 <?php
 
-use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\CredentialType;
+use ClaudioDekker\Keystone\Methods\CredentialTypeRegistry;
+use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\InitiateShape;
 use ClaudioDekker\Keystone\Methods\Proof;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Methods\Verification;
 
 beforeEach(function () {
-    Keystone::credentialType(new class implements CredentialType
+    app(CredentialTypeRegistry::class)->register(new class implements CredentialType
     {
         public function name(): string
         {
@@ -38,7 +39,7 @@ beforeEach(function () {
 });
 
 it('lists only the types that serve sign-in, each with its initiate shape', function () {
-    $types = collect(Keystone::credentialTypes()->serving(Surface::SIGN_IN))
+    $types = collect(app(CredentialTypes::class)->serving(Surface::SIGN_IN))
         ->map(fn (CredentialType $type) => [
             'name' => $type->name(),
             'shape' => $type->initiateShape(Surface::SIGN_IN)->value,

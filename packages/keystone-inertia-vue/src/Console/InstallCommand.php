@@ -12,7 +12,7 @@ use ClaudioDekker\Keystone\InertiaVue\Install\Edits\RequireRouteFile;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\SetSessionCookie;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\UseKeystoneGuard;
 use ClaudioDekker\Keystone\InertiaVue\Install\Stubs;
-use ClaudioDekker\Keystone\Keystone;
+use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Process\ProcessResult;
@@ -49,7 +49,7 @@ class InstallCommand extends Command
      *
      * Every step converges, so a second run changes nothing and finishes a run that stopped part way.
      */
-    public function handle(Stubs $stubs, Filesystem $files, Repository $config): int
+    public function handle(Stubs $stubs, Filesystem $files, Repository $config, CredentialTypes $types): int
     {
         $manifest = json_decode($files->get($this->laravel->basePath('composer.json')), true);
 
@@ -63,7 +63,7 @@ class InstallCommand extends Command
             return $this->refuse($refusals);
         }
 
-        $this->copy($stubs, $files);
+        $this->copy($stubs, $files, $types);
         $this->replaceSkeletonFiles($stubs, $files);
 
         $everyEditApplied = collect($this->edits($config, $files))
@@ -270,11 +270,11 @@ class InstallCommand extends Command
     /**
      * Copy the stubs the app lacks, or every stub when forced.
      */
-    protected function copy(Stubs $stubs, Filesystem $files): void
+    protected function copy(Stubs $stubs, Filesystem $files, CredentialTypes $types): void
     {
         $skipped = [];
 
-        foreach ($stubs->for(Keystone::credentialTypes()->names()) as $path) {
+        foreach ($stubs->for($types->names()) as $path) {
             $target = $this->laravel->basePath($path);
 
             if ($files->exists($target) && ! $this->option('force')) {

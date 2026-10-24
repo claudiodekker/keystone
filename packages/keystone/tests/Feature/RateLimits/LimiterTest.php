@@ -4,13 +4,13 @@
 
 use ClaudioDekker\Keystone\Exceptions\MissingFlowException;
 use ClaudioDekker\Keystone\Exceptions\ThrottledException;
-use ClaudioDekker\Keystone\Keystone;
+use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\RateLimits\Limiter;
 use ClaudioDekker\Keystone\RateLimits\StepKind;
 
 it('asks to retry after the seconds left of the hour the failed attempts were counted in', function () {
-    $type = Keystone::credentialTypes()->find('form', Surface::SIGN_IN);
+    $type = app(CredentialTypes::class)->find('form', Surface::SIGN_IN);
     $limiter = $this->app->make(Limiter::class);
 
     foreach (range(1, config('keystone.rate_limits.failed_attempts_per_hour')) as $i) {
@@ -37,7 +37,7 @@ it('asks to retry after the seconds left of the minute the requests were counted
 });
 
 it('refuses to count a failed attempt on a surface that is in no flow', function () {
-    $type = Keystone::credentialTypes()->find('form', Surface::SIGN_IN);
+    $type = app(CredentialTypes::class)->find('form', Surface::SIGN_IN);
     $limiter = $this->app->make(Limiter::class);
 
     $take = fn () => $limiter->takeFailedAttempt($type, Surface::CHALLENGE, null, 'grace@example.com');
