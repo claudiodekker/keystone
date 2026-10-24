@@ -6,8 +6,6 @@ use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\Assert;
 
 /**
- * Check the hardening floor and Clear-Site-Data on a response, which Keystone sets whatever the app's controllers answer.
- *
  * @api
  */
 trait AssertsHardening

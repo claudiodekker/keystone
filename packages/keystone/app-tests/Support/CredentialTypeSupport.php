@@ -7,8 +7,6 @@ use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\Surface;
 
 /**
- * Let AppTests drive a credential type on a surface it serves: arrange a credential, and give a valid or a rejected proof.
- *
  * @internal
  */
 interface CredentialTypeSupport

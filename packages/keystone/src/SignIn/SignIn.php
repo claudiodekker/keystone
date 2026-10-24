@@ -22,8 +22,6 @@ use Illuminate\Validation\ValidationException;
 use Throwable;
 
 /**
- * Attempt a sign-in with a credential type's proof, from the submitted input to a signed-in session or one refusal.
- *
  * @internal
  */
 class SignIn

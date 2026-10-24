@@ -8,8 +8,6 @@ use Inertia\Support\SessionKey;
 use PHPUnit\Framework\Assert as PHPUnit;
 
 /**
- * Check how an Inertia app answers signing out.
- *
  * @api
  */
 trait SignOutAssertions

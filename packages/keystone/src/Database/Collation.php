@@ -6,8 +6,6 @@ use ClaudioDekker\Keystone\Exceptions\KeystoneMisconfiguredException;
 use Illuminate\Support\Facades\DB;
 
 /**
- * The collation that makes a string column compare as binary on the default connection.
- *
  * @internal
  */
 class Collation

@@ -14,8 +14,6 @@ use Illuminate\Session\TokenMismatchException;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Refuse a cross-site request that changes something on a Keystone route, reading none of the app's CSRF exemptions.
- *
  * @internal
  */
 class RefuseCrossSiteRequests extends PreventRequestForgery

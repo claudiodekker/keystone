@@ -6,8 +6,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
 /**
- * Who is asking: the request's address, its subnet, its cleaned user agent, its path and a request id, captured once per request.
- *
  * @internal
  *
  * @phpstan-consistent-constructor

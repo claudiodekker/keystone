@@ -6,8 +6,6 @@ use ClaudioDekker\Keystone\InertiaVue\Console\InstallCommand;
 use Illuminate\Support\ServiceProvider;
 
 /**
- * Offer keystone:install to the app.
- *
  * @internal
  */
 class InertiaVueServiceProvider extends ServiceProvider

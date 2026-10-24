@@ -14,8 +14,6 @@ use Illuminate\Support\Facades\Hash;
 use PHPUnit\Framework\Assert;
 
 /**
- * Let AppTests drive the password type: arrange a password the way the app hashes it, and prove or reject it.
- *
  * @api
  */
 class PasswordSupport implements CredentialTypeSupport

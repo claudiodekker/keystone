@@ -8,8 +8,6 @@ use PHPUnit\Framework\Assert;
 use Throwable;
 
 /**
- * Fake the exception handler and remember which reports the test asserted.
- *
  * @internal
  */
 class ExceptionHandlerFake extends BaseExceptionHandlerFake

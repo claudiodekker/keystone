@@ -2,9 +2,6 @@
 
 namespace ClaudioDekker\Keystone\Tests\Fixtures\Methods;
 
-/**
- * A second form type with its own name and secret, so the contract AppTests run over more than one installed type.
- */
 class FakePinType extends FakeFormType
 {
     /**

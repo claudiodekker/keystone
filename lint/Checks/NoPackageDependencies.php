@@ -9,9 +9,6 @@ use ClaudioDekker\LaravelGuardrails\Violation;
 use PhpParser\Node;
 use PhpParser\Node\Name;
 
-/**
- * Refuse core that depends on a method or adapter package.
- */
 class NoPackageDependencies extends Check
 {
     /**

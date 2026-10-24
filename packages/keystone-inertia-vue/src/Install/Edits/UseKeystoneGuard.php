@@ -5,8 +5,6 @@ namespace ClaudioDekker\Keystone\InertiaVue\Install\Edits;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edit;
 
 /**
- * Point the guard at the keystone driver in config/auth.php.
- *
  * @internal
  */
 class UseKeystoneGuard extends Edit

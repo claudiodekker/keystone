@@ -5,9 +5,6 @@ namespace ClaudioDekker\Keystone\Lint\Checks;
 use ClaudioDekker\LaravelGuardrails\ForbiddenCalls;
 use ClaudioDekker\LaravelGuardrails\Kind;
 
-/**
- * Refuse a container lookup in a package's source, so services are injected.
- */
 class NoContainerLookups extends ForbiddenCalls
 {
     /**

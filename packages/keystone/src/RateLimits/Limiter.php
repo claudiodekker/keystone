@@ -21,10 +21,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Date;
 
 /**
- * Count requests and failed attempts against their allowances in Laravel's rate-limiter store, and refuse a spent one as throttled.
- *
- * Keys are hashed under a subkey of the app key, so the store holds no identifier or address in clear.
- *
  * @internal
  */
 class Limiter

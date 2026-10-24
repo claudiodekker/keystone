@@ -8,8 +8,6 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 /**
- * The hash a subject without a usable password is checked against, so the check costs what a wrong password does.
- *
  * @internal
  */
 class DummyHash

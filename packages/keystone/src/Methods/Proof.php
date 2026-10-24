@@ -5,8 +5,6 @@ namespace ClaudioDekker\Keystone\Methods;
 use Closure;
 
 /**
- * What a type's verify proved: one of the credentials it was given, or nothing. It names a credential, never a user.
- *
  * @internal
  *
  * @phpstan-consistent-constructor

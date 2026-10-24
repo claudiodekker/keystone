@@ -6,8 +6,6 @@ use Illuminate\Contracts\Hashing\Hasher;
 use SensitiveParameter;
 
 /**
- * A driver that hashes as the real one does but refuses every hash it is asked to check.
- *
  * @internal
  */
 class RefusingHasher implements Hasher

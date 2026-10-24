@@ -18,8 +18,6 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 /**
- * Record every security event, called inline from the code that made it happen.
- *
  * @internal
  */
 class Recorder

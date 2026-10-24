@@ -19,8 +19,6 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
- * Show the sign-in page and take a proof of a credential type, ending every outcome in one response hook.
- *
  * @api
  */
 abstract class SignInController implements KeystoneController

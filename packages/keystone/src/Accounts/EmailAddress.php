@@ -5,8 +5,6 @@ namespace ClaudioDekker\Keystone\Accounts;
 use Normalizer;
 
 /**
- * An email address's identity: trimmed, NFC, lowercase, with its domain as IDN ASCII, and no accent folding.
- *
  * @internal
  */
 class EmailAddress

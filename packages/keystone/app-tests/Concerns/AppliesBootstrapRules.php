@@ -12,8 +12,6 @@ use LogicException;
 use PHPUnit\Framework\Assert;
 
 /**
- * Hold a test to the suite's rules: no stray HTTP, no real queue push, a frozen clock and asserted reports.
- *
  * @api
  */
 trait AppliesBootstrapRules
