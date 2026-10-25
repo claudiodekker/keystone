@@ -145,3 +145,7 @@ What a credential type gives AppTests: arrange a credential, give a valid proof 
 ## Workbench
 
 The one Testbench app at the repository root that wires core, every installed method package and the inertia-vue stubs together, as `keystone:install` wires an app. `KEYSTONE_ADAPTER` names the adapter whose stub test case the AppTests then run on.
+
+## Boot checks
+
+The checks core runs when the config is cached, and on every boot of an app that has no cached config, except for `config:clear` and `optimize:clear`. They refuse what core can't run with or would read wrongly, and apply the same in every environment. The one exception they raise lists every failure, and a config that fails can't be cached.

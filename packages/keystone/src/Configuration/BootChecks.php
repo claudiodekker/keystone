@@ -15,7 +15,7 @@ class BootChecks
     public function __construct(
         protected KeyChecks $keys,
         protected MethodChecks $methods,
-        protected ModelChecks $models,
+        protected MiddlewareChecks $middleware,
     ) {
         //
     }
@@ -46,7 +46,7 @@ class BootChecks
         return [
             ...$this->keys->failures(),
             ...$this->methods->failures(),
-            ...$this->models->failures(),
+            ...$this->middleware->failures(),
         ];
     }
 }
