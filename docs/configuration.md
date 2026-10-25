@@ -60,4 +60,6 @@ The checks set no ceilings. In every environment, they refuse a value of the wro
 | `methods` | `null`, or a list of installed types by name, each alone or with a non-empty list of surfaces the type serves. No type may be named twice. |
 | `trusted_origins` | A list of origins, each a scheme and a host with nothing after it. |
 
-It also refuses two packages that register one credential type name, and an HTTP kernel that doesn't run Keystone's global middleware that captures the request context. Without it, Keystone can't read the client's address, so every request would count as coming from the same address.
+It also refuses two packages that register one credential type name, and a user model on a database connection other than the default one, because Keystone's tables are migrated on the default connection.
+
+Keystone also refuses to boot an app whose HTTP kernel doesn't run Keystone's global middleware that captures the request context. Without it, Keystone can't read the client's address, so every request would count as coming from the same address.
