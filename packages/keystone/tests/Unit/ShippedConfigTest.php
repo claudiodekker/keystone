@@ -27,3 +27,9 @@ it('ships a default for every key that core reads', function (string $key) {
 
     expect(Arr::has($shipped, $parent))->toBeTrue();
 })->with('config reads');
+
+it('ends a session twelve hours after its sign-in by default', function () {
+    $shipped = require dirname(__DIR__, 2).'/config/keystone.php';
+
+    expect($shipped['session']['absolute_lifetime_seconds'])->toBe(43200);
+});

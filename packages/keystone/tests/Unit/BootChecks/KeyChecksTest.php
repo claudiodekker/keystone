@@ -162,3 +162,25 @@ it('boots with clear_site_data that is empty or lists kinds', function (array $k
     'one kind' => [['cookies']],
     'every kind' => [['cache', 'cookies', 'executionContexts', 'storage']],
 ]);
+
+it('refuses an absolute lifetime that is neither null nor a positive integer', function (mixed $value) {
+    config(['keystone.session.absolute_lifetime_seconds' => $value]);
+
+    expect($this->bootFailures())->toBe(['keystone.session.absolute_lifetime_seconds must be null or a positive integer.']);
+})->with([
+    'zero' => 0,
+    'negative' => -1,
+    'a numeric string' => '43200',
+    'a float' => 43200.5,
+    'true' => true,
+    'a list' => [[43200]],
+]);
+
+it('boots with the absolute lifetime off or at its smallest', function (?int $seconds) {
+    config(['keystone.session.absolute_lifetime_seconds' => $seconds]);
+
+    expect($this->bootFailures())->toBe([]);
+})->with([
+    'off' => null,
+    'one second' => 1,
+]);

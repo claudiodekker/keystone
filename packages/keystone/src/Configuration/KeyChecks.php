@@ -31,6 +31,7 @@ class KeyChecks
     public function failures(): array
     {
         return [
+            ...$this->absoluteLifetime(),
             ...$this->allowances(),
             ...$this->clearSiteData(),
             ...$this->eventsEnabled(),
@@ -38,6 +39,22 @@ class KeyChecks
             ...$this->logChannel(),
             ...$this->trustedOrigins(),
         ];
+    }
+
+    /**
+     * Get the failure of session.absolute_lifetime_seconds when it is neither null nor a positive integer.
+     *
+     * @return list<string>
+     */
+    protected function absoluteLifetime(): array
+    {
+        $lifetime = $this->config->get('keystone.session.absolute_lifetime_seconds');
+
+        if ($lifetime === null || $this->isPositiveInteger($lifetime)) {
+            return [];
+        }
+
+        return ['keystone.session.absolute_lifetime_seconds must be null or a positive integer.'];
     }
 
     /**

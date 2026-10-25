@@ -93,6 +93,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Session
+    |--------------------------------------------------------------------------
+    |
+    | How many seconds a session lasts after its sign-in, however busy it
+    | stays. Null turns it off. Laravel's session.lifetime still ends an
+    | idle session, and every request extends that one, not this one.
+    |
+    */
+
+    'session' => [
+        'absolute_lifetime_seconds' => 12 * 60 * 60,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Trusted Origins
     |--------------------------------------------------------------------------
     |
