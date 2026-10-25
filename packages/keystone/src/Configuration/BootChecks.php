@@ -16,6 +16,7 @@ class BootChecks
         protected KeyChecks $keys,
         protected MethodChecks $methods,
         protected ModelChecks $models,
+        protected MiddlewareChecks $middleware,
     ) {
         //
     }
@@ -47,6 +48,7 @@ class BootChecks
             ...$this->keys->failures(),
             ...$this->methods->failures(),
             ...$this->models->failures(),
+            ...$this->middleware->failures(),
         ];
     }
 }
