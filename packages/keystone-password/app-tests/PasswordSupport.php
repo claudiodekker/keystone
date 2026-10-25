@@ -73,7 +73,8 @@ class PasswordSupport implements CredentialTypeSupport
      */
     public function arrangeHash(KeystoneUser $user, ?string $hash): static
     {
-        UserCredential::factory()->for($user, 'user')->create([
+        UserCredential::factory()->create([
+            'user_id' => $user->getAuthIdentifier(),
             'type' => 'password',
             'secret' => $hash,
         ]);
