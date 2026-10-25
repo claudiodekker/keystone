@@ -4,8 +4,8 @@ namespace ClaudioDekker\Keystone\Password\AppTests;
 
 use ClaudioDekker\Keystone\AppTests\Support\CredentialTypeSupport;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
-use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\CredentialType;
+use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Models\UserCredential;
 use ClaudioDekker\Keystone\Password\AppTests\Support\FailingHasher;
@@ -28,7 +28,7 @@ class PasswordSupport implements CredentialTypeSupport
      */
     public function type(): CredentialType
     {
-        return Keystone::credentialTypes()->find('password', Surface::SIGN_IN)
+        return app(CredentialTypes::class)->find('password', Surface::SIGN_IN)
             ?? Assert::fail('The password type is not registered. Install claudiodekker/keystone-password.');
     }
 

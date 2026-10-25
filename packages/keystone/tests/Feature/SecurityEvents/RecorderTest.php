@@ -2,7 +2,7 @@
 
 // Fault injection and pinned formats of the recorder, which no app can change.
 
-use ClaudioDekker\Keystone\Keystone;
+use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Models\UserSecurityEvent;
 use ClaudioDekker\Keystone\SecurityEvents\Recorder;
@@ -11,7 +11,7 @@ use ClaudioDekker\Keystone\Tests\Fixtures\Models\User;
 
 it('stores a reason prefixed by the credential type or by keystone', function (?string $credentialType, string $reason) {
     $user = User::factory()->create();
-    $type = $credentialType === null ? null : Keystone::credentialTypes()->find($credentialType, Surface::SIGN_IN);
+    $type = $credentialType === null ? null : app(CredentialTypes::class)->find($credentialType, Surface::SIGN_IN);
 
     $this->app->make(Recorder::class)->record(SecurityEventType::PROOF_REJECTED, account: $user, credentialType: $type, reason: $reason);
 
@@ -25,7 +25,7 @@ it('stores a reason prefixed by the credential type or by keystone', function (?
 
 it('stores anything else as the invalid reason of the credential type, or of keystone', function (?string $credentialType, string $reason, string $stored) {
     $user = User::factory()->create();
-    $type = $credentialType === null ? null : Keystone::credentialTypes()->find($credentialType, Surface::SIGN_IN);
+    $type = $credentialType === null ? null : app(CredentialTypes::class)->find($credentialType, Surface::SIGN_IN);
 
     $this->app->make(Recorder::class)->record(SecurityEventType::PROOF_REJECTED, account: $user, credentialType: $type, reason: $reason);
 

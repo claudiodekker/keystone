@@ -8,41 +8,43 @@ namespace ClaudioDekker\Keystone\Methods;
 readonly class CredentialTypes
 {
     /**
-     * Create the set from the registered types, by name.
+     * Create the set from what the packages registered and the methods config allows.
      *
-     * @param  array<string, CredentialType>  $types
+     * @param  array<string, CredentialType>  $types  by name
      */
-    public function __construct(protected array $types)
-    {
+    public function __construct(
+        protected array $types,
+        protected MethodAllowList $allowList,
+    ) {
         //
     }
 
     /**
-     * Find the type with the given name, when it serves the surface.
+     * Find the type with the given name, when it is offered on the surface.
      */
     public function find(string $name, Surface $surface): ?CredentialType
     {
-        $type = $this->types[$name] ?? null;
-
-        if ($type === null || ! $this->serves($type, $surface)) {
+        if (! $this->offers($name, $surface)) {
             return null;
         }
 
-        return $type;
+        return $this->registered($name);
     }
 
     /**
-     * Get the name of every registered type.
+     * Get the name of every type offered on some surface.
      *
      * @return list<string>
      */
     public function names(): array
     {
-        return array_keys($this->types);
+        $names = array_keys($this->types);
+
+        return array_values(array_filter($names, $this->isOfferedAnywhere(...)));
     }
 
     /**
-     * Get the types that serve the surface.
+     * Get the types that are offered on the surface.
      *
      * @return list<CredentialType>
      */
@@ -50,18 +52,20 @@ readonly class CredentialTypes
     {
         return array_values(array_filter(
             $this->types,
-            fn (CredentialType $type) => $this->serves($type, $surface),
+            fn (CredentialType $type, string $name) => $this->offers($name, $surface),
+            ARRAY_FILTER_USE_BOTH,
         ));
     }
 
     /**
-     * Get the name and initiate shape of each type that serves the surface, as a page lists them.
+     * Get the name and initiate shape of each type that is offered on the surface, as a page lists them.
      *
      * @return array<int, array{name: string, shape: string}>
      */
     public function shapes(Surface $surface): array
     {
         return collect($this->types)
+            ->filter(fn (CredentialType $type, string $name) => $this->offers($name, $surface))
             ->map(fn (CredentialType $type) => $type->initiateShape($surface))
             ->filter()
             ->map(fn (InitiateShape $shape, string $name) => ['name' => $name, 'shape' => $shape->value])
@@ -70,10 +74,35 @@ readonly class CredentialTypes
     }
 
     /**
-     * Determine if the type serves the surface.
+     * Get the allow-list the set was built with.
      */
-    protected function serves(CredentialType $type, Surface $surface): bool
+    public function allowList(): MethodAllowList
     {
-        return $type->initiateShape($surface) !== null;
+        return $this->allowList;
+    }
+
+    /**
+     * Determine if the type is offered on any surface.
+     */
+    protected function isOfferedAnywhere(string $name): bool
+    {
+        return array_any(Surface::cases(), fn (Surface $surface) => $this->offers($name, $surface));
+    }
+
+    /**
+     * Determine if the type serves the surface and the allow-list lets it be offered there.
+     */
+    protected function offers(string $name, Surface $surface): bool
+    {
+        return $this->registered($name)?->initiateShape($surface) !== null
+            && $this->allowList->allows($name, $surface);
+    }
+
+    /**
+     * Get the registered type with the given name, even when the allow-list offers it nowhere.
+     */
+    protected function registered(string $name): ?CredentialType
+    {
+        return $this->types[$name] ?? null;
     }
 }

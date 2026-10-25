@@ -13,6 +13,7 @@ use ClaudioDekker\Keystone\AppTests\Support\RecordedSecurityEvents;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\CredentialType;
+use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Models\UserEmail;
 use ClaudioDekker\Keystone\RateLimits\StepKind;
@@ -222,7 +223,7 @@ trait InteractsWithKeystone
      */
     public function supportsFor(Surface $surface): array
     {
-        return collect(Keystone::credentialTypes()->serving($surface))
+        return collect($this->app->make(CredentialTypes::class)->serving($surface))
             ->map(fn (CredentialType $type) => $this->supportOf($type))
             ->filter()
             ->values()

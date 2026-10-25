@@ -1,19 +1,9 @@
 <?php
 
 use ClaudioDekker\Keystone\Keystone;
-use ClaudioDekker\Keystone\KeystoneServiceProvider;
-use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Tests\Fixtures\Models\User;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Support\Facades\Auth;
-
-it('starts each app from no registered credential types', function () {
-    $provider = new KeystoneServiceProvider($this->app);
-
-    $provider->register();
-
-    expect(Keystone::credentialTypes()->shapes(Surface::SIGN_IN))->toBe([]);
-});
 
 it('reads the user model from the keystone guard', function () {
     expect(Keystone::userModel())->toBe(User::class);

@@ -2,7 +2,7 @@
 
 namespace ClaudioDekker\Keystone\Tests\Fixtures;
 
-use ClaudioDekker\Keystone\Keystone;
+use ClaudioDekker\Keystone\Methods\CredentialTypeRegistry;
 use ClaudioDekker\Keystone\Tests\Fixtures\Methods\FakeChallengeType;
 use ClaudioDekker\Keystone\Tests\Fixtures\Methods\FakeFormType;
 use ClaudioDekker\Keystone\Tests\Fixtures\Methods\FakePinType;
@@ -26,11 +26,11 @@ class FixtureServiceProvider extends ServiceProvider
     /**
      * Boot the fixture app.
      */
-    public function boot(): void
+    public function boot(CredentialTypeRegistry $registry): void
     {
-        Keystone::credentialType(new FakeFormType);
-        Keystone::credentialType(new FakePinType);
-        Keystone::credentialType(new FakeChallengeType);
+        $registry->register(new FakeFormType);
+        $registry->register(new FakePinType);
+        $registry->register(new FakeChallengeType);
 
         Route::middleware('web')->group(__DIR__.'/routes/keystone.php');
 

@@ -2,7 +2,7 @@
 
 namespace ClaudioDekker\Keystone\Password;
 
-use ClaudioDekker\Keystone\Keystone;
+use ClaudioDekker\Keystone\Methods\CredentialTypeRegistry;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Foundation\Http\Middleware\TrimStrings;
 use Illuminate\Support\ServiceProvider;
@@ -24,11 +24,9 @@ class PasswordServiceProvider extends ServiceProvider
      *
      * TrimStrings merges this list with the app's own $except, so an app that empties $except still never trims them.
      */
-    public function boot(): void
+    public function boot(CredentialTypeRegistry $registry, Repository $config): void
     {
-        $config = $this->app->make(Repository::class);
-
-        Keystone::credentialType(new PasswordType($config, new DummyHash($config)));
+        $registry->register(new PasswordType($config, new DummyHash($config)));
         TrimStrings::except(static::PASSWORD_FIELDS);
     }
 }

@@ -2,7 +2,7 @@
 
 // Fault injection through the fake type: only core's fake hands back a rehash on demand, or one that throws, so no AppTest can.
 
-use ClaudioDekker\Keystone\Keystone;
+use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Models\UserCredential;
 use ClaudioDekker\Keystone\Models\UserEmail;
@@ -14,7 +14,7 @@ it('signs in with the secret the type rehashed the credential to', function () {
     $ada = User::factory()->create();
     UserEmail::factory()->for($ada, 'user')->verified()->create(['address' => 'ada@example.com']);
     UserCredential::factory()->for($ada, 'user')->create(['type' => 'form', 'secret' => 'correct horse']);
-    Keystone::credentialTypes()->find('form', Surface::SIGN_IN)->rehashNextProof(fn () => 'new horse');
+    app(CredentialTypes::class)->find('form', Surface::SIGN_IN)->rehashNextProof(fn () => 'new horse');
 
     $first = $this->post(route('login.submit', 'form'), ['identifier' => 'ada@example.com', 'secret' => 'correct horse']);
 
@@ -36,7 +36,7 @@ it('keeps a secret written while the type was verifying', function () {
     $ada = User::factory()->create();
     UserEmail::factory()->for($ada, 'user')->verified()->create(['address' => 'ada@example.com']);
     $credential = UserCredential::factory()->for($ada, 'user')->create(['type' => 'form', 'secret' => 'correct horse']);
-    $type = Keystone::credentialTypes()->find('form', Surface::SIGN_IN);
+    $type = app(CredentialTypes::class)->find('form', Surface::SIGN_IN);
     $type->duringNextVerify(function () use ($credential) {
         $credential->secret = 'changed horse';
         $credential->save();
@@ -64,7 +64,7 @@ it('signs in and reports a rehash that throws, keeping the secret', function () 
     $ada = User::factory()->create();
     UserEmail::factory()->for($ada, 'user')->verified()->create(['address' => 'ada@example.com']);
     UserCredential::factory()->for($ada, 'user')->create(['type' => 'form', 'secret' => 'correct horse']);
-    Keystone::credentialTypes()->find('form', Surface::SIGN_IN)->rehashNextProof(fn () => throw new RuntimeException('The hasher is down.'));
+    app(CredentialTypes::class)->find('form', Surface::SIGN_IN)->rehashNextProof(fn () => throw new RuntimeException('The hasher is down.'));
 
     $first = $this->post(route('login.submit', 'form'), ['identifier' => 'ada@example.com', 'secret' => 'correct horse']);
 
@@ -83,7 +83,7 @@ it('never runs the rehash of a proof that signs nobody in', function () {
     $grace = User::factory()->create();
     $graces = UserCredential::factory()->for($grace, 'user')->create(['type' => 'form', 'secret' => 'grace horse']);
     $ran = false;
-    $type = Keystone::credentialTypes()->find('form', Surface::SIGN_IN);
+    $type = app(CredentialTypes::class)->find('form', Surface::SIGN_IN);
     $type->forgeProofOf($graces);
     $type->rehashNextProof(function () use (&$ran) {
         $ran = true;
@@ -103,7 +103,7 @@ it('leaves a credential the type proved but was never given alone', function () 
     UserEmail::factory()->for($ada, 'user')->verified()->create(['address' => 'ada@example.com']);
     UserCredential::factory()->for($ada, 'user')->create(['type' => 'form', 'secret' => 'correct horse']);
     $enrolled = null;
-    $type = Keystone::credentialTypes()->find('form', Surface::SIGN_IN);
+    $type = app(CredentialTypes::class)->find('form', Surface::SIGN_IN);
     $type->duringNextVerify(function () use ($ada, $type, &$enrolled) {
         $enrolled = UserCredential::factory()->for($ada, 'user')->create(['type' => 'form', 'secret' => 'enrolled horse']);
         $type->forgeProofOf($enrolled);

@@ -2,7 +2,8 @@
 
 use ClaudioDekker\Keystone\InertiaVue\Install\Stubs;
 use ClaudioDekker\Keystone\InertiaVue\Tests\InstallsIntoFreshApp;
-use ClaudioDekker\Keystone\Keystone;
+use ClaudioDekker\Keystone\Methods\CredentialTypeRegistry;
+use ClaudioDekker\Keystone\Methods\CredentialTypes;
 
 uses(InstallsIntoFreshApp::class);
 
@@ -19,8 +20,8 @@ it('copies a partial only for each installed credential type', function () {
 });
 
 it('installs without any credential type, copying no partial', function () {
-    expect(Keystone::credentialTypes()->names())->not->toBeEmpty();
-    Keystone::flushState();
+    expect(app(CredentialTypes::class)->names())->not->toBeEmpty();
+    $this->app->instance(CredentialTypeRegistry::class, new CredentialTypeRegistry);
 
     $this->artisan('keystone:install')->assertSuccessful();
 

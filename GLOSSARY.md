@@ -24,6 +24,14 @@ A place in the flows where a credential type can be used: sign-in, challenge, re
 
 How a page starts a credential type on a surface: `form`, `clientCeremony`, `redirect` or `delivered`. A page renders one component per shape.
 
+## Allow-list
+
+The `methods` config key. It names the credential types core offers and the surfaces it offers each on, and it only ever narrows the surfaces the installed types serve. A type it leaves out is offered nowhere.
+
+## Offered
+
+A credential type is offered on a surface when it serves that surface and the allow-list, if set, lists it there. Only an offered type appears on a page or accepts a proof.
+
 ## Credential
 
 A row of `user_credentials`: something an account holds of one credential type, with its secret encrypted by core.

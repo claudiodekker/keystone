@@ -5,7 +5,7 @@ namespace ClaudioDekker\Keystone\Http\Controllers;
 use ClaudioDekker\Keystone\Http\Middleware\FlashOnlyTheIdentifier;
 use ClaudioDekker\Keystone\Http\Middleware\LimitRequests;
 use ClaudioDekker\Keystone\Http\Pages\SignInPage;
-use ClaudioDekker\Keystone\Keystone;
+use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\RateLimits\StepKind;
 use ClaudioDekker\Keystone\Session\SessionState;
@@ -42,14 +42,14 @@ abstract class SignInController implements KeystoneController
     /**
      * Show the sign-in page to a guest.
      */
-    public function show(Request $request, SessionState $session): Response|Responsable
+    public function show(Request $request, SessionState $session, CredentialTypes $types): Response|Responsable
     {
         if ($session->isSignedIn()) {
             return $this->sendAlreadySignedIn($request);
         }
 
         $page = new SignInPage(
-            types: Keystone::credentialTypes()->shapes(Surface::SIGN_IN),
+            types: $types->shapes(Surface::SIGN_IN),
             status: $session->status()?->label(),
         );
 
@@ -59,13 +59,13 @@ abstract class SignInController implements KeystoneController
     /**
      * Take a guest's proof of the credential type the route names.
      */
-    public function store(Request $request, string $type, SessionState $session, SignIn $signIn): Response|Responsable
+    public function store(Request $request, string $type, SessionState $session, SignIn $signIn, CredentialTypes $types): Response|Responsable
     {
         if ($session->isSignedIn()) {
             return $this->sendAlreadySignedIn($request);
         }
 
-        $credentialType = Keystone::credentialTypes()->find($type, Surface::SIGN_IN) ?? throw new NotFoundHttpException;
+        $credentialType = $types->find($type, Surface::SIGN_IN) ?? throw new NotFoundHttpException;
 
         $outcome = $signIn->attempt($credentialType, $request->all());
 

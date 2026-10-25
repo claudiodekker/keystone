@@ -1,13 +1,13 @@
 <?php
 
-use ClaudioDekker\Keystone\Keystone;
+use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Password\PasswordType;
 use Illuminate\Foundation\Http\Middleware\TrimStrings;
 use Illuminate\Http\Request;
 
 it('registers password as a plain instance it never binds', function () {
-    $type = Keystone::credentialTypes()->find('password', Surface::SIGN_IN);
+    $type = app(CredentialTypes::class)->find('password', Surface::SIGN_IN);
 
     expect($type)->toBeInstanceOf(PasswordType::class)
         ->and($this->app->bound(PasswordType::class))->toBeFalse();

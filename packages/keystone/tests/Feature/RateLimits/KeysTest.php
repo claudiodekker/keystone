@@ -3,7 +3,7 @@
 // The limiter's keys sit in a cache an app may share, so they must give neither an identifier nor an address away.
 
 use ClaudioDekker\Keystone\Http\RequestContext;
-use ClaudioDekker\Keystone\Keystone;
+use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\RateLimits\Limiter;
 use ClaudioDekker\Keystone\RateLimits\StepKind;
@@ -18,7 +18,7 @@ it('keeps no identifier or address, and no plain hash of either, in the limiter 
     $request = Request::create('/login/form', 'POST', server: ['REMOTE_ADDR' => '203.0.113.9']);
     RequestContext::capture($request)->storeOn($request);
     $this->app->instance('request', $request);
-    $type = Keystone::credentialTypes()->find('form', Surface::SIGN_IN);
+    $type = app(CredentialTypes::class)->find('form', Surface::SIGN_IN);
     $limiter = $this->app->make(Limiter::class);
 
     $limiter->takeRequest(StepKind::SUBMIT);
