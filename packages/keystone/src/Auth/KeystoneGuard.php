@@ -4,6 +4,8 @@ namespace ClaudioDekker\Keystone\Auth;
 
 use ClaudioDekker\Keystone\Exceptions\SessionGuardSignInException;
 use ClaudioDekker\Keystone\Http\Middleware\ClearSiteData;
+use ClaudioDekker\Keystone\SecurityEvents\Recorder;
+use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use ClaudioDekker\Keystone\Session\SessionState;
 use ClaudioDekker\Keystone\Status;
 use Illuminate\Auth\SessionGuard;
@@ -144,11 +146,17 @@ class KeystoneGuard extends SessionGuard
      */
     protected function expire(): void
     {
+        $account = $this->sessionAccount();
+
         $this->loggedOut = true;
 
         $this->endSession();
 
         $this->state()->leaveStatus(Status::SESSION_EXPIRED);
+
+        $recorder = $this->container->make(Recorder::class);
+
+        $recorder->record(SecurityEventType::SESSION_ENDED, account: $account, reason: 'keystone.expired');
     }
 
     /**
@@ -160,6 +168,16 @@ class KeystoneGuard extends SessionGuard
         $this->session->regenerateToken();
 
         ClearSiteData::forResponseTo($this->request);
+    }
+
+    /**
+     * Get the account the session names, if it still exists.
+     */
+    protected function sessionAccount(): ?KeystoneUser
+    {
+        $user = $this->provider->retrieveById($this->session->get($this->getName()));
+
+        return $user instanceof KeystoneUser ? $user : null;
     }
 
     /**

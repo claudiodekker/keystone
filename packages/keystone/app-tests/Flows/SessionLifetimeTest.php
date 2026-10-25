@@ -2,6 +2,7 @@
 
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\Surface;
+use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use Illuminate\Support\Facades\Auth;
 
 it('signs out a session its absolute lifetime after the sign-in, and tells the user why', function () {
@@ -129,4 +130,85 @@ it('leaves a guest who never signed in alone', function () {
     $this->assertSiteDataKept($response);
     expect($this->securityEvents()->stored())->toBeEmpty()
         ->and($this->securityEvents()->logged())->toBe([]);
+});
+
+it('records session.ended with the reason expired for the account', function () {
+    $this->freezeTime();
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    Auth::forgetGuards();
+    $this->travel($this->absoluteLifetimeSeconds())->seconds();
+    $this->get(route('login'));
+
+    $events = $this->securityEvents()->for($user);
+
+    expect($events->pluck('type')->all())->toBe([SecurityEventType::SIGNED_IN, SecurityEventType::SESSION_ENDED])
+        ->and($events[1]->reason)->toBe('keystone.expired')
+        ->and($events[1]->flow)->toBeNull();
+});
+
+it('records the expiry with the address of the request that found it', function () {
+    $this->freezeTime();
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.9'])->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    Auth::forgetGuards();
+    $this->travel($this->absoluteLifetimeSeconds())->seconds();
+    $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.7'])->get(route('login'));
+
+    $events = $this->securityEvents()->for($user);
+
+    expect($events->pluck('ip_address')->all())->toBe(['203.0.113.9', '198.51.100.7']);
+});
+
+it("clears the browser's site data when the session expires", function () {
+    $this->freezeTime();
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    Auth::forgetGuards();
+    $this->travel($this->absoluteLifetimeSeconds())->seconds();
+
+    $response = $this->get(route('login'));
+
+    $this->assertSiteDataCleared($response, ['cache', 'storage']);
+});
+
+it('clears nothing on the page the user then signs in on', function () {
+    $this->freezeTime();
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    Auth::forgetGuards();
+    $this->travel($this->absoluteLifetimeSeconds())->seconds();
+    $this->get(route('login'));
+
+    $response = $this->get(route('login'));
+
+    $this->assertSiteDataKept($response);
 });
