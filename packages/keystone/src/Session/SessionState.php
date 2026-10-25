@@ -7,9 +7,11 @@ use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Status;
 use Illuminate\Auth\Events\Login;
+use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Contracts\Routing\UrlGenerator;
 use Illuminate\Contracts\Session\Session;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
 
 /**
@@ -23,12 +25,18 @@ class SessionState
     protected const string STATUS = 'keystone.status';
 
     /**
+     * The session key that holds when the session's sign-in completed, in Unix seconds.
+     */
+    protected const string SIGNED_IN_AT = 'keystone.signed_in_at';
+
+    /**
      * Create the session state over the request's session.
      */
     public function __construct(
         protected Session $session,
         protected UrlGenerator $urls,
         protected Dispatcher $events,
+        protected Config $config,
     ) {
         //
     }
@@ -49,6 +57,33 @@ class SessionState
         $user = Keystone::guard()->user();
 
         return $user instanceof KeystoneUser ? $user : null;
+    }
+
+    /**
+     * Determine if the session's sign-in is past the absolute lifetime, a missing or future sign-in time included.
+     */
+    public function hasExpired(): bool
+    {
+        $lifetime = $this->config->get('keystone.session.absolute_lifetime_seconds');
+
+        if ($lifetime === null) {
+            return false;
+        }
+
+        $signedInAt = $this->session->get(static::SIGNED_IN_AT);
+        $now = Date::now()->getTimestamp();
+
+        return ! is_int($signedInAt)
+            || $signedInAt > $now
+            || $now >= $signedInAt + $lifetime;
+    }
+
+    /**
+     * Leave the status for the next page to show.
+     */
+    public function leaveStatus(Status $status): void
+    {
+        $this->session->flash(static::STATUS, $status->value);
     }
 
     /**
@@ -73,7 +108,7 @@ class SessionState
 
         Keystone::guard()->logout();
 
-        $this->session->flash(static::STATUS, Status::SIGNED_OUT->value);
+        $this->leaveStatus(Status::SIGNED_OUT);
 
         return $account;
     }
@@ -106,13 +141,14 @@ class SessionState
     }
 
     /**
-     * Put the account on the guard's session key and on the guard for the rest of the request.
+     * Stamp the sign-in time, and put the account on the guard's session key and on the guard for the rest of the request.
      */
     protected function enter(KeystoneUser $account): void
     {
         $guard = Keystone::guard();
 
         $this->session->put($guard->getName(), $account->getAuthIdentifier());
+        $this->session->put(static::SIGNED_IN_AT, Date::now()->getTimestamp());
         $guard->setUser($account);
 
         $this->events->dispatch(new Login($guard->getName(), $account, false));

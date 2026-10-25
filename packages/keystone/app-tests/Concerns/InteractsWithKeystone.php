@@ -110,6 +110,20 @@ trait InteractsWithKeystone
     }
 
     /**
+     * Get how many seconds a session lasts after its sign-in as the app configures it, skipping the test when the app turned the lifetime off.
+     */
+    public function absoluteLifetimeSeconds(): int
+    {
+        $lifetime = config('keystone.session.absolute_lifetime_seconds');
+
+        if (! is_int($lifetime)) {
+            $this->markTestSkipped('The app turned the absolute session lifetime off.');
+        }
+
+        return $lifetime;
+    }
+
+    /**
      * Get how many requests of the step kind one IP address or one signed-in account gets in a minute, as the app configures it.
      */
     public function requestAllowance(StepKind $kind): int

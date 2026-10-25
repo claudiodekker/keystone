@@ -176,6 +176,7 @@ class KeystoneServiceProvider extends ServiceProvider
 
         $guard = new KeystoneGuard($name, $provider, $app->make('session.store'));
 
+        $guard->setContainer($app);
         $guard->setCookieJar($app->make('cookie'));
         $guard->setDispatcher($app->make('events'));
         $guard->setRequest($app->refresh('request', $guard, 'setRequest'));

@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Lang;
 enum Status: string
 {
     case CREDENTIALS_REJECTED = 'credentials-rejected';
+    case SESSION_EXPIRED = 'session-expired';
     case SIGNED_OUT = 'signed-out';
     case THROTTLED = 'throttled';
 
