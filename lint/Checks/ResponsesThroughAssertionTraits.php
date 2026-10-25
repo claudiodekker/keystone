@@ -12,9 +12,6 @@ use PhpParser\Node\Expr\NullsafeMethodCall;
 use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Identifier;
 
-/**
- * Refuse an AppTest that checks a response itself instead of through an assertion the app can override.
- */
 class ResponsesThroughAssertionTraits extends Check
 {
     /**

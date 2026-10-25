@@ -5,8 +5,6 @@ namespace ClaudioDekker\Keystone\InertiaVue\Install\Edits;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edit;
 
 /**
- * Require routes/keystone.php from routes/web.php.
- *
  * @internal
  */
 class RequireRouteFile extends Edit

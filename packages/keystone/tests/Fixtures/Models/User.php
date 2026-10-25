@@ -8,9 +8,6 @@ use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 
-/**
- * The fixture app's user model, with its own table and key name, so every AppTest in core CI runs on both.
- */
 #[UseFactory(UserFactory::class)]
 class User extends Authenticatable implements KeystoneUser
 {

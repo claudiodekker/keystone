@@ -5,8 +5,6 @@ namespace ClaudioDekker\Keystone\Http;
 use Illuminate\Contracts\Config\Repository as Config;
 
 /**
- * Read the three config keys that loosen the hardening floor, and say that a key is malformed by giving back null.
- *
  * @internal
  */
 class HardeningSettings

@@ -10,8 +10,6 @@ use Symfony\Component\HttpFoundation\Request as SymfonyRequest;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Clear the browser's site data with the response to a request during which Keystone ended the session, on any route.
- *
  * @internal
  */
 class ClearSiteData

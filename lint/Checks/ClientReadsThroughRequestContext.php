@@ -15,9 +15,6 @@ use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Scalar\String_;
 
-/**
- * Refuse reading the client's address or user agent outside the request context, which captures them once per request.
- */
 class ClientReadsThroughRequestContext extends Check
 {
     /**

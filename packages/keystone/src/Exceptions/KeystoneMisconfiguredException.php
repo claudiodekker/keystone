@@ -5,8 +5,6 @@ namespace ClaudioDekker\Keystone\Exceptions;
 use LogicException;
 
 /**
- * Name what the app's auth or database setup lacks for Keystone to run.
- *
  * @internal
  *
  * @phpstan-consistent-constructor

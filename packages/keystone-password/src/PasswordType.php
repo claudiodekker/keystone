@@ -13,8 +13,6 @@ use Illuminate\Support\Facades\Hash;
 use SensitiveParameter;
 
 /**
- * A password, hashed with the app's own hasher and checked by the driver of the algorithm that made the hash.
- *
  * @internal
  */
 class PasswordType implements CredentialType

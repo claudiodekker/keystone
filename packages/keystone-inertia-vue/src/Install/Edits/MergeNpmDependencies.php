@@ -5,8 +5,6 @@ namespace ClaudioDekker\Keystone\InertiaVue\Install\Edits;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edit;
 
 /**
- * Add the given npm packages to the app's devDependencies, at the given versions.
- *
  * @internal
  */
 class MergeNpmDependencies extends Edit

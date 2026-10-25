@@ -6,8 +6,6 @@ use ClaudioDekker\Keystone\InertiaVue\Install\AppTests;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edit;
 
 /**
- * Bind the app's tests/Keystone/TestCase.php to every installed Keystone package's AppTests in tests/Pest.php.
- *
  * @internal
  */
 class BindKeystoneTestCase extends Edit

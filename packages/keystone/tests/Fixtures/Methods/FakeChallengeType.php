@@ -8,9 +8,6 @@ use ClaudioDekker\Keystone\Methods\Proof;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Methods\Verification;
 
-/**
- * A credential type that only answers a challenge, so it serves no sign-in surface.
- */
 class FakeChallengeType implements CredentialType
 {
     /**

@@ -6,8 +6,6 @@ use ClaudioDekker\Keystone\InertiaVue\Install\Edit;
 use Illuminate\Support\Str;
 
 /**
- * Name the session cookie __Host-<app>-session, which browsers only keep when it is secure, on path /, without a domain.
- *
  * @internal
  */
 class SetSessionCookie extends Edit

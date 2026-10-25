@@ -6,8 +6,6 @@ use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Models\UserEmail;
 
 /**
- * Resolve the one account a typed identifier names.
- *
  * @internal
  */
 class AccountLookup

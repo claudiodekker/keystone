@@ -9,8 +9,6 @@ use Monolog\Handler\TestHandler;
 use Monolog\LogRecord;
 
 /**
- * Read what Keystone recorded during a test: the stored events and the security event log lines.
- *
  * @api
  */
 class RecordedSecurityEvents

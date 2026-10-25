@@ -5,8 +5,6 @@ namespace ClaudioDekker\Keystone\Http;
 use Illuminate\Support\Str;
 
 /**
- * One Content-Security-Policy as a browser reads it: its directives in order, the first of a repeated directive winning.
- *
  * @internal
  *
  * @phpstan-consistent-constructor

@@ -9,9 +9,6 @@ use ClaudioDekker\LaravelGuardrails\Violation;
 use PhpParser\Node\Expr\StaticCall;
 use PhpParser\Node\Identifier;
 
-/**
- * Refuse a model factory called in an AppTest, which would skip the model the app swapped in.
- */
 class NoFactoriesInAppTests extends Check
 {
     /**

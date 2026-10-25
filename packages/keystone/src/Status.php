@@ -5,8 +5,6 @@ namespace ClaudioDekker\Keystone;
 use Illuminate\Support\Facades\Lang;
 
 /**
- * A status core tells the user, translated under keystone:: before it reaches a page or a hook.
- *
  * @api
  */
 enum Status: string

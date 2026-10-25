@@ -7,8 +7,6 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 
 /**
- * Make fixture users, as an app's own user factory does.
- *
  * @extends Factory<User>
  */
 class UserFactory extends Factory

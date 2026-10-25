@@ -8,12 +8,6 @@ use Illuminate\Support\Sleep;
 use Throwable;
 
 /**
- * Hold a step's answer until a fixed time has passed since it started, so every refusal takes as long.
- *
- * It measures with the app's clock and waits with Sleep, so a faked
- * sleep moves a faked clock by the whole wait. Laravel's Timebox
- * instead reads microtime(), which a faked sleep never moves.
- *
  * @internal
  */
 class TimingFloor
@@ -34,6 +28,7 @@ class TimingFloor
      */
     public function hold(Closure $work, Closure $answersEarly): mixed
     {
+        // Laravel's Timebox reads microtime(), which a faked sleep never moves. The app's clock and Sleep move together.
         $deadline = Date::now()->addMilliseconds(static::MILLISECONDS);
 
         try {

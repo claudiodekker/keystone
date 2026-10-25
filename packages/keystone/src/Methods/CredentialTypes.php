@@ -3,8 +3,6 @@
 namespace ClaudioDekker\Keystone\Methods;
 
 /**
- * The registered credential types.
- *
  * @internal
  */
 readonly class CredentialTypes

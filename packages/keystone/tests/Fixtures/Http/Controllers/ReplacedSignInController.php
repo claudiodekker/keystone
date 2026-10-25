@@ -8,9 +8,6 @@ use Illuminate\Contracts\Support\Responsable;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
-/**
- * Replace both sign-in actions outright, as an app may, answering without any of Keystone's sign-in code.
- */
 class ReplacedSignInController extends SignInController
 {
     /**

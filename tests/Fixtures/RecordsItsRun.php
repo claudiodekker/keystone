@@ -6,9 +6,6 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Cache;
 
-/**
- * Count its runs in the cache, so a test can tell the job ran.
- */
 class RecordsItsRun implements ShouldQueue
 {
     use Queueable;

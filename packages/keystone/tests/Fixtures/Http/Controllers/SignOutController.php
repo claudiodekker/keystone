@@ -6,9 +6,6 @@ use ClaudioDekker\Keystone\Http\Controllers\SignOutController as BaseSignOutCont
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
-/**
- * Answer signing out the way Keystone's default assertions expect.
- */
 class SignOutController extends BaseSignOutController
 {
     /**

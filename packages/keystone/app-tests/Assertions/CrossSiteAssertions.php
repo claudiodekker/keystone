@@ -5,8 +5,6 @@ namespace ClaudioDekker\Keystone\AppTests\Assertions;
 use Illuminate\Testing\TestResponse;
 
 /**
- * Check the refusal a cross-site request to a Keystone route gets, which the app's exception handler renders.
- *
  * @api
  */
 trait CrossSiteAssertions

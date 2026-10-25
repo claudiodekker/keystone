@@ -15,8 +15,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\ServiceProvider;
 
 /**
- * Register Keystone with the app.
- *
  * @internal
  */
 class KeystoneServiceProvider extends ServiceProvider

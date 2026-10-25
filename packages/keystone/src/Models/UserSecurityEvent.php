@@ -18,8 +18,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * A security event: one entry of the audit trail, with the same fixed fields whatever its type.
- *
  * @property CarbonImmutable $occurred_at
  * @property SecurityEventType $type
  * @property int|string|null $user_id

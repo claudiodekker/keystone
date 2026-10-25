@@ -5,8 +5,6 @@ namespace ClaudioDekker\Keystone\AppTests\Assertions;
 use Illuminate\Testing\TestResponse;
 
 /**
- * Check how the app answers a signed-in user at a guest step, which every guest step answers alike.
- *
  * @api
  */
 trait GuestStepAssertions

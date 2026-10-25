@@ -26,10 +26,6 @@ use Symfony\Component\Console\Output\OutputInterface;
 use function Laravel\Prompts\task;
 
 /**
- * Install Keystone's sign-in pages into the app as its own files, and wire the app up to run them and their AppTests.
- *
- * Every step converges, so a second run changes nothing and a run that stopped part way is finished by running again.
- *
  * @internal
  */
 class InstallCommand extends Command
@@ -50,6 +46,8 @@ class InstallCommand extends Command
 
     /**
      * Install, after refusing an app that can't take Keystone before anything changes.
+     *
+     * Every step converges, so a second run changes nothing and finishes a run that stopped part way.
      */
     public function handle(Stubs $stubs, Filesystem $files, Repository $config): int
     {

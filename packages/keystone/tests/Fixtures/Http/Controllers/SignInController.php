@@ -7,9 +7,6 @@ use ClaudioDekker\Keystone\Http\Pages\SignInPage;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
-/**
- * Answer every sign-in outcome the way Keystone's default assertions expect.
- */
 class SignInController extends BaseSignInController
 {
     /**

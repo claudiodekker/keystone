@@ -8,9 +8,6 @@ use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Str;
 use Symfony\Component\Finder\SplFileInfo;
 
-/**
- * A copy of the Laravel skeleton as `laravel new --pest` leaves it.
- */
 class FreshApp
 {
     /**

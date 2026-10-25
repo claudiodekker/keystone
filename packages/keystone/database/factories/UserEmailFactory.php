@@ -7,8 +7,6 @@ use ClaudioDekker\Keystone\Models\UserEmail;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * Make addresses for the app's users.
- *
  * @extends Factory<UserEmail>
  */
 class UserEmailFactory extends Factory

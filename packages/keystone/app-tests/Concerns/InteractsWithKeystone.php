@@ -32,8 +32,6 @@ use PHPUnit\Framework\Assert;
 use Symfony\Component\HttpFoundation\Cookie;
 
 /**
- * Drive the app the way a user does, and check its answers through assertions the app can override.
- *
  * @api
  */
 trait InteractsWithKeystone

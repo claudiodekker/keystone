@@ -10,10 +10,6 @@ use SensitiveParameter;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
- * Resolve the signed-in account from the session, and sign nobody in through any SessionGuard method.
- *
- * Only Keystone signs in, so no sign-in skips its checks. once() and onceBasic() are refused through validate(), and basic() through attempt().
- *
  * @internal
  */
 class KeystoneGuard extends SessionGuard
@@ -27,6 +23,8 @@ class KeystoneGuard extends SessionGuard
 
     /**
      * Refuse to sign anyone in with credentials.
+     *
+     * basic() signs in through here, so it is refused too.
      *
      * @param  array<string, mixed>  $credentials
      */
@@ -48,6 +46,8 @@ class KeystoneGuard extends SessionGuard
 
     /**
      * Refuse to vouch for any credentials, a hash in the app's users.password included.
+     *
+     * once() and onceBasic() sign in through here, so they are refused too.
      *
      * @param  array<string, mixed>  $credentials
      */

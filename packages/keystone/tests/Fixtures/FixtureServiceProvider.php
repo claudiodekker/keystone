@@ -10,9 +10,6 @@ use ClaudioDekker\Keystone\Tests\Fixtures\Models\User;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
-/**
- * Set Testbench's app up the way keystone:install sets up a real one, with fake types in place of method packages.
- */
 class FixtureServiceProvider extends ServiceProvider
 {
     /**
