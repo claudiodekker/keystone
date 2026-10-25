@@ -32,6 +32,13 @@ dataset('assertion traits', function () {
         ->all();
 });
 
+dataset('response contracts', function () {
+    return collect(glob(dirname(__DIR__, 2).'/src/Contracts/*Response.php'))
+        ->map(fn (string $path) => basename($path, 'Response.php'))
+        ->mapWithKeys(fn (string $name) => [$name => [$name]])
+        ->all();
+});
+
 it('has an assertion for every response hook of a core controller', function (string $controller, string $testCase) {
     $hooks = collect((new ReflectionClass("ClaudioDekker\\Keystone\\Http\\Controllers\\{$controller}"))->getMethods())
         ->map(fn (ReflectionMethod $method) => $method->getName())
@@ -42,6 +49,10 @@ it('has an assertion for every response hook of a core controller', function (st
     expect($hooks)->not->toBeEmpty()
         ->and($missing->values()->all())->toBe([]);
 })->with('controllers', 'app test cases');
+
+it('has an assertion for every swappable response', function (string $response, string $testCase) {
+    expect(method_exists($testCase, 'assert'.$response))->toBeTrue();
+})->with('response contracts', 'app test cases');
 
 it('has a concrete subclass of every core controller that implements every hook', function (string $controller, string $controllers) {
     $subclass = new ReflectionClass($controllers.$controller);
