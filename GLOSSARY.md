@@ -130,13 +130,25 @@ Core's refusal of a request that changes something on a Keystone route and doesn
 
 The header the response carries when Keystone ended the session during the request, on any route. The kinds come from `clear_site_data`.
 
+## Sign-in time
+
+The Unix second a session's sign-in completed, stamped in the session at every sign-in whether or not the absolute lifetime is on.
+
+## Absolute lifetime
+
+How long a session lasts after its sign-in time, however busy it stays: `session.absolute_lifetime_seconds`. The guard checks it when something asks for the user. A missing or future sign-in time counts as expired. Laravel's `session.lifetime` stays the idle timeout.
+
+## Session expiry response
+
+The response for a request that needs a signed-in user and whose session expired during it. The app binds its own `SessionExpiredResponse`. Core has already ended and recorded the session when it runs.
+
 ## AppTest
 
 A test in a package's `app-tests/` that drives the app's own routes and published controllers, and checks each answer through an assertion the app can override. AppTests are the feature suite.
 
 ## Assertion trait
 
-A trait of `assert*` methods, one per response hook, that AppTests check answers through. The app's copy uses Keystone's and redefines what its own responses change.
+A trait of `assert*` methods, one per response hook and swappable response, that AppTests check answers through. The app's copy uses Keystone's and redefines what its own responses change.
 
 ## Test support
 

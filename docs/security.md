@@ -134,7 +134,7 @@ Each entry is a scheme and a host, with a port if it has one, and nothing after 
 
 ### Clearing site data
 
-When Keystone ends a session, the response to that request carries `Clear-Site-Data`, whatever route the request was for. Signing out does, and so does your own code calling `Auth::logout()`. The browser clears what `clear_site_data` lists:
+When Keystone ends a session, the response to that request carries `Clear-Site-Data`, whatever route the request was for. Signing out does, your own code calling `Auth::logout()` does, and so does a session that passed its absolute lifetime. The browser clears what `clear_site_data` lists:
 
 ```php
 'clear_site_data' => ['cache', 'storage'],

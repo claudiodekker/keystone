@@ -29,6 +29,7 @@ Set `log_channel` to the name of a channel in your `logging.php` to send the log
 | `limit.tripped` | A rate limit refused its first attempt of the window. The reason names the limit: `keystone.failed_attempt_limit` or `keystone.request_limit`. |
 | `proof.rejected` | A sign-in was refused for an account that the typed address named. |
 | `request.rejected` | A request was refused before it ran. The reason says why: `keystone.cross_site_request`. The event is anonymous. |
+| `session.ended` | Keystone ended the session. The reason says why: `keystone.expired` when it passed its absolute lifetime. |
 | `signed_in` | A session signed in. |
 | `signed_out` | The user signed out. |
 
