@@ -5,6 +5,7 @@ namespace ClaudioDekker\Keystone\AppTests\Concerns;
 use ClaudioDekker\Keystone\Accounts\EmailAddress;
 use ClaudioDekker\Keystone\AppTests\Assertions\CrossSiteAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\GuestStepAssertions;
+use ClaudioDekker\Keystone\AppTests\Assertions\SessionExpiryAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\SignInAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\SignOutAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\ThrottledAssertions;
@@ -26,6 +27,7 @@ use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Monolog\Handler\TestHandler;
@@ -41,6 +43,7 @@ trait InteractsWithKeystone
     use CrossSiteAssertions;
     use GuestStepAssertions;
     use LazilyRefreshDatabase;
+    use SessionExpiryAssertions;
     use SignInAssertions;
     use SignOutAssertions;
     use ThrottledAssertions;
@@ -99,6 +102,18 @@ trait InteractsWithKeystone
 
             return $response;
         });
+    }
+
+    /**
+     * Serve a page only a signed-in user reaches, through the app's own auth middleware, and get its path.
+     */
+    public function protectedPage(): string
+    {
+        $path = '/keystone/app-tests/protected';
+
+        Route::middleware(['web', 'auth'])->get($path, fn () => response()->noContent());
+
+        return $path;
     }
 
     /**

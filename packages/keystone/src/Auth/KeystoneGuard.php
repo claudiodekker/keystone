@@ -4,6 +4,7 @@ namespace ClaudioDekker\Keystone\Auth;
 
 use ClaudioDekker\Keystone\Exceptions\SessionGuardSignInException;
 use ClaudioDekker\Keystone\Http\Middleware\ClearSiteData;
+use ClaudioDekker\Keystone\Http\SessionExpiry;
 use ClaudioDekker\Keystone\SecurityEvents\Recorder;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use ClaudioDekker\Keystone\Session\SessionState;
@@ -153,6 +154,8 @@ class KeystoneGuard extends SessionGuard
         $this->endSession();
 
         $this->state()->leaveStatus(Status::SESSION_EXPIRED);
+
+        SessionExpiry::forResponseTo($this->request);
 
         $recorder = $this->container->make(Recorder::class);
 

@@ -1,12 +1,13 @@
 <?php
 
+use ClaudioDekker\Keystone\AppTests\Support\NotingExpiryResponse;
+use ClaudioDekker\Keystone\Contracts\SessionExpiredResponse;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use Illuminate\Support\Facades\Auth;
 
 it('signs out a session its absolute lifetime after the sign-in, and tells the user why', function () {
-    $this->freezeTime();
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
@@ -25,7 +26,6 @@ it('signs out a session its absolute lifetime after the sign-in, and tells the u
 });
 
 it('does not extend the lifetime for requests during it', function () {
-    $this->freezeTime();
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
@@ -50,7 +50,6 @@ it('does not extend the lifetime for requests during it', function () {
 
 it('keeps the session for good when the lifetime is null', function () {
     config(['keystone.session.absolute_lifetime_seconds' => null]);
-    $this->freezeTime();
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
@@ -70,7 +69,6 @@ it('keeps the session for good when the lifetime is null', function () {
 
 it('counts from the sign-in when the lifetime is turned on after it', function () {
     config(['keystone.session.absolute_lifetime_seconds' => null]);
-    $this->freezeTime();
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
@@ -105,7 +103,6 @@ it('counts a session with no sign-in time as expired, however long the lifetime'
 });
 
 it('counts a sign-in time in the future as expired', function () {
-    $this->freezeTime();
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
@@ -133,7 +130,6 @@ it('leaves a guest who never signed in alone', function () {
 });
 
 it('records session.ended with the reason expired for the account', function () {
-    $this->freezeTime();
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
@@ -155,7 +151,6 @@ it('records session.ended with the reason expired for the account', function () 
 });
 
 it('records the expiry with the address of the request that found it', function () {
-    $this->freezeTime();
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
@@ -175,7 +170,6 @@ it('records the expiry with the address of the request that found it', function 
 });
 
 it("clears the browser's site data when the session expires", function () {
-    $this->freezeTime();
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
@@ -194,7 +188,6 @@ it("clears the browser's site data when the session expires", function () {
 });
 
 it('clears nothing on the page the user then signs in on', function () {
-    $this->freezeTime();
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
@@ -211,4 +204,70 @@ it('clears nothing on the page the user then signs in on', function () {
     $response = $this->get(route('login'));
 
     $this->assertSiteDataKept($response);
+});
+
+it('tells a JSON client its session expired', function () {
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    Auth::forgetGuards();
+    $this->travel($this->absoluteLifetimeSeconds())->seconds();
+
+    $response = $this->getJson($this->protectedPage());
+
+    $this->assertSessionExpiredForJson($response);
+});
+
+it('sends an HTML request to sign in, and back where it was going after', function () {
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+    $signIn = fn () => $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $signIn();
+
+    Auth::forgetGuards();
+    $this->travel($this->absoluteLifetimeSeconds())->seconds();
+    $expired = $this->get($this->protectedPage());
+
+    Auth::forgetGuards();
+    $next = $signIn();
+
+    $this->assertSessionExpired($expired);
+    $this->assertSignedIn($next, $this->protectedPage());
+});
+
+it("answers with the app's own expiry response, after ending and recording the session", function () {
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+    $answer = new NotingExpiryResponse($this->securityEvents());
+    $this->app->instance(SessionExpiredResponse::class, $answer);
+
+    $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    Auth::forgetGuards();
+    $this->travel($this->absoluteLifetimeSeconds())->seconds();
+    $response = $this->get($this->protectedPage());
+
+    $next = $this->get(route('login'));
+
+    expect($response->getStatusCode())->toBe(418)
+        ->and($answer->signedIn)->toBeFalse()
+        ->and($answer->recorded)->toBe([SecurityEventType::SIGNED_IN, SecurityEventType::SESSION_ENDED]);
+
+    $this->assertSiteDataCleared($response, ['cache', 'storage']);
+    $this->assertSignInPage($next, ['status' => __('keystone::messages.session-expired')]);
 });
