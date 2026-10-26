@@ -150,15 +150,12 @@ class KeystoneGuard extends SessionGuard
         $account = $this->sessionAccount();
 
         $this->loggedOut = true;
-
         $this->endSession();
 
         $this->state()->leaveStatus(Status::SESSION_EXPIRED);
-
         SessionExpiry::forResponseTo($this->request);
 
         $recorder = $this->container->make(Recorder::class);
-
         $recorder->record(SecurityEventType::SESSION_ENDED, account: $account, reason: 'keystone.expired');
     }
 
