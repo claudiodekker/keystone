@@ -2,6 +2,7 @@
 
 use ClaudioDekker\Keystone\Methods\Surface;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
+use Illuminate\Support\Facades\Route;
 
 it('refuses a cross-site sign-in submit, and records request.rejected', function () {
     $user = $this->createUser();
@@ -58,6 +59,19 @@ it("refuses a cross-site submit even when the app exempts every route from Larav
     $response = $this->fromAnotherSite()->post(route('login.submit', $support->type()->name()));
 
     $this->assertCrossSiteRefused($response);
+});
+
+it("refuses a cross-site sign-out even when the app removes Laravel's CSRF middleware from the route", function () {
+    $user = $this->createUser();
+    Route::getRoutes()->getByName('logout')->withoutMiddleware(PreventRequestForgery::class);
+
+    $response = $this->actingAs($user)->fromAnotherSite()->post(route('logout'));
+
+    $this->assertCrossSiteRefused($response);
+
+    $next = $this->get(route('login'));
+
+    $this->assertAlreadySignedIn($next);
 });
 
 it('refuses a submit from another subdomain', function () {
