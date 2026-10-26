@@ -4,16 +4,23 @@ namespace ClaudioDekker\Keystone;
 
 use ClaudioDekker\Keystone\Auth\KeystoneGuard;
 use ClaudioDekker\Keystone\Configuration\BootChecks;
+use ClaudioDekker\Keystone\Contracts\SessionExpiredResponse;
 use ClaudioDekker\Keystone\Exceptions\KeystoneMisconfiguredException;
 use ClaudioDekker\Keystone\Http\Middleware\ApplyHardeningFloor;
 use ClaudioDekker\Keystone\Http\Middleware\CaptureRequestContext;
 use ClaudioDekker\Keystone\Http\Middleware\ClearSiteData;
 use ClaudioDekker\Keystone\Http\Middleware\RefuseCrossSiteRequests;
+use ClaudioDekker\Keystone\Http\Responses\UnauthenticatedResponse;
+use ClaudioDekker\Keystone\Http\SessionExpiry;
 use ClaudioDekker\Keystone\Methods\CredentialTypeRegistry;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\MethodAllowList;
+use Illuminate\Auth\AuthenticationException;
+use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Http\Kernel;
+use Illuminate\Foundation\Exceptions\Handler;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\ServiceProvider;
 
@@ -38,6 +45,8 @@ class KeystoneServiceProvider extends ServiceProvider
 
         $this->app->singleton(CredentialTypeRegistry::class);
 
+        $this->app->bindIf(SessionExpiredResponse::class, UnauthenticatedResponse::class);
+
         $this->app->bind(CredentialTypes::class, fn (Application $app) => new CredentialTypes(
             $app->make(CredentialTypeRegistry::class)->types(),
             MethodAllowList::from($app->make('config')->get('keystone.methods')),
@@ -51,6 +60,7 @@ class KeystoneServiceProvider extends ServiceProvider
     {
         Auth::extend('keystone', $this->createGuard(...));
 
+        $this->answerExpiredSessions();
         $this->captureRequestContext();
         $this->hardenResponses();
         $this->refuseCrossSiteRequests();
@@ -135,6 +145,24 @@ class KeystoneServiceProvider extends ServiceProvider
     }
 
     /**
+     * Render the app's expiry response, through Laravel's exception handler, for a request that needs a user whose session expired during it.
+     */
+    protected function answerExpiredSessions(): void
+    {
+        $this->callAfterResolving(ExceptionHandler::class, function (ExceptionHandler $handler) {
+            if (! $handler instanceof Handler) {
+                return;
+            }
+
+            $handler->renderable(function (AuthenticationException $exception, Request $request) {
+                $expiry = $this->app->make(SessionExpiry::class);
+
+                return $expiry->render($exception, $request);
+            });
+        });
+    }
+
+    /**
      * Add the request context middleware to the end of the global middleware, so it runs after the app's trusted-proxy middleware.
      */
     protected function captureRequestContext(): void
@@ -176,6 +204,7 @@ class KeystoneServiceProvider extends ServiceProvider
 
         $guard = new KeystoneGuard($name, $provider, $app->make('session.store'));
 
+        $guard->setContainer($app);
         $guard->setCookieJar($app->make('cookie'));
         $guard->setDispatcher($app->make('events'));
         $guard->setRequest($app->refresh('request', $guard, 'setRequest'));

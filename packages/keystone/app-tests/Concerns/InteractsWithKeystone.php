@@ -5,6 +5,7 @@ namespace ClaudioDekker\Keystone\AppTests\Concerns;
 use ClaudioDekker\Keystone\Accounts\EmailAddress;
 use ClaudioDekker\Keystone\AppTests\Assertions\CrossSiteAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\GuestStepAssertions;
+use ClaudioDekker\Keystone\AppTests\Assertions\SessionExpiryAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\SignInAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\SignOutAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\ThrottledAssertions;
@@ -26,6 +27,7 @@ use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Monolog\Handler\TestHandler;
@@ -41,6 +43,7 @@ trait InteractsWithKeystone
     use CrossSiteAssertions;
     use GuestStepAssertions;
     use LazilyRefreshDatabase;
+    use SessionExpiryAssertions;
     use SignInAssertions;
     use SignOutAssertions;
     use ThrottledAssertions;
@@ -102,11 +105,37 @@ trait InteractsWithKeystone
     }
 
     /**
+     * Serve a page only a signed-in user reaches, through the app's own auth middleware, and get its path.
+     */
+    public function protectedPage(): string
+    {
+        $path = '/keystone/app-tests/protected';
+
+        Route::middleware(['web', 'auth'])->get($path, fn () => response()->noContent());
+
+        return $path;
+    }
+
+    /**
      * Get how many failed attempts an account gets per credential type and flow in an hour, as the app configures it.
      */
     public function failedAttemptAllowance(): int
     {
         return config()->integer('keystone.rate_limits.failed_attempts_per_hour');
+    }
+
+    /**
+     * Get how many seconds a session lasts after its sign-in as the app configures it, skipping the test when the app turned the lifetime off.
+     */
+    public function absoluteLifetimeSeconds(): int
+    {
+        $lifetime = config('keystone.session.absolute_lifetime_seconds');
+
+        if (! is_int($lifetime)) {
+            $this->markTestSkipped('The app turned the absolute session lifetime off.');
+        }
+
+        return $lifetime;
     }
 
     /**
