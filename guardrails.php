@@ -28,8 +28,9 @@ use ClaudioDekker\LaravelGuardrails\Checks\Php\Safety\NoWeakRandomness;
 use ClaudioDekker\LaravelGuardrails\Checks\Php\Shape\BlankLineAfterMultilineStatements;
 use ClaudioDekker\LaravelGuardrails\Checks\Php\Shape\NoBlankLineOpeningBlocks;
 use ClaudioDekker\LaravelGuardrails\Checks\Php\Shape\NoEmptyBraces;
-use ClaudioDekker\LaravelGuardrails\Checks\Php\Shape\NoMatchOnCall;
 use ClaudioDekker\LaravelGuardrails\Checks\Php\Shape\NoNewThenCall;
+use ClaudioDekker\LaravelGuardrails\Checks\Php\Shape\NoParenthesesAroundCallReceivers;
+use ClaudioDekker\LaravelGuardrails\Checks\Php\Shape\NoParenthesisedReceiverInConditions;
 use ClaudioDekker\LaravelGuardrails\Checks\Php\Shape\OneClausePerLine;
 use ClaudioDekker\LaravelGuardrails\Checks\Php\Structure\ConcernsHoldOnlyTraits;
 use ClaudioDekker\LaravelGuardrails\Checks\Php\Structure\NoFinal;
@@ -62,7 +63,8 @@ return [
     NoUnserialize::class,
     NoWeakHashes::class,
     NoWeakRandomness::class,
-    NoMatchOnCall::class,
+    NoParenthesesAroundCallReceivers::class,
+    NoParenthesisedReceiverInConditions::class,
     NoNewThenCall::class,
     OneClausePerLine::class,
     NoBlankLineOpeningBlocks::class,
@@ -83,7 +85,6 @@ return [
         'packages/keystone/src/Http/HardeningSettings.php' => 'It parses config values, which hold whatever the app wrote.',
         'packages/keystone/src/KeystoneServiceProvider.php' => 'It checks config values, which hold whatever the app wrote.',
         'packages/keystone/src/Methods/MethodAllowList.php' => 'It parses the keystone.methods config value, which holds whatever the app wrote.',
-        'packages/keystone/src/SignIn/TimingFloor.php' => 'hold() returns what its callback returns, typed by a @template that PHP cannot declare natively.',
     ]),
     (new ClientReadsThroughRequestContext)->allowing([
         'packages/keystone/src/Http/RequestContext.php' => 'The request context is where the client is read, once per request.',
