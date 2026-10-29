@@ -120,7 +120,15 @@ A request that is not `GET`, `HEAD` or `OPTIONS` to a Keystone route must come f
 - It carries the session's CSRF token in `_token`, `X-CSRF-TOKEN` or the encrypted `X-XSRF-TOKEN`.
 - Its `Origin` is the request's own origin or one in `trusted_origins`.
 
-Anything else, a `same-site` request from another subdomain included, is refused with Laravel's `TokenMismatchException`, which your app renders as its usual 419 page. The check runs in the `web` group after the session starts, and after Laravel's own CSRF check. It reads none of the exemptions you gave Laravel's, so listing a Keystone route there doesn't open it.
+Anything else, a `same-site` request from another subdomain included, is refused with Laravel's `TokenMismatchException`, which your app renders as its usual 419 page. The check runs in the `web` group after the session starts, and after Laravel's own CSRF check. It reads none of the exemptions you gave Laravel's, so listing a Keystone route there, or removing Laravel's CSRF middleware from it, doesn't open it. Only excluding the check itself does:
+
+```php
+use App\Http\Controllers\Auth\SignOutController;
+use ClaudioDekker\Keystone\Http\Middleware\RefuseCrossSiteRequests;
+
+Route::post('logout', [SignOutController::class, 'destroy'])
+    ->withoutMiddleware(RefuseCrossSiteRequests::class);
+```
 
 Each refusal records a `request.rejected` security event with the reason `keystone.cross_site_request`. The event is anonymous: a page on any site can make a browser send a request as the user, so the refusal is never recorded against the user's account. It is a log line, and identical ones are logged once per 60 seconds.
 
