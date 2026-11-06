@@ -3,7 +3,7 @@
   "private": true,
   "description": "The dependencies keystone:install merges into an app's package.json. The monorepo builds and type-checks the stubs against these same versions.",
   "dependencies": {
-    "@inertiajs/vue3": "^3.9",
+    "@inertiajs/vue3": "^3.11",
     "@laravel/vite-plugin-wayfinder": "^0.1",
     "@tailwindcss/vite": "^4.3",
     "@vitejs/plugin-vue": "^6.0",
