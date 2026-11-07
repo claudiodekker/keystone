@@ -3,9 +3,12 @@
 namespace ClaudioDekker\Keystone\Accounts;
 
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
+use ClaudioDekker\Keystone\Exceptions\AccountChangeRefusedException;
+use ClaudioDekker\Keystone\Models\UserCredential;
 use ClaudioDekker\Keystone\SecurityEvents\Recorder;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use Closure;
+use SensitiveParameter;
 
 /**
  * @internal
@@ -45,6 +48,25 @@ class AccountChange
             account: $this->account,
             operator: $operator,
         );
+    }
+
+    /**
+     * Replace the credential's secret with its rehash, which ends nothing, refusing when another write changed the secret since it was loaded.
+     *
+     * Every write encrypts with a fresh IV, so a ciphertext that differs from the loaded one means another write got there first.
+     *
+     * @throws AccountChangeRefusedException
+     */
+    public function rehash(UserCredential $credential, #[SensitiveParameter] string $secret): void
+    {
+        $updated = UserCredential::query()
+            ->whereKey($credential->getKey())
+            ->where('secret', $credential->getRawOriginal('secret'))
+            ->update(['secret' => $credential->encryptSecret($secret)]);
+
+        if ($updated === 0) {
+            throw AccountChangeRefusedException::secretChanged();
+        }
     }
 
     /**

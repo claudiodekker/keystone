@@ -58,3 +58,18 @@ it('signs in and keeps the hash when the hasher fails, reporting the failure', f
     $this->assertSignInRefused($second, __('keystone::messages.credentials-rejected'));
     Exceptions::assertReported(fn (RuntimeException $exception) => $exception->getMessage() === 'The hasher failed to hash.');
 });
+
+it("keeps the account's other sessions signed in when a sign-in rehashes the password", function () {
+    config(['hashing.rehash_on_login' => false]);
+
+    $this->post(route('login.submit', 'password'), $this->fields);
+
+    config(['hashing.rehash_on_login' => true]);
+    $first = $this->switchToFreshBrowser();
+    $this->post(route('login.submit', 'password'), $this->fields);
+
+    $this->switchBackTo($first);
+    $response = $this->get(route('login'));
+
+    $this->assertAlreadySignedIn($response);
+});

@@ -32,7 +32,7 @@ it('signs in with the secret the type rehashed the credential to', function () {
     $withOld->assertSessionHasErrors('identifier');
 });
 
-it('keeps a secret written while the type was verifying', function () {
+it('keeps a secret written while the type was verifying, without reporting the refused rehash', function () {
     $ada = User::factory()->create();
     UserEmail::factory()->for($ada, 'user')->verified()->create(['address' => 'ada@example.com']);
     $credential = UserCredential::factory()->for($ada, 'user')->create(['type' => 'form', 'secret' => 'correct horse']);
@@ -58,6 +58,7 @@ it('keeps a secret written while the type was verifying', function () {
     $withChanged->assertRedirect('/');
     $withNew->assertRedirectToRoute('login');
     $withNew->assertSessionHasErrors('identifier');
+    Exceptions::assertNothingReported();
 });
 
 it('signs in and reports a rehash that throws, keeping the secret', function () {
