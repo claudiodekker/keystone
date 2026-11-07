@@ -38,3 +38,17 @@ it('refuses to run without an operator, ending nothing', function (Closure $argu
     'for every account' => [fn () => ['--all' => true]],
     'with an empty name' => [fn (User $ada) => ['user' => $ada->getKey(), '--operator' => '']],
 ]);
+
+it('tells the operator whose sessions ended', function () {
+    $ada = User::factory()->create();
+
+    $this->artisan('keystone:end-sessions', ['user' => $ada->getKey(), '--operator' => 'margaret'])
+        ->expectsOutputToContain("Ended every session of the account [{$ada->getKey()}]. Each ends on its next request.")
+        ->assertSuccessful();
+});
+
+it('tells the operator every session ended', function () {
+    $this->artisan('keystone:end-sessions', ['--all' => true, '--operator' => 'margaret'])
+        ->expectsOutputToContain('Ended every session of every account. Each ends on its next request.')
+        ->assertSuccessful();
+});

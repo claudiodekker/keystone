@@ -41,11 +41,17 @@ class EndSessionsCommand extends Command
         }
 
         if ($this->option('all')) {
-            EndAllSessions::dispatchSync($operator);
-
-            return self::SUCCESS;
+            return $this->endAllSessions($operator);
         }
 
+        return $this->endSessions($accounts, $operator);
+    }
+
+    /**
+     * End every session of the account the argument names.
+     */
+    protected function endSessions(AccountLookup $accounts, string $operator): int
+    {
         $id = $this->argument('user');
 
         if ($id === null) {
@@ -59,6 +65,20 @@ class EndSessionsCommand extends Command
         }
 
         EndSessions::dispatchSync($account, $operator);
+
+        $this->components->info("Ended every session of the account [{$id}]. Each ends on its next request.");
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * End every session of every account.
+     */
+    protected function endAllSessions(string $operator): int
+    {
+        EndAllSessions::dispatchSync($operator);
+
+        $this->components->info('Ended every session of every account. Each ends on its next request.');
 
         return self::SUCCESS;
     }
