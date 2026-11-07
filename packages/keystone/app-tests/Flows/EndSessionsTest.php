@@ -130,3 +130,13 @@ it('records sessions.terminated for the account, by the operator who ended them'
         ->and($events[0]->actor)->toBe(Actor::OPERATOR)
         ->and($events[0]->operator)->toBe('margaret');
 });
+
+it("stores the operator's name cut to 64 characters, with control characters replaced by spaces", function () {
+    $user = $this->createUser();
+
+    Artisan::call('keystone:end-sessions', ['user' => $user->getAuthIdentifier(), '--operator' => "margaret\nINFO: forged ".str_repeat('x', 60)]);
+
+    $event = $this->securityEvents()->for($user)->sole();
+
+    expect($event->operator)->toBe('margaret INFO: forged '.str_repeat('x', 42));
+});
