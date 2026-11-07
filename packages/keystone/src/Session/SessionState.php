@@ -85,11 +85,11 @@ class SessionState
     }
 
     /**
-     * Determine if the session was signed in on the epoch, a session with no epoch stamp never being on one.
+     * Determine if the session was signed in on the epoch.
      */
     public function isOnEpoch(?int $epoch): bool
     {
-        return $epoch !== null && $this->session->get(static::EPOCH) === $epoch;
+        return $this->session->get(static::EPOCH) === $epoch;
     }
 
     /**

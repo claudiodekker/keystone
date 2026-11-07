@@ -2,6 +2,7 @@
 
 use ClaudioDekker\Keystone\Jobs\EndAllSessions;
 use ClaudioDekker\Keystone\Jobs\EndSessions;
+use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\SecurityEvents\Actor;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
@@ -223,4 +224,15 @@ it("clears the browser's site data on the request that finds the session ended",
     $response = $this->get(route('login'));
 
     $this->assertSiteDataCleared($response, ['cache', 'storage']);
+});
+
+it('signs out a session from before Keystone, which carries no epoch, on its first request', function () {
+    config(['keystone.session.absolute_lifetime_seconds' => null]);
+    $user = $this->createUser();
+
+    $this->withSession([Keystone::guard()->getName() => $user->getAuthIdentifier()]);
+
+    $response = $this->get(route('login'));
+
+    $this->assertSignInPage($response, ['status' => __('keystone::messages.session-ended')]);
 });
