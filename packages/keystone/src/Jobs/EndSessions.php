@@ -35,6 +35,6 @@ class EndSessions implements ShouldQueue
      */
     public function handle(AccountChanges $accountChanges): void
     {
-        $accountChanges->change($this->account, fn (AccountChange $change) => $change->endSessions());
+        $accountChanges->change($this->account, fn (AccountChange $change) => $change->endSessions($this->operator));
     }
 }

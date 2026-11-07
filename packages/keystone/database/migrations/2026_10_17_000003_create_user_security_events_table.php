@@ -31,6 +31,7 @@ return new class extends Migration
             $table->text('user_agent')->nullable();
             $table->boolean('known_device')->nullable();
             $table->char('request_id', 26)->nullable();
+            $table->string('operator', 64)->nullable();
 
             $table->index(['user_id', 'occurred_at']);
         });

@@ -43,6 +43,11 @@ class Recorder
     protected const int REASON_LENGTH = 64;
 
     /**
+     * The most characters an operator's name may hold.
+     */
+    protected const int OPERATOR_LENGTH = 64;
+
+    /**
      * Create the recorder.
      */
     public function __construct(
@@ -56,6 +61,8 @@ class Recorder
 
     /**
      * Record the security event, as a log line alone when it is anonymous.
+     *
+     * Naming an operator records the event as theirs rather than the user's.
      */
     public function record(
         SecurityEventType $type,
@@ -64,12 +71,13 @@ class Recorder
         ?CredentialType $credentialType = null,
         int|string|null $credential = null,
         ?string $reason = null,
+        ?string $operator = null,
     ): void {
         if ($this->config->get('keystone.events.enabled') === false) {
             return;
         }
 
-        $entry = rescue(fn () => $this->makeEntry($type, $account, $surface, $credentialType, $credential, $reason));
+        $entry = rescue(fn () => $this->makeEntry($type, $account, $surface, $credentialType, $credential, $reason, $operator));
 
         if ($entry === null) {
             return;
@@ -96,6 +104,7 @@ class Recorder
         ?CredentialType $credentialType,
         int|string|null $credential,
         ?string $reason,
+        ?string $operator,
     ): UserSecurityEvent {
         $context = RequestContext::of($this->request);
 
@@ -104,7 +113,7 @@ class Recorder
             'occurred_at' => Date::now()->toImmutable(),
             'type' => $type,
             'user_id' => $account?->getAuthIdentifier(),
-            'actor' => Actor::USER,
+            'actor' => $operator === null ? Actor::USER : Actor::OPERATOR,
             'flow' => $this->session->flow($surface),
             'credential_type' => $credentialType?->name(),
             'credential_id' => $credential,
@@ -115,6 +124,7 @@ class Recorder
             'user_agent' => $context?->userAgent,
             'known_device' => null,
             'request_id' => $context?->requestId,
+            'operator' => $operator === null ? null : $this->operator($operator),
         ]);
     }
 
@@ -135,6 +145,17 @@ class Recorder
         }
 
         return $prefix.'.invalid_reason';
+    }
+
+    /**
+     * Get the operator's name as stored, with control characters replaced and bounded.
+     */
+    protected function operator(string $operator): string
+    {
+        $valid = mb_scrub($operator, 'UTF-8');
+        $printable = preg_replace('/\p{Cc}/u', ' ', $valid) ?? '';
+
+        return mb_substr($printable, 0, static::OPERATOR_LENGTH);
     }
 
     /**

@@ -23,6 +23,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int|string|null $user_id
  * @property Actor $actor
  * @property Flow|null $flow
+ * @property string|null $operator
  *
  * @api
  */

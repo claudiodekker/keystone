@@ -3,6 +3,8 @@
 use ClaudioDekker\Keystone\Jobs\EndAllSessions;
 use ClaudioDekker\Keystone\Jobs\EndSessions;
 use ClaudioDekker\Keystone\Methods\Surface;
+use ClaudioDekker\Keystone\SecurityEvents\Actor;
+use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Bus;
@@ -115,4 +117,16 @@ it("signs out every account's sessions through the job an admin panel dispatches
     $response = $this->get(route('login'));
 
     $this->assertSignInPage($response);
+});
+
+it('records sessions.terminated for the account, by the operator who ended them', function () {
+    $user = $this->createUser();
+
+    Artisan::call('keystone:end-sessions', ['user' => $user->getAuthIdentifier(), '--operator' => 'margaret']);
+
+    $events = $this->securityEvents()->for($user);
+
+    expect($events->pluck('type')->all())->toBe([SecurityEventType::SESSIONS_TERMINATED])
+        ->and($events[0]->actor)->toBe(Actor::OPERATOR)
+        ->and($events[0]->operator)->toBe('margaret');
 });

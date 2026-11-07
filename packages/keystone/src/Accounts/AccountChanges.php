@@ -4,6 +4,7 @@ namespace ClaudioDekker\Keystone\Accounts;
 
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Keystone;
+use ClaudioDekker\Keystone\SecurityEvents\Recorder;
 use Closure;
 use Illuminate\Database\Connection;
 
@@ -17,6 +18,7 @@ class AccountChanges
      */
     public function __construct(
         protected Connection $connection,
+        protected Recorder $recorder,
     ) {
         //
     }
@@ -24,21 +26,27 @@ class AccountChanges
     /**
      * Apply a change to the account while its row is locked, moving its credential epoch when the change ended anything.
      *
+     * The change records its events only once the outermost transaction commits, so one that rolls back records nothing.
+     *
      * @param  Closure(AccountChange): void  $apply
      */
     public function change(KeystoneUser $account, Closure $apply): void
     {
-        $this->connection->transaction(function () use ($account, $apply) {
+        $change = $this->connection->transaction(function () use ($account, $apply) {
             $this->lock($account);
 
-            $change = new AccountChange;
+            $change = new AccountChange($account);
 
             $apply($change);
 
             if ($change->movesEpoch()) {
                 CredentialEpoch::move($account->getAuthIdentifier());
             }
+
+            return $change;
         });
+
+        $this->connection->afterCommit(fn () => $change->record($this->recorder));
     }
 
     /**
