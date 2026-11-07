@@ -171,10 +171,16 @@ class Recorder
     }
 
     /**
-     * Log an anonymous event once per cooldown.
+     * Log an anonymous event once per cooldown, or every time an operator made it.
      */
     protected function logAnonymous(UserSecurityEvent $entry): void
     {
+        if ($entry->actor === Actor::OPERATOR) {
+            rescue(fn () => $this->log($entry));
+
+            return;
+        }
+
         $add = fn () => Cache::add($this->cooldownKey($entry), true, static::COOLDOWN_SECONDS);
         $first = rescue($add, rescue: true);
 

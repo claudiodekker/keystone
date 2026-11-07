@@ -157,3 +157,12 @@ it('logs one sessions.terminated about nobody for --all, by the operator who ran
         ->and($logged[0]['operator'])->toBe('margaret')
         ->and($logged[0]['reason'])->toBe('keystone.every_account');
 });
+
+it('logs every --all, however close together they run', function () {
+    Artisan::call('keystone:end-sessions', ['--all' => true, '--operator' => 'margaret']);
+    Artisan::call('keystone:end-sessions', ['--all' => true, '--operator' => 'margaret']);
+
+    $logged = $this->securityEvents()->logged();
+
+    expect($logged)->toHaveCount(2);
+});
