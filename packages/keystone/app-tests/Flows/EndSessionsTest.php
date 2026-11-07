@@ -1,5 +1,6 @@
 <?php
 
+use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Jobs\EndAllSessions;
 use ClaudioDekker\Keystone\Jobs\EndSessions;
 use ClaudioDekker\Keystone\Keystone;
@@ -11,6 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\DB;
 
 it("signs out a session that signed in before the operator ended the account's sessions, on its next request", function () {
     $user = $this->createUser();
@@ -259,3 +261,31 @@ it("signs out the sessions of an account the app's global scopes hid while the o
 
     $this->assertSignInPage($response, ['status' => __('keystone::messages.session-ended')]);
 });
+
+it('ends nothing and records nothing when the transaction the job ran in rolls back', function (Closure $endSessions) {
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $rolledBack = fn () => DB::transaction(function () use ($endSessions, $user) {
+        $endSessions($user);
+
+        throw new RuntimeException('The admin panel failed after ending the sessions.');
+    });
+
+    expect($rolledBack)->toThrow(RuntimeException::class);
+
+    Auth::forgetGuards();
+    $response = $this->get(route('login'));
+
+    $this->assertAlreadySignedIn($response);
+    expect(array_column($this->securityEvents()->logged(), 'type'))->toBe(['signed_in']);
+})->with([
+    'the account' => [fn (KeystoneUser $user) => EndSessions::dispatchSync($user, operator: 'margaret')],
+    'every account' => [fn () => EndAllSessions::dispatchSync(operator: 'margaret')],
+]);
