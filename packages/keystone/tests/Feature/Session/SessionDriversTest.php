@@ -14,7 +14,7 @@ it("signs out another session on its next request once the operator ends the acc
     $ada = User::factory()->create();
     UserEmail::factory()->for($ada, 'user')->verified()->create(['address' => 'ada@example.com']);
     UserCredential::factory()->for($ada, 'user')->create(['type' => 'form', 'secret' => 'correct horse']);
-    $browser = fn (TestResponse $response) => collect($response->headers->getCookies())
+    $cookiesOf = fn (TestResponse $response) => collect($response->headers->getCookies())
         ->mapWithKeys(fn ($cookie) => [$cookie->getName() => $response->getCookie($cookie->getName())->getValue()])
         ->all();
 
@@ -27,11 +27,11 @@ it("signs out another session on its next request once the operator ends the acc
     };
 
     $signedIn = $this->post(route('login.submit', 'form'), ['identifier' => 'ada@example.com', 'secret' => 'correct horse']);
-    $before = $nextRequest($browser($signedIn));
+    $before = $nextRequest($cookiesOf($signedIn));
 
     Artisan::call('keystone:end-sessions', ['user' => $ada->getKey(), '--operator' => 'margaret']);
 
-    $after = $nextRequest($browser($before));
+    $after = $nextRequest($cookiesOf($before));
 
     $before->assertRedirect('/');
     $after->assertOk();

@@ -26,6 +26,14 @@ class CredentialEpoch
     }
 
     /**
+     * Lock the row of the account with the id until the transaction ends, so changes to one account run one after another.
+     */
+    public static function lock(int|string $id): void
+    {
+        static::account($id)->lockForUpdate()->value(static::COLUMN);
+    }
+
+    /**
      * Move the epoch of the account with the id, ending every session stamped with the one before.
      */
     public static function move(int|string $id): void

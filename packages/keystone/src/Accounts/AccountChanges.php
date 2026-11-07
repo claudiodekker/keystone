@@ -3,7 +3,6 @@
 namespace ClaudioDekker\Keystone\Accounts;
 
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
-use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\SecurityEvents\Recorder;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use Closure;
@@ -34,7 +33,7 @@ class AccountChanges
     public function change(KeystoneUser $account, Closure $apply): void
     {
         $change = $this->connection->transaction(function () use ($account, $apply) {
-            $this->lock($account);
+            CredentialEpoch::lock($account->getAuthIdentifier());
 
             $change = new AccountChange($account);
 
@@ -63,18 +62,5 @@ class AccountChanges
             reason: 'keystone.every_account',
             operator: $operator,
         ));
-    }
-
-    /**
-     * Lock the account's row until the change commits, so changes to one account run one after another.
-     */
-    protected function lock(KeystoneUser $account): void
-    {
-        Keystone::userModel()::query()
-            ->withoutGlobalScopes()
-            ->whereKey($account->getAuthIdentifier())
-            ->lockForUpdate()
-            ->toBase()
-            ->value(CredentialEpoch::COLUMN);
     }
 }
