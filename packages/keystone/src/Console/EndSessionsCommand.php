@@ -27,7 +27,7 @@ class EndSessionsCommand extends Command
      *
      * @var string
      */
-    protected $description = 'End every session of an account on its next request';
+    protected $description = 'End every session of an account, or of every account, on its next request';
 
     /**
      * End every session of the account, or of every account.
@@ -40,10 +40,26 @@ class EndSessionsCommand extends Command
             return self::SUCCESS;
         }
 
-        $account = $accounts->find($this->argument('user'));
+        $id = $this->argument('user');
+
+        if ($id === null) {
+            return $this->refuse('Name the account whose sessions end, or pass --all.');
+        }
+
+        $account = $accounts->find($id);
 
         EndSessions::dispatchSync($account, $this->option('operator'));
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Tell the operator why nothing ended, and fail.
+     */
+    protected function refuse(string $message): int
+    {
+        $this->components->error($message);
+
+        return self::FAILURE;
     }
 }
