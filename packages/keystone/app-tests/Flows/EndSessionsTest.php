@@ -14,10 +14,36 @@ it("signs out a session that signed in before the operator ended the account's s
         ...$support->validProof(Surface::SIGN_IN, $user),
     ]);
 
-    Artisan::call('keystone:end-sessions', ['user' => $user->getAuthIdentifier(), '--operator' => 'grace']);
+    Artisan::call('keystone:end-sessions', ['user' => $user->getAuthIdentifier(), '--operator' => 'margaret']);
 
     Auth::forgetGuards();
     $response = $this->get(route('login'));
 
     $this->assertSignInPage($response);
+});
+
+it("keeps another account's session signed in", function () {
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $other = $this->createUser();
+    $this->addVerifiedAddress($other, 'grace@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user)->arrangeCredential(Surface::SIGN_IN, $other);
+
+    $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'grace@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $other),
+    ]);
+
+    $gracesBrowser = $this->switchToFreshBrowser();
+    $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    Artisan::call('keystone:end-sessions', ['user' => $user->getAuthIdentifier(), '--operator' => 'margaret']);
+
+    $this->switchBackTo($gracesBrowser);
+    $response = $this->get(route('login'));
+
+    $this->assertAlreadySignedIn($response);
 });
