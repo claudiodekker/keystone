@@ -34,6 +34,17 @@ class CredentialEpoch
     }
 
     /**
+     * Move every account's epoch in one query, ending every session.
+     */
+    public static function moveAll(): void
+    {
+        Keystone::userModel()::query()
+            ->withoutGlobalScopes()
+            ->toBase()
+            ->increment(static::COLUMN);
+    }
+
+    /**
      * Get a query on the users row with the id, past every global scope and model event of the app's user model.
      */
     protected static function account(int|string $id): Builder

@@ -42,6 +42,14 @@ class AccountChanges
     }
 
     /**
+     * End every account's sessions at once.
+     */
+    public function endAllSessions(): void
+    {
+        CredentialEpoch::moveAll();
+    }
+
+    /**
      * Lock the account's row until the change commits, so changes to one account run one after another.
      */
     protected function lock(KeystoneUser $account): void
