@@ -27,6 +27,24 @@ it("signs out a session that signed in before the operator ended the account's s
     $this->assertSignInPage($response);
 });
 
+it('tells the user on the sign-in page that their session was ended', function () {
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    Artisan::call('keystone:end-sessions', ['user' => $user->getAuthIdentifier(), '--operator' => 'margaret']);
+
+    Auth::forgetGuards();
+    $response = $this->get(route('login'));
+
+    $this->assertSignInPage($response, ['status' => __('keystone::messages.session-ended')]);
+});
+
 it("keeps another account's session signed in", function () {
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');

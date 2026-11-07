@@ -186,12 +186,14 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * End the session its account's credential epoch left behind, before anything answers the request.
+     * End the session its account's credential epoch left behind and tell the user on their next page, before anything answers the request.
      */
     protected function endOffEpoch(): void
     {
         $this->loggedOut = true;
         $this->endSession();
+
+        $this->state()->leaveStatus(Status::SESSION_ENDED);
     }
 
     /**
