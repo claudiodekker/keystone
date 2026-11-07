@@ -1,6 +1,7 @@
 <?php
 
 use ClaudioDekker\Keystone\Lint\Checks\ClientReadsThroughRequestContext;
+use ClaudioDekker\Keystone\Lint\Checks\CredentialWritesThroughAccountChange;
 use ClaudioDekker\Keystone\Lint\Checks\NoContainerLookups;
 use ClaudioDekker\Keystone\Lint\Checks\NoFactoriesInAppTests;
 use ClaudioDekker\Keystone\Lint\Checks\NoHttpInFeatureTests;
@@ -88,6 +89,9 @@ return [
     ]),
     (new ClientReadsThroughRequestContext)->allowing([
         'packages/keystone/src/Http/RequestContext.php' => 'The request context is where the client is read, once per request.',
+    ]),
+    (new CredentialWritesThroughAccountChange)->allowing([
+        'packages/keystone/src/Accounts/AccountChange.php' => 'The account change is the one place that writes credentials.',
     ]),
     NoContainerLookups::class,
     NoPackageDependencies::class,
