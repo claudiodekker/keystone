@@ -206,3 +206,21 @@ it('records session.ended with the reason epoch when the ended session makes its
         ->and($events[2]->reason)->toBe('keystone.epoch')
         ->and($events[2]->actor)->toBe(Actor::USER);
 });
+
+it("clears the browser's site data on the request that finds the session ended", function () {
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    Artisan::call('keystone:end-sessions', ['user' => $user->getAuthIdentifier(), '--operator' => 'margaret']);
+
+    Auth::forgetGuards();
+    $response = $this->get(route('login'));
+
+    $this->assertSiteDataCleared($response, ['cache', 'storage']);
+});
