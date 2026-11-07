@@ -27,6 +27,6 @@ class EndAllSessions implements ShouldQueue
      */
     public function handle(AccountChanges $accountChanges): void
     {
-        $accountChanges->endAllSessions();
+        $accountChanges->endAllSessions($this->operator);
     }
 }

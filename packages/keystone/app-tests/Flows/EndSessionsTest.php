@@ -140,3 +140,20 @@ it("stores the operator's name cut to 64 characters, with control characters rep
 
     expect($event->operator)->toBe('margaret INFO: forged '.str_repeat('x', 42));
 });
+
+it('logs one sessions.terminated about nobody for --all, by the operator who ran it', function () {
+    $this->createUser();
+    $this->createUser();
+
+    Artisan::call('keystone:end-sessions', ['--all' => true, '--operator' => 'margaret']);
+
+    $logged = $this->securityEvents()->logged();
+
+    expect($this->securityEvents()->stored())->toBeEmpty()
+        ->and($logged)->toHaveCount(1)
+        ->and($logged[0]['type'])->toBe('sessions.terminated')
+        ->and($logged[0]['user_id'])->toBeNull()
+        ->and($logged[0]['actor'])->toBe('operator')
+        ->and($logged[0]['operator'])->toBe('margaret')
+        ->and($logged[0]['reason'])->toBe('keystone.every_account');
+});

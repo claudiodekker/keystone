@@ -5,6 +5,7 @@ namespace ClaudioDekker\Keystone\Accounts;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\SecurityEvents\Recorder;
+use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use Closure;
 use Illuminate\Database\Connection;
 
@@ -50,11 +51,18 @@ class AccountChanges
     }
 
     /**
-     * End every account's sessions at once.
+     * End every account's sessions at once, for the operator who asked, recording it about nobody once the outermost transaction commits.
      */
-    public function endAllSessions(): void
+    public function endAllSessions(string $operator): void
     {
         CredentialEpoch::moveAll();
+
+        $this->connection->afterCommit(fn () => $this->recorder->record(
+            SecurityEventType::SESSIONS_TERMINATED,
+            account: null,
+            reason: 'keystone.every_account',
+            operator: $operator,
+        ));
     }
 
     /**
