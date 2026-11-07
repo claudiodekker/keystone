@@ -169,31 +169,37 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * End the expired session and tell the user why on their next page, before anything answers the request.
+     * End the expired session, and have the request that needs a user answered with the app's expiry response.
      */
     protected function expire(): void
+    {
+        $this->end(Status::SESSION_EXPIRED, reason: 'keystone.expired');
+
+        SessionExpiry::forResponseTo($this->request);
+    }
+
+    /**
+     * End the session its account's credential epoch left behind.
+     */
+    protected function endOffEpoch(): void
+    {
+        $this->end(Status::SESSION_ENDED, reason: 'keystone.epoch');
+    }
+
+    /**
+     * End the session, tell the user why on their next page and record it for the account, before anything answers the request.
+     */
+    protected function end(Status $status, string $reason): void
     {
         $account = $this->sessionAccount();
 
         $this->loggedOut = true;
         $this->endSession();
 
-        $this->state()->leaveStatus(Status::SESSION_EXPIRED);
-        SessionExpiry::forResponseTo($this->request);
+        $this->state()->leaveStatus($status);
 
         $recorder = $this->container->make(Recorder::class);
-        $recorder->record(SecurityEventType::SESSION_ENDED, account: $account, reason: 'keystone.expired');
-    }
-
-    /**
-     * End the session its account's credential epoch left behind and tell the user on their next page, before anything answers the request.
-     */
-    protected function endOffEpoch(): void
-    {
-        $this->loggedOut = true;
-        $this->endSession();
-
-        $this->state()->leaveStatus(Status::SESSION_ENDED);
+        $recorder->record(SecurityEventType::SESSION_ENDED, account: $account, reason: $reason);
     }
 
     /**

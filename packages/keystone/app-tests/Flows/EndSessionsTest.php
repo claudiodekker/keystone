@@ -184,3 +184,25 @@ it('logs every --all, however close together they run', function () {
 
     expect($logged)->toHaveCount(2);
 });
+
+it('records session.ended with the reason epoch when the ended session makes its next request', function () {
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    Artisan::call('keystone:end-sessions', ['user' => $user->getAuthIdentifier(), '--operator' => 'margaret']);
+
+    Auth::forgetGuards();
+    $this->get(route('login'));
+
+    $events = $this->securityEvents()->for($user);
+
+    expect($events->pluck('type')->all())->toBe([SecurityEventType::SIGNED_IN, SecurityEventType::SESSIONS_TERMINATED, SecurityEventType::SESSION_ENDED])
+        ->and($events[2]->reason)->toBe('keystone.epoch')
+        ->and($events[2]->actor)->toBe(Actor::USER);
+});
