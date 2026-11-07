@@ -23,3 +23,18 @@ it('refuses an id no account has', function () {
 
     $this->assertDatabaseCount(UserSecurityEvent::class, 0);
 });
+
+it('refuses to run without an operator, ending nothing', function (Closure $arguments) {
+    $ada = User::factory()->create();
+
+    $this->artisan('keystone:end-sessions', $arguments($ada))
+        ->expectsOutputToContain('Name the operator ending the sessions with --operator.')
+        ->assertFailed();
+
+    expect(CredentialEpoch::of($ada->getKey()))->toBe(0);
+    $this->assertDatabaseCount(UserSecurityEvent::class, 0);
+})->with([
+    'for the account' => [fn (User $ada) => ['user' => $ada->getKey()]],
+    'for every account' => [fn () => ['--all' => true]],
+    'with an empty name' => [fn (User $ada) => ['user' => $ada->getKey(), '--operator' => '']],
+]);

@@ -34,8 +34,14 @@ class EndSessionsCommand extends Command
      */
     public function handle(AccountLookup $accounts): int
     {
+        $operator = $this->option('operator');
+
+        if (! is_string($operator) || $operator === '') {
+            return $this->refuse('Name the operator ending the sessions with --operator.');
+        }
+
         if ($this->option('all')) {
-            EndAllSessions::dispatchSync($this->option('operator'));
+            EndAllSessions::dispatchSync($operator);
 
             return self::SUCCESS;
         }
@@ -52,7 +58,7 @@ class EndSessionsCommand extends Command
             return $this->refuse("No account has the id [{$id}].");
         }
 
-        EndSessions::dispatchSync($account, $this->option('operator'));
+        EndSessions::dispatchSync($account, $operator);
 
         return self::SUCCESS;
     }
