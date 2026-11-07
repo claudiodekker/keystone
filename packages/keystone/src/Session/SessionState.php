@@ -2,6 +2,7 @@
 
 namespace ClaudioDekker\Keystone\Session;
 
+use ClaudioDekker\Keystone\Accounts\CredentialEpoch;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\Surface;
@@ -28,6 +29,11 @@ class SessionState
      * The session key that holds when the session's sign-in completed, in Unix seconds.
      */
     protected const string SIGNED_IN_AT = 'keystone.signed_in_at';
+
+    /**
+     * The session key that holds the account's credential epoch at the session's sign-in.
+     */
+    protected const string EPOCH = 'keystone.epoch';
 
     /**
      * Create the session state over the request's session.
@@ -76,6 +82,14 @@ class SessionState
         return ! is_int($signedInAt)
             || $signedInAt > $now
             || $now >= $signedInAt + $lifetime;
+    }
+
+    /**
+     * Determine if the session was signed in on the epoch, a session with no epoch stamp never being on one.
+     */
+    public function isOnEpoch(?int $epoch): bool
+    {
+        return $epoch !== null && $this->session->get(static::EPOCH) === $epoch;
     }
 
     /**
@@ -141,7 +155,7 @@ class SessionState
     }
 
     /**
-     * Stamp the sign-in time, and put the account on the guard's session key and on the guard for the rest of the request.
+     * Stamp the sign-in time and the account's credential epoch, and put the account on the guard's session key and on the guard for the rest of the request.
      */
     protected function enter(KeystoneUser $account): void
     {
@@ -149,6 +163,7 @@ class SessionState
 
         $this->session->put($guard->getName(), $account->getAuthIdentifier());
         $this->session->put(static::SIGNED_IN_AT, Date::now()->getTimestamp());
+        $this->session->put(static::EPOCH, CredentialEpoch::of($account->getAuthIdentifier()));
         $guard->setUser($account);
 
         $this->events->dispatch(new Login($guard->getName(), $account, false));

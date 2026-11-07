@@ -3,6 +3,7 @@
 namespace ClaudioDekker\Keystone\Accounts;
 
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
+use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Models\UserEmail;
 
 /**
@@ -30,5 +31,15 @@ class AccountLookup
         }
 
         return $holders->first()?->user;
+    }
+
+    /**
+     * Find the account with the id, past every global scope of the app's user model.
+     */
+    public function find(int|string $id): ?KeystoneUser
+    {
+        return Keystone::userModel()::query()
+            ->withoutGlobalScopes()
+            ->find($id);
     }
 }
