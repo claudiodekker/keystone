@@ -16,7 +16,7 @@ it('reads the events for the user, and none for another user', function () {
         ...$support->validProof(Surface::SIGN_IN, $other),
     ]);
 
-    $this->flushSession()->post(route('logout'));
+    $this->post(route('logout'));
     $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada@example.com',
         ...$support->validProof(Surface::SIGN_IN, $user),
@@ -41,7 +41,7 @@ it('reads every event, oldest first, when given no user', function () {
     ]);
 
     $this->travel(5)->seconds();
-    $this->flushSession()->post(route('logout'));
+    $this->post(route('logout'));
     $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada@example.com',
         ...$support->validProof(Surface::SIGN_IN, $user),

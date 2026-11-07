@@ -21,8 +21,8 @@ it('keeps the hash when rehash_on_login is off', function () {
     $first = $this->post(route('login.submit', 'password'), $this->fields);
 
     $this->support->refuseHashesOf('bcrypt');
-    Auth::forgetGuards();
-    $second = $this->flushSession()->post(route('login.submit', 'password'), $this->fields);
+    $this->switchToFreshBrowser();
+    $second = $this->post(route('login.submit', 'password'), $this->fields);
 
     $this->assertSignedIn($first, '/');
     $this->assertSignInRefused($second, __('keystone::messages.credentials-rejected'));
@@ -34,8 +34,8 @@ it('rehashes when the hashing config leaves rehash_on_login out', function () {
     $first = $this->post(route('login.submit', 'password'), $this->fields);
 
     $this->support->refuseHashesOf('bcrypt');
-    Auth::forgetGuards();
-    $second = $this->flushSession()->post(route('login.submit', 'password'), $this->fields);
+    $this->switchToFreshBrowser();
+    $second = $this->post(route('login.submit', 'password'), $this->fields);
 
     Auth::forgetGuards();
     $next = $this->get(route('login'));
@@ -51,8 +51,8 @@ it('signs in and keeps the hash when the hasher fails, reporting the failure', f
     $first = $this->post(route('login.submit', 'password'), $this->fields);
 
     $this->support->refuseHashesOf('bcrypt');
-    Auth::forgetGuards();
-    $second = $this->flushSession()->post(route('login.submit', 'password'), $this->fields);
+    $this->switchToFreshBrowser();
+    $second = $this->post(route('login.submit', 'password'), $this->fields);
 
     $this->assertSignedIn($first, '/');
     $this->assertSignInRefused($second, __('keystone::messages.credentials-rejected'));

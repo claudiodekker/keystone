@@ -12,7 +12,8 @@ it('treats surrounding spaces as part of the password', function () {
 
     $this->assertSignInRefused($trimmed, __('keystone::messages.credentials-rejected'));
 
-    $spaced = $this->flushSession()->post(route('login.submit', 'password'), ['identifier' => 'ada@example.com', 'password' => '  odd horse  ']);
+    $this->switchToFreshBrowser();
+    $spaced = $this->post(route('login.submit', 'password'), ['identifier' => 'ada@example.com', 'password' => '  odd horse  ']);
 
     Auth::forgetGuards();
     $next = $this->get(route('login'));
