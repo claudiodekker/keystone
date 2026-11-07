@@ -16,7 +16,7 @@ use SensitiveParameter;
 class AccountChange
 {
     /**
-     * Whether the change removed, replaced or ended anything, which moves the account's credential epoch.
+     * Whether the change ends the account's sessions, which moves its credential epoch.
      */
     protected bool $movesEpoch = false;
 
@@ -70,7 +70,7 @@ class AccountChange
     }
 
     /**
-     * Determine if the change removed, replaced or ended anything, so the account's credential epoch moves.
+     * Determine if the change ends the account's sessions, so its credential epoch moves.
      */
     public function movesEpoch(): bool
     {

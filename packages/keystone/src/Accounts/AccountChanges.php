@@ -24,7 +24,7 @@ class AccountChanges
     }
 
     /**
-     * Apply a change to the account while its row is locked, moving its credential epoch when the change ended anything.
+     * Apply a change to the account while its row is locked, moving its credential epoch when the change ends its sessions.
      *
      * The change records its events only once the outermost transaction commits, so one that rolls back records nothing.
      *
@@ -50,7 +50,7 @@ class AccountChanges
     }
 
     /**
-     * End every account's sessions at once, for the operator who asked, recording it about nobody once the outermost transaction commits.
+     * End every account's sessions at once, for the operator who asked, recording one event without an account once the outermost transaction commits.
      */
     public function endAllSessions(string $operator): void
     {
