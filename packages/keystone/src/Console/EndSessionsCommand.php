@@ -48,6 +48,10 @@ class EndSessionsCommand extends Command
 
         $account = $accounts->find($id);
 
+        if ($account === null) {
+            return $this->refuse("No account has the id [{$id}].");
+        }
+
         EndSessions::dispatchSync($account, $this->option('operator'));
 
         return self::SUCCESS;
