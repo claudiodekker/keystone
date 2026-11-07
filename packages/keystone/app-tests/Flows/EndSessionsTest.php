@@ -6,6 +6,8 @@ use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\SecurityEvents\Actor;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Bus;
@@ -232,6 +234,27 @@ it('signs out a session from before Keystone, which carries no epoch, on its fir
 
     $this->withSession([Keystone::guard()->getName() => $user->getAuthIdentifier()]);
 
+    $response = $this->get(route('login'));
+
+    $this->assertSignInPage($response, ['status' => __('keystone::messages.session-ended')]);
+});
+
+it("signs out the sessions of an account the app's global scopes hid while the operator ended them", function () {
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+    $this->beforeApplicationDestroyed(fn () => Model::clearBootedModels());
+
+    $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    Keystone::userModel()::addGlobalScope('hidden', fn (Builder $query) => $query->whereKeyNot($user->getAuthIdentifier()));
+    Artisan::call('keystone:end-sessions', ['user' => $user->getAuthIdentifier(), '--operator' => 'margaret']);
+    Model::clearBootedModels();
+
+    Auth::forgetGuards();
     $response = $this->get(route('login'));
 
     $this->assertSignInPage($response, ['status' => __('keystone::messages.session-ended')]);
