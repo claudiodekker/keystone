@@ -73,6 +73,8 @@ class AccountChange
     public function unsuspend(string $operator): void
     {
         Suspension::lift($this->account->getAuthIdentifier());
+
+        $this->recordForOperator(SecurityEventType::ACCOUNT_UNSUSPENDED, $operator, $this->recipients);
     }
 
     /**

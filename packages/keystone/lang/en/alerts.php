@@ -7,6 +7,10 @@ return [
             'subject' => 'Your account was suspended',
             'summary' => "An administrator suspended your account, so it can't be signed in to.",
         ],
+        'unsuspended' => [
+            'subject' => 'Your account can sign in again',
+            'summary' => 'An administrator lifted the suspension of your account, so you can sign in again.',
+        ],
     ],
     'device' => 'Device: :device',
     'device-name' => ':browser on :platform',

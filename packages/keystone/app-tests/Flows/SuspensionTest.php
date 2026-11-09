@@ -124,3 +124,22 @@ it('signs the account in again with the secret it already had once it is unsuspe
     $this->assertSignedIn($response, '/');
     $this->assertAlreadySignedIn($next);
 });
+
+it('records account.unsuspended by the operator who lifted the suspension, and alerts the owner', function () {
+    Notification::fake();
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+
+    Artisan::call('keystone:suspend', ['user' => $user->getAuthIdentifier(), '--operator' => 'margaret']);
+    Artisan::call('keystone:unsuspend', ['user' => $user->getAuthIdentifier(), '--operator' => 'grace']);
+
+    $events = $this->securityEvents()->for($user);
+    $alerts = $this->sentAlerts();
+
+    expect($events->pluck('type')->all())->toBe([SecurityEventType::ACCOUNT_SUSPENDED, SecurityEventType::ACCOUNT_UNSUSPENDED])
+        ->and($events[1]->actor)->toBe(Actor::OPERATOR)
+        ->and($events[1]->operator)->toBe('grace')
+        ->and($alerts->pluck('address')->all())->toBe(['ada@example.com', 'ada@example.com'])
+        ->and($alerts[1]['alert'])->toBeInstanceOf(SecurityAlert::class)
+        ->and($alerts[1]['alert']->type)->toBe(SecurityEventType::ACCOUNT_UNSUSPENDED);
+});

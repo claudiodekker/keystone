@@ -30,6 +30,7 @@ class SecurityAlert extends Notification implements ShouldBeEncrypted, ShouldQue
      */
     protected const array VIEWS = [
         'account.suspended' => 'keystone::alerts.account.suspended',
+        'account.unsuspended' => 'keystone::alerts.account.unsuspended',
         'sessions.terminated' => 'keystone::alerts.sessions.terminated',
     ];
 
