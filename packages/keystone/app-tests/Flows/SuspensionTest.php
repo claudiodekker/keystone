@@ -47,3 +47,21 @@ it('signs out a session that signed in before the suspension on its next request
 
     $this->assertSignInPage($response, ['status' => __('keystone::messages.session-ended')]);
 });
+
+it("signs out a session on the account's credential epoch once the account is suspended", function () {
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $user->forceFill(['suspended_at' => now()])->save();
+
+    Auth::forgetGuards();
+    $response = $this->get(route('login'));
+
+    $this->assertSignInPage($response, ['status' => __('keystone::messages.session-ended')]);
+});

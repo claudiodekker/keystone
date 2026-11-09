@@ -16,11 +16,13 @@ class CredentialEpoch
     public const string COLUMN = 'credential_epoch';
 
     /**
-     * Get the epoch of the account with the id, or null when no account has it.
+     * Get the epoch of the account with the id, or null when no account has it or the account is suspended, so no session is on it.
      */
     public static function of(int|string $id): ?int
     {
-        $epoch = static::account($id)->value(static::COLUMN);
+        $epoch = static::account($id)
+            ->whereNull(Suspension::COLUMN)
+            ->value(static::COLUMN);
 
         return $epoch === null ? null : (int) $epoch;
     }
