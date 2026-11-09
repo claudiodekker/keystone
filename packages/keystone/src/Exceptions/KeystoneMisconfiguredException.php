@@ -52,6 +52,14 @@ class KeystoneMisconfiguredException extends LogicException
     }
 
     /**
+     * Create the exception for a SecurityAlert sent about a type it has no mail for.
+     */
+    public static function noAlertMail(string $type): static
+    {
+        return new static("SecurityAlert has no mail for [{$type}]. Give keystone.notifications.{$type} a notification class of the app's own.");
+    }
+
+    /**
      * Create the exception for an app that fails boot checks, listing every failure on a line of its own.
      *
      * @param  non-empty-list<string>  $failures

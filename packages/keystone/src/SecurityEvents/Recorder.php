@@ -2,6 +2,7 @@
 
 namespace ClaudioDekker\Keystone\SecurityEvents;
 
+use ClaudioDekker\Keystone\Accounts\AlertRecipients;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Events\SecurityEventRecorded;
 use ClaudioDekker\Keystone\Http\RequestContext;
@@ -11,7 +12,9 @@ use ClaudioDekker\Keystone\Models\UserSecurityEvent;
 use ClaudioDekker\Keystone\Session\SessionState;
 use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Contracts\Events\Dispatcher;
+use Illuminate\Contracts\Notifications\Dispatcher as Notifications;
 use Illuminate\Http\Request;
+use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Log;
@@ -51,8 +54,10 @@ class Recorder
      * Create the recorder.
      */
     public function __construct(
+        protected AlertRecipients $alertRecipients,
         protected Config $config,
         protected Dispatcher $events,
+        protected Notifications $notifications,
         protected Request $request,
         protected SessionState $session,
     ) {
@@ -63,6 +68,9 @@ class Recorder
      * Record the security event, as a log line alone when it is anonymous.
      *
      * Naming an operator records the event as theirs rather than the user's.
+     * The alert goes to the given recipients, read before the change that caused the event, or to the account's addresses as they are now.
+     *
+     * @param  list<string>|null  $recipients
      */
     public function record(
         SecurityEventType $type,
@@ -72,6 +80,7 @@ class Recorder
         int|string|null $credential = null,
         ?string $reason = null,
         ?string $operator = null,
+        ?array $recipients = null,
     ): void {
         if ($this->config->get('keystone.events.enabled') === false) {
             return;
@@ -83,7 +92,7 @@ class Recorder
             return;
         }
 
-        if ($entry->isAnonymous()) {
+        if ($account === null) {
             $this->logAnonymous($entry);
 
             return;
@@ -91,6 +100,7 @@ class Recorder
 
         rescue(fn () => $this->log($entry));
         rescue(fn () => $entry->saveQuietly());
+        rescue(fn () => $this->alert($entry, $account, $recipients));
         rescue(fn () => $this->events->dispatch(new SecurityEventRecorded($entry)));
     }
 
@@ -168,6 +178,35 @@ class Recorder
         $context = $entry->toLogContext();
 
         $logger->info(static::MESSAGE, $context);
+    }
+
+    /**
+     * Mail the entry's alert to each recipient, unless its type's slot is null.
+     *
+     * @param  list<string>|null  $recipients
+     */
+    protected function alert(UserSecurityEvent $entry, KeystoneUser $account, ?array $recipients): void
+    {
+        $slot = $this->config->get('keystone.notifications')[$entry->type->value] ?? null;
+
+        if ($slot === null) {
+            return;
+        }
+
+        $addresses = $recipients ?? $this->alertRecipients->of($account);
+        $notifiables = array_map($this->recipient(...), $addresses);
+
+        $this->notifications->send($notifiables, new $slot($entry));
+    }
+
+    /**
+     * Get the address as one recipient of an alert.
+     */
+    protected function recipient(string $address): AnonymousNotifiable
+    {
+        $notifiable = new AnonymousNotifiable;
+
+        return $notifiable->route('mail', $address);
     }
 
     /**

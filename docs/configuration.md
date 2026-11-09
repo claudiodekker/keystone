@@ -20,8 +20,10 @@ This file raises the view allowance and keeps every other allowance at its defau
 | `clear_site_data` | `['cache', 'storage']` | A shorter list leaves more of an ended session in the browser, and `[]` leaves all of it. Adding `cookies` signs the browser out of everything it holds a cookie for on your domain. |
 | `events.enabled` | `true` | `false` keeps no trail and sends no alert. |
 | `hardening.frame_ancestors` | `[]` | A listed source can frame Keystone's pages and trick a user into clicking on them. |
+| `ip_location.allow_plaintext_driver` | `false` | `true` lets a `stevebauman/location` driver send IP addresses to a third party over plain HTTP. |
 | `log_channel` | `null` | None. It only picks where the security event lines go. |
 | `methods` | `null` | None. It only narrows: a type it leaves out is offered nowhere, and it can't offer a type on a surface the type doesn't serve. |
+| `notifications.<type>` | `SecurityAlert` for `sessions.terminated`, `null` for every other type | `null` stops the alert for that type, so its owner no longer hears about it. |
 | `rate_limits.failed_attempts_per_hour` | `20` | A higher number gives an attacker more guesses per account. |
 | `rate_limits.requests_per_minute.change` | `10` | A higher number lets more sign-outs through from one address. |
 | `rate_limits.requests_per_minute.submit` | `10` | A higher number lets more sign-in submits through from one address. |
@@ -29,7 +31,7 @@ This file raises the view allowance and keeps every other allowance at its defau
 | `session.absolute_lifetime_seconds` | `12 * 60 * 60` | A longer lifetime keeps a stolen session alive longer while it stays busy, and `null` keeps it alive for as long as it stays busy. |
 | `trusted_origins` | `[]` | Any page on a listed origin can sign users in and out. |
 
-`Cross-Origin-Opener-Policy` and `base-uri` have no setting. The [security page](security.md) says what each key does.
+`Cross-Origin-Opener-Policy` and `base-uri` have no setting. The [security page](security.md) says what each key does, and the [security events page](security-events.md#alerts) covers the alert slots and IP locations.
 
 ## Choosing the methods
 
@@ -109,7 +111,9 @@ The checks set no ceilings. In every environment, they refuse a value of the wro
 |---|---|
 | `rate_limits.failed_attempts_per_hour` and every `rate_limits.requests_per_minute.*` | An integer of at least 1. |
 | `events.enabled` | `true` or `false`. |
+| `ip_location.allow_plaintext_driver` | `true` or `false`. |
 | `log_channel` | `null`, or the name of a channel in your `logging` config. |
+| `notifications` | A map of security event types, each to `null` or to a notification class whose constructor takes the event alone. `SecurityAlert` is refused on a type it has no mail for. |
 | `clear_site_data` | A list of `cache`, `cookies`, `executionContexts` and `storage`. |
 | `hardening.frame_ancestors` | A list of single CSP sources, such as `'self'` or `https://portal.example.com`. |
 | `methods` | `null`, or a list of installed types by name, each alone or with a non-empty list of surfaces the type serves. No type may be named twice. |

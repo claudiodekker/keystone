@@ -6,6 +6,7 @@ use ClaudioDekker\Keystone\Accounts\AccountLookup;
 use ClaudioDekker\Keystone\Jobs\EndAllSessions;
 use ClaudioDekker\Keystone\Jobs\EndSessions;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Bus;
 
 /**
  * @internal
@@ -20,6 +21,7 @@ class EndSessionsCommand extends Command
     protected $signature = 'keystone:end-sessions
         {user? : The id of the account whose sessions end}
         {--all : End the sessions of every account}
+        {--no-alert : End the sessions without mailing the owner of the account}
         {--operator= : Who is ending the sessions, recorded on the security event}';
 
     /**
@@ -64,7 +66,13 @@ class EndSessionsCommand extends Command
             return $this->refuse("No account has the id [{$id}].");
         }
 
-        EndSessions::dispatchSync($account, $operator);
+        $job = new EndSessions($account, $operator);
+
+        if ($this->option('no-alert')) {
+            $job->withoutAlert();
+        }
+
+        Bus::dispatchSync($job);
 
         $this->components->info("Ended every session of the account [{$id}]. Each ends on its next request.");
 

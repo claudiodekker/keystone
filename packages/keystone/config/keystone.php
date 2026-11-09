@@ -1,5 +1,7 @@
 <?php
 
+use ClaudioDekker\Keystone\Notifications\SecurityAlert;
+
 return [
 
     /*
@@ -47,6 +49,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | IP Location
+    |--------------------------------------------------------------------------
+    |
+    | An alert names where its IP address is when stevebauman/location is
+    | installed. Its drivers that send the address over plain HTTP are
+    | skipped, unless you set allow_plaintext_driver to true here.
+    |
+    */
+
+    'ip_location' => [
+        'allow_plaintext_driver' => false,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Log Channel
     |--------------------------------------------------------------------------
     |
@@ -70,6 +87,27 @@ return [
     */
 
     'methods' => null,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Notifications
+    |--------------------------------------------------------------------------
+    |
+    | Each type of security event mails its account's owner the notification
+    | class named here, built from the event alone. Null sends no alert of
+    | that type, so an app can silence each type it handles on its own.
+    |
+    */
+
+    'notifications' => [
+        'limit.tripped' => null,
+        'proof.rejected' => null,
+        'request.rejected' => null,
+        'session.ended' => null,
+        'sessions.terminated' => SecurityAlert::class,
+        'signed_in' => null,
+        'signed_out' => null,
+    ],
 
     /*
     |--------------------------------------------------------------------------

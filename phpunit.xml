@@ -27,6 +27,11 @@
             <directory>tests</directory>
         </testsuite>
     </testsuites>
+    <groups>
+        <exclude>
+            <group>ip-location</group>
+        </exclude>
+    </groups>
     <php>
         <env name="APP_ENV" value="testing"/>
         <env name="APP_KEY" value="base64:iO0Xn7B30kWbdkuR2r8eRk0EXwfrXFfXcRAJCU6AXrs="/>

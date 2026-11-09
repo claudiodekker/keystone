@@ -86,6 +86,14 @@ One entry of the audit trail: something that happened to an account's security, 
 
 The one place that records security events. Core calls it inline from the code that made the event happen, and it writes the log line, the row and the `SecurityEventRecorded` event, each rescued on its own.
 
+## Alert
+
+A mail that tells an account's owner something happened to its security. The recorder sends one for an event about an account when the event's slot holds a notification, to the account's verified addresses, or to the ones counting as verified when it holds none, read before the change that caused the event.
+
+## Slot
+
+The notification class `keystone.notifications` names for one type of security event, or null to send no alert of that type.
+
 ## Request context
 
 Who is asking: the request's IP address, its subnet, its cleaned user agent, its path and a request id, captured once per request by core's global middleware after the app's trusted-proxy middleware. It is the only code in core that reads the client's address or user agent.

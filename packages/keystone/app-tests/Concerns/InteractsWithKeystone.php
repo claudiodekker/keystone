@@ -26,11 +26,16 @@ use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Http\Request;
+use Illuminate\Notifications\AnonymousNotifiable;
+use Illuminate\Notifications\Notification;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification as NotificationFacade;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
+use Illuminate\Support\Testing\Fakes\NotificationFake;
 use Illuminate\Testing\TestResponse;
 use Monolog\Handler\TestHandler;
 use PHPUnit\Framework\Assert;
@@ -268,6 +273,30 @@ trait InteractsWithKeystone
     public function securityEvents(): RecordedSecurityEvents
     {
         return new RecordedSecurityEvents($this->securityLog);
+    }
+
+    /**
+     * Get every alert sent while notifications were faked, each with the address it went to.
+     *
+     * @return Collection<int, array{address: string, alert: Notification}>
+     */
+    public function sentAlerts(): Collection
+    {
+        $notifications = NotificationFacade::getFacadeRoot();
+
+        if (! $notifications instanceof NotificationFake) {
+            Assert::fail('Notifications are not faked. Call Notification::fake() before the alert is sent.');
+        }
+
+        $onDemand = $notifications->sentNotifications()[AnonymousNotifiable::class] ?? [];
+
+        return collect($onDemand)
+            ->flatten(2)
+            ->map(fn (array $sent) => [
+                'address' => $sent['notifiable']->routeNotificationFor('mail'),
+                'alert' => $sent['notification'],
+            ])
+            ->values();
     }
 
     /**

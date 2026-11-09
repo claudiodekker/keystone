@@ -36,7 +36,7 @@ class UserEmail extends Model
     /**
      * Store the address normalized, so every reader compares it as written.
      *
-     * @return Attribute<never, string>
+     * @return Attribute<string, string>
      */
     protected function address(): Attribute
     {

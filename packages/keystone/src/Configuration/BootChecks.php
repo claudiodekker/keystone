@@ -17,6 +17,7 @@ class BootChecks
         protected MethodChecks $methods,
         protected ModelChecks $models,
         protected MiddlewareChecks $middleware,
+        protected NotificationChecks $notifications,
     ) {
         //
     }
@@ -49,6 +50,7 @@ class BootChecks
             ...$this->methods->failures(),
             ...$this->models->failures(),
             ...$this->middleware->failures(),
+            ...$this->notifications->failures(),
         ];
     }
 }

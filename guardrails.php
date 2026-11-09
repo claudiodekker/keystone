@@ -2,6 +2,7 @@
 
 use ClaudioDekker\Keystone\Lint\Checks\ClientReadsThroughRequestContext;
 use ClaudioDekker\Keystone\Lint\Checks\CredentialWritesThroughAccountChange;
+use ClaudioDekker\Keystone\Lint\Checks\MailQueuedAndEncrypted;
 use ClaudioDekker\Keystone\Lint\Checks\NoContainerLookups;
 use ClaudioDekker\Keystone\Lint\Checks\NoFactoriesInAppTests;
 use ClaudioDekker\Keystone\Lint\Checks\NoHttpInFeatureTests;
@@ -55,7 +56,9 @@ return [
     OneClassPerFile::class,
     ConcernsHoldOnlyTraits::class,
     NoFinal::class,
-    NoReflection::class,
+    (new NoReflection)->allowing([
+        'packages/keystone/src/Configuration/NotificationChecks.php' => "It checks at boot that each alert slot's constructor takes the security event alone, which only the constructor's signature can tell before any event exists.",
+    ]),
     NoTestCodeInApp::class,
     SortedEnumCases::class,
     EnumCasesDocumentedAlike::class,
@@ -83,6 +86,7 @@ return [
     new ClassesTaggedApiOrInternal(['packages/*/src']),
     (new NoMixedTypes(['packages/*/src']))->allowing([
         'packages/keystone/src/Configuration/KeyChecks.php' => 'It checks config values, which hold whatever the app wrote.',
+        'packages/keystone/src/Configuration/NotificationChecks.php' => 'It checks config values, which hold whatever the app wrote.',
         'packages/keystone/src/Http/HardeningSettings.php' => 'It parses config values, which hold whatever the app wrote.',
         'packages/keystone/src/KeystoneServiceProvider.php' => 'It checks config values, which hold whatever the app wrote.',
         'packages/keystone/src/Methods/MethodAllowList.php' => 'It parses the keystone.methods config value, which holds whatever the app wrote.',
@@ -93,11 +97,18 @@ return [
     (new CredentialWritesThroughAccountChange)->allowing([
         'packages/keystone/src/Accounts/AccountChange.php' => 'The account change is the one place that writes credentials.',
     ]),
-    NoContainerLookups::class,
+    (new NoContainerLookups)->allowing([
+        'packages/keystone/src/Notifications/SecurityAlert.php' => 'An alert is built from its event alone, and its mail is built on the queue worker, so neither step can take SessionInfo or IpLocation through injection.',
+    ]),
     NoPackageDependencies::class,
+    MailQueuedAndEncrypted::class,
     NoTableAccess::class,
     NoFactoriesInAppTests::class,
-    ResponsesThroughAssertionTraits::class,
+    (new ResponsesThroughAssertionTraits)->allowing([
+        'packages/keystone/app-tests/Flows/AlertsTest.php' => "It asserts what the alert's fakes saw, and no response.",
+        'packages/keystone/app-tests/Harness/IpLocationFakeTest.php' => "It tests the fake's own assertions, and no response.",
+        'packages/keystone/app-tests/Harness/SessionInfoFakeTest.php' => "It tests the fake's own assertions, and no response.",
+    ]),
     (new NoHttpInFeatureTests)->allowing([
         'packages/keystone/tests/Feature/Http/AppRoutesTest.php' => "It checks that the app's own routes keep their headers, get no cross-site check, and clear site data when they sign the user out. AppTests serve only Keystone's routes and one empty page behind auth, so none can check a route the app owns.",
         'packages/keystone/tests/Feature/RateLimits/ReplacedActionTest.php' => "It checks that rate limiting, the hardening floor and the cross-site check still hold for a controller that overrides show() and store() without calling Keystone's. The stub controllers always call Keystone's, so no AppTest runs one that skips them.",

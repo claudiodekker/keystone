@@ -1,10 +1,11 @@
 # Security events
 
-Keystone records what happens to an account's security as security events. Every event goes through one recorder, which Keystone calls from the code that made the event happen. The recorder runs three steps, each on its own, so a step that fails is reported to the exception handler and the others still run:
+Keystone records what happens to an account's security as security events. Every event goes through one recorder, which Keystone calls from the code that made the event happen. The recorder runs four steps, each on its own, so a step that fails is reported to the exception handler and the others still run:
 
 1. It writes a log line.
 2. It writes a row of `user_security_events`, when the event is for an account.
-3. It dispatches the `ClaudioDekker\Keystone\Events\SecurityEventRecorded` event with the whole entry.
+3. It mails the account's owner an [alert](#alerts), when the event is for an account and its type's slot holds a notification.
+4. It dispatches the `ClaudioDekker\Keystone\Events\SecurityEventRecorded` event with the whole entry.
 
 An anonymous event, such as a refused sign-in for an address no account holds, is only a log line. Identical ones, with the same type, IP address and path, are logged once per 60 seconds, counted in the default cache under a hash keyed by a key derived from your app key, so the cache never holds an address. While the cache fails, every one is logged. An operator's anonymous event, such as ending every account's sessions, is logged every time.
 
@@ -18,7 +19,7 @@ An anonymous event, such as a refused sign-in for an address no account holds, i
 'log_channel' => null,
 ```
 
-Set `events.enabled` to `false` to turn the recorder off in any environment. Nothing is logged, written or dispatched then. Only `false` turns it off.
+Set `events.enabled` to `false` to turn the recorder off in any environment. Nothing is logged, written, mailed or dispatched then. Only `false` turns it off.
 
 Set `log_channel` to the name of a channel in your `logging.php` to send the log lines there. Leave it `null` to use the app's default channel.
 
@@ -70,6 +71,103 @@ The message of every log line is `keystone.security_event`. Every field travels 
 ## The request context
 
 Keystone adds one piece of global middleware after the app's trusted-proxy middleware. It reads the client's IP address and user agent once per request, and keeps them with the address's subnet, the path and a new request id. Every event in the request carries that context, so set your trusted proxies the way Laravel documents, and the recorded address is the client's.
+
+## Alerts
+
+An alert is a mail that tells an account's owner something happened to its security. Each type of event has a slot in `notifications`: the notification class Keystone sends for that type, or `null` to send none. Today `sessions.terminated` is the one type that alerts by default:
+
+```php
+'notifications' => [
+    'limit.tripped' => null,
+    'proof.rejected' => null,
+    'request.rejected' => null,
+    'session.ended' => null,
+    'sessions.terminated' => SecurityAlert::class,
+    'signed_in' => null,
+    'signed_out' => null,
+],
+```
+
+There is no switch that silences every alert at once. To stop one type, set its slot to `null`. Alerts are not de-duplicated, so each event sends its own.
+
+### Who gets one
+
+An alert goes to every verified address of the account, one mail each. An account that holds no verified address gets it at its unverified addresses instead, except an address another account holds verified. An address someone typed into a form never gets one.
+
+When a change to the account causes the event, Keystone reads the addresses before the change. An address that the change, or the transaction around it, removed still gets the alert.
+
+### What it says
+
+Every default slot is `ClaudioDekker\Keystone\Notifications\SecurityAlert`, which picks a view and translation keys for its type. The mail is plain HTML, with every value escaped and no links. It says what happened and when, in UTC, the IP address of the request that caused it and where that address is, and the device. It ends with "If this wasn't you, sign in and review your security settings." Its wording sits in Keystone's `keystone::alerts` translations.
+
+The device is the platform and browser parsed from the user agent, such as "Chrome on Mac", or "Unknown device". The alert parses the user agent while the request records the event, so the queue carries only the device and never the user agent. It looks the location up later, on the queue worker, while it builds the mail. A lookup during the request would slow down only the requests for accounts that exist, and tell an attacker which addresses have one.
+
+Keystone names devices and locations through two packages it suggests but doesn't require:
+
+```bash
+composer require matomo/device-detector
+composer require stevebauman/location
+```
+
+Without `matomo/device-detector`, every device is "Unknown device". Without `stevebauman/location`, the mail gives the IP address alone. With it installed, Keystone asks the drivers in your `location` config in order, and skips every driver whose URL is plain `http`, because it would send the address to a third party in clear. The package's default driver is one of them. Choose a driver that uses `https`, or a local MaxMind database, or set `ip_location.allow_plaintext_driver` to `true` to allow plain `http`.
+
+To use another service, bind your own implementation of `ClaudioDekker\Keystone\Contracts\IpLocation` or `ClaudioDekker\Keystone\Contracts\SessionInfo` in a service provider. Neither may throw. Return `null` for a location or device you don't know.
+
+### Sending your own
+
+Name your own notification class in a slot to send it in place of Keystone's, or to alert for a type that sends nothing by default. Keystone builds it with the event as its only argument, so its constructor can't ask the container for anything else:
+
+```php
+// config/keystone.php
+use App\Notifications\SignedOutAlert;
+
+'notifications' => [
+    'signed_out' => SignedOutAlert::class,
+],
+```
+
+```php
+namespace App\Notifications;
+
+use ClaudioDekker\Keystone\Models\UserSecurityEvent;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Notifications\Notification;
+
+class SignedOutAlert extends Notification implements ShouldBeEncrypted, ShouldQueue
+{
+    use Queueable;
+
+    public string $occurredAt;
+
+    public function __construct(UserSecurityEvent $event)
+    {
+        $this->occurredAt = $event->occurred_at->toDateTimeString();
+    }
+
+    public function via(object $notifiable): array
+    {
+        return ['mail'];
+    }
+
+    public function toMail(object $notifiable): MailMessage
+    {
+        return (new MailMessage)
+            ->subject('You signed out')
+            ->line("Your account signed out at {$this->occurredAt} UTC.");
+    }
+}
+```
+
+Keystone sends it on demand, to each address in turn, so `$notifiable` is the address and not your user. The event may be unsaved when its row could not be written, so copy what the mail needs in the constructor rather than keeping the event to reload on the queue. Implement `ShouldQueue` and `ShouldBeEncrypted`, as Keystone's own alert does, so your `jobs` and `failed_jobs` tables never hold an IP address or an address in clear.
+
+Keystone refuses to boot with a slot that would lose every alert of its type: a slot for a type that doesn't exist, a value that is neither `null` nor a notification class, a class whose constructor can't take the event alone, or `SecurityAlert` on a type it has no mail for. `SecurityAlert` has a mail only for the types that alert by default, so any other type needs a class of your own.
+
+### Queue worker
+
+Alerts are queued, so they need a queue worker. With the `sync` connection they are sent during the request that caused them. Their payloads are encrypted with your app key.
 
 ## Listening
 

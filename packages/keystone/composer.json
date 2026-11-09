@@ -7,6 +7,10 @@
         "ext-intl": "*",
         "laravel/framework": "^13.0"
     },
+    "suggest": {
+        "matomo/device-detector": "Name the platform and browser of the device in each security alert.",
+        "stevebauman/location": "Name where the IP address of each security alert is."
+    },
     "autoload": {
         "psr-4": {
             "ClaudioDekker\\Keystone\\": "src/",

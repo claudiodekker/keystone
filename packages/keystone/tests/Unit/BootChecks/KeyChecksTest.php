@@ -69,6 +69,22 @@ it('boots with the recorder switched off', function () {
     expect($this->bootFailures())->toBe([]);
 });
 
+it('refuses ip_location.allow_plaintext_driver when it is not a boolean', function (mixed $value) {
+    config(['keystone.ip_location.allow_plaintext_driver' => $value]);
+
+    expect($this->bootFailures())->toBe(['keystone.ip_location.allow_plaintext_driver must be true or false.']);
+})->with([
+    'a string' => 'yes',
+    'one' => 1,
+    'null' => null,
+]);
+
+it('boots with plain HTTP location drivers allowed', function () {
+    config(['keystone.ip_location.allow_plaintext_driver' => true]);
+
+    expect($this->bootFailures())->toBe([]);
+});
+
 it('refuses a log channel that the logging config does not hold', function (mixed $value) {
     config(['keystone.log_channel' => $value]);
 
