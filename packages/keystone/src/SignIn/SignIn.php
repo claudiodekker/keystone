@@ -100,15 +100,12 @@ class SignIn
 
         $owner = $this->decision->decide($proof, $type, $account);
 
-        if ($owner === null || ! $this->advance($owner, $proof, $credentials)) {
-            $this->recorder->record(
-                SecurityEventType::PROOF_REJECTED,
-                account: $account,
-                surface: Surface::SIGN_IN,
-                credentialType: $type,
-            );
+        if ($owner === null) {
+            return $this->refuse($type, $account);
+        }
 
-            return new Refused;
+        if (! $this->advance($owner, $proof, $credentials)) {
+            return $this->refuse($type, $account);
         }
 
         $redirectTo = $this->session->signIn($owner);
@@ -126,6 +123,21 @@ class SignIn
         $this->rehash($owner, $proof, $credentials);
 
         return new SignedIn($redirectTo);
+    }
+
+    /**
+     * Refuse the sign-in, recording the rejected proof for the account the identifier named.
+     */
+    protected function refuse(CredentialType $type, ?KeystoneUser $account): Refused
+    {
+        $this->recorder->record(
+            SecurityEventType::PROOF_REJECTED,
+            account: $account,
+            surface: Surface::SIGN_IN,
+            credentialType: $type,
+        );
+
+        return new Refused;
     }
 
     /**
