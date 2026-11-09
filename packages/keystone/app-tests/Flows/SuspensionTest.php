@@ -104,3 +104,23 @@ it('records account.suspended by the operator who suspended the account, and ale
         ->and($alerts[0]['alert'])->toBeInstanceOf(SecurityAlert::class)
         ->and($alerts[0]['alert']->type)->toBe(SecurityEventType::ACCOUNT_SUSPENDED);
 });
+
+it('signs the account in again with the secret it already had once it is unsuspended', function () {
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    Artisan::call('keystone:suspend', ['user' => $user->getAuthIdentifier(), '--operator' => 'margaret']);
+    Artisan::call('keystone:unsuspend', ['user' => $user->getAuthIdentifier(), '--operator' => 'margaret']);
+
+    $response = $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    Auth::forgetGuards();
+    $next = $this->get(route('login'));
+
+    $this->assertSignedIn($response, '/');
+    $this->assertAlreadySignedIn($next);
+});

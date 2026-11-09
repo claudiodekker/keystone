@@ -68,6 +68,14 @@ class AccountChange
     }
 
     /**
+     * Lift the account's suspension, for the operator who asked, so it signs in again with the credentials it already had.
+     */
+    public function unsuspend(string $operator): void
+    {
+        Suspension::lift($this->account->getAuthIdentifier());
+    }
+
+    /**
      * Replace the credential's secret with its rehash, which ends nothing, refusing when another write changed the secret since it was loaded.
      *
      * Every write encrypts with a fresh IV, so a ciphertext that differs from the loaded one means another write got there first.

@@ -33,6 +33,14 @@ class Suspension
     }
 
     /**
+     * Lift the suspension of the account with the id, so it can sign in again.
+     */
+    public static function lift(int|string $id): void
+    {
+        static::account($id)->update([static::COLUMN => null]);
+    }
+
+    /**
      * Get a query on the users row with the id, past every global scope and model event of the app's user model.
      */
     protected static function account(int|string $id): Builder
