@@ -1,8 +1,12 @@
 <?php
 
 use ClaudioDekker\Keystone\Methods\Surface;
+use ClaudioDekker\Keystone\Notifications\SecurityAlert;
+use ClaudioDekker\Keystone\SecurityEvents\Actor;
+use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Sleep;
 
 it("refuses a suspended account's right secret exactly like a wrong one", function () {
@@ -81,4 +85,22 @@ it('keeps holding the addresses a suspended account verified, so another account
     ]);
 
     $this->assertSignInRefused($response, __('keystone::messages.credentials-rejected'));
+});
+
+it('records account.suspended by the operator who suspended the account, and alerts its owner', function () {
+    Notification::fake();
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+
+    Artisan::call('keystone:suspend', ['user' => $user->getAuthIdentifier(), '--operator' => 'margaret']);
+
+    $events = $this->securityEvents()->for($user);
+    $alerts = $this->sentAlerts();
+
+    expect($events->pluck('type')->all())->toBe([SecurityEventType::ACCOUNT_SUSPENDED])
+        ->and($events[0]->actor)->toBe(Actor::OPERATOR)
+        ->and($events[0]->operator)->toBe('margaret')
+        ->and($alerts->pluck('address')->all())->toBe(['ada@example.com'])
+        ->and($alerts[0]['alert'])->toBeInstanceOf(SecurityAlert::class)
+        ->and($alerts[0]['alert']->type)->toBe(SecurityEventType::ACCOUNT_SUSPENDED);
 });

@@ -63,6 +63,8 @@ class AccountChange
         Suspension::suspend($this->account->getAuthIdentifier());
 
         $this->movesEpoch = true;
+
+        $this->recordForOperator(SecurityEventType::ACCOUNT_SUSPENDED, $operator, $this->recipients);
     }
 
     /**
@@ -93,8 +95,18 @@ class AccountChange
     {
         $this->movesEpoch = true;
 
+        $this->recordForOperator(SecurityEventType::SESSIONS_TERMINATED, $operator, $recipients);
+    }
+
+    /**
+     * Record the event of the type for the operator who caused it once the change commits, alerting the given addresses.
+     *
+     * @param  list<string>  $recipients
+     */
+    protected function recordForOperator(SecurityEventType $type, string $operator, array $recipients): void
+    {
         $this->events[] = fn (Recorder $recorder) => $recorder->record(
-            SecurityEventType::SESSIONS_TERMINATED,
+            $type,
             account: $this->account,
             operator: $operator,
             recipients: $recipients,
