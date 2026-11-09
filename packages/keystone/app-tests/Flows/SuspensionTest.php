@@ -172,3 +172,28 @@ it('refuses to unsuspend an account that is not suspended, recording and alertin
         ->and($this->securityEvents()->for($user))->toBeEmpty()
         ->and($this->sentAlerts())->toBeEmpty();
 });
+
+it("keeps a suspended account's right secret counted against the failed-attempt limit", function () {
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+    $this->submitRejectedProofs($support, 'ada@example.com', $this->failedAttemptAllowance() - 1);
+
+    Artisan::call('keystone:suspend', ['user' => $user->getAuthIdentifier(), '--operator' => 'margaret']);
+
+    $this->switchToFreshBrowser();
+    $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    Artisan::call('keystone:unsuspend', ['user' => $user->getAuthIdentifier(), '--operator' => 'margaret']);
+
+    $this->switchToFreshBrowser();
+    $response = $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $this->assertSignInThrottled($response);
+});
