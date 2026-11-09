@@ -65,7 +65,7 @@ it("signs out a session on the account's credential epoch once the account is su
         ...$support->validProof(Surface::SIGN_IN, $user),
     ]);
 
-    $user->forceFill(['suspended_at' => now()])->save();
+    $user->newQuery()->whereKey($user->getAuthIdentifier())->update(['suspended_at' => now()]);
 
     Auth::forgetGuards();
     $response = $this->get(route('login'));
