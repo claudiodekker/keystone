@@ -100,7 +100,7 @@ class SignIn
 
         $owner = $this->decision->decide($proof, $type, $account);
 
-        if ($owner === null) {
+        if ($owner === null || ! $this->advance($owner, $proof, $credentials)) {
             $this->recorder->record(
                 SecurityEventType::PROOF_REJECTED,
                 account: $account,
@@ -110,8 +110,6 @@ class SignIn
 
             return new Refused;
         }
-
-        $this->advance($owner, $proof, $credentials);
 
         $redirectTo = $this->session->signIn($owner);
 
@@ -171,21 +169,27 @@ class SignIn
     }
 
     /**
-     * Advance the proven credential to the secret the proof carries.
+     * Advance the proven credential to the secret the proof carries, and determine if the proof still holds: false when another write changed the credential first.
      *
      * @param  Collection<int, UserCredential>  $credentials
      */
-    protected function advance(KeystoneUser $owner, Proof $proof, Collection $credentials): void
+    protected function advance(KeystoneUser $owner, Proof $proof, Collection $credentials): bool
     {
         $secret = $proof->advancedSecret();
 
         if ($secret === null) {
-            return;
+            return true;
         }
 
         $credential = $credentials->find($proof->credential);
 
-        $this->accountChanges->change($owner, fn (AccountChange $change) => $change->advance($credential, $secret));
+        try {
+            $this->accountChanges->change($owner, fn (AccountChange $change) => $change->advance($credential, $secret));
+        } catch (AccountChangeRefusedException) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
