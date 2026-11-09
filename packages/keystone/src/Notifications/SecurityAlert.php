@@ -3,6 +3,7 @@
 namespace ClaudioDekker\Keystone\Notifications;
 
 use Carbon\CarbonImmutable;
+use ClaudioDekker\Keystone\Contracts\IpLocation;
 use ClaudioDekker\Keystone\Contracts\SessionInfo;
 use ClaudioDekker\Keystone\Devices\Device;
 use ClaudioDekker\Keystone\Exceptions\KeystoneMisconfiguredException;
@@ -72,7 +73,41 @@ class SecurityAlert extends Notification implements ShouldBeEncrypted, ShouldQue
 
         return $message
             ->subject(Lang::get("keystone::alerts.{$this->type->value}.subject"))
-            ->view(static::view($this->type));
+            ->view(static::view($this->type), [
+                'device' => $this->deviceLabel(),
+                'ipAddress' => $this->ipAddressLabel(),
+                'time' => $this->occurredAt->utc()->format('Y-m-d H:i'),
+            ]);
+    }
+
+    /**
+     * Get the line that names the device, or says it isn't known.
+     */
+    protected function deviceLabel(): string
+    {
+        $name = $this->device === null
+            ? Lang::get('keystone::alerts.unknown-device')
+            : Lang::get('keystone::alerts.device-name', ['browser' => $this->device->browser, 'platform' => $this->device->platform]);
+
+        return Lang::get('keystone::alerts.device', ['device' => $name]);
+    }
+
+    /**
+     * Get the line that names the IP address and where it is, looked up now, as the mail is built on the queue worker.
+     */
+    protected function ipAddressLabel(): ?string
+    {
+        if ($this->ipAddress === null) {
+            return null;
+        }
+
+        $location = app(IpLocation::class)->locate($this->ipAddress);
+
+        if ($location === null) {
+            return Lang::get('keystone::alerts.ip-address', ['ip_address' => $this->ipAddress]);
+        }
+
+        return Lang::get('keystone::alerts.ip-address-at', ['ip_address' => $this->ipAddress, 'location' => $location]);
     }
 
     /**
