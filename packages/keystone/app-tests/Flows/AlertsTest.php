@@ -1,7 +1,9 @@
 <?php
 
+use ClaudioDekker\Keystone\AppTests\Support\AppAlert;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Jobs\EndSessions;
+use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Models\UserEmail;
 use ClaudioDekker\Keystone\Notifications\SecurityAlert;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
@@ -100,4 +102,49 @@ it('mails an address the account held when its sessions ended, though the transa
     $alerts = $this->sentAlerts();
 
     expect($alerts->pluck('address')->sort()->values()->all())->toBe(['ada@example.com', 'ada@stolen.example']);
+});
+
+it('sends nothing for a type whose slot the app set to null', function () {
+    config(['keystone.notifications' => [...config('keystone.notifications'), 'sessions.terminated' => null]]);
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+
+    Artisan::call('keystone:end-sessions', ['user' => $user->getAuthIdentifier(), '--operator' => 'margaret']);
+
+    expect($this->sentAlerts())->toBeEmpty()
+        ->and($this->securityEvents()->for($user)->pluck('type')->all())->toBe([SecurityEventType::SESSIONS_TERMINATED]);
+});
+
+it("sends the app's own class in place of Keystone's, built from the event", function () {
+    config(['keystone.notifications' => [...config('keystone.notifications'), 'sessions.terminated' => AppAlert::class]]);
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+
+    Artisan::call('keystone:end-sessions', ['user' => $user->getAuthIdentifier(), '--operator' => 'margaret']);
+
+    $alerts = $this->sentAlerts();
+
+    expect($alerts->pluck('address')->all())->toBe(['ada@example.com'])
+        ->and($alerts[0]['alert'])->toBeInstanceOf(AppAlert::class)
+        ->and($alerts[0]['alert']->event->type)->toBe(SecurityEventType::SESSIONS_TERMINATED)
+        ->and($alerts[0]['alert']->event->operator)->toBe('margaret');
+});
+
+it("mails the account's addresses for a type that sends nothing by default once the app gives it a class", function () {
+    config(['keystone.notifications' => [...config('keystone.notifications'), 'signed_out' => AppAlert::class]]);
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $this->post(route('logout'));
+
+    $alerts = $this->sentAlerts();
+
+    expect($alerts->pluck('address')->all())->toBe(['ada@example.com'])
+        ->and($alerts[0]['alert']->event->type)->toBe(SecurityEventType::SIGNED_OUT);
 });
