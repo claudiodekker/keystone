@@ -1,15 +1,23 @@
 <?php
 
+use ClaudioDekker\Keystone\AppTests\IpLocationFake;
+use ClaudioDekker\Keystone\AppTests\SessionInfoFake;
 use ClaudioDekker\Keystone\AppTests\Support\AppAlert;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
+use ClaudioDekker\Keystone\Contracts\IpLocation;
+use ClaudioDekker\Keystone\Contracts\SessionInfo;
+use ClaudioDekker\Keystone\Devices\Device;
 use ClaudioDekker\Keystone\Jobs\EndSessions;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Models\UserEmail;
 use ClaudioDekker\Keystone\Notifications\SecurityAlert;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Route;
 
 beforeEach(function () {
     Notification::fake();
@@ -147,4 +155,37 @@ it("mails the account's addresses for a type that sends nothing by default once 
 
     expect($alerts->pluck('address')->all())->toBe(['ada@example.com'])
         ->and($alerts[0]['alert']->event->type)->toBe(SecurityEventType::SIGNED_OUT);
+});
+
+it('queues the alert encrypted, with the device parsed from the user agent and never the user agent itself', function () {
+    $userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+    $sessionInfo = new SessionInfoFake;
+    $sessionInfo->knows($userAgent, new Device(platform: 'Mac', browser: 'Chrome'));
+    $this->app->instance(SessionInfo::class, $sessionInfo);
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    Route::post('/admin/end-sessions', fn () => EndSessions::dispatchSync($user, operator: 'margaret'));
+
+    $this->withHeader('User-Agent', $userAgent)->withServerVariables(['REMOTE_ADDR' => '203.0.113.9'])->post('/admin/end-sessions');
+
+    $alert = $this->sentAlerts()->sole()['alert'];
+
+    expect($alert)->toBeInstanceOf(ShouldQueue::class)
+        ->and($alert)->toBeInstanceOf(ShouldBeEncrypted::class)
+        ->and($alert->ipAddress)->toBe('203.0.113.9')
+        ->and($alert->device)->toEqual(new Device(platform: 'Mac', browser: 'Chrome'))
+        ->and(serialize($alert))->not->toContain('Mozilla');
+});
+
+it('looks up no location while the request that caused the alert runs', function () {
+    $ipLocation = new IpLocationFake;
+    $this->app->instance(IpLocation::class, $ipLocation);
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    Route::post('/admin/end-sessions', fn () => EndSessions::dispatchSync($user, operator: 'margaret'));
+
+    $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.9'])->post('/admin/end-sessions');
+
+    expect($this->sentAlerts())->toHaveCount(1);
+    $ipLocation->assertNothingLocated();
 });

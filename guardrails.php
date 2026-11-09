@@ -93,11 +93,15 @@ return [
     (new CredentialWritesThroughAccountChange)->allowing([
         'packages/keystone/src/Accounts/AccountChange.php' => 'The account change is the one place that writes credentials.',
     ]),
-    NoContainerLookups::class,
+    (new NoContainerLookups)->allowing([
+        'packages/keystone/src/Notifications/SecurityAlert.php' => 'An alert is built from its event alone, and its mail is built on the queue worker, so neither step can take the session-info or IP-location port through injection.',
+    ]),
     NoPackageDependencies::class,
     NoTableAccess::class,
     NoFactoriesInAppTests::class,
-    ResponsesThroughAssertionTraits::class,
+    (new ResponsesThroughAssertionTraits)->allowing([
+        'packages/keystone/app-tests/Flows/AlertsTest.php' => "It asserts what the alert's fakes saw, and no response.",
+    ]),
     (new NoHttpInFeatureTests)->allowing([
         'packages/keystone/tests/Feature/Http/AppRoutesTest.php' => "It checks that the app's own routes keep their headers, get no cross-site check, and clear site data when they sign the user out. AppTests serve only Keystone's routes and one empty page behind auth, so none can check a route the app owns.",
         'packages/keystone/tests/Feature/RateLimits/ReplacedActionTest.php' => "It checks that rate limiting, the hardening floor and the cross-site check still hold for a controller that overrides show() and store() without calling Keystone's. The stub controllers always call Keystone's, so no AppTest runs one that skips them.",

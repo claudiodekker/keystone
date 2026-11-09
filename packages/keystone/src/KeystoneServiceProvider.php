@@ -5,7 +5,10 @@ namespace ClaudioDekker\Keystone;
 use ClaudioDekker\Keystone\Auth\KeystoneGuard;
 use ClaudioDekker\Keystone\Configuration\BootChecks;
 use ClaudioDekker\Keystone\Console\EndSessionsCommand;
+use ClaudioDekker\Keystone\Contracts\IpLocation;
 use ClaudioDekker\Keystone\Contracts\SessionExpiredResponse;
+use ClaudioDekker\Keystone\Contracts\SessionInfo;
+use ClaudioDekker\Keystone\Devices\NullSessionInfo;
 use ClaudioDekker\Keystone\Exceptions\KeystoneMisconfiguredException;
 use ClaudioDekker\Keystone\Http\Middleware\ApplyHardeningFloor;
 use ClaudioDekker\Keystone\Http\Middleware\CaptureRequestContext;
@@ -13,6 +16,7 @@ use ClaudioDekker\Keystone\Http\Middleware\ClearSiteData;
 use ClaudioDekker\Keystone\Http\Middleware\RefuseCrossSiteRequests;
 use ClaudioDekker\Keystone\Http\Responses\UnauthenticatedResponse;
 use ClaudioDekker\Keystone\Http\SessionExpiry;
+use ClaudioDekker\Keystone\Locations\NullIpLocation;
 use ClaudioDekker\Keystone\Methods\CredentialTypeRegistry;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\MethodAllowList;
@@ -47,6 +51,8 @@ class KeystoneServiceProvider extends ServiceProvider
         $this->app->singleton(CredentialTypeRegistry::class);
 
         $this->app->bindIf(SessionExpiredResponse::class, UnauthenticatedResponse::class);
+        $this->app->bindIf(IpLocation::class, NullIpLocation::class);
+        $this->app->bindIf(SessionInfo::class, NullSessionInfo::class);
 
         $this->app->bind(CredentialTypes::class, fn (Application $app) => new CredentialTypes(
             $app->make(CredentialTypeRegistry::class)->types(),
