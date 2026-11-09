@@ -36,6 +36,10 @@ A credential type is offered on a surface when it serves that surface and the al
 
 A row of `user_credentials`: something an account holds of one credential type, with its secret encrypted by core.
 
+## One-time code
+
+A credential type whose answer is a short code someone could guess their way through, such as TOTP. RFC 6238 and NIST call it a one-time password, and HTML names its field `one-time-code`. Its failures count against a fixed daily ceiling on top of the hourly failed-attempt limit.
+
 ## Subject
 
 The account a typed identifier names, if any. A credential type checks a proof against the subject's credentials of its type, and gets none when there is no subject.

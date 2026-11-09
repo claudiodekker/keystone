@@ -9,7 +9,7 @@ use ClaudioDekker\Keystone\Exceptions\ThrottledException;
 use ClaudioDekker\Keystone\Http\RequestContext;
 use ClaudioDekker\Keystone\Http\Subnet;
 use ClaudioDekker\Keystone\Methods\CredentialType;
-use ClaudioDekker\Keystone\Methods\ShortCode;
+use ClaudioDekker\Keystone\Methods\OneTimeCode;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\SecurityEvents\Recorder;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
@@ -37,9 +37,9 @@ class Limiter
     protected const string UNKNOWN_ADDRESS = 'unknown';
 
     /**
-     * The failed short codes an account gets in a day, across every hourly allowance.
+     * The failed one-time codes an account gets in a day, across every hourly allowance.
      */
-    protected const int DAILY_SHORT_CODE_FAILURES = 100;
+    protected const int DAILY_ONE_TIME_CODE_FAILURES = 100;
 
     /**
      * Create the limiter.
@@ -91,7 +91,7 @@ class Limiter
     /**
      * Count a failed attempt of the type before it verifies anything, and refuse it once the account's count is spent.
      *
-     * A short code is also counted against a daily ceiling, but only once the hourly count let it through. A store failure is reported and refuses the attempt.
+     * A one-time code is also counted against a daily ceiling, but only once the hourly count let it through. A store failure is reported and refuses the attempt.
      *
      * @throws ThrottledException
      */
@@ -103,8 +103,8 @@ class Limiter
 
         $counts = [$this->takeWithin(Limit::FAILED_ATTEMPT, $parts, $allowance, $account, $surface, $type)];
 
-        if ($type instanceof ShortCode) {
-            $counts[] = $this->takeWithin(Limit::DAILY_FAILED_ATTEMPT, $parts, static::DAILY_SHORT_CODE_FAILURES, $account, $surface, $type);
+        if ($type instanceof OneTimeCode) {
+            $counts[] = $this->takeWithin(Limit::DAILY_FAILED_ATTEMPT, $parts, static::DAILY_ONE_TIME_CODE_FAILURES, $account, $surface, $type);
         }
 
         return new FailedAttempt($counts);

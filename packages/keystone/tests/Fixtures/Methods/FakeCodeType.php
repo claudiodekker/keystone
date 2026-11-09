@@ -2,9 +2,9 @@
 
 namespace ClaudioDekker\Keystone\Tests\Fixtures\Methods;
 
-use ClaudioDekker\Keystone\Methods\ShortCode;
+use ClaudioDekker\Keystone\Methods\OneTimeCode;
 
-class FakeCodeType extends FakeFormType implements ShortCode
+class FakeCodeType extends FakeFormType implements OneTimeCode
 {
     /**
      * The secret every arranged credential holds.

@@ -1,6 +1,6 @@
 <?php
 
-// Fault injection through a fake type: no installed type answers with a short code on the sign-in surface, so no AppTest can reach the daily ceiling there.
+// Fault injection through a fake type: no installed type answers with a one-time code on the sign-in surface, so no AppTest can reach the daily ceiling there.
 
 use ClaudioDekker\Keystone\Exceptions\ThrottledException;
 use ClaudioDekker\Keystone\Models\UserCredential;
@@ -12,7 +12,7 @@ use ClaudioDekker\Keystone\SignIn\SignIn;
 use ClaudioDekker\Keystone\Tests\Fixtures\Methods\FakeCodeType;
 use ClaudioDekker\Keystone\Tests\Fixtures\Models\User;
 
-it('refuses the 101st failed short code in a day, with the hourly allowance left', function () {
+it('refuses the 101st failed one-time code in a day, with the hourly allowance left', function () {
     $ada = User::factory()->create();
     UserEmail::factory()->for($ada, 'user')->verified()->create(['address' => 'ada@example.com']);
     UserCredential::factory()->for($ada, 'user')->create(['type' => 'code', 'secret' => '613302']);
@@ -29,7 +29,7 @@ it('refuses the 101st failed short code in a day, with the hourly allowance left
     expect($attempt)->toThrow(ThrottledException::class);
 });
 
-it('counts only the short codes the hourly allowance let through toward the daily ceiling', function () {
+it('counts only the one-time codes the hourly allowance let through toward the daily ceiling', function () {
     $ada = User::factory()->create();
     UserEmail::factory()->for($ada, 'user')->verified()->create(['address' => 'ada@example.com']);
     UserCredential::factory()->for($ada, 'user')->create(['type' => 'code', 'secret' => '613302']);
@@ -49,7 +49,7 @@ it('counts only the short codes the hourly allowance let through toward the dail
     expect($type->comparisons())->toBe(40);
 });
 
-it('gives a short code that signs in back to the daily ceiling too', function () {
+it('gives a one-time code that signs in back to the daily ceiling too', function () {
     $ada = User::factory()->create();
     UserEmail::factory()->for($ada, 'user')->verified()->create(['address' => 'ada@example.com']);
     UserCredential::factory()->for($ada, 'user')->create(['type' => 'code', 'secret' => '613302']);

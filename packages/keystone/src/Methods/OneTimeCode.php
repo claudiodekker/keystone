@@ -5,7 +5,7 @@ namespace ClaudioDekker\Keystone\Methods;
 /**
  * @internal
  */
-interface ShortCode
+interface OneTimeCode
 {
     //
 }
