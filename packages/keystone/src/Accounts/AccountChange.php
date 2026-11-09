@@ -56,6 +56,44 @@ class AccountChange
     }
 
     /**
+     * Suspend the account, for the operator who asked, so it can't sign in and its sessions end.
+     *
+     * @throws AccountChangeRefusedException
+     */
+    public function suspend(string $operator): void
+    {
+        $id = $this->account->getAuthIdentifier();
+
+        if (Suspension::isSuspended($id)) {
+            throw AccountChangeRefusedException::alreadySuspended($id);
+        }
+
+        Suspension::suspend($id);
+
+        $this->movesEpoch = true;
+
+        $this->recordForOperator(SecurityEventType::ACCOUNT_SUSPENDED, $operator, $this->recipients);
+    }
+
+    /**
+     * Lift the account's suspension, for the operator who asked, so it signs in again with the credentials it already had.
+     *
+     * @throws AccountChangeRefusedException
+     */
+    public function unsuspend(string $operator): void
+    {
+        $id = $this->account->getAuthIdentifier();
+
+        if (! Suspension::isSuspended($id)) {
+            throw AccountChangeRefusedException::notSuspended($id);
+        }
+
+        Suspension::lift($id);
+
+        $this->recordForOperator(SecurityEventType::ACCOUNT_UNSUSPENDED, $operator, $this->recipients);
+    }
+
+    /**
      * Replace the credential's secret with its rehash, which ends nothing, refusing when another write changed the secret since it was loaded.
      *
      * Every write encrypts with a fresh IV, so a ciphertext that differs from the loaded one means another write got there first.
@@ -83,8 +121,18 @@ class AccountChange
     {
         $this->movesEpoch = true;
 
+        $this->recordForOperator(SecurityEventType::SESSIONS_TERMINATED, $operator, $recipients);
+    }
+
+    /**
+     * Record the event of the type for the operator who caused it once the change commits, alerting the given addresses.
+     *
+     * @param  list<string>  $recipients
+     */
+    protected function recordForOperator(SecurityEventType $type, string $operator, array $recipients): void
+    {
         $this->events[] = fn (Recorder $recorder) => $recorder->record(
-            SecurityEventType::SESSIONS_TERMINATED,
+            $type,
             account: $this->account,
             operator: $operator,
             recipients: $recipients,

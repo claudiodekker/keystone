@@ -7,6 +7,6 @@
 <p>{{ $ipAddress }}</p>
 @endif
 <p>{{ $device }}</p>
-<p>{{ __('keystone::alerts.if-not-you') }}</p>
+<p>@yield('advice', __('keystone::alerts.if-not-you'))</p>
 </body>
 </html>

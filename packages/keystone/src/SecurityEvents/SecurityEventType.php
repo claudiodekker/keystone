@@ -7,6 +7,8 @@ namespace ClaudioDekker\Keystone\SecurityEvents;
  */
 enum SecurityEventType: string
 {
+    case ACCOUNT_SUSPENDED = 'account.suspended';
+    case ACCOUNT_UNSUSPENDED = 'account.unsuspended';
     case LIMIT_TRIPPED = 'limit.tripped';
     case PROOF_REJECTED = 'proof.rejected';
     case REQUEST_REJECTED = 'request.rejected';

@@ -5,6 +5,8 @@ namespace ClaudioDekker\Keystone;
 use ClaudioDekker\Keystone\Auth\KeystoneGuard;
 use ClaudioDekker\Keystone\Configuration\BootChecks;
 use ClaudioDekker\Keystone\Console\EndSessionsCommand;
+use ClaudioDekker\Keystone\Console\SuspendCommand;
+use ClaudioDekker\Keystone\Console\UnsuspendCommand;
 use ClaudioDekker\Keystone\Contracts\IpLocation;
 use ClaudioDekker\Keystone\Contracts\SessionExpiredResponse;
 use ClaudioDekker\Keystone\Contracts\SessionInfo;
@@ -101,7 +103,11 @@ class KeystoneServiceProvider extends ServiceProvider
         $this->loadViewsFrom(dirname(__DIR__).'/resources/views', 'keystone');
 
         if ($this->app->runningInConsole()) {
-            $this->commands([EndSessionsCommand::class]);
+            $this->commands([
+                EndSessionsCommand::class,
+                SuspendCommand::class,
+                UnsuspendCommand::class,
+            ]);
         }
 
         $this->checkBoot();

@@ -1,6 +1,7 @@
 <?php
 
 use ClaudioDekker\Keystone\Accounts\CredentialEpoch;
+use ClaudioDekker\Keystone\Accounts\Suspension;
 use ClaudioDekker\Keystone\Keystone;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
@@ -17,6 +18,7 @@ return new class extends Migration
 
         Schema::table($user->getTable(), function (Blueprint $table) {
             $table->unsignedBigInteger(CredentialEpoch::COLUMN)->default(0);
+            $table->timestamp(Suspension::COLUMN)->nullable();
         });
     }
 };

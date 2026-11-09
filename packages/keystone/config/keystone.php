@@ -100,6 +100,8 @@ return [
     */
 
     'notifications' => [
+        'account.suspended' => SecurityAlert::class,
+        'account.unsuspended' => SecurityAlert::class,
         'limit.tripped' => null,
         'proof.rejected' => null,
         'request.rejected' => null,
