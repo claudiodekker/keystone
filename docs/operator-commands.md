@@ -14,6 +14,12 @@ End every session of every account, yours included, with `--all`:
 
     php artisan keystone:end-sessions --all --operator="Margaret Hamilton"
 
+Keystone mails the account's owner an [alert](security-events.md#alerts) that an administrator signed them out. Pass `--no-alert` to end the sessions without one, such as when you tell the owner yourself:
+
+    php artisan keystone:end-sessions 42 --operator="Margaret Hamilton" --no-alert
+
+Ending every account's sessions with `--all` alerts nobody.
+
 `--operator` names who is ending the sessions, and it is required. Keystone records it on the security event, cut to 64 characters, with control characters replaced by spaces. Use a name your team will recognise in the logs, such as an email address.
 
 The account is found by its id whatever global scopes your user model has, so an account a scope hides still has its sessions ended.
@@ -42,6 +48,12 @@ class UserSessionsController
 }
 ```
 
+Chain `withoutAlert()` to end the sessions without mailing the owner:
+
+```php
+EndSessions::dispatch($user, operator: $request->user()->email)->withoutAlert();
+```
+
 ```php
 use ClaudioDekker\Keystone\Jobs\EndAllSessions;
 
@@ -62,4 +74,4 @@ Keep the epoch out of your own writes. The `HasKeystone` trait on your user mode
 
 ### What gets recorded
 
-Ending one account's sessions records `sessions.terminated` for that account, with actor `operator` and the operator's name in the `operator` field. Ending every account's sessions records one `sessions.terminated` about nobody, with reason `keystone.every_account`, as a log line only. Each ended session then records `session.ended` with reason `keystone.epoch` when it makes its next request. [Security events](security-events.md) lists every field.
+Ending one account's sessions records `sessions.terminated` for that account, with actor `operator` and the operator's name in the `operator` field, and alerts its owner unless you passed `--no-alert` or chained `withoutAlert()`. Ending every account's sessions records one `sessions.terminated` about nobody, with reason `keystone.every_account`, as a log line only. Each ended session then records `session.ended` with reason `keystone.epoch` when it makes its next request. [Security events](security-events.md) lists every field.
