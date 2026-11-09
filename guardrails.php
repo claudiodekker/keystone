@@ -55,7 +55,9 @@ return [
     OneClassPerFile::class,
     ConcernsHoldOnlyTraits::class,
     NoFinal::class,
-    NoReflection::class,
+    (new NoReflection)->allowing([
+        'packages/keystone/src/Configuration/NotificationChecks.php' => "It checks at boot that each alert slot's constructor takes the security event alone, which only the constructor's signature can tell before any event exists.",
+    ]),
     NoTestCodeInApp::class,
     SortedEnumCases::class,
     EnumCasesDocumentedAlike::class,
@@ -83,6 +85,7 @@ return [
     new ClassesTaggedApiOrInternal(['packages/*/src']),
     (new NoMixedTypes(['packages/*/src']))->allowing([
         'packages/keystone/src/Configuration/KeyChecks.php' => 'It checks config values, which hold whatever the app wrote.',
+        'packages/keystone/src/Configuration/NotificationChecks.php' => 'It checks config values, which hold whatever the app wrote.',
         'packages/keystone/src/Http/HardeningSettings.php' => 'It parses config values, which hold whatever the app wrote.',
         'packages/keystone/src/KeystoneServiceProvider.php' => 'It checks config values, which hold whatever the app wrote.',
         'packages/keystone/src/Methods/MethodAllowList.php' => 'It parses the keystone.methods config value, which holds whatever the app wrote.',

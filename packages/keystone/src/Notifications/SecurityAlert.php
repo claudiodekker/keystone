@@ -24,6 +24,15 @@ class SecurityAlert extends Notification implements ShouldBeEncrypted, ShouldQue
     use Queueable;
 
     /**
+     * The view of each type's mail, which is every type the alert can be sent about.
+     *
+     * @var array<string, view-string>
+     */
+    protected const array VIEWS = [
+        'sessions.terminated' => 'keystone::alerts.sessions.terminated',
+    ];
+
+    /**
      * The type of the event the alert is about.
      */
     public SecurityEventType $type;
@@ -123,15 +132,20 @@ class SecurityAlert extends Notification implements ShouldBeEncrypted, ShouldQue
     }
 
     /**
+     * Determine if the alert has a mail for the type, so it can be sent about it.
+     */
+    public static function hasMail(SecurityEventType $type): bool
+    {
+        return array_key_exists($type->value, static::VIEWS);
+    }
+
+    /**
      * Get the view of the type's mail.
      *
      * @return view-string
      */
     protected static function view(SecurityEventType $type): string
     {
-        return match ($type) {
-            SecurityEventType::SESSIONS_TERMINATED => 'keystone::alerts.sessions.terminated',
-            default => throw KeystoneMisconfiguredException::noAlertMail($type->value),
-        };
+        return static::VIEWS[$type->value] ?? throw KeystoneMisconfiguredException::noAlertMail($type->value);
     }
 }
