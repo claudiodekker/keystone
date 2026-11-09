@@ -75,3 +75,58 @@ Keep the epoch out of your own writes. The `HasKeystone` trait on your user mode
 ### What gets recorded
 
 Ending one account's sessions records `sessions.terminated` for that account, with actor `operator` and the operator's name in the `operator` field, and alerts its owner unless you passed `--no-alert` or chained `withoutAlert()`. Ending every account's sessions records one `sessions.terminated` about nobody, with reason `keystone.every_account`, as a log line only. Each ended session then records `session.ended` with reason `keystone.epoch` when it makes its next request. [Security events](security-events.md) lists every field.
+
+## Suspending accounts
+
+Suspend an account to bar it from signing in while you look into it, without freeing its email addresses for anyone else:
+
+    php artisan keystone:suspend 42 --operator="Margaret Hamilton"
+
+`42` is the account's id. Every session of the account ends on its next request, the way [ending sessions](#ending-sessions) ends them. While the account is suspended, every sign-in to it is refused with the same answer a wrong password gets, even with the right one, so the refusal doesn't tell anyone the account is suspended. That right password still counts against the account's failed-attempt limit. Its addresses stay its own, so no other account signs in with them or takes them over.
+
+Lift the suspension to let the account sign in again with the credentials it already had:
+
+    php artisan keystone:unsuspend 42 --operator="Margaret Hamilton"
+
+Lifting a suspension ends no session, since the account has none left.
+
+Suspending an account that is already suspended, or lifting the suspension of one that isn't, changes nothing, and the command says so and fails. `--operator` is required, as it is for ending sessions, and the account is found by its id whatever global scopes your user model has.
+
+### From your app
+
+An admin panel dispatches `SuspendAccount` or `UnsuspendAccount`. Authorize the request in your app first, because each job acts on whatever account it is given. A job whose account is already in that state throws `AccountChangeRefusedException`, so catch it when you run the job with `dispatchSync()`:
+
+```php
+use App\Models\User;
+use ClaudioDekker\Keystone\Exceptions\AccountChangeRefusedException;
+use ClaudioDekker\Keystone\Jobs\SuspendAccount;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
+
+class UserSuspensionController
+{
+    public function store(Request $request, User $user): RedirectResponse
+    {
+        Gate::authorize('suspend', $user);
+
+        try {
+            SuspendAccount::dispatchSync($user, operator: $request->user()->email);
+        } catch (AccountChangeRefusedException $exception) {
+            return back()->withErrors(['user' => $exception->getMessage()]);
+        }
+
+        return back();
+    }
+}
+```
+
+A queued job whose account was deleted before it ran is dropped. When a job runs inside a database transaction that rolls back, nothing changes and nothing is recorded.
+
+### How it works
+
+Suspending sets the `suspended_at` column Keystone adds to your users table, and moves the account's [credential epoch](#how-it-works) so its sessions end. The `keystone` guard reads the suspension together with the epoch on every request that asks who is signed in, past your user model's global scopes, so a session of a suspended account ends even if it was somehow on the account's epoch. The `HasKeystone` trait leaves `suspended_at` out of the model's array form and refuses to mass-assign it, so a request can't lift its own account's suspension.
+
+### What gets recorded
+
+Suspending records `account.suspended`, and lifting the suspension records `account.unsuspended`, both with actor `operator` and the operator's name in the `operator` field. Each mails the account's owner an [alert](security-events.md#alerts). Set the type's slot in `notifications` to `null` to stop it.

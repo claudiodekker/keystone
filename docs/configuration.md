@@ -23,7 +23,7 @@ This file raises the view allowance and keeps every other allowance at its defau
 | `ip_location.allow_plaintext_driver` | `false` | `true` lets a `stevebauman/location` driver send IP addresses to a third party over plain HTTP. |
 | `log_channel` | `null` | None. It only picks where the security event lines go. |
 | `methods` | `null` | None. It only narrows: a type it leaves out is offered nowhere, and it can't offer a type on a surface the type doesn't serve. |
-| `notifications.<type>` | `SecurityAlert` for `sessions.terminated`, `null` for every other type | `null` stops the alert for that type, so its owner no longer hears about it. |
+| `notifications.<type>` | `SecurityAlert` for `account.suspended`, `account.unsuspended` and `sessions.terminated`, `null` for every other type | `null` stops the alert for that type, so its owner no longer hears about it. |
 | `rate_limits.failed_attempts_per_hour` | `20` | A higher number gives an attacker more guesses per account. |
 | `rate_limits.requests_per_minute.change` | `10` | A higher number lets more sign-outs through from one address. |
 | `rate_limits.requests_per_minute.submit` | `10` | A higher number lets more sign-in submits through from one address. |

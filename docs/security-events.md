@@ -27,10 +27,12 @@ Set `log_channel` to the name of a channel in your `logging.php` to send the log
 
 | Type | Recorded when |
 |---|---|
+| `account.suspended` | An operator suspended the account. |
+| `account.unsuspended` | An operator lifted the account's suspension. |
 | `limit.tripped` | A rate limit refused its first attempt of the window. The reason names the limit: `keystone.failed_attempt_limit` or `keystone.request_limit`. |
 | `proof.rejected` | A sign-in was refused for an account that the typed address named. |
 | `request.rejected` | A request was refused before it ran. The reason says why: `keystone.cross_site_request`. The event is anonymous. |
-| `session.ended` | Keystone ended the session. The reason says why: `keystone.expired` when it passed its absolute lifetime, `keystone.epoch` when an operator ended the account's sessions after it signed in. |
+| `session.ended` | Keystone ended the session. The reason says why: `keystone.expired` when it passed its absolute lifetime, `keystone.epoch` when an operator ended the account's sessions or suspended it after it signed in. |
 | `sessions.terminated` | An operator ended every session of the account. Ending every account's sessions records one about nobody, with reason `keystone.every_account`. |
 | `signed_in` | A session signed in. |
 | `signed_out` | The user signed out. |
@@ -74,10 +76,12 @@ Keystone adds one piece of global middleware after the app's trusted-proxy middl
 
 ## Alerts
 
-An alert is a mail that tells an account's owner something happened to its security. Each type of event has a slot in `notifications`: the notification class Keystone sends for that type, or `null` to send none. Today `sessions.terminated` is the one type that alerts by default:
+An alert is a mail that tells an account's owner something happened to its security. Each type of event has a slot in `notifications`: the notification class Keystone sends for that type, or `null` to send none. Today `account.suspended`, `account.unsuspended` and `sessions.terminated` alert by default:
 
 ```php
 'notifications' => [
+    'account.suspended' => SecurityAlert::class,
+    'account.unsuspended' => SecurityAlert::class,
     'limit.tripped' => null,
     'proof.rejected' => null,
     'request.rejected' => null,
@@ -98,7 +102,7 @@ When a change to the account causes the event, Keystone reads the addresses befo
 
 ### What it says
 
-Every default slot is `ClaudioDekker\Keystone\Notifications\SecurityAlert`, which picks a view and translation keys for its type. The mail is plain HTML, with every value escaped and no links. It says what happened and when, in UTC, the IP address of the request that caused it and where that address is, and the device. It ends with "If this wasn't you, sign in and review your security settings." Its wording sits in Keystone's `keystone::alerts` translations.
+Every default slot is `ClaudioDekker\Keystone\Notifications\SecurityAlert`, which picks a view and translation keys for its type. The mail is plain HTML, with every value escaped and no links. It says what happened and when, in UTC, the IP address of the request that caused it and where that address is, and the device. It ends with "If this wasn't you, sign in and review your security settings.", except the mail about a suspension, which can't ask its owner to sign in and ends with "If you think this is a mistake, contact the site's administrators." Its wording sits in Keystone's `keystone::alerts` translations.
 
 The device is the platform and browser parsed from the user agent, such as "Chrome on Mac", or "Unknown device". The alert parses the user agent while the request records the event, so the queue carries only the device and never the user agent. It looks the location up later, on the queue worker, while it builds the mail. A lookup during the request would slow down only the requests for accounts that exist, and tell an attacker which addresses have one.
 

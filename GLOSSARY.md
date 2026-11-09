@@ -48,7 +48,7 @@ A proven proof may also carry a rehash: the work that remakes the credential's s
 
 ## Sign-in decision
 
-The one place core decides what a proof earns. Today a proof signs in its credential's owner when the owner is the subject; holds join it later.
+The one place core decides what a proof earns. Today a proof signs in its credential's owner when the owner is the subject and isn't suspended; holds join it later.
 
 ## Verified address
 
@@ -156,11 +156,15 @@ A counter on each account's `users` row. Every sign-in stamps the session with t
 
 ## Account change
 
-The one way core writes an account's credentials, addresses or credential epoch. It locks the account's row, applies the change, moves the epoch when the change removed, replaced or ended anything, and records the change's security events once the outermost transaction commits, so a change that rolls back records nothing. A change it can't make, such as a rehash over a secret another write changed, is refused.
+The one way core writes an account's credentials, addresses, suspension or credential epoch. It locks the account's row, applies the change, moves the epoch when the change removed, replaced or ended anything, and records the change's security events once the outermost transaction commits, so a change that rolls back records nothing. A change it can't make, such as a rehash over a secret another write changed, is refused.
 
 ## Operator
 
 Whoever runs an operator command or dispatches its job, such as an admin ending an account's sessions. Keystone doesn't authorize them. It records the name the command or job gives on the security event, with actor `operator`.
+
+## Suspended account
+
+An account an operator barred from signing in. Sign-in refuses it exactly like a wrong credential, and the guard ends its sessions. It keeps its addresses, so they still block other accounts, and it signs in again with the credentials it already had once an operator lifts the suspension.
 
 ## AppTest
 
