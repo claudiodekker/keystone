@@ -65,3 +65,20 @@ it("signs out a session on the account's credential epoch once the account is su
 
     $this->assertSignInPage($response, ['status' => __('keystone::messages.session-ended')]);
 });
+
+it('keeps holding the addresses a suspended account verified, so another account that holds one unverified is not signed in by it', function () {
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'shared@example.com');
+    $other = $this->createUser();
+    $this->addUnverifiedAddress($other, 'shared@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user)->arrangeCredential(Surface::SIGN_IN, $other);
+
+    Artisan::call('keystone:suspend', ['user' => $user->getAuthIdentifier(), '--operator' => 'margaret']);
+
+    $response = $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'shared@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $other),
+    ]);
+
+    $this->assertSignInRefused($response, __('keystone::messages.credentials-rejected'));
+});
