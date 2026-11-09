@@ -36,7 +36,7 @@ class SuspendCommand extends Command
         $operator = $this->option('operator');
 
         if (! is_string($operator) || $operator === '') {
-            return $this->refuse('Name the operator suspending with --operator.');
+            return $this->refuse('Name the operator suspending the account with --operator.');
         }
 
         $id = $this->argument('user');

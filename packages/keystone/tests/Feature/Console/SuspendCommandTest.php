@@ -26,7 +26,7 @@ it('refuses to run without an operator, changing nothing', function (array $oper
     $ada = User::factory()->create();
 
     $this->artisan('keystone:suspend', ['user' => $ada->getKey(), ...$operator])
-        ->expectsOutputToContain('Name the operator suspending with --operator.')
+        ->expectsOutputToContain('Name the operator suspending the account with --operator.')
         ->assertFailed();
 
     $this->assertDatabaseCount(UserSecurityEvent::class, 0);
