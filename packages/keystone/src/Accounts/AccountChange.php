@@ -56,11 +56,13 @@ class AccountChange
     }
 
     /**
-     * Suspend the account, for the operator who asked, so it can't sign in.
+     * Suspend the account, for the operator who asked, so it can't sign in and its sessions end.
      */
     public function suspend(string $operator): void
     {
         Suspension::suspend($this->account->getAuthIdentifier());
+
+        $this->movesEpoch = true;
     }
 
     /**
