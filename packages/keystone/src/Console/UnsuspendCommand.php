@@ -33,12 +33,22 @@ class UnsuspendCommand extends Command
      */
     public function handle(AccountLookup $accounts): int
     {
+        $operator = $this->option('operator');
+
+        if (! is_string($operator) || $operator === '') {
+            return $this->refuse('Name the operator lifting the suspension with --operator.');
+        }
+
         $id = $this->argument('user');
 
         $account = $accounts->find($id);
 
+        if ($account === null) {
+            return $this->refuse("No account has the id [{$id}].");
+        }
+
         try {
-            UnsuspendAccount::dispatchSync($account, $this->option('operator'));
+            UnsuspendAccount::dispatchSync($account, $operator);
         } catch (AccountChangeRefusedException $exception) {
             return $this->refuse($exception->getMessage());
         }
