@@ -7,6 +7,7 @@ namespace ClaudioDekker\Keystone\RateLimits;
  */
 enum Limit: string
 {
+    case DAILY_FAILED_ATTEMPT = 'daily_failed_attempt_limit';
     case FAILED_ATTEMPT = 'failed_attempt_limit';
     case REQUEST = 'request_limit';
 
@@ -16,6 +17,7 @@ enum Limit: string
     public function windowSeconds(): int
     {
         return match ($this) {
+            Limit::DAILY_FAILED_ATTEMPT => 60 * 60 * 24,
             Limit::FAILED_ATTEMPT => 60 * 60,
             Limit::REQUEST => 60,
         };

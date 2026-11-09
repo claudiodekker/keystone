@@ -9,6 +9,7 @@ use ClaudioDekker\Keystone\Exceptions\ThrottledException;
 use ClaudioDekker\Keystone\Http\RequestContext;
 use ClaudioDekker\Keystone\Http\Subnet;
 use ClaudioDekker\Keystone\Methods\CredentialType;
+use ClaudioDekker\Keystone\Methods\ShortCode;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\SecurityEvents\Recorder;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
@@ -34,6 +35,11 @@ class Limiter
      * The key part every request without a usable IP address shares.
      */
     protected const string UNKNOWN_ADDRESS = 'unknown';
+
+    /**
+     * The failed short codes an account gets in a day, on top of the hourly allowance, which no config changes.
+     */
+    protected const int DAILY_SHORT_CODE_FAILURES = 100;
 
     /**
      * Create the limiter.
@@ -85,27 +91,23 @@ class Limiter
     /**
      * Count a failed attempt of the type before it verifies anything, and refuse it once the account's count is spent.
      *
-     * A store failure is reported and refuses the attempt.
+     * A short code is also counted against a daily ceiling, but only once the hourly count let it through. A store failure is reported and refuses the attempt.
      *
      * @throws ThrottledException
      */
     public function takeFailedAttempt(CredentialType $type, Surface $surface, ?KeystoneUser $account, string $identifier): CountedAttempt
     {
         $flow = $this->session->flow($surface) ?? throw MissingFlowException::forSurface($surface);
-        $key = $this->key(Limit::FAILED_ATTEMPT, [...$this->subject($account, $identifier), $type->name(), $flow->value]);
+        $parts = [...$this->subject($account, $identifier), $type->name(), $flow->value];
         $allowance = $this->config->integer('keystone.rate_limits.failed_attempts_per_hour');
 
-        $attempt = $this->take($key, Limit::FAILED_ATTEMPT) ?? throw ThrottledException::retryAfter(1);
+        $attempt = $this->takeWithin(Limit::FAILED_ATTEMPT, $parts, $allowance, $account, $surface, $type);
 
-        if (! $attempt->isOver($allowance)) {
-            return $attempt;
+        if ($type instanceof ShortCode) {
+            $this->takeWithin(Limit::DAILY_FAILED_ATTEMPT, $parts, static::DAILY_SHORT_CODE_FAILURES, $account, $surface, $type);
         }
 
-        if ($attempt->isFirstOver($allowance)) {
-            $this->trip(Limit::FAILED_ATTEMPT, $account, $surface, $type);
-        }
-
-        throw ThrottledException::retryAfter($this->secondsUntil($attempt->availableAt));
+        return $attempt;
     }
 
     /**
@@ -116,6 +118,28 @@ class Limiter
     public function giveBack(CountedAttempt $attempt): void
     {
         rescue(fn () => $this->release($attempt));
+    }
+
+    /**
+     * Count a failed attempt under the limit, and refuse it once the count is past the allowance, recording the trip the first time.
+     *
+     * @param  list<string>  $parts
+     *
+     * @throws ThrottledException
+     */
+    protected function takeWithin(Limit $limit, array $parts, int $allowance, ?KeystoneUser $account, Surface $surface, CredentialType $type): CountedAttempt
+    {
+        $attempt = $this->take($this->key($limit, $parts), $limit) ?? throw ThrottledException::retryAfter(1);
+
+        if (! $attempt->isOver($allowance)) {
+            return $attempt;
+        }
+
+        if ($attempt->isFirstOver($allowance)) {
+            $this->trip($limit, $account, $surface, $type);
+        }
+
+        throw ThrottledException::retryAfter($this->secondsUntil($attempt->availableAt));
     }
 
     /**
