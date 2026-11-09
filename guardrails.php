@@ -2,6 +2,7 @@
 
 use ClaudioDekker\Keystone\Lint\Checks\ClientReadsThroughRequestContext;
 use ClaudioDekker\Keystone\Lint\Checks\CredentialWritesThroughAccountChange;
+use ClaudioDekker\Keystone\Lint\Checks\MailQueuedAndEncrypted;
 use ClaudioDekker\Keystone\Lint\Checks\NoContainerLookups;
 use ClaudioDekker\Keystone\Lint\Checks\NoFactoriesInAppTests;
 use ClaudioDekker\Keystone\Lint\Checks\NoHttpInFeatureTests;
@@ -100,6 +101,7 @@ return [
         'packages/keystone/src/Notifications/SecurityAlert.php' => 'An alert is built from its event alone, and its mail is built on the queue worker, so neither step can take the session-info or IP-location port through injection.',
     ]),
     NoPackageDependencies::class,
+    MailQueuedAndEncrypted::class,
     NoTableAccess::class,
     NoFactoriesInAppTests::class,
     (new ResponsesThroughAssertionTraits)->allowing([
