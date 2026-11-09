@@ -28,10 +28,13 @@ class AccountChange
     protected array $events = [];
 
     /**
-     * Create the change to the account.
+     * Create the change to the account, whose alerts go to the given addresses.
+     *
+     * @param  list<string>  $recipients
      */
     public function __construct(
         protected KeystoneUser $account,
+        protected array $recipients,
     ) {
         //
     }
@@ -47,6 +50,7 @@ class AccountChange
             SecurityEventType::SESSIONS_TERMINATED,
             account: $this->account,
             operator: $operator,
+            recipients: $this->recipients,
         );
     }
 

@@ -17,6 +17,7 @@ class AccountChanges
      * Create the account changes.
      */
     public function __construct(
+        protected AlertRecipients $alertRecipients,
         protected Connection $connection,
         protected Recorder $recorder,
     ) {
@@ -26,7 +27,7 @@ class AccountChanges
     /**
      * Apply a change to the account while its row is locked, moving its credential epoch when the change ends its sessions.
      *
-     * The change records its events only once the outermost transaction commits, so one that rolls back records nothing.
+     * The change records its events only once the outermost transaction commits, so one that rolls back records nothing. Their alerts go to the addresses the account held before the change.
      *
      * @param  Closure(AccountChange): void  $apply
      */
@@ -35,7 +36,9 @@ class AccountChanges
         $change = $this->connection->transaction(function () use ($account, $apply) {
             CredentialEpoch::lock($account->getAuthIdentifier());
 
-            $change = new AccountChange($account);
+            $recipients = $this->alertRecipients->of($account);
+
+            $change = new AccountChange($account, $recipients);
 
             $apply($change);
 
