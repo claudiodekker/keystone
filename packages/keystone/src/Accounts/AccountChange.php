@@ -104,7 +104,7 @@ class AccountChange
     }
 
     /**
-     * Advance the credential's secret to the one its proof carries, which ends nothing, refusing when another write changed the secret since it was loaded.
+     * Advance the credential's secret to the given one, which ends nothing, refusing when another write changed the secret since it was loaded.
      *
      * @throws AccountChangeRefusedException
      */
@@ -126,7 +126,7 @@ class AccountChange
     }
 
     /**
-     * Replace the credential's secret, unless another write changed it since it was loaded.
+     * Replace the credential's secret, refusing when another write changed it since it was loaded.
      *
      * Every write encrypts with a fresh IV, so a ciphertext that differs from the loaded one means another write got there first.
      *

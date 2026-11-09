@@ -37,7 +37,7 @@ class Limiter
     protected const string UNKNOWN_ADDRESS = 'unknown';
 
     /**
-     * The failed short codes an account gets in a day, on top of the hourly allowance, which no config changes.
+     * The failed short codes an account gets in a day, across every hourly allowance.
      */
     protected const int DAILY_SHORT_CODE_FAILURES = 100;
 

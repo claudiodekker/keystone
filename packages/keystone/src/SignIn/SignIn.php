@@ -181,7 +181,7 @@ class SignIn
     }
 
     /**
-     * Advance the proven credential to the secret the proof carries, and determine if the proof still holds: false for a credential the type wasn't given, or one another write changed first.
+     * Advance the proven credential to the secret the proof carries, and determine if the proof still holds.
      *
      * @param  Collection<int, UserCredential>  $credentials
      */
