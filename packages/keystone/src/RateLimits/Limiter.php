@@ -95,29 +95,31 @@ class Limiter
      *
      * @throws ThrottledException
      */
-    public function takeFailedAttempt(CredentialType $type, Surface $surface, ?KeystoneUser $account, string $identifier): CountedAttempt
+    public function takeFailedAttempt(CredentialType $type, Surface $surface, ?KeystoneUser $account, string $identifier): FailedAttempt
     {
         $flow = $this->session->flow($surface) ?? throw MissingFlowException::forSurface($surface);
         $parts = [...$this->subject($account, $identifier), $type->name(), $flow->value];
         $allowance = $this->config->integer('keystone.rate_limits.failed_attempts_per_hour');
 
-        $attempt = $this->takeWithin(Limit::FAILED_ATTEMPT, $parts, $allowance, $account, $surface, $type);
+        $counts = [$this->takeWithin(Limit::FAILED_ATTEMPT, $parts, $allowance, $account, $surface, $type)];
 
         if ($type instanceof ShortCode) {
-            $this->takeWithin(Limit::DAILY_FAILED_ATTEMPT, $parts, static::DAILY_SHORT_CODE_FAILURES, $account, $surface, $type);
+            $counts[] = $this->takeWithin(Limit::DAILY_FAILED_ATTEMPT, $parts, static::DAILY_SHORT_CODE_FAILURES, $account, $surface, $type);
         }
 
-        return $attempt;
+        return new FailedAttempt($counts);
     }
 
     /**
-     * Give a counted attempt back, unless the window it was counted in has ended.
+     * Give each count of a failed attempt back, unless the window it was counted in has ended.
      *
-     * A store failure is reported and leaves the attempt counted.
+     * A store failure is reported and leaves that count taken.
      */
-    public function giveBack(CountedAttempt $attempt): void
+    public function giveBack(FailedAttempt $attempt): void
     {
-        rescue(fn () => $this->release($attempt));
+        foreach ($attempt->counts as $count) {
+            rescue(fn () => $this->release($count));
+        }
     }
 
     /**

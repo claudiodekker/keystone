@@ -13,7 +13,7 @@ use ClaudioDekker\Keystone\Methods\Proof;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Methods\Verification;
 use ClaudioDekker\Keystone\Models\UserCredential;
-use ClaudioDekker\Keystone\RateLimits\CountedAttempt;
+use ClaudioDekker\Keystone\RateLimits\FailedAttempt;
 use ClaudioDekker\Keystone\RateLimits\Limiter;
 use ClaudioDekker\Keystone\SecurityEvents\Recorder;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
@@ -134,7 +134,7 @@ class SignIn
      * @param  Collection<int, UserCredential>  $credentials
      * @param  array<string, mixed>  $validated
      */
-    protected function verify(CredentialType $type, Collection $credentials, array $validated, CountedAttempt $attempt): Proof
+    protected function verify(CredentialType $type, Collection $credentials, array $validated, FailedAttempt $attempt): Proof
     {
         $verification = new Verification(
             surface: Surface::SIGN_IN,
