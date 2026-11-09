@@ -1,5 +1,7 @@
 <?php
 
+use ClaudioDekker\Keystone\Notifications\SecurityAlert;
+
 return [
 
     /*
@@ -70,6 +72,27 @@ return [
     */
 
     'methods' => null,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Notifications
+    |--------------------------------------------------------------------------
+    |
+    | The notification each type of security event mails to the account's
+    | owner, as a class built from the event. Null sends none of that type,
+    | and there is no switch that silences every type at once.
+    |
+    */
+
+    'notifications' => [
+        'limit.tripped' => null,
+        'proof.rejected' => null,
+        'request.rejected' => null,
+        'session.ended' => null,
+        'sessions.terminated' => SecurityAlert::class,
+        'signed_in' => null,
+        'signed_out' => null,
+    ],
 
     /*
     |--------------------------------------------------------------------------

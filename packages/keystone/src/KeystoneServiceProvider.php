@@ -68,6 +68,7 @@ class KeystoneServiceProvider extends ServiceProvider
 
         $this->loadMigrationsFrom(dirname(__DIR__).'/database/migrations');
         $this->loadTranslationsFrom(dirname(__DIR__).'/lang', 'keystone');
+        $this->loadViewsFrom(dirname(__DIR__).'/resources/views', 'keystone');
 
         if ($this->app->runningInConsole()) {
             $this->commands([EndSessionsCommand::class]);

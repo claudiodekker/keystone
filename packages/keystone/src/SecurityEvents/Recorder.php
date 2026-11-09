@@ -7,11 +7,14 @@ use ClaudioDekker\Keystone\Events\SecurityEventRecorded;
 use ClaudioDekker\Keystone\Http\RequestContext;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\Surface;
+use ClaudioDekker\Keystone\Models\UserEmail;
 use ClaudioDekker\Keystone\Models\UserSecurityEvent;
 use ClaudioDekker\Keystone\Session\SessionState;
 use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Contracts\Events\Dispatcher;
+use Illuminate\Contracts\Notifications\Dispatcher as Notifications;
 use Illuminate\Http\Request;
+use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Log;
@@ -53,6 +56,7 @@ class Recorder
     public function __construct(
         protected Config $config,
         protected Dispatcher $events,
+        protected Notifications $notifications,
         protected Request $request,
         protected SessionState $session,
     ) {
@@ -91,6 +95,7 @@ class Recorder
 
         rescue(fn () => $this->log($entry));
         rescue(fn () => $entry->saveQuietly());
+        rescue(fn () => $this->alert($entry));
         rescue(fn () => $this->events->dispatch(new SecurityEventRecorded($entry)));
     }
 
@@ -168,6 +173,36 @@ class Recorder
         $context = $entry->toLogContext();
 
         $logger->info(static::MESSAGE, $context);
+    }
+
+    /**
+     * Mail the entry's alert to each of its account's addresses, unless its type's slot is null.
+     */
+    protected function alert(UserSecurityEvent $entry): void
+    {
+        $slot = $this->config->get('keystone.notifications')[$entry->type->value] ?? null;
+
+        if ($slot === null) {
+            return;
+        }
+
+        $recipients = UserEmail::query()
+            ->where('user_id', $entry->user_id)
+            ->whereNotNull('verified_address')
+            ->pluck('address')
+            ->map($this->recipient(...));
+
+        $this->notifications->send($recipients, new $slot($entry));
+    }
+
+    /**
+     * Get the address as one recipient of an alert.
+     */
+    protected function recipient(string $address): AnonymousNotifiable
+    {
+        $notifiable = new AnonymousNotifiable;
+
+        return $notifiable->route('mail', $address);
     }
 
     /**
