@@ -3,6 +3,7 @@
 namespace ClaudioDekker\Keystone\Auth;
 
 use ClaudioDekker\Keystone\Accounts\CredentialEpoch;
+use ClaudioDekker\Keystone\Accounts\Suspension;
 
 /**
  * @api
@@ -38,6 +39,9 @@ trait HasKeystone
      */
     protected function keystoneColumns(): array
     {
-        return [CredentialEpoch::COLUMN];
+        return [
+            CredentialEpoch::COLUMN,
+            Suspension::COLUMN,
+        ];
     }
 }
