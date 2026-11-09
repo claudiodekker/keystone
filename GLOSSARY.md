@@ -142,6 +142,18 @@ How long a session lasts after its sign-in time, however busy it stays: `session
 
 The response for a request that needs a signed-in user and whose session expired during it. The app binds its own `SessionExpiredResponse`. Core has already ended and recorded the session when it runs.
 
+## Credential epoch
+
+A counter on each account's `users` row. Every sign-in stamps the session with the account's epoch, and the guard ends a session stamped with another, or with none, when something asks for the user. Moving the epoch ends every session of the account on every session driver. A change moves it when it removed, replaced or ended anything.
+
+## Account change
+
+The one way core writes an account's credentials, addresses or credential epoch. It locks the account's row, applies the change, moves the epoch when the change removed, replaced or ended anything, and records the change's security events once the outermost transaction commits, so a change that rolls back records nothing. A change it can't make, such as a rehash over a secret another write changed, is refused.
+
+## Operator
+
+Whoever runs an operator command or dispatches its job, such as an admin ending an account's sessions. Keystone doesn't authorize them. It records the name the command or job gives on the security event, with actor `operator`.
+
 ## AppTest
 
 A test in a package's `app-tests/` that drives the app's own routes and published controllers, and checks each answer through an assertion the app can override. AppTests are the feature suite.

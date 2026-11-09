@@ -15,7 +15,8 @@ it('answers an account without a password exactly like a wrong password', functi
 
     $this->assertSignInRefused($wrong, __('keystone::messages.credentials-rejected'));
 
-    $without = $this->flushSession()->post(route('login.submit', 'password'), ['identifier' => 'grace@example.com', ...$support->validProof(Surface::SIGN_IN, $grace)]);
+    $this->switchToFreshBrowser();
+    $without = $this->post(route('login.submit', 'password'), ['identifier' => 'grace@example.com', ...$support->validProof(Surface::SIGN_IN, $grace)]);
 
     $this->assertSignInRefused($without, __('keystone::messages.credentials-rejected'));
     $this->assertIndistinguishable($wrong, $without);
@@ -34,7 +35,8 @@ it('answers an account whose stored secret is not a hash exactly like a wrong pa
 
     $this->assertSignInRefused($wrong, __('keystone::messages.credentials-rejected'));
 
-    $unusable = $this->flushSession()->post(route('login.submit', 'password'), ['identifier' => 'grace@example.com', ...$support->validProof(Surface::SIGN_IN, $grace)]);
+    $this->switchToFreshBrowser();
+    $unusable = $this->post(route('login.submit', 'password'), ['identifier' => 'grace@example.com', ...$support->validProof(Surface::SIGN_IN, $grace)]);
 
     $this->assertSignInRefused($unusable, __('keystone::messages.credentials-rejected'));
     $this->assertIndistinguishable($wrong, $unusable);

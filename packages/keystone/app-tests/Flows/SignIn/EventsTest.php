@@ -217,6 +217,7 @@ it('logs every fixed field in the context of the log line', function () {
         'user_agent',
         'known_device',
         'request_id',
+        'operator',
     ])
         ->and($line['id'])->toBe($this->securityEvents()->for($user)->sole()->id)
         ->and($line['occurred_at'])->toBe('2026-10-17T12:00:00.000000Z')

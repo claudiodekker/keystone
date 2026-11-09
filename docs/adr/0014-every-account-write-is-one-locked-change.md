@@ -8,6 +8,8 @@ Creating an account is the one write that starts without a row to lock. The app'
 
 A change may name the session writing it: a pending sign-in, a sudo grant or a sudo in progress. Once the account is locked, and before anything is applied, the change is refused when the account is barred, when a pending sign-in is no longer on the account's epoch, or when a sudo grant has ended. A flow can then never write for a session that lost the right to while it waited for the lock, and a refusal writes and records nothing.
 
+A change is one callback. The caller hands the account and a closure to the account changes, which lock the row and give the closure an account change whose methods are the writes. Each write that removes, replaces or ends something marks the epoch to move as it runs, and queues its own events, so neither the move nor the events depend on the caller. Ending every account's sessions writes every row at once and is a method beside it, so every epoch write stays in one class. A refusal throws `AccountChangeRefusedException`, and each flow catches that exception alone.
+
 ## Consequences
 
 - Removing a credential or unlinking OAuth, a key-to-passkey upgrade, regenerating recovery codes over a live set, a password change or removal, sign out others, suspension, deletion and completed recovery move the epoch. Adding a credential, a first password or first codes, a rehash, revoking one session, a sudo grant, a restore and unsuspending don't.

@@ -45,7 +45,8 @@ it('ends the whole session, so nothing it held outlives signing out', function (
 
     $this->withCookie($cookie, $signedIn)->post(route('logout'));
 
-    $this->flushSession()->withCookie($cookie, $signedIn);
+    $this->switchToFreshBrowser();
+    $this->withCookie($cookie, $signedIn);
     $next = $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada@example.com',
         ...$support->validProof(Surface::SIGN_IN, $user),

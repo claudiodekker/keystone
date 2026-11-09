@@ -47,19 +47,11 @@ class UserCredential extends Model
     }
 
     /**
-     * Replace the secret, only while the row still holds the ciphertext this model loaded.
-     *
-     * Every write encrypts with a fresh IV, so a ciphertext that differs from the loaded one means another write got there first.
+     * Get the secret as the column stores it, encrypted with a fresh IV.
      */
-    public function updateSecretUnlessChanged(#[SensitiveParameter] string $secret): void
+    public function encryptSecret(#[SensitiveParameter] string $secret): string
     {
-        $loaded = $this->getRawOriginal('secret');
-        $encrypted = $this->castAttributeAsEncryptedString('secret', $secret);
-
-        $this->newQuery()
-            ->whereKey($this->getKey())
-            ->where('secret', $loaded)
-            ->update(['secret' => $encrypted]);
+        return $this->castAttributeAsEncryptedString('secret', $secret);
     }
 
     /**

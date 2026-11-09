@@ -52,8 +52,8 @@ it('gives the session a new id on sign-in', function () {
         ...$support->validProof(Surface::SIGN_IN, $user),
     ]);
 
-    Auth::forgetGuards();
-    $response = $this->flushSession()->withCookie($cookie, $beforeSigningIn)->get(route('login'));
+    $this->switchToFreshBrowser();
+    $response = $this->withCookie($cookie, $beforeSigningIn)->get(route('login'));
 
     $this->assertSignInPage($response);
 });

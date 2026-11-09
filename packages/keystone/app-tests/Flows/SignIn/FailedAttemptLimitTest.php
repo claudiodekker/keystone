@@ -5,7 +5,6 @@ use ClaudioDekker\Keystone\RateLimits\StepKind;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use ClaudioDekker\Keystone\Session\Flow;
 use Illuminate\Auth\Events\Lockout;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Exceptions;
 
@@ -53,8 +52,7 @@ it('leaves earlier failures counted after a success in between', function () {
 
     $this->assertSignedIn($signIn, '/');
 
-    Auth::forgetGuards();
-    $this->flushSession();
+    $this->switchToFreshBrowser();
     $this->submitRejectedProofs($support, 'ada@example.com', $this->failedAttemptAllowance() - $half);
 
     $response = $this->post(route('login.submit', $support->type()->name()), [
@@ -77,7 +75,8 @@ it('answers a real account, a made-up one and a garbage credential type alike on
         ...$support->validProof(Surface::SIGN_IN, $user),
     ]);
 
-    $madeUp = $this->flushSession()->post(route('login.submit', $support->type()->name()), [
+    $this->switchToFreshBrowser();
+    $madeUp = $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'grace@example.com',
         ...$support->rejectedProof(Surface::SIGN_IN),
     ]);
@@ -86,7 +85,8 @@ it('answers a real account, a made-up one and a garbage credential type alike on
         $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.9'])->post(route('login.submit', 'garbage'));
     }
 
-    $garbage = $this->flushSession()->post(route('login.submit', 'garbage'));
+    $this->switchToFreshBrowser();
+    $garbage = $this->post(route('login.submit', 'garbage'));
 
     $this->assertSignInThrottled($real);
     $this->assertSignInThrottled($madeUp);
@@ -189,15 +189,16 @@ it('gives a sign-in its own count back, and no more', function () {
 
     $this->assertSignedIn($signIn, '/');
 
-    Auth::forgetGuards();
-    $givenBack = $this->flushSession()->post(route('login.submit', $support->type()->name()), [
+    $this->switchToFreshBrowser();
+    $givenBack = $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada@example.com',
         ...$support->rejectedProof(Surface::SIGN_IN),
     ]);
 
     $this->assertSignInRefused($givenBack, __('keystone::messages.credentials-rejected'));
 
-    $spent = $this->flushSession()->post(route('login.submit', $support->type()->name()), [
+    $this->switchToFreshBrowser();
+    $spent = $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada@example.com',
         ...$support->rejectedProof(Surface::SIGN_IN),
     ]);
@@ -218,7 +219,8 @@ it('keeps a count per account, so another account still signs in once one is thr
         ...$support->validProof(Surface::SIGN_IN, $ada),
     ]);
 
-    $signIn = $this->flushSession()->post(route('login.submit', $support->type()->name()), [
+    $this->switchToFreshBrowser();
+    $signIn = $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'grace@example.com',
         ...$support->validProof(Surface::SIGN_IN, $grace),
     ]);
@@ -246,7 +248,8 @@ it('keeps a count per credential type, so another type still signs the account i
         ...$spent->validProof(Surface::SIGN_IN, $user),
     ]);
 
-    $signIn = $this->flushSession()->post(route('login.submit', $other->type()->name()), [
+    $this->switchToFreshBrowser();
+    $signIn = $this->post(route('login.submit', $other->type()->name()), [
         'identifier' => 'ada@example.com',
         ...$other->validProof(Surface::SIGN_IN, $user),
     ]);

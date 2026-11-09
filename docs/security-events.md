@@ -6,7 +6,7 @@ Keystone records what happens to an account's security as security events. Every
 2. It writes a row of `user_security_events`, when the event is for an account.
 3. It dispatches the `ClaudioDekker\Keystone\Events\SecurityEventRecorded` event with the whole entry.
 
-An anonymous event, such as a refused sign-in for an address no account holds, is only a log line. Identical ones, with the same type, IP address and path, are logged once per 60 seconds, counted in the default cache under a hash keyed by a key derived from your app key, so the cache never holds an address. While the cache fails, every one is logged.
+An anonymous event, such as a refused sign-in for an address no account holds, is only a log line. Identical ones, with the same type, IP address and path, are logged once per 60 seconds, counted in the default cache under a hash keyed by a key derived from your app key, so the cache never holds an address. While the cache fails, every one is logged. An operator's anonymous event, such as ending every account's sessions, is logged every time.
 
 ## Configuration
 
@@ -29,7 +29,8 @@ Set `log_channel` to the name of a channel in your `logging.php` to send the log
 | `limit.tripped` | A rate limit refused its first attempt of the window. The reason names the limit: `keystone.failed_attempt_limit` or `keystone.request_limit`. |
 | `proof.rejected` | A sign-in was refused for an account that the typed address named. |
 | `request.rejected` | A request was refused before it ran. The reason says why: `keystone.cross_site_request`. The event is anonymous. |
-| `session.ended` | Keystone ended the session. The reason says why: `keystone.expired` when it passed its absolute lifetime. |
+| `session.ended` | Keystone ended the session. The reason says why: `keystone.expired` when it passed its absolute lifetime, `keystone.epoch` when an operator ended the account's sessions after it signed in. |
+| `sessions.terminated` | An operator ended every session of the account. Ending every account's sessions records one about nobody, with reason `keystone.every_account`. |
 | `signed_in` | A session signed in. |
 | `signed_out` | The user signed out. |
 
@@ -43,7 +44,7 @@ Every event has the same fields, whatever its type. There is no free-form metada
 | `occurred_at` | When the event happened, in UTC, whatever your app's timezone is. |
 | `type` | One of the types above. |
 | `user_id` | The account the event is for, or null for an anonymous event. The column has no foreign key, so a removed account's rows keep its id. |
-| `actor` | Who made it happen: `user`, `operator` or `system`. |
+| `actor` | Who made it happen: `user`, `operator` or `system`. An event an operator command or job records is the operator's. |
 | `flow` | The flow the request was in, such as `sign-in`, or null when it was in none, such as signing out. |
 | `credential_type` | The name of the credential type involved, if any. |
 | `credential_id` | The credential involved, if any. A rejection names a credential only when it belongs to the account the attempt named. |
@@ -54,6 +55,7 @@ Every event has the same fields, whatever its type. There is no free-form metada
 | `user_agent` | The client's user agent, cleaned of invalid UTF-8 and control characters, cut to 512 characters and encrypted at rest. |
 | `known_device` | Whether the browser was a known device of the account, when that was checked. |
 | `request_id` | A ULID minted once per request, shared by every event the request records. |
+| `operator` | The operator a command or job names, cut to 64 characters with control characters replaced by spaces, or null when no operator acted. |
 
 The `ip_address`, `location` and `user_agent` fields are left out of the model's array form. Read them from the model's attributes when a page needs them.
 
@@ -62,7 +64,7 @@ The `ip_address`, `location` and `user_agent` fields are left out of the model's
 The message of every log line is `keystone.security_event`. Every field travels in the context array, with the IP address, location and user agent in clear, since the log is the operator's. A value that reaches a field, such as a user agent, is JSON-escaped in the context and cannot forge a second line.
 
 ```
-[2026-10-17 15:04:05] local.INFO: keystone.security_event {"id":"01k7qz1g3w8ndq0y9q1ztp7s6e","occurred_at":"2026-10-17T15:04:05.000000Z","type":"signed_in","user_id":42,"actor":"user","flow":"sign-in","credential_type":"password","credential_id":7,"credential_label":null,"reason":null,"ip_address":"203.0.113.9","location":null,"user_agent":"Mozilla/5.0 (X11; Linux x86_64)","known_device":null,"request_id":"01k7qz1g3v2f0h0y9q1ztp7s6d"}
+[2026-10-17 15:04:05] local.INFO: keystone.security_event {"id":"01k7qz1g3w8ndq0y9q1ztp7s6e","occurred_at":"2026-10-17T15:04:05.000000Z","type":"signed_in","user_id":42,"actor":"user","flow":"sign-in","credential_type":"password","credential_id":7,"credential_label":null,"reason":null,"ip_address":"203.0.113.9","location":null,"user_agent":"Mozilla/5.0 (X11; Linux x86_64)","known_device":null,"request_id":"01k7qz1g3v2f0h0y9q1ztp7s6d","operator":null}
 ```
 
 ## The request context

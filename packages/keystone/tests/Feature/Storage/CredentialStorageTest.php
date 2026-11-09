@@ -2,6 +2,8 @@
 
 // Storage shape: what sits in the credentials table at rest, which no app can see through a page.
 
+use ClaudioDekker\Keystone\Accounts\AccountChange;
+use ClaudioDekker\Keystone\Accounts\AccountChanges;
 use ClaudioDekker\Keystone\Models\UserCredential;
 use Illuminate\Support\Facades\Crypt;
 
@@ -24,7 +26,7 @@ it('keeps a replaced secret encrypted at rest', function () {
     $credential = UserCredential::factory()->create(['secret' => 'correct horse']);
     $loaded = UserCredential::query()->findOrFail($credential->getKey());
 
-    $loaded->updateSecretUnlessChanged('new horse');
+    app(AccountChanges::class)->change($loaded->user, fn (AccountChange $change) => $change->rehash($loaded, 'new horse'));
 
     $stored = UserCredential::query()->toBase()->where('id', $credential->getKey())->value('secret');
     expect($stored)->not->toBe('new horse')

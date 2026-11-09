@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use ClaudioDekker\Keystone\Auth\HasKeystone;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
@@ -17,6 +18,8 @@ class User extends Authenticatable implements KeystoneUser
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
+
+    use HasKeystone;
 
     /**
      * Get the attributes that should be cast.

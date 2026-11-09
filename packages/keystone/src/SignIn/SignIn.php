@@ -2,8 +2,11 @@
 
 namespace ClaudioDekker\Keystone\SignIn;
 
+use ClaudioDekker\Keystone\Accounts\AccountChange;
+use ClaudioDekker\Keystone\Accounts\AccountChanges;
 use ClaudioDekker\Keystone\Accounts\AccountLookup;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
+use ClaudioDekker\Keystone\Exceptions\AccountChangeRefusedException;
 use ClaudioDekker\Keystone\Exceptions\ThrottledException;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\Proof;
@@ -30,6 +33,7 @@ class SignIn
      * Create the sign-in.
      */
     public function __construct(
+        protected AccountChanges $accountChanges,
         protected AccountLookup $accounts,
         protected SignInDecision $decision,
         protected Limiter $limiter,
@@ -119,7 +123,7 @@ class SignIn
             credential: $proof->credential,
         );
 
-        $this->rehash($proof, $credentials);
+        $this->rehash($owner, $proof, $credentials);
 
         return new SignedIn($redirectTo);
     }
@@ -169,7 +173,7 @@ class SignIn
      *
      * @param  Collection<int, UserCredential>  $credentials
      */
-    protected function rehash(Proof $proof, Collection $credentials): void
+    protected function rehash(KeystoneUser $owner, Proof $proof, Collection $credentials): void
     {
         $credential = $credentials->find($proof->credential);
 
@@ -177,13 +181,13 @@ class SignIn
             return;
         }
 
-        rescue(fn () => $this->writeRehash($proof, $credential));
+        rescue(fn () => $this->writeRehash($owner, $proof, $credential));
     }
 
     /**
      * Make the proof's rehash and write it over the proven credential, unless its secret changed meanwhile.
      */
-    protected function writeRehash(Proof $proof, UserCredential $credential): void
+    protected function writeRehash(KeystoneUser $owner, Proof $proof, UserCredential $credential): void
     {
         $secret = $proof->rehashed();
 
@@ -191,6 +195,10 @@ class SignIn
             return;
         }
 
-        $credential->updateSecretUnlessChanged($secret);
+        try {
+            $this->accountChanges->change($owner, fn (AccountChange $change) => $change->rehash($credential, $secret));
+        } catch (AccountChangeRefusedException) {
+            //
+        }
     }
 }

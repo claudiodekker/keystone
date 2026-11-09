@@ -4,6 +4,7 @@ namespace ClaudioDekker\Keystone;
 
 use ClaudioDekker\Keystone\Auth\KeystoneGuard;
 use ClaudioDekker\Keystone\Configuration\BootChecks;
+use ClaudioDekker\Keystone\Console\EndSessionsCommand;
 use ClaudioDekker\Keystone\Contracts\SessionExpiredResponse;
 use ClaudioDekker\Keystone\Exceptions\KeystoneMisconfiguredException;
 use ClaudioDekker\Keystone\Http\Middleware\ApplyHardeningFloor;
@@ -67,6 +68,10 @@ class KeystoneServiceProvider extends ServiceProvider
 
         $this->loadMigrationsFrom(dirname(__DIR__).'/database/migrations');
         $this->loadTranslationsFrom(dirname(__DIR__).'/lang', 'keystone');
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([EndSessionsCommand::class]);
+        }
 
         $this->checkBoot();
     }

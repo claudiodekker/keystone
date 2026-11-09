@@ -9,6 +9,7 @@ use ClaudioDekker\Keystone\AppTests\Assertions\SessionExpiryAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\SignInAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\SignOutAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\ThrottledAssertions;
+use ClaudioDekker\Keystone\AppTests\Support\Browser;
 use ClaudioDekker\Keystone\AppTests\Support\CredentialTypeSupport;
 use ClaudioDekker\Keystone\AppTests\Support\RecordedSecurityEvents;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
@@ -25,6 +26,7 @@ use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
@@ -76,6 +78,37 @@ trait InteractsWithKeystone
             'Origin' => 'https://elsewhere.example',
             'Sec-Fetch-Site' => 'cross-site',
         ]);
+    }
+
+    /**
+     * Send the requests from here on from a browser that has never visited the app, and get the browser left behind.
+     */
+    public function switchToFreshBrowser(): Browser
+    {
+        return $this->switchTo(new Browser([]));
+    }
+
+    /**
+     * Send the requests from here on from the browser, as it was when it was left.
+     */
+    public function switchBackTo(Browser $browser): void
+    {
+        $this->switchTo($browser);
+    }
+
+    /**
+     * Put the browser's session in place of the current one, and get the browser that held the current one.
+     */
+    protected function switchTo(Browser $browser): Browser
+    {
+        $session = $this->app['session'];
+        $left = new Browser($session->all());
+
+        Auth::forgetGuards();
+        $session->flush();
+        $session->put($browser->session);
+
+        return $left;
     }
 
     /**

@@ -14,8 +14,8 @@ it('signs in with a stored hash of another driver, and rehashes it to the app dr
     $first = $this->post(route('login.submit', 'password'), $fields);
 
     $support->refuseHashesOf($stored);
-    Auth::forgetGuards();
-    $second = $this->flushSession()->post(route('login.submit', 'password'), $fields);
+    $this->switchToFreshBrowser();
+    $second = $this->post(route('login.submit', 'password'), $fields);
 
     Auth::forgetGuards();
     $next = $this->get(route('login'));

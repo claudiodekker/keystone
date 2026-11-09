@@ -2,7 +2,6 @@
 
 use ClaudioDekker\Keystone\Methods\Surface;
 use Illuminate\Auth\Events\Login;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Sleep;
 
@@ -20,8 +19,8 @@ it('signs in with a valid proof of every installed type that serves sign-in', fu
         $address = $this->addVerifiedAddress($user);
         $support->arrangeCredential(Surface::SIGN_IN, $user);
 
-        Auth::forgetGuards();
-        $response = $this->flushSession()->post(route('login.submit', $support->type()->name()), [
+        $this->switchToFreshBrowser();
+        $response = $this->post(route('login.submit', $support->type()->name()), [
             'identifier' => $address,
             ...$support->validProof(Surface::SIGN_IN, $user),
         ]);
@@ -37,7 +36,8 @@ it('refuses a rejected proof of every installed type that serves sign-in', funct
         $address = $this->addVerifiedAddress($user);
         $support->arrangeCredential(Surface::SIGN_IN, $user);
 
-        $response = $this->flushSession()->post(route('login.submit', $support->type()->name()), [
+        $this->switchToFreshBrowser();
+        $response = $this->post(route('login.submit', $support->type()->name()), [
             'identifier' => $address,
             ...$support->rejectedProof(Surface::SIGN_IN),
         ]);
@@ -52,14 +52,16 @@ it('answers no account exactly like a rejected proof, for every installed type t
         $address = $this->addVerifiedAddress($user);
         $support->arrangeCredential(Surface::SIGN_IN, $user);
 
-        $rejected = $this->flushSession()->post(route('login.submit', $support->type()->name()), [
+        $this->switchToFreshBrowser();
+        $rejected = $this->post(route('login.submit', $support->type()->name()), [
             'identifier' => $address,
             ...$support->rejectedProof(Surface::SIGN_IN),
         ]);
 
         $this->assertSignInRefused($rejected, __('keystone::messages.credentials-rejected'));
 
-        $missing = $this->flushSession()->post(route('login.submit', $support->type()->name()), [
+        $this->switchToFreshBrowser();
+        $missing = $this->post(route('login.submit', $support->type()->name()), [
             'identifier' => 'nobody.'.$address,
             ...$support->rejectedProof(Surface::SIGN_IN),
         ]);

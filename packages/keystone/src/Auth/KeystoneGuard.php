@@ -2,6 +2,7 @@
 
 namespace ClaudioDekker\Keystone\Auth;
 
+use ClaudioDekker\Keystone\Accounts\CredentialEpoch;
 use ClaudioDekker\Keystone\Exceptions\SessionGuardSignInException;
 use ClaudioDekker\Keystone\Http\Middleware\ClearSiteData;
 use ClaudioDekker\Keystone\Http\SessionExpiry;
@@ -43,12 +44,16 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Get the signed-in user, ending a session past its absolute lifetime first so the request reads it as a guest's.
+     * Get the signed-in user, ending a session past its absolute lifetime or its account's credential epoch first so the request reads it as a guest's.
      */
     public function user(): ?Authenticatable
     {
         if ($this->hasExpired()) {
             $this->expire();
+        }
+
+        if ($this->hasLeftEpoch()) {
+            $this->endOffEpoch();
         }
 
         return parent::user();
@@ -132,31 +137,69 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Determine if the session names a user whose sign-in is past the absolute lifetime, unless this request already read or set one.
+     * Determine if the session names a user whose sign-in is past the absolute lifetime.
      */
     protected function hasExpired(): bool
     {
-        return ! $this->loggedOut
-            && $this->user === null
-            && $this->session->has($this->getName())
-            && $this->state()->hasExpired();
+        return $this->namesUnreadUser() && $this->state()->hasExpired();
     }
 
     /**
-     * End the expired session and tell the user why on their next page, before anything answers the request.
+     * Determine if the session names a user and was signed in on another credential epoch than the account's.
+     */
+    protected function hasLeftEpoch(): bool
+    {
+        if (! $this->namesUnreadUser()) {
+            return false;
+        }
+
+        $epoch = CredentialEpoch::of($this->session->get($this->getName()));
+
+        return ! $this->state()->isOnEpoch($epoch);
+    }
+
+    /**
+     * Determine if the session names a user, unless this request already read, set or signed one out.
+     */
+    protected function namesUnreadUser(): bool
+    {
+        return ! $this->loggedOut
+            && $this->user === null
+            && $this->session->has($this->getName());
+    }
+
+    /**
+     * End the expired session, and have the request that needs a user answered with the app's expiry response.
      */
     protected function expire(): void
+    {
+        $this->end(Status::SESSION_EXPIRED, reason: 'keystone.expired');
+
+        SessionExpiry::forResponseTo($this->request);
+    }
+
+    /**
+     * End the session its account's credential epoch left behind.
+     */
+    protected function endOffEpoch(): void
+    {
+        $this->end(Status::SESSION_ENDED, reason: 'keystone.epoch');
+    }
+
+    /**
+     * End the session, tell the user why on their next page and record it for the account, before anything answers the request.
+     */
+    protected function end(Status $status, string $reason): void
     {
         $account = $this->sessionAccount();
 
         $this->loggedOut = true;
         $this->endSession();
 
-        $this->state()->leaveStatus(Status::SESSION_EXPIRED);
-        SessionExpiry::forResponseTo($this->request);
+        $this->state()->leaveStatus($status);
 
         $recorder = $this->container->make(Recorder::class);
-        $recorder->record(SecurityEventType::SESSION_ENDED, account: $account, reason: 'keystone.expired');
+        $recorder->record(SecurityEventType::SESSION_ENDED, account: $account, reason: $reason);
     }
 
     /**
