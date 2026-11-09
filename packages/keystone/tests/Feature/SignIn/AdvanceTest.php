@@ -52,3 +52,23 @@ it('refuses a proof whose credential another write advanced while the type was v
     $raced->assertRedirectToRoute('login');
     $withRaced->assertRedirect('/');
 });
+
+it('keeps the attempt of a proof refused for a raced credential counted', function () {
+    config(['keystone.rate_limits.failed_attempts_per_hour' => 1]);
+    $ada = User::factory()->create();
+    UserEmail::factory()->for($ada, 'user')->verified()->create(['address' => 'ada@example.com']);
+    $credential = UserCredential::factory()->for($ada, 'user')->create(['type' => 'form', 'secret' => 'correct horse']);
+    $type = app(CredentialTypes::class)->find('form', Surface::SIGN_IN);
+    $type->duringNextVerify(function () use ($credential) {
+        $credential->secret = 'raced horse';
+        $credential->save();
+    });
+
+    $type->advanceNextProof('advanced horse');
+
+    $this->post(route('login.submit', 'form'), ['identifier' => 'ada@example.com', 'secret' => 'correct horse']);
+
+    $afterRace = $this->post(route('login.submit', 'form'), ['identifier' => 'ada@example.com', 'secret' => 'raced horse']);
+
+    $afterRace->assertTooManyRequests();
+});
