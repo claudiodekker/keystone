@@ -40,18 +40,19 @@ class AccountChange
     }
 
     /**
-     * End every session of the account, for the operator who asked.
+     * End every session of the account, for the operator who asked, and alert its owner.
      */
     public function endSessions(string $operator): void
     {
-        $this->movesEpoch = true;
+        $this->terminateSessions($operator, $this->recipients);
+    }
 
-        $this->events[] = fn (Recorder $recorder) => $recorder->record(
-            SecurityEventType::SESSIONS_TERMINATED,
-            account: $this->account,
-            operator: $operator,
-            recipients: $this->recipients,
-        );
+    /**
+     * End every session of the account, for the operator who asked, without alerting its owner.
+     */
+    public function endSessionsWithoutAlert(string $operator): void
+    {
+        $this->terminateSessions($operator, recipients: []);
     }
 
     /**
@@ -71,6 +72,23 @@ class AccountChange
         if ($updated === 0) {
             throw AccountChangeRefusedException::secretChanged();
         }
+    }
+
+    /**
+     * Move the account's credential epoch, and record that the operator ended its sessions, alerting the given addresses.
+     *
+     * @param  list<string>  $recipients
+     */
+    protected function terminateSessions(string $operator, array $recipients): void
+    {
+        $this->movesEpoch = true;
+
+        $this->events[] = fn (Recorder $recorder) => $recorder->record(
+            SecurityEventType::SESSIONS_TERMINATED,
+            account: $this->account,
+            operator: $operator,
+            recipients: $recipients,
+        );
     }
 
     /**
