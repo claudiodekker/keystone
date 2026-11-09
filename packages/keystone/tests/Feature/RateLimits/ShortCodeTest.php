@@ -5,6 +5,8 @@
 use ClaudioDekker\Keystone\Exceptions\ThrottledException;
 use ClaudioDekker\Keystone\Models\UserCredential;
 use ClaudioDekker\Keystone\Models\UserEmail;
+use ClaudioDekker\Keystone\Models\UserSecurityEvent;
+use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use ClaudioDekker\Keystone\SignIn\SignedIn;
 use ClaudioDekker\Keystone\SignIn\SignIn;
 use ClaudioDekker\Keystone\Tests\Fixtures\Methods\FakeCodeType;
@@ -58,4 +60,31 @@ it('gives a short code that signs in back to the daily ceiling too', function ()
     }
 
     expect($attempt())->toBeInstanceOf(SignedIn::class);
+});
+
+it('records the daily ceiling tripping once for the account', function () {
+    $ada = User::factory()->create();
+    UserEmail::factory()->for($ada, 'user')->verified()->create(['address' => 'ada@example.com']);
+    UserCredential::factory()->for($ada, 'user')->create(['type' => 'code', 'secret' => '613302']);
+    $attempt = fn () => $this->app->make(SignIn::class)->attempt(new FakeCodeType, ['identifier' => 'ada@example.com', 'secret' => '000000']);
+
+    foreach (range(1, 5) as $hour) {
+        foreach (range(1, 20) as $i) {
+            $attempt();
+        }
+
+        $this->travel(61)->minutes();
+    }
+
+    rescue($attempt, report: false);
+    rescue($attempt, report: false);
+
+    $tripped = UserSecurityEvent::query()
+        ->whereBelongsTo($ada, 'user')
+        ->where('type', SecurityEventType::LIMIT_TRIPPED)
+        ->get();
+
+    expect($tripped)->toHaveCount(1)
+        ->and($tripped[0]->reason)->toBe('keystone.daily_failed_attempt_limit')
+        ->and($tripped[0]->credential_type)->toBe('code');
 });
