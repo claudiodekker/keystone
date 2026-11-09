@@ -3,6 +3,7 @@
 namespace ClaudioDekker\Keystone\Console;
 
 use ClaudioDekker\Keystone\Accounts\AccountLookup;
+use ClaudioDekker\Keystone\Exceptions\AccountChangeRefusedException;
 use ClaudioDekker\Keystone\Jobs\UnsuspendAccount;
 use Illuminate\Console\Command;
 
@@ -36,10 +37,24 @@ class UnsuspendCommand extends Command
 
         $account = $accounts->find($id);
 
-        UnsuspendAccount::dispatchSync($account, $this->option('operator'));
+        try {
+            UnsuspendAccount::dispatchSync($account, $this->option('operator'));
+        } catch (AccountChangeRefusedException $exception) {
+            return $this->refuse($exception->getMessage());
+        }
 
         $this->components->info("Lifted the suspension of the account [{$id}].");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Tell the operator why nothing changed, and fail.
+     */
+    protected function refuse(string $message): int
+    {
+        $this->components->error($message);
+
+        return self::FAILURE;
     }
 }
