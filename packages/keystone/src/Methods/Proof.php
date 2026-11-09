@@ -3,6 +3,7 @@
 namespace ClaudioDekker\Keystone\Methods;
 
 use Closure;
+use SensitiveParameter;
 
 /**
  * @internal
@@ -19,6 +20,7 @@ readonly class Proof
     protected function __construct(
         public int|string|null $credential,
         protected ?Closure $rehash = null,
+        #[SensitiveParameter] protected ?string $advancedSecret = null,
     ) {
         //
     }
@@ -36,11 +38,27 @@ readonly class Proof
     }
 
     /**
+     * Create a proof of one of the credentials the type was given, which holds only once its secret is advanced to the given one, such as a TOTP step that must not be accepted twice.
+     */
+    public static function advanced(Credential $credential, #[SensitiveParameter] string $secret): static
+    {
+        return new static($credential->id, advancedSecret: $secret);
+    }
+
+    /**
      * Create a rejection.
      */
     public static function rejected(): static
     {
         return new static(null);
+    }
+
+    /**
+     * Get the secret the proven credential must be advanced to before the proof signs anyone in, or null when it needn't be.
+     */
+    public function advancedSecret(): ?string
+    {
+        return $this->advancedSecret;
     }
 
     /**

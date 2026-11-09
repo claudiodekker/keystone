@@ -111,6 +111,8 @@ class SignIn
             return new Refused;
         }
 
+        $this->advance($owner, $proof, $credentials);
+
         $redirectTo = $this->session->signIn($owner);
 
         $this->limiter->giveBack($attempt);
@@ -166,6 +168,24 @@ class SignIn
             ->where('user_id', $account->getAuthIdentifier())
             ->where('type', $type->name())
             ->get();
+    }
+
+    /**
+     * Advance the proven credential to the secret the proof carries.
+     *
+     * @param  Collection<int, UserCredential>  $credentials
+     */
+    protected function advance(KeystoneUser $owner, Proof $proof, Collection $credentials): void
+    {
+        $secret = $proof->advancedSecret();
+
+        if ($secret === null) {
+            return;
+        }
+
+        $credential = $credentials->find($proof->credential);
+
+        $this->accountChanges->change($owner, fn (AccountChange $change) => $change->advance($credential, $secret));
     }
 
     /**

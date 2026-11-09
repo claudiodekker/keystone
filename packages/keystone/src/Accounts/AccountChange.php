@@ -113,6 +113,16 @@ class AccountChange
     }
 
     /**
+     * Advance the credential's secret to the one its proof carries.
+     */
+    public function advance(UserCredential $credential, #[SensitiveParameter] string $secret): void
+    {
+        UserCredential::query()
+            ->whereKey($credential->getKey())
+            ->update(['secret' => $credential->encryptSecret($secret)]);
+    }
+
+    /**
      * End every session of the account, for the operator who asked, alerting the given addresses.
      *
      * @param  list<string>  $recipients
