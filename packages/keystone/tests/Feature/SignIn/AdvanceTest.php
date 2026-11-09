@@ -72,3 +72,23 @@ it('keeps the attempt of a proof refused for a raced credential counted', functi
 
     $afterRace->assertTooManyRequests();
 });
+
+it('refuses a proof that advances a credential the type was never given, leaving it alone', function () {
+    $ada = User::factory()->create();
+    UserEmail::factory()->for($ada, 'user')->verified()->create(['address' => 'ada@example.com']);
+    UserCredential::factory()->for($ada, 'user')->create(['type' => 'form', 'secret' => 'correct horse']);
+    $enrolled = null;
+    $type = app(CredentialTypes::class)->find('form', Surface::SIGN_IN);
+    $type->duringNextVerify(function () use ($ada, $type, &$enrolled) {
+        $enrolled = UserCredential::factory()->for($ada, 'user')->create(['type' => 'form', 'secret' => 'enrolled horse']);
+        $type->forgeProofOf($enrolled);
+    });
+
+    $type->advanceNextProof('advanced horse');
+
+    $response = $this->post(route('login.submit', 'form'), ['identifier' => 'ada@example.com', 'secret' => 'correct horse']);
+
+    $response->assertRedirectToRoute('login');
+    $response->assertSessionHasErrors('identifier');
+    expect($enrolled->fresh()->secret)->toBe('enrolled horse');
+});

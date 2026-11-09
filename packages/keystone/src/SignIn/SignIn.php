@@ -169,7 +169,7 @@ class SignIn
     }
 
     /**
-     * Advance the proven credential to the secret the proof carries, and determine if the proof still holds: false when another write changed the credential first.
+     * Advance the proven credential to the secret the proof carries, and determine if the proof still holds: false for a credential the type wasn't given, or one another write changed first.
      *
      * @param  Collection<int, UserCredential>  $credentials
      */
@@ -182,6 +182,10 @@ class SignIn
         }
 
         $credential = $credentials->find($proof->credential);
+
+        if ($credential === null) {
+            return false;
+        }
 
         try {
             $this->accountChanges->change($owner, fn (AccountChange $change) => $change->advance($credential, $secret));
