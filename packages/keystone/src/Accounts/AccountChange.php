@@ -57,10 +57,18 @@ class AccountChange
 
     /**
      * Suspend the account, for the operator who asked, so it can't sign in and its sessions end.
+     *
+     * @throws AccountChangeRefusedException
      */
     public function suspend(string $operator): void
     {
-        Suspension::suspend($this->account->getAuthIdentifier());
+        $id = $this->account->getAuthIdentifier();
+
+        if (Suspension::isSuspended($id)) {
+            throw AccountChangeRefusedException::alreadySuspended($id);
+        }
+
+        Suspension::suspend($id);
 
         $this->movesEpoch = true;
 

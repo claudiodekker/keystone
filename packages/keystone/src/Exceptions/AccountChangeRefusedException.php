@@ -5,12 +5,20 @@ namespace ClaudioDekker\Keystone\Exceptions;
 use RuntimeException;
 
 /**
- * @internal
+ * @api
  *
  * @phpstan-consistent-constructor
  */
 class AccountChangeRefusedException extends RuntimeException
 {
+    /**
+     * Create the exception for suspending the account with the id, which is already suspended.
+     */
+    public static function alreadySuspended(int|string $id): static
+    {
+        return new static("The account [{$id}] is already suspended.");
+    }
+
     /**
      * Create the exception for a rehash over a secret another write changed since it was read.
      */

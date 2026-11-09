@@ -1,5 +1,8 @@
 <?php
 
+use ClaudioDekker\Keystone\Exceptions\AccountChangeRefusedException;
+use ClaudioDekker\Keystone\Jobs\SuspendAccount;
+use ClaudioDekker\Keystone\Jobs\UnsuspendAccount;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Notifications\SecurityAlert;
 use ClaudioDekker\Keystone\SecurityEvents\Actor;
@@ -142,4 +145,18 @@ it('records account.unsuspended by the operator who lifted the suspension, and a
         ->and($alerts->pluck('address')->all())->toBe(['ada@example.com', 'ada@example.com'])
         ->and($alerts[1]['alert'])->toBeInstanceOf(SecurityAlert::class)
         ->and($alerts[1]['alert']->type)->toBe(SecurityEventType::ACCOUNT_UNSUSPENDED);
+});
+
+it('refuses to suspend an account that is already suspended, recording and alerting nothing more', function () {
+    Notification::fake();
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+
+    SuspendAccount::dispatchSync($user, operator: 'margaret');
+
+    $suspendAgain = fn () => SuspendAccount::dispatchSync($user, operator: 'grace');
+
+    expect($suspendAgain)->toThrow(AccountChangeRefusedException::class)
+        ->and($this->securityEvents()->for($user)->pluck('type')->all())->toBe([SecurityEventType::ACCOUNT_SUSPENDED])
+        ->and($this->sentAlerts())->toHaveCount(1);
 });
