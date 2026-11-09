@@ -2,6 +2,7 @@
 
 namespace ClaudioDekker\Keystone\SignIn;
 
+use ClaudioDekker\Keystone\Accounts\Suspension;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\Proof;
@@ -24,6 +25,10 @@ class SignInDecision
         $owner = $this->owner($proof, $type);
 
         if ($owner?->getAuthIdentifier() !== $subject->getAuthIdentifier()) {
+            return null;
+        }
+
+        if (Suspension::isSuspended($owner->getAuthIdentifier())) {
             return null;
         }
 

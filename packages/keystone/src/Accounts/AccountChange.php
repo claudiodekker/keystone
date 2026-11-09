@@ -56,6 +56,14 @@ class AccountChange
     }
 
     /**
+     * Suspend the account, for the operator who asked, so it can't sign in.
+     */
+    public function suspend(string $operator): void
+    {
+        Suspension::suspend($this->account->getAuthIdentifier());
+    }
+
+    /**
      * Replace the credential's secret with its rehash, which ends nothing, refusing when another write changed the secret since it was loaded.
      *
      * Every write encrypts with a fresh IV, so a ciphertext that differs from the loaded one means another write got there first.
