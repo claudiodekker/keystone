@@ -11,10 +11,19 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 
-it("signs out a session that signed in before the operator ended the account's sessions, on its next request", function () {
+dataset('ending the account\'s sessions', [
+    'with the command' => [fn (KeystoneUser $user) => Artisan::call('keystone:end-sessions', ['user' => $user->getAuthIdentifier(), '--operator' => 'margaret'])],
+    'through the job an admin panel dispatches' => [fn (KeystoneUser $user) => EndSessions::dispatchSync($user, operator: 'margaret')],
+]);
+
+dataset('ending every account\'s sessions', [
+    'with the command' => [fn () => Artisan::call('keystone:end-sessions', ['--all' => true, '--operator' => 'margaret'])],
+    'through the job an admin panel dispatches' => [fn () => EndAllSessions::dispatchSync(operator: 'margaret')],
+]);
+
+it("signs out a session that signed in before the operator ended the account's sessions on its next request, and tells the user why", function (Closure $endSessions) {
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
@@ -24,33 +33,15 @@ it("signs out a session that signed in before the operator ended the account's s
         ...$support->validProof(Surface::SIGN_IN, $user),
     ]);
 
-    Artisan::call('keystone:end-sessions', ['user' => $user->getAuthIdentifier(), '--operator' => 'margaret']);
-
-    Auth::forgetGuards();
-    $response = $this->get(route('login'));
-
-    $this->assertSignInPage($response);
-});
-
-it('tells the user on the sign-in page that their session was ended', function () {
-    $user = $this->createUser();
-    $this->addVerifiedAddress($user, 'ada@example.com');
-    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
-
-    $this->post(route('login.submit', $support->type()->name()), [
-        'identifier' => 'ada@example.com',
-        ...$support->validProof(Surface::SIGN_IN, $user),
-    ]);
-
-    Artisan::call('keystone:end-sessions', ['user' => $user->getAuthIdentifier(), '--operator' => 'margaret']);
+    $endSessions($user);
 
     Auth::forgetGuards();
     $response = $this->get(route('login'));
 
     $this->assertSignInPage($response, ['status' => __('keystone::messages.session-ended')]);
-});
+})->with('ending the account\'s sessions');
 
-it("keeps another account's session signed in", function () {
+it("keeps another account's session signed in", function (Closure $endSessions) {
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
     $other = $this->createUser();
@@ -68,15 +59,15 @@ it("keeps another account's session signed in", function () {
         ...$support->validProof(Surface::SIGN_IN, $user),
     ]);
 
-    Artisan::call('keystone:end-sessions', ['user' => $user->getAuthIdentifier(), '--operator' => 'margaret']);
+    $endSessions($user);
 
     $this->switchBackTo($gracesBrowser);
     $response = $this->get(route('login'));
 
     $this->assertAlreadySignedIn($response);
-});
+})->with('ending the account\'s sessions');
 
-it("signs out every account's sessions with --all", function () {
+it("signs out every account's sessions", function (Closure $endAllSessions) {
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
     $other = $this->createUser();
@@ -94,7 +85,7 @@ it("signs out every account's sessions with --all", function () {
         ...$support->validProof(Surface::SIGN_IN, $user),
     ]);
 
-    Artisan::call('keystone:end-sessions', ['--all' => true, '--operator' => 'margaret']);
+    $endAllSessions();
 
     Auth::forgetGuards();
     $inAdasBrowser = $this->get(route('login'));
@@ -102,45 +93,9 @@ it("signs out every account's sessions with --all", function () {
     $this->switchBackTo($gracesBrowser);
     $inGracesBrowser = $this->get(route('login'));
 
-    $this->assertSignInPage($inAdasBrowser);
-    $this->assertSignInPage($inGracesBrowser);
-});
-
-it("signs out the account's sessions through the job an admin panel dispatches", function () {
-    $user = $this->createUser();
-    $this->addVerifiedAddress($user, 'ada@example.com');
-    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
-
-    $this->post(route('login.submit', $support->type()->name()), [
-        'identifier' => 'ada@example.com',
-        ...$support->validProof(Surface::SIGN_IN, $user),
-    ]);
-
-    Bus::dispatch(new EndSessions($user, operator: 'margaret')->onConnection('sync'));
-
-    Auth::forgetGuards();
-    $response = $this->get(route('login'));
-
-    $this->assertSignInPage($response);
-});
-
-it("signs out every account's sessions through the job an admin panel dispatches", function () {
-    $user = $this->createUser();
-    $this->addVerifiedAddress($user, 'ada@example.com');
-    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
-
-    $this->post(route('login.submit', $support->type()->name()), [
-        'identifier' => 'ada@example.com',
-        ...$support->validProof(Surface::SIGN_IN, $user),
-    ]);
-
-    Bus::dispatch(new EndAllSessions(operator: 'margaret')->onConnection('sync'));
-
-    Auth::forgetGuards();
-    $response = $this->get(route('login'));
-
-    $this->assertSignInPage($response);
-});
+    $this->assertSignInPage($inAdasBrowser, ['status' => __('keystone::messages.session-ended')]);
+    $this->assertSignInPage($inGracesBrowser, ['status' => __('keystone::messages.session-ended')]);
+})->with('ending every account\'s sessions');
 
 it('records sessions.terminated for the account, by the operator who ended them', function () {
     $user = $this->createUser();
