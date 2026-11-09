@@ -77,10 +77,18 @@ class AccountChange
 
     /**
      * Lift the account's suspension, for the operator who asked, so it signs in again with the credentials it already had.
+     *
+     * @throws AccountChangeRefusedException
      */
     public function unsuspend(string $operator): void
     {
-        Suspension::lift($this->account->getAuthIdentifier());
+        $id = $this->account->getAuthIdentifier();
+
+        if (! Suspension::isSuspended($id)) {
+            throw AccountChangeRefusedException::notSuspended($id);
+        }
+
+        Suspension::lift($id);
 
         $this->recordForOperator(SecurityEventType::ACCOUNT_UNSUSPENDED, $operator, $this->recipients);
     }

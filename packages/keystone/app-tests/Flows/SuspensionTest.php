@@ -160,3 +160,15 @@ it('refuses to suspend an account that is already suspended, recording and alert
         ->and($this->securityEvents()->for($user)->pluck('type')->all())->toBe([SecurityEventType::ACCOUNT_SUSPENDED])
         ->and($this->sentAlerts())->toHaveCount(1);
 });
+
+it('refuses to unsuspend an account that is not suspended, recording and alerting nothing', function () {
+    Notification::fake();
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+
+    $unsuspend = fn () => UnsuspendAccount::dispatchSync($user, operator: 'margaret');
+
+    expect($unsuspend)->toThrow(AccountChangeRefusedException::class)
+        ->and($this->securityEvents()->for($user))->toBeEmpty()
+        ->and($this->sentAlerts())->toBeEmpty();
+});
