@@ -21,9 +21,9 @@ class EndSessions implements ShouldQueue
     public bool $deleteWhenMissingModels = true;
 
     /**
-     * Whether the account's owner is mailed that its sessions ended.
+     * Whether the job mails the account's owner that its sessions ended.
      */
-    public bool $alerts = true;
+    public bool $alertsOwner = true;
 
     /**
      * Create the job that ends every session of the account, for the operator who asked.
@@ -42,7 +42,7 @@ class EndSessions implements ShouldQueue
      */
     public function withoutAlert(): static
     {
-        $this->alerts = false;
+        $this->alertsOwner = false;
 
         return $this;
     }
@@ -60,7 +60,7 @@ class EndSessions implements ShouldQueue
      */
     protected function endSessions(AccountChange $change): void
     {
-        if (! $this->alerts) {
+        if (! $this->alertsOwner) {
             $change->endSessionsWithoutAlert($this->operator);
 
             return;

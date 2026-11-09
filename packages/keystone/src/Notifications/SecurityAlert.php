@@ -83,16 +83,32 @@ class SecurityAlert extends Notification implements ShouldBeEncrypted, ShouldQue
         return $message
             ->subject(Lang::get("keystone::alerts.{$this->type->value}.subject"))
             ->view(static::view($this->type), [
-                'device' => $this->deviceLabel(),
-                'ipAddress' => $this->ipAddressLabel(),
-                'time' => $this->occurredAt->utc()->format('Y-m-d H:i'),
+                'device' => $this->deviceLine(),
+                'ipAddress' => $this->ipAddressLine(),
+                'when' => $this->whenLine(),
             ]);
+    }
+
+    /**
+     * Determine if the alert has a mail for the type, so it can be sent about it.
+     */
+    public static function hasMail(SecurityEventType $type): bool
+    {
+        return array_key_exists($type->value, static::VIEWS);
+    }
+
+    /**
+     * Get the line that says when the event happened, in UTC.
+     */
+    protected function whenLine(): string
+    {
+        return Lang::get('keystone::alerts.when', ['time' => $this->occurredAt->utc()->format('Y-m-d H:i')]);
     }
 
     /**
      * Get the line that names the device, or says it isn't known.
      */
-    protected function deviceLabel(): string
+    protected function deviceLine(): string
     {
         $name = $this->device === null
             ? Lang::get('keystone::alerts.unknown-device')
@@ -102,9 +118,9 @@ class SecurityAlert extends Notification implements ShouldBeEncrypted, ShouldQue
     }
 
     /**
-     * Get the line that names the IP address and where it is, looked up now, as the mail is built on the queue worker.
+     * Get the line that names the IP address and where it is.
      */
-    protected function ipAddressLabel(): ?string
+    protected function ipAddressLine(): ?string
     {
         if ($this->ipAddress === null) {
             return null;
@@ -129,14 +145,6 @@ class SecurityAlert extends Notification implements ShouldBeEncrypted, ShouldQue
         }
 
         return app(SessionInfo::class)->device($userAgent);
-    }
-
-    /**
-     * Determine if the alert has a mail for the type, so it can be sent about it.
-     */
-    public static function hasMail(SecurityEventType $type): bool
-    {
-        return array_key_exists($type->value, static::VIEWS);
     }
 
     /**

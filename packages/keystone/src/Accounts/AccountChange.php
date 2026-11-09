@@ -75,7 +75,7 @@ class AccountChange
     }
 
     /**
-     * Move the account's credential epoch, and record that the operator ended its sessions, alerting the given addresses.
+     * End every session of the account, for the operator who asked, alerting the given addresses.
      *
      * @param  list<string>  $recipients
      */

@@ -75,7 +75,7 @@ class StevebaumanIpLocation implements IpLocation
     }
 
     /**
-     * Determine if the driver may be sent the IP address, which only https, or a driver without a URL, may unless the app allows plain HTTP.
+     * Determine if the driver may be sent the IP address.
      */
     protected function mayAsk(Driver $driver, string $ipAddress): bool
     {

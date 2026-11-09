@@ -11,7 +11,7 @@ use Illuminate\Notifications\Notification;
 class AlertWithOptions extends Notification
 {
     /**
-     * Create the alert about the event, which any model stands for, with options that keep their defaults.
+     * Create the alert about the event, with options that keep their defaults.
      *
      * @param  array<string, string>  $options
      */

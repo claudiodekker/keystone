@@ -93,9 +93,9 @@ return [
     | Notifications
     |--------------------------------------------------------------------------
     |
-    | The notification each type of security event mails to the account's
-    | owner, as a class built from the event. Null sends none of that type,
-    | and there is no switch that silences every type at once.
+    | Each type of security event mails its account's owner the notification
+    | class named here, built from the event alone. Null sends no alert of
+    | that type, so an app can silence each type it handles on its own.
     |
     */
 

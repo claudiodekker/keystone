@@ -2,7 +2,7 @@
 <html>
 <body>
 <p>@yield('summary')</p>
-<p>{{ __('keystone::alerts.when', ['time' => $time]) }}</p>
+<p>{{ $when }}</p>
 @if ($ipAddress !== null)
 <p>{{ $ipAddress }}</p>
 @endif

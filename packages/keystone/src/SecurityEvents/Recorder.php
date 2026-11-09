@@ -67,7 +67,8 @@ class Recorder
     /**
      * Record the security event, as a log line alone when it is anonymous.
      *
-     * Naming an operator records the event as theirs rather than the user's. The alert goes to the given recipients, read before the change that caused the event, or to the account's addresses as they are now.
+     * Naming an operator records the event as theirs rather than the user's.
+     * The alert goes to the given recipients, read before the change that caused the event, or to the account's addresses as they are now.
      *
      * @param  list<string>|null  $recipients
      */

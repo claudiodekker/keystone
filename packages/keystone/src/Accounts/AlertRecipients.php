@@ -33,7 +33,7 @@ class AlertRecipients
     }
 
     /**
-     * Get the unverified emails of an account that holds no verified address, but those another account holds verified.
+     * Get the emails that no other account holds verified.
      *
      * @param  Collection<int, UserEmail>  $emails
      * @return Collection<int, UserEmail>
