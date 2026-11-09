@@ -28,7 +28,7 @@ class SignInDecision
             return null;
         }
 
-        if (Suspension::isSuspended($owner->getAuthIdentifier())) {
+        if (Suspension::isSuspended($subject->getAuthIdentifier())) {
             return null;
         }
 
