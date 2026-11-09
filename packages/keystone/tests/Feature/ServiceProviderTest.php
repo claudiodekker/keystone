@@ -1,10 +1,14 @@
 <?php
 
+use ClaudioDekker\Keystone\Contracts\IpLocation;
+use ClaudioDekker\Keystone\Contracts\SessionInfo;
+use ClaudioDekker\Keystone\Devices\DeviceDetectorSessionInfo;
 use ClaudioDekker\Keystone\Http\Middleware\ApplyHardeningFloor;
 use ClaudioDekker\Keystone\Http\Middleware\CaptureRequestContext;
 use ClaudioDekker\Keystone\Http\Middleware\ClearSiteData;
 use ClaudioDekker\Keystone\Http\Middleware\RefuseCrossSiteRequests;
 use ClaudioDekker\Keystone\KeystoneServiceProvider;
+use ClaudioDekker\Keystone\Locations\StevebaumanIpLocation;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Http\Middleware\TrustProxies;
@@ -40,4 +44,12 @@ it('clears site data from the start of the global middleware, before the trusted
 
     expect($middleware)->toContain(ClearSiteData::class)
         ->and(array_search(ClearSiteData::class, $middleware, true))->toBeLessThan(array_search(TrustProxies::class, $middleware, true));
+});
+
+it('looks IP addresses up through stevebauman/location when the app installed it', function () {
+    expect($this->app->make(IpLocation::class))->toBeInstanceOf(StevebaumanIpLocation::class);
+});
+
+it('parses user agents through matomo/device-detector when the app installed it', function () {
+    expect($this->app->make(SessionInfo::class))->toBeInstanceOf(DeviceDetectorSessionInfo::class);
 });

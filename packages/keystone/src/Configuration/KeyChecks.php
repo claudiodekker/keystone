@@ -36,6 +36,7 @@ class KeyChecks
             ...$this->clearSiteData(),
             ...$this->eventsEnabled(),
             ...$this->frameAncestors(),
+            ...$this->plaintextLocationDrivers(),
             ...$this->logChannel(),
             ...$this->trustedOrigins(),
         ];
@@ -87,6 +88,20 @@ class KeyChecks
         }
 
         return ['keystone.events.enabled must be true or false.'];
+    }
+
+    /**
+     * Get the failure of ip_location.allow_plaintext_driver when it isn't a boolean.
+     *
+     * @return list<string>
+     */
+    protected function plaintextLocationDrivers(): array
+    {
+        if (is_bool($this->config->get('keystone.ip_location.allow_plaintext_driver'))) {
+            return [];
+        }
+
+        return ['keystone.ip_location.allow_plaintext_driver must be true or false.'];
     }
 
     /**

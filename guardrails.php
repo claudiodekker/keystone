@@ -101,6 +101,8 @@ return [
     NoFactoriesInAppTests::class,
     (new ResponsesThroughAssertionTraits)->allowing([
         'packages/keystone/app-tests/Flows/AlertsTest.php' => "It asserts what the alert's fakes saw, and no response.",
+        'packages/keystone/app-tests/Harness/IpLocationFakeTest.php' => "It tests the fake's own assertions, and no response.",
+        'packages/keystone/app-tests/Harness/SessionInfoFakeTest.php' => "It tests the fake's own assertions, and no response.",
     ]),
     (new NoHttpInFeatureTests)->allowing([
         'packages/keystone/tests/Feature/Http/AppRoutesTest.php' => "It checks that the app's own routes keep their headers, get no cross-site check, and clear site data when they sign the user out. AppTests serve only Keystone's routes and one empty page behind auth, so none can check a route the app owns.",

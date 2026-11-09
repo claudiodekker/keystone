@@ -8,6 +8,7 @@ use ClaudioDekker\Keystone\Console\EndSessionsCommand;
 use ClaudioDekker\Keystone\Contracts\IpLocation;
 use ClaudioDekker\Keystone\Contracts\SessionExpiredResponse;
 use ClaudioDekker\Keystone\Contracts\SessionInfo;
+use ClaudioDekker\Keystone\Devices\DeviceDetectorSessionInfo;
 use ClaudioDekker\Keystone\Devices\NullSessionInfo;
 use ClaudioDekker\Keystone\Exceptions\KeystoneMisconfiguredException;
 use ClaudioDekker\Keystone\Http\Middleware\ApplyHardeningFloor;
@@ -17,9 +18,11 @@ use ClaudioDekker\Keystone\Http\Middleware\RefuseCrossSiteRequests;
 use ClaudioDekker\Keystone\Http\Responses\UnauthenticatedResponse;
 use ClaudioDekker\Keystone\Http\SessionExpiry;
 use ClaudioDekker\Keystone\Locations\NullIpLocation;
+use ClaudioDekker\Keystone\Locations\StevebaumanIpLocation;
 use ClaudioDekker\Keystone\Methods\CredentialTypeRegistry;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\MethodAllowList;
+use DeviceDetector\DeviceDetector;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Contracts\Foundation\Application;
@@ -28,6 +31,7 @@ use Illuminate\Foundation\Exceptions\Handler;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\ServiceProvider;
+use Stevebauman\Location\LocationManager;
 
 /**
  * @internal
@@ -51,13 +55,33 @@ class KeystoneServiceProvider extends ServiceProvider
         $this->app->singleton(CredentialTypeRegistry::class);
 
         $this->app->bindIf(SessionExpiredResponse::class, UnauthenticatedResponse::class);
-        $this->app->bindIf(IpLocation::class, NullIpLocation::class);
-        $this->app->bindIf(SessionInfo::class, NullSessionInfo::class);
+        $this->app->bindIf(IpLocation::class, $this->ipLocation());
+        $this->app->bindIf(SessionInfo::class, $this->sessionInfo());
 
         $this->app->bind(CredentialTypes::class, fn (Application $app) => new CredentialTypes(
             $app->make(CredentialTypeRegistry::class)->types(),
             MethodAllowList::from($app->make('config')->get('keystone.methods')),
         ));
+    }
+
+    /**
+     * Get the IP location to bind: the stevebauman/location adapter when the app installed that package, or none.
+     *
+     * @return class-string<IpLocation>
+     */
+    protected function ipLocation(): string
+    {
+        return class_exists(LocationManager::class) ? StevebaumanIpLocation::class : NullIpLocation::class;
+    }
+
+    /**
+     * Get the session info to bind: the matomo/device-detector adapter when the app installed that package, or none.
+     *
+     * @return class-string<SessionInfo>
+     */
+    protected function sessionInfo(): string
+    {
+        return class_exists(DeviceDetector::class) ? DeviceDetectorSessionInfo::class : NullSessionInfo::class;
     }
 
     /**
