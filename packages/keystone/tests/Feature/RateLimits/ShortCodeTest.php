@@ -25,3 +25,23 @@ it('refuses the 101st failed short code in a day, with the hourly allowance left
 
     expect($attempt)->toThrow(ThrottledException::class);
 });
+
+it('counts only the short codes the hourly allowance let through toward the daily ceiling', function () {
+    $ada = User::factory()->create();
+    UserEmail::factory()->for($ada, 'user')->verified()->create(['address' => 'ada@example.com']);
+    UserCredential::factory()->for($ada, 'user')->create(['type' => 'code', 'secret' => '613302']);
+    $type = new FakeCodeType;
+    $attempt = fn () => $this->app->make(SignIn::class)->attempt($type, ['identifier' => 'ada@example.com', 'secret' => '000000']);
+
+    foreach (range(1, 130) as $i) {
+        rescue($attempt, report: false);
+    }
+
+    $this->travel(61)->minutes();
+
+    foreach (range(1, 20) as $i) {
+        $attempt();
+    }
+
+    expect($type->comparisons())->toBe(40);
+});
