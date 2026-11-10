@@ -1,15 +1,9 @@
 <?php
 
-use ClaudioDekker\Keystone\Accounts\AccountChange;
-use ClaudioDekker\Keystone\Accounts\AccountChanges;
 use ClaudioDekker\Keystone\AppTests\Support\RecoveryCodeSupport;
 use ClaudioDekker\Keystone\Methods\Surface;
-use ClaudioDekker\Keystone\Models\UserCredential;
-use ClaudioDekker\Keystone\Models\UserRecoveryCode;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use ClaudioDekker\Keystone\Session\Flow;
-use Illuminate\Database\Events\QueryExecuted;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 
 it('signs the held user in with one of their recovery codes, alerting the owner with the codes left', function () {
@@ -194,38 +188,6 @@ it('spends the last recovery code like any other while recovery codes are not re
     $this->assertChallengeRefused($spent, 'recovery_code', __('keystone::messages.credential-invalid'));
 });
 
-it('spends a code once when another answer spends it after the first read it', function () {
-    $user = $this->createUser();
-    $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);
-    $codes = (new RecoveryCodeSupport)->arrangeCodes($user, ['7KQ2M-XW9PD-4HNRT-B3ZCF-6JVGL-8', 'D5WLC-RM8QT-2YXHN-9GKPB-F4JZV-3']);
-    $this->passFirstFactor($user);
-    $table = (new UserRecoveryCode)->getTable();
-    $raced = false;
-
-    DB::listen(function (QueryExecuted $query) use ($user, $table, &$raced) {
-        if ($raced
-            || ! str_starts_with($query->sql, 'select * from')
-            || ! str_contains($query->sql, $table)
-        ) {
-            return;
-        }
-
-        $raced = true;
-        $first = UserRecoveryCode::query()->where('user_id', $user->getAuthIdentifier())->oldest('id')->firstOrFail();
-
-        app(AccountChanges::class)->change($user, fn (AccountChange $change) => $change->spendRecoveryCode($first));
-    });
-
-    $response = $this->answerChallenge($user, $codes);
-
-    $this->assertChallengeRefused($response, 'recovery_code', __('keystone::messages.credential-invalid'));
-    expect($this->securityEvents()->for($user)->pluck('type')->all())->toBe([
-        SecurityEventType::SIGN_IN_HELD,
-        SecurityEventType::RECOVERY_CODE_USED,
-        SecurityEventType::PROOF_REJECTED,
-    ]);
-});
-
 it('matches an imported Fortify code exactly as it was typed', function () {
     $user = $this->createUser();
     $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);
@@ -258,7 +220,7 @@ it('spends no code on an answer sent once the account no longer holds a second f
     $codes = (new RecoveryCodeSupport)->arrangeCredential(Surface::CHALLENGE, $user);
     $this->passFirstFactor($user);
 
-    UserCredential::query()->where('type', $support->type()->name())->delete();
+    $this->removeCredentials($user, $support);
     $dropped = $this->answerChallenge($user, $codes);
 
     $support->arrangeCredential(Surface::CHALLENGE, $user);

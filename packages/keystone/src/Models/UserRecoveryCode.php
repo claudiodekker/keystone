@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * @api
+ * @internal
  */
 #[UseFactory(UserRecoveryCodeFactory::class)]
 class UserRecoveryCode extends Model
