@@ -124,7 +124,7 @@ class Enrollment
             return new NoPendingSignIn;
         }
 
-        if ($this->decision->enrollsSecondFactor($pending)) {
+        if ($this->decision->enrollsSecondFactor($pending, $account)) {
             return $this->secondFactorPage($account);
         }
 
@@ -218,7 +218,7 @@ class Enrollment
      */
     protected function step(CredentialType $type, array $validated, PendingSignIn $pending, KeystoneUser $account): SignedIn|Held|Refused|RecoveryCodeIncorrect|EnrollmentExpired
     {
-        if (! $this->decision->enrollsSecondFactor($pending)) {
+        if (! $this->decision->enrollsSecondFactor($pending, $account)) {
             return $type instanceof RecoveryCodeType
                 ? $this->saveRecoveryCodes($type, (string) $validated['recovery_code'], $pending, $account)
                 : new Refused;

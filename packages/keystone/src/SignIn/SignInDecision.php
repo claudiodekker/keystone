@@ -97,7 +97,7 @@ class SignInDecision
      * Get the account the pending sign-in still holds at its stage, or why the hold ends.
      *
      * A hold ends voided when its account's credential epoch moved or the account was barred since the hold, and unneeded when the account no longer owes the stage.
-     * A hold at enrollment also ends once its account holds a second factor the pending sign-in never proved, so the next sign-in answers the challenge for it.
+     * A hold at enrollment also ends once its account holds a second factor the pending sign-in never proved, so the next sign-in answers the challenge for it. A first factor that proves two factors on its own proved it.
      */
     public function resume(PendingSignIn $pending): KeystoneUser|HoldEnded
     {
@@ -130,21 +130,32 @@ class SignInDecision
     /**
      * Determine if the pending sign-in, resumed at enrollment, enrolls its second factor next rather than its recovery codes.
      *
-     * Resuming dropped every hold whose account holds a second factor the pending sign-in didn't pass, so one that passed none holds none.
+     * Resuming dropped every hold whose account holds a second factor the pending sign-in didn't prove, so one that proved none holds none. A first factor that proved two factors on its own is never dropped for it, so its account's holding is read.
      */
-    public function enrollsSecondFactor(PendingSignIn $pending): bool
+    public function enrollsSecondFactor(PendingSignIn $pending, KeystoneUser $account): bool
     {
-        return $pending->secondFactor === null && $this->config->boolean('keystone.require_second_factor');
+        if (! $this->config->boolean('keystone.require_second_factor')) {
+            return false;
+        }
+
+        if ($this->provedTwoFactors($pending)) {
+            return ! $this->holdings->holdsSecondFactor($account);
+        }
+
+        return $pending->secondFactor === null;
     }
 
     /**
-     * Determine if the pending sign-in still owes enrollment, reading each of its account's holdings once: never once its account holds a second factor the pending sign-in neither answered nor enrolled itself.
+     * Determine if the pending sign-in still owes enrollment, reading each of its account's holdings once: never once its account holds a second factor the pending sign-in didn't prove.
      */
     protected function owesEnrollment(PendingSignIn $pending, KeystoneUser $account): bool
     {
         $holdsSecondFactor = $this->holdings->holdsSecondFactor($account);
 
-        if ($pending->secondFactor === null && $holdsSecondFactor) {
+        if ($holdsSecondFactor
+            && $pending->secondFactor === null
+            && ! $this->provedTwoFactors($pending)
+        ) {
             return false;
         }
 
@@ -153,6 +164,14 @@ class SignInDecision
         }
 
         return $this->owesRecoveryCodes($account);
+    }
+
+    /**
+     * Determine if the pending sign-in's first factor proved two factors on its own, so it was never owed a challenge.
+     */
+    protected function provedTwoFactors(PendingSignIn $pending): bool
+    {
+        return $this->types->find($pending->firstFactor, Surface::SIGN_IN)?->isMultiFactor() === true;
     }
 
     /**
