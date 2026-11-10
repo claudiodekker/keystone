@@ -117,15 +117,15 @@ class AccountChange
     }
 
     /**
-     * Determine if the account holds one unspent recovery code and no more.
+     * Determine if the code is the only unspent recovery code the account holds.
      */
-    public function holdsLastRecoveryCode(): bool
+    public function isLastRecoveryCode(UserRecoveryCode $code): bool
     {
         $held = UserRecoveryCode::query()
             ->where('user_id', $this->account->getAuthIdentifier())
-            ->count();
+            ->pluck($code->getKeyName());
 
-        return $held === 1;
+        return $held->count() === 1 && $held->contains($code->getKey());
     }
 
     /**

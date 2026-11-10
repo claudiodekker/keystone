@@ -222,7 +222,7 @@ class Challenge
      */
     protected function spendUnlessLast(AccountChange $change, UserRecoveryCode $code): bool
     {
-        if ($this->config->boolean('keystone.require_recovery_codes') && $change->holdsLastRecoveryCode()) {
+        if ($this->config->boolean('keystone.require_recovery_codes') && $change->isLastRecoveryCode($code)) {
             return false;
         }
 
