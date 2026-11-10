@@ -76,7 +76,7 @@ The one session value that says where a guest session is in the flows, such as a
 
 ## Ceremony slot
 
-What a credential type keeps between starting a ceremony and verifying its answer, such as a WebAuthn challenge or a TOTP key being enrolled. A type that has something to start implements `StartsCeremony`, and a type with nothing to start implements nothing. Core keeps one slot per type and surface, encrypted in the session, and hands it to the type's verify. Starting again replaces it. It ends 10 minutes after its start, or with the pending sign-in it was started under when that comes first, and at every change of auth level.
+What a credential type keeps between starting a ceremony and verifying its answer, such as a WebAuthn challenge or a TOTP key being enrolled. A type that has something to start implements `StartsCeremony`, and a type with nothing to start implements nothing. Core keeps one slot per type and surface, encrypted in the session, and hands it to the type's verify. The type draws its page from the slot on each request, such as a TOTP key's QR code, so the slot keeps nothing the page can draw again. Starting again replaces it. It ends 10 minutes after its start, or with the pending sign-in it was started under when that comes first, and at every change of auth level.
 
 ## Verified address
 
