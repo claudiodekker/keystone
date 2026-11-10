@@ -74,6 +74,10 @@ The stage where a pending sign-in answers with a second factor of another type t
 
 The one session value that says where a guest session is in the flows, such as a pending sign-in. A new phase replaces the old one, and every change of auth level forgets it: a hold, a sign-in and a cancel each give the session a new id.
 
+## Ceremony slot
+
+What a credential type keeps between starting a ceremony and verifying its answer, such as a WebAuthn challenge or a TOTP key being enrolled. A type that has something to start implements `StartsCeremony`, and a type with nothing to start implements nothing. Core keeps one slot per type and surface, encrypted in the session, and hands it to the type's verify. Starting again replaces it. It ends 10 minutes after its start, or with the pending sign-in it was started under when that comes first, and at every change of auth level.
+
 ## Verified address
 
 An address an account has proven it receives mail at. It sits in `verified_address`, and one account at a time can hold an address verified.
