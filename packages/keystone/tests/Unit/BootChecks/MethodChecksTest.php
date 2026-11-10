@@ -80,3 +80,26 @@ it('refuses two packages that register one name, whatever the list holds', funct
         'Two packages register the credential type [form]: '.FakeFormType::class.' and '.FakeSurfacesType::class.'.',
     ]);
 });
+
+it('refuses to require a second factor in production while no listed type can be enrolled as one', function () {
+    $this->app->detectEnvironment(fn () => 'production');
+    config(['keystone.methods' => ['form', 'challenge-only']]);
+
+    expect($this->bootFailures())->toBe(['keystone.require_second_factor is on, and keystone.methods lists no type on both enrollment and the challenge, so no account could enroll a second factor.']);
+});
+
+it('boots outside production, or without requiring a second factor, while no listed type can be enrolled as one', function (string $environment, bool $required) {
+    $this->app->detectEnvironment(fn () => $environment);
+    config(['keystone.methods' => ['form', 'challenge-only'], 'keystone.require_second_factor' => $required]);
+
+    expect($this->bootFailures())->toBe([]);
+})->with([
+    'outside production' => ['local', true],
+    'not required in production' => ['production', false],
+]);
+
+it('boots in production requiring a second factor while a listed type can be enrolled as one', function () {
+    $this->app->detectEnvironment(fn () => 'production');
+
+    expect($this->bootFailures())->toBe([]);
+});

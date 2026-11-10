@@ -112,4 +112,22 @@ trait EnrollmentAssertions
     {
         $response->assertRedirectToRoute('login');
     }
+
+    /**
+     * Assert the response sent the user whose session was demoted to sign in again.
+     */
+    public function assertSessionDemoted(TestResponse $response): void
+    {
+        $response->assertRedirectToRoute('login');
+    }
+
+    /**
+     * Assert the response told a JSON client its session was demoted.
+     */
+    public function assertSessionDemotedForJson(TestResponse $response): void
+    {
+        $response->assertUnauthorized();
+        $response->assertJsonPath('reason', 'demoted');
+        $response->assertJsonPath('message', __('keystone::messages.session-demoted'));
+    }
 }

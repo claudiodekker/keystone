@@ -8,6 +8,7 @@ use ClaudioDekker\Keystone\Console\EndSessionsCommand;
 use ClaudioDekker\Keystone\Console\SuspendCommand;
 use ClaudioDekker\Keystone\Console\UnsuspendCommand;
 use ClaudioDekker\Keystone\Contracts\IpLocation;
+use ClaudioDekker\Keystone\Contracts\SessionDemotedResponse;
 use ClaudioDekker\Keystone\Contracts\SessionExpiredResponse;
 use ClaudioDekker\Keystone\Contracts\SessionInfo;
 use ClaudioDekker\Keystone\Devices\DeviceDetectorSessionInfo;
@@ -18,12 +19,13 @@ use ClaudioDekker\Keystone\Http\Middleware\CaptureRequestContext;
 use ClaudioDekker\Keystone\Http\Middleware\ClearSiteData;
 use ClaudioDekker\Keystone\Http\Middleware\RefuseCrossSiteRequests;
 use ClaudioDekker\Keystone\Http\Responses\UnauthenticatedResponse;
-use ClaudioDekker\Keystone\Http\SessionExpiry;
+use ClaudioDekker\Keystone\Http\EndedSession;
 use ClaudioDekker\Keystone\Locations\NullIpLocation;
 use ClaudioDekker\Keystone\Locations\StevebaumanIpLocation;
 use ClaudioDekker\Keystone\Methods\CredentialTypeRegistry;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\MethodAllowList;
+use ClaudioDekker\Keystone\Status;
 use DeviceDetector\DeviceDetector;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Contracts\Debug\ExceptionHandler;
@@ -31,6 +33,7 @@ use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Foundation\Exceptions\Handler;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Redirector;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\ServiceProvider;
 use Stevebauman\Location\LocationManager;
@@ -56,7 +59,18 @@ class KeystoneServiceProvider extends ServiceProvider
 
         $this->app->singleton(CredentialTypeRegistry::class);
 
-        $this->app->bindIf(SessionExpiredResponse::class, UnauthenticatedResponse::class);
+        $this->app->bindIf(SessionDemotedResponse::class, fn (Application $app) => new UnauthenticatedResponse(
+            $app->make(Redirector::class),
+            Status::SESSION_DEMOTED,
+            reason: 'demoted',
+        ));
+
+        $this->app->bindIf(SessionExpiredResponse::class, fn (Application $app) => new UnauthenticatedResponse(
+            $app->make(Redirector::class),
+            Status::SESSION_EXPIRED,
+            reason: 'expired',
+        ));
+
         $this->app->bindIf(IpLocation::class, $this->ipLocation());
         $this->app->bindIf(SessionInfo::class, $this->sessionInfo());
 
@@ -93,7 +107,7 @@ class KeystoneServiceProvider extends ServiceProvider
     {
         Auth::extend('keystone', $this->createGuard(...));
 
-        $this->answerExpiredSessions();
+        $this->answerEndedSessions();
         $this->captureRequestContext();
         $this->hardenResponses();
         $this->refuseCrossSiteRequests();
@@ -187,9 +201,9 @@ class KeystoneServiceProvider extends ServiceProvider
     }
 
     /**
-     * Render the app's expiry response, through Laravel's exception handler, for a request that needs a user whose session expired during it.
+     * Render the app's expiry or demotion response, through Laravel's exception handler, for a request that needs a user whose session Keystone ended during it.
      */
-    protected function answerExpiredSessions(): void
+    protected function answerEndedSessions(): void
     {
         $this->callAfterResolving(ExceptionHandler::class, function (ExceptionHandler $handler) {
             if (! $handler instanceof Handler) {
@@ -197,9 +211,9 @@ class KeystoneServiceProvider extends ServiceProvider
             }
 
             $handler->renderable(function (AuthenticationException $exception, Request $request) {
-                $expiry = $this->app->make(SessionExpiry::class);
+                $ended = $this->app->make(EndedSession::class);
 
-                return $expiry->render($exception, $request);
+                return $ended->render($exception, $request);
             });
         });
     }

@@ -8,6 +8,9 @@ use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypeRegistry;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\MethodAllowList;
+use ClaudioDekker\Keystone\SignIn\SignInDecision;
+use Illuminate\Contracts\Config\Repository as Config;
+use Illuminate\Contracts\Foundation\Application;
 
 /**
  * @internal
@@ -20,6 +23,9 @@ class MethodChecks
     public function __construct(
         protected CredentialTypeRegistry $registry,
         protected CredentialTypes $types,
+        protected SignInDecision $decision,
+        protected Application $app,
+        protected Config $config,
     ) {
         //
     }
@@ -39,6 +45,7 @@ class MethodChecks
             ...$allowList->problems,
             ...$this->unservedSurfaces($allowList),
             ...$this->unregistered($allowList),
+            ...$this->unenrollableSecondFactor(),
         ];
     }
 
@@ -118,5 +125,22 @@ class MethodChecks
             fn (AllowListEntry $entry) => "keystone.methods names [{$entry->name}], and no installed package registers a credential type with that name.",
             array_values($missing),
         );
+    }
+
+    /**
+     * Get the failure of requiring a second factor in production while no listed type can be enrolled as one, which would hold every sign-in at a step it can't finish.
+     *
+     * @return list<string>
+     */
+    protected function unenrollableSecondFactor(): array
+    {
+        if (! $this->app->isProduction()
+            || $this->config->get('keystone.require_second_factor') !== true
+            || $this->decision->enrollable() !== []
+        ) {
+            return [];
+        }
+
+        return ['keystone.require_second_factor is on, and keystone.methods lists no type on both enrollment and the challenge, so no account could enroll a second factor.'];
     }
 }
