@@ -7,6 +7,8 @@ use Illuminate\Auth\Events\Logout;
 use Illuminate\Support\Facades\Event;
 
 beforeEach(function () {
+    $this->withoutEnrollmentMandates();
+
     Event::fake([Logout::class]);
 });
 

@@ -40,6 +40,7 @@ it('fails assertSignedIn on a refusal', function () {
 });
 
 it('fails assertSignedIn on a sign-in that lands somewhere else', function () {
+    $this->withoutEnrollmentMandates();
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
@@ -54,6 +55,7 @@ it('fails assertSignedIn on a sign-in that lands somewhere else', function () {
 });
 
 it('fails assertSignInRefused on a sign-in', function () {
+    $this->withoutEnrollmentMandates();
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);

@@ -64,6 +64,7 @@ it('replaces an earlier pending sign-in in the session with a new one', function
 });
 
 it("signs in on the first factor alone while the second factor's type is taken off the challenge, and holds again once it is back", function () {
+    $this->withoutEnrollmentMandates();
     $user = $this->createUser();
     $secondFactor = $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user)->type()->name();
     $firstFactor = $this->supportFor(Surface::SIGN_IN)->type()->name();

@@ -3,6 +3,7 @@
 use ClaudioDekker\Keystone\Methods\Surface;
 
 it('passes the first factor of a user without a second factor, signing them in', function () {
+    $this->withoutEnrollmentMandates();
     $user = $this->createUser();
 
     $response = $this->passFirstFactor($user);

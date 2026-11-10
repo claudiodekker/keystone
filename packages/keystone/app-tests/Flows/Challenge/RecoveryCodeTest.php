@@ -70,6 +70,7 @@ it("offers recovery codes after the account's other second factors", function ()
 });
 
 it('signs in on the first factor alone an account that holds recovery codes and no second factor', function () {
+    $this->withoutEnrollmentMandates();
     $user = $this->createUser();
     (new RecoveryCodeSupport)->arrangeCredential(Surface::CHALLENGE, $user);
 

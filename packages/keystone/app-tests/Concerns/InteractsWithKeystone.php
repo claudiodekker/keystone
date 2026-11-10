@@ -203,6 +203,17 @@ trait InteractsWithKeystone
     }
 
     /**
+     * Turn the second-factor and recovery-code mandates off for the rest of the test, so an account holding neither signs in on its first factor alone.
+     */
+    public function withoutEnrollmentMandates(): void
+    {
+        config([
+            'keystone.require_recovery_codes' => false,
+            'keystone.require_second_factor' => false,
+        ]);
+    }
+
+    /**
      * Give the user a verified address and a credential of the first installed type that serves sign-in, and submit its valid proof.
      */
     public function passFirstFactor(KeystoneUser $user): TestResponse

@@ -14,6 +14,7 @@ beforeEach(function () {
 });
 
 it('signs in with a valid proof of every installed type that serves sign-in', function () {
+    $this->withoutEnrollmentMandates();
     foreach ($this->supportsFor(Surface::SIGN_IN) as $support) {
         $user = $this->createUser();
         $address = $this->addVerifiedAddress($user);

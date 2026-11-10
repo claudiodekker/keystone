@@ -8,6 +8,10 @@ use Illuminate\Auth\Events\Lockout;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Exceptions;
 
+beforeEach(function () {
+    $this->withoutEnrollmentMandates();
+});
+
 it('refuses the right secret as throttled after the allowance of wrong secrets in an hour', function () {
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');

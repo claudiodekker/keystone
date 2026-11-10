@@ -2,6 +2,10 @@
 
 use ClaudioDekker\Keystone\Methods\Surface;
 
+beforeEach(function () {
+    $this->withoutEnrollmentMandates();
+});
+
 it('switches to a fresh browser that is not signed in', function () {
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');

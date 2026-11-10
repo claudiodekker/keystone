@@ -4,6 +4,10 @@ use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use Illuminate\Support\Facades\Log;
 
+beforeEach(function () {
+    $this->withoutEnrollmentMandates();
+});
+
 it('reads the events for the user, and none for another user', function () {
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');

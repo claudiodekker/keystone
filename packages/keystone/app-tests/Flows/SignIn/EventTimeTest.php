@@ -4,6 +4,10 @@ use Carbon\CarbonImmutable;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Models\UserSecurityEvent;
 
+beforeEach(function () {
+    $this->withoutEnrollmentMandates();
+});
+
 afterEach(function () {
     date_default_timezone_set('UTC');
 });

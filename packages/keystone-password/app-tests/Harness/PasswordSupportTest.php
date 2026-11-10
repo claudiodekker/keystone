@@ -5,6 +5,10 @@ use ClaudioDekker\Keystone\Password\AppTests\PasswordSupport;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 
+beforeEach(function () {
+    $this->withoutEnrollmentMandates();
+});
+
 it('gives the contract AppTests the test support of the installed password type', function () {
     $names = collect($this->supportsFor(Surface::SIGN_IN))
         ->map(fn ($support) => $support->type()->name())
