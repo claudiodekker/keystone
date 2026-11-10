@@ -32,17 +32,11 @@ class SignInDecision
      */
     public function decide(Proof $proof, CredentialType $type, ?KeystoneUser $subject): ?KeystoneUser
     {
-        if ($subject === null) {
+        if ($subject === null || ! $this->holds($subject, $proof, $type)) {
             return null;
         }
 
-        $owner = $this->owner($proof, $type);
-
-        if ($owner?->getAuthIdentifier() !== $subject->getAuthIdentifier()) {
-            return null;
-        }
-
-        return $owner;
+        return $subject;
     }
 
     /**
@@ -104,15 +98,14 @@ class SignInDecision
     }
 
     /**
-     * Re-read the proven credential of the type and get the account that holds it; a rejection names no credential, so it has none.
+     * Determine if the account holds the proven credential of the type, read again from its row; a rejection names no credential, so it holds none.
      */
-    protected function owner(Proof $proof, CredentialType $type): ?KeystoneUser
+    protected function holds(KeystoneUser $account, Proof $proof, CredentialType $type): bool
     {
-        $credential = UserCredential::query()
+        return UserCredential::query()
             ->whereKey($proof->credential)
             ->where('type', $type->name())
-            ->first();
-
-        return $credential?->user;
+            ->where('user_id', $account->getAuthIdentifier())
+            ->exists();
     }
 }
