@@ -134,3 +134,15 @@ it('reads a ceremony kept under an app key since rotated away as none', function
 
     expect($ceremony)->toBeNull();
 });
+
+it("ends the type's earlier ceremony on the surface when a start fails", function () {
+    $type = new FakeCeremonyType;
+    $session = app(SessionState::class);
+    $session->startCeremony($type, Surface::CHALLENGE);
+    $type->failNextStart();
+
+    $failure = rescue(fn () => $session->startCeremony($type, Surface::CHALLENGE), fn (Throwable $exception) => $exception, report: false);
+
+    expect($failure)->toBeInstanceOf(RuntimeException::class)
+        ->and($session->ceremony($type, Surface::CHALLENGE))->toBeNull();
+});

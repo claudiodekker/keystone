@@ -5,6 +5,7 @@ namespace ClaudioDekker\Keystone\Tests\Fixtures\Methods;
 use ClaudioDekker\Keystone\Methods\InitiateShape;
 use ClaudioDekker\Keystone\Methods\StartsCeremony;
 use ClaudioDekker\Keystone\Methods\Surface;
+use RuntimeException;
 
 class FakeCeremonyType extends FakeChallengeType implements StartsCeremony
 {
@@ -12,6 +13,11 @@ class FakeCeremonyType extends FakeChallengeType implements StartsCeremony
      * The number of ceremonies the type started.
      */
     protected int $starts = 0;
+
+    /**
+     * Whether the next start throws.
+     */
+    protected bool $failsNextStart = false;
 
     /**
      * Get the client ceremony shape on a challenge, and nothing on every other surface.
@@ -26,7 +32,7 @@ class FakeCeremonyType extends FakeChallengeType implements StartsCeremony
     }
 
     /**
-     * Start a ceremony that keeps the type's name, its number and its surface.
+     * Start a ceremony that keeps the type's name, its number and its surface, unless the next start fails.
      *
      * @return array<string, mixed>
      */
@@ -34,9 +40,23 @@ class FakeCeremonyType extends FakeChallengeType implements StartsCeremony
     {
         $this->starts++;
 
+        if ($this->failsNextStart) {
+            $this->failsNextStart = false;
+
+            throw new RuntimeException('The ceremony could not start.');
+        }
+
         return [
             'challenge' => $this->name().' ceremony '.$this->starts,
             'surface' => $surface->value,
         ];
+    }
+
+    /**
+     * Make the next start throw, as a type whose provider is down would.
+     */
+    public function failNextStart(): void
+    {
+        $this->failsNextStart = true;
     }
 }

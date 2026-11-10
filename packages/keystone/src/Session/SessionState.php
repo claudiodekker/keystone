@@ -144,10 +144,14 @@ class SessionState
     /**
      * Start the type's ceremony on the surface, keeping what the start returned in its slot in place of any earlier one, and get it.
      *
+     * The earlier ceremony ends before the type starts, so a start that throws leaves none.
+     *
      * @return array<string, mixed>|null
      */
     public function startCeremony(CredentialType&StartsCeremony $type, Surface $surface): ?array
     {
+        $this->forgetCeremony($type, $surface);
+
         $ceremony = $type->start($surface);
 
         $slot = $this->encrypter->encrypt([
@@ -285,6 +289,18 @@ class SessionState
     {
         $this->session->regenerate(true);
         $this->session->forget([static::PHASE, static::CEREMONIES]);
+    }
+
+    /**
+     * End the type's ceremony on the surface.
+     */
+    protected function forgetCeremony(CredentialType $type, Surface $surface): void
+    {
+        $ceremonies = $this->session->get(static::CEREMONIES, []);
+
+        unset($ceremonies[$this->slot($type, $surface)]);
+
+        $this->session->put(static::CEREMONIES, $ceremonies);
     }
 
     /**
