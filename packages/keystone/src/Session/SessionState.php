@@ -12,6 +12,7 @@ use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Status;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Contracts\Config\Repository as Config;
+use Illuminate\Contracts\Encryption\Encrypter;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Contracts\Routing\UrlGenerator;
 use Illuminate\Contracts\Session\Session;
@@ -62,6 +63,7 @@ class SessionState
         protected UrlGenerator $urls,
         protected Dispatcher $events,
         protected Config $config,
+        protected Encrypter $encrypter,
     ) {
         //
     }
@@ -147,10 +149,10 @@ class SessionState
     {
         $ceremony = $type->start($surface);
 
-        $slot = [
+        $slot = $this->encrypter->encrypt([
             'ceremony' => $ceremony,
             'ends_at' => $this->ceremonyEndsAt(),
-        ];
+        ]);
 
         $this->session->put(static::CEREMONIES, [
             ...$this->session->get(static::CEREMONIES, []),
@@ -167,9 +169,15 @@ class SessionState
      */
     public function ceremony(CredentialType $type, Surface $surface): ?array
     {
-        $slot = $this->session->get(static::CEREMONIES)[$this->slot($type, $surface)] ?? null;
+        $encrypted = $this->session->get(static::CEREMONIES)[$this->slot($type, $surface)] ?? null;
 
-        if ($slot === null || Date::now()->getTimestamp() >= $slot['ends_at']) {
+        if ($encrypted === null) {
+            return null;
+        }
+
+        $slot = $this->encrypter->decrypt($encrypted);
+
+        if (Date::now()->getTimestamp() >= $slot['ends_at']) {
             return null;
         }
 

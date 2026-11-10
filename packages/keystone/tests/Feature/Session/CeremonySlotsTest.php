@@ -113,3 +113,13 @@ it('ends a ceremony with the pending sign-in it was started under', function () 
     expect($lastSecond)->not->toBeNull()
         ->and($ended)->toBeNull();
 });
+
+it('keeps a ceremony encrypted in the session', function () {
+    $type = new FakeCeremonyType;
+    $session = app(SessionState::class);
+
+    $session->startCeremony($type, Surface::CHALLENGE);
+
+    expect(serialize(session()->all()))->not->toContain('challenge-only ceremony 1')
+        ->and($session->ceremony($type, Surface::CHALLENGE))->toBe(['challenge' => 'challenge-only ceremony 1', 'surface' => 'challenge']);
+});
