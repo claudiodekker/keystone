@@ -76,6 +76,7 @@
         ],
         "firewatch": [
             "@putenv FIREWATCH_ENABLED=true",
+            "@putenv FIREWATCH_RETENTION_AGE=5200w",
             "@putenv KEYSTONE_ADAPTER=keystone-inertia-vue",
             "pest packages/*/app-tests"
         ]
