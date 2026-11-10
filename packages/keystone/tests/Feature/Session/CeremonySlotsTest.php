@@ -95,3 +95,21 @@ it('ends a ceremony 10 minutes after its start', function () {
     expect($lastSecond)->not->toBeNull()
         ->and($ended)->toBeNull();
 });
+
+it('ends a ceremony with the pending sign-in it was started under', function () {
+    $this->freezeSecond();
+    $ada = User::factory()->create();
+    $type = new FakeCeremonyType;
+    $session = app(SessionState::class);
+    $session->hold($ada, app(CredentialTypes::class)->find('form', Surface::SIGN_IN), Stage::CHALLENGE);
+    $this->travel(10 * 60)->seconds();
+    $session->startCeremony($type, Surface::CHALLENGE);
+
+    $this->travel(5 * 60 - 1)->seconds();
+    $lastSecond = $session->ceremony($type, Surface::CHALLENGE);
+    $this->travel(1)->seconds();
+    $ended = $session->ceremony($type, Surface::CHALLENGE);
+
+    expect($lastSecond)->not->toBeNull()
+        ->and($ended)->toBeNull();
+});

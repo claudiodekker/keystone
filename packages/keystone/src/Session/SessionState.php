@@ -149,7 +149,7 @@ class SessionState
 
         $slot = [
             'ceremony' => $ceremony,
-            'ends_at' => Date::now()->getTimestamp() + static::CEREMONY_LIFETIME_SECONDS,
+            'ends_at' => $this->ceremonyEndsAt(),
         ];
 
         $this->session->put(static::CEREMONIES, [
@@ -272,6 +272,16 @@ class SessionState
     {
         $this->session->regenerate(true);
         $this->session->forget([static::PHASE, static::CEREMONIES]);
+    }
+
+    /**
+     * Get the Unix second a ceremony started now ends at: its lifetime after now, or the end of the pending sign-in it was started under when that comes first.
+     */
+    protected function ceremonyEndsAt(): int
+    {
+        $endsAt = Date::now()->getTimestamp() + static::CEREMONY_LIFETIME_SECONDS;
+
+        return min($endsAt, $this->pendingSignIn()?->endsAt() ?? $endsAt);
     }
 
     /**
