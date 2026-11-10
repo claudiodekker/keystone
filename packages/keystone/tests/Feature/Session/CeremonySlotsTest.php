@@ -1,6 +1,6 @@
 <?php
 
-// Ceremony slots: no installed type starts a ceremony yet, so only core's fake can.
+// Ceremony slots: driven through core's fake, since no installed type starts a ceremony.
 
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;

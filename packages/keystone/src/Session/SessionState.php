@@ -142,9 +142,9 @@ class SessionState
     }
 
     /**
-     * Start the type's ceremony on the surface, keeping what the start returned in its slot in place of any earlier one, and get it.
+     * Start the type's ceremony on the surface in place of any earlier one, and get what it kept.
      *
-     * The earlier ceremony ends before the type starts, so a start that throws leaves none.
+     * A start that throws leaves the surface with no ceremony.
      *
      * @return array<string, mixed>|null
      */

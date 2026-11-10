@@ -32,7 +32,7 @@ class FakeCeremonyType extends FakeChallengeType implements StartsCeremony
     }
 
     /**
-     * Start a ceremony that keeps the type's name, its number and its surface, unless the next start fails.
+     * Start a ceremony that keeps the type's name, its number and its surface, or throw when told to fail.
      *
      * @return array<string, mixed>
      */
