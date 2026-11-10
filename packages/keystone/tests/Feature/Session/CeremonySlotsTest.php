@@ -21,5 +21,25 @@ it("gives the type's verify what its ceremony's start kept", function () {
 
     $this->app->make(Challenge::class)->answer($type, ['secret' => 'second horse']);
 
-    expect($type->verifications()[0]->ceremony)->toBe(['challenge' => 'ceremony 1', 'surface' => 'challenge']);
+    expect($type->verifications()[0]->ceremony)->toBe(['challenge' => 'challenge-only ceremony 1', 'surface' => 'challenge']);
+});
+
+it("keeps each type's ceremony on each surface in a slot of its own", function () {
+    $type = new FakeCeremonyType;
+    $other = new class extends FakeCeremonyType
+    {
+        public function name(): string
+        {
+            return 'other-ceremony';
+        }
+    };
+
+    $session = app(SessionState::class);
+    $session->startCeremony($type, Surface::CHALLENGE);
+    $session->startCeremony($other, Surface::CHALLENGE);
+    $session->startCeremony($type, Surface::ENROLLMENT);
+
+    $ceremony = $session->ceremony($type, Surface::CHALLENGE);
+
+    expect($ceremony)->toBe(['challenge' => 'challenge-only ceremony 1', 'surface' => 'challenge']);
 });

@@ -26,7 +26,7 @@ class FakeCeremonyType extends FakeChallengeType implements StartsCeremony
     }
 
     /**
-     * Start a ceremony that keeps its own number and surface.
+     * Start a ceremony that keeps the type's name, its number and its surface.
      *
      * @return array<string, mixed>
      */
@@ -35,7 +35,7 @@ class FakeCeremonyType extends FakeChallengeType implements StartsCeremony
         $this->starts++;
 
         return [
-            'challenge' => 'ceremony '.$this->starts,
+            'challenge' => $this->name().' ceremony '.$this->starts,
             'surface' => $surface->value,
         ];
     }

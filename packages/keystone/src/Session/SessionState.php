@@ -143,6 +143,7 @@ class SessionState
         $ceremony = $type->start($surface);
 
         $this->session->put(static::CEREMONIES, [
+            ...$this->session->get(static::CEREMONIES, []),
             $this->slot($type, $surface) => $ceremony,
         ]);
 
