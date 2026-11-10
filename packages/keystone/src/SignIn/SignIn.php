@@ -13,7 +13,7 @@ use ClaudioDekker\Keystone\Methods\Proof;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Methods\Verification;
 use ClaudioDekker\Keystone\Models\UserCredential;
-use ClaudioDekker\Keystone\RateLimits\CountedAttempt;
+use ClaudioDekker\Keystone\RateLimits\FailedAttempt;
 use ClaudioDekker\Keystone\RateLimits\Limiter;
 use ClaudioDekker\Keystone\SecurityEvents\Recorder;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
@@ -101,14 +101,11 @@ class SignIn
         $owner = $this->decision->decide($proof, $type, $account);
 
         if ($owner === null) {
-            $this->recorder->record(
-                SecurityEventType::PROOF_REJECTED,
-                account: $account,
-                surface: Surface::SIGN_IN,
-                credentialType: $type,
-            );
+            return $this->refuse($type, $account);
+        }
 
-            return new Refused;
+        if (! $this->advance($owner, $proof, $credentials)) {
+            return $this->refuse($type, $account);
         }
 
         $redirectTo = $this->session->signIn($owner);
@@ -129,12 +126,27 @@ class SignIn
     }
 
     /**
+     * Refuse the sign-in, recording the rejected proof for the account the identifier named.
+     */
+    protected function refuse(CredentialType $type, ?KeystoneUser $account): Refused
+    {
+        $this->recorder->record(
+            SecurityEventType::PROOF_REJECTED,
+            account: $account,
+            surface: Surface::SIGN_IN,
+            credentialType: $type,
+        );
+
+        return new Refused;
+    }
+
+    /**
      * Let the type verify the input against the account's credentials, giving the attempt back when the type throws.
      *
      * @param  Collection<int, UserCredential>  $credentials
      * @param  array<string, mixed>  $validated
      */
-    protected function verify(CredentialType $type, Collection $credentials, array $validated, CountedAttempt $attempt): Proof
+    protected function verify(CredentialType $type, Collection $credentials, array $validated, FailedAttempt $attempt): Proof
     {
         $verification = new Verification(
             surface: Surface::SIGN_IN,
@@ -166,6 +178,34 @@ class SignIn
             ->where('user_id', $account->getAuthIdentifier())
             ->where('type', $type->name())
             ->get();
+    }
+
+    /**
+     * Advance the proven credential to the secret the proof carries, and determine if the proof still holds.
+     *
+     * @param  Collection<int, UserCredential>  $credentials
+     */
+    protected function advance(KeystoneUser $owner, Proof $proof, Collection $credentials): bool
+    {
+        $secret = $proof->advancedSecret();
+
+        if ($secret === null) {
+            return true;
+        }
+
+        $credential = $credentials->find($proof->credential);
+
+        if ($credential === null) {
+            return false;
+        }
+
+        try {
+            $this->accountChanges->change($owner, fn (AccountChange $change) => $change->advance($credential, $secret));
+        } catch (AccountChangeRefusedException) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
