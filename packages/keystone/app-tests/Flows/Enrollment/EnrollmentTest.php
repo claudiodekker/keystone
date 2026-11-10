@@ -56,6 +56,17 @@ it('refuses a code the recovery-code step never showed, saving nothing', functio
     expect($this->securityEvents()->for($user)->pluck('type')->all())->not->toContain(SecurityEventType::RECOVERY_CODES_GENERATED);
 });
 
+it('refuses a recovery code while the account still owes its second factor, saving nothing', function () {
+    $user = $this->createUser();
+    $this->passFirstFactor($user);
+    $this->get(route('login.enrollment'));
+
+    $response = $this->post(route('login.enrollment.submit', 'recovery-code'), ['recovery_code' => RecoveryCode::generate()->format()]);
+
+    $this->assertEnrollmentRefused($response, 'recovery_code', __('keystone::messages.credential-invalid'));
+    expect($this->securityEvents()->for($user)->pluck('type')->all())->not->toContain(SecurityEventType::RECOVERY_CODES_GENERATED);
+});
+
 it('saves the shown codes, so one of them answers a later challenge', function () {
     $user = $this->createUser();
     $support = $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);
