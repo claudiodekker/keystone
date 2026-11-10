@@ -39,6 +39,16 @@ class ChallengeController extends BaseChallengeController
     }
 
     /**
+     * Return to the challenge with the message on the code's field, flashing back all input as a careless app would.
+     */
+    protected function sendLastRecoveryCodeKept(Request $request, string $field, string $message): Response
+    {
+        return to_route('login.challenge')
+            ->withErrors([$field => $message])
+            ->withInput();
+    }
+
+    /**
      * Send the user on to where the sign-in lands.
      */
     protected function sendSignedIn(Request $request, string $redirectTo): Response

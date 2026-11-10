@@ -3,6 +3,7 @@
 return [
     'credential-invalid' => 'The provided credential is invalid.',
     'credentials-rejected' => 'These credentials do not match our records.',
+    'last-recovery-code' => 'This is your last recovery code. It is kept for account recovery and cannot be used here.',
     'session-ended' => 'Your session has ended. Please sign in again.',
     'session-expired' => 'Your session has expired. Please sign in again.',
     'sign-in-cancelled' => 'Sign-in cancelled. You were not logged in.',

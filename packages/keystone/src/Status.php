@@ -11,6 +11,7 @@ enum Status: string
 {
     case CREDENTIALS_REJECTED = 'credentials-rejected';
     case CREDENTIAL_INVALID = 'credential-invalid';
+    case LAST_RECOVERY_CODE = 'last-recovery-code';
     case SESSION_ENDED = 'session-ended';
     case SESSION_EXPIRED = 'session-expired';
     case SIGNED_OUT = 'signed-out';

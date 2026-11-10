@@ -39,7 +39,7 @@ it('refuses a spent code at the next challenge', function () {
 it('matches a code typed in lower case, with or without its dashes and with spaces', function (string $typed) {
     $user = $this->createUser();
     $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);
-    (new RecoveryCodeSupport)->arrangeCodes($user, ['7KQ2M-XW9PD-4HNRT-B3ZCF-6JVGL-8']);
+    (new RecoveryCodeSupport)->arrangeCodes($user, ['7KQ2M-XW9PD-4HNRT-B3ZCF-6JVGL-8', 'D5WLC-RM8QT-2YXHN-9GKPB-F4JZV-3']);
     $this->passFirstFactor($user);
 
     $response = $this->post(route('login.challenge.submit', 'recovery-code'), ['recovery_code' => $typed]);
@@ -143,4 +143,47 @@ it('refuses even a right code as throttled once wrong codes spent their allowanc
     $response = $this->withServerVariables(['REMOTE_ADDR' => '10.2.0.1'])->answerChallenge($user, $codes);
 
     $this->assertThrottled($response);
+});
+
+it('refuses and keeps the last recovery code while recovery codes are required', function () {
+    $user = $this->createUser();
+    $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);
+    $codes = (new RecoveryCodeSupport)->arrangeCodes($user, ['7KQ2M-XW9PD-4HNRT-B3ZCF-6JVGL-8']);
+    $this->passFirstFactor($user);
+
+    $refused = $this->answerChallenge($user, $codes);
+    $again = $this->answerChallenge($user, $codes);
+
+    $this->assertLastRecoveryCodeKept($refused);
+    $this->assertLastRecoveryCodeKept($again);
+});
+
+it('keeps the attempt of a refused last recovery code counted', function () {
+    config(['keystone.rate_limits.failed_attempts_per_hour' => 1]);
+    $user = $this->createUser();
+    $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);
+    $codes = (new RecoveryCodeSupport)->arrangeCodes($user, ['7KQ2M-XW9PD-4HNRT-B3ZCF-6JVGL-8']);
+    $this->passFirstFactor($user);
+    $this->answerChallenge($user, $codes);
+
+    $response = $this->answerChallenge($user, $codes);
+
+    $this->assertThrottled($response);
+});
+
+it('spends the last recovery code like any other while recovery codes are not required', function () {
+    config(['keystone.require_recovery_codes' => false]);
+    $user = $this->createUser();
+    $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);
+    $codes = (new RecoveryCodeSupport)->arrangeCodes($user, ['7KQ2M-XW9PD-4HNRT-B3ZCF-6JVGL-8']);
+    $this->passFirstFactor($user);
+
+    $signedIn = $this->answerChallenge($user, $codes);
+
+    $this->switchToFreshBrowser();
+    $this->passFirstFactor($user);
+    $spent = $this->answerChallenge($user, $codes);
+
+    $this->assertSignedIn($signedIn, '/');
+    $this->assertChallengeRefused($spent, 'recovery_code', __('keystone::messages.credential-invalid'));
 });

@@ -9,6 +9,7 @@ use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\RateLimits\StepKind;
 use ClaudioDekker\Keystone\SignIn\Challenge;
+use ClaudioDekker\Keystone\SignIn\LastRecoveryCodeKept;
 use ClaudioDekker\Keystone\SignIn\NoPendingSignIn;
 use ClaudioDekker\Keystone\SignIn\Refused;
 use ClaudioDekker\Keystone\Status;
@@ -71,6 +72,10 @@ abstract class ChallengeController implements KeystoneController
             return $this->sendChallengeRefused($request, $this->field($credentialType), Status::CREDENTIAL_INVALID->label());
         }
 
+        if ($outcome instanceof LastRecoveryCodeKept) {
+            return $this->sendLastRecoveryCodeKept($request, $this->field($credentialType), Status::LAST_RECOVERY_CODE->label());
+        }
+
         return $this->sendSignedIn($request, $outcome->redirectTo);
     }
 
@@ -106,6 +111,11 @@ abstract class ChallengeController implements KeystoneController
      * Refuse the answer with the translated message on the type's field, keeping the pending sign-in.
      */
     abstract protected function sendChallengeRefused(Request $request, string $field, string $message): Response|Responsable;
+
+    /**
+     * Refuse the account's last recovery code with the translated message on its field, keeping the code and the pending sign-in.
+     */
+    abstract protected function sendLastRecoveryCodeKept(Request $request, string $field, string $message): Response|Responsable;
 
     /**
      * Send the user on after the challenge completed the sign-in.

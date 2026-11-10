@@ -44,6 +44,17 @@ trait ChallengeAssertions
     }
 
     /**
+     * Assert the response refused the account's last recovery code with its message, back at the challenge and flashing back no input.
+     */
+    public function assertLastRecoveryCodeKept(TestResponse $response): void
+    {
+        $response->assertRedirectToRoute('login.challenge');
+        $response->assertSessionHasErrors(['recovery_code' => __('keystone::messages.last-recovery-code')]);
+
+        Assert::assertSame([], $this->app['session.store']->getOldInput(), 'The response flashed back the code.');
+    }
+
+    /**
      * Assert the response refused the answer as invalid on the given fields, flashing back no input.
      *
      * @param  array<int|string, string>  $fields  Field names, or a field's expected message by its name.

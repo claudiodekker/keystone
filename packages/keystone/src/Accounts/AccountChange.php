@@ -117,6 +117,18 @@ class AccountChange
     }
 
     /**
+     * Determine if the account holds one unspent recovery code and no more.
+     */
+    public function holdsLastRecoveryCode(): bool
+    {
+        $held = UserRecoveryCode::query()
+            ->where('user_id', $this->account->getAuthIdentifier())
+            ->count();
+
+        return $held === 1;
+    }
+
+    /**
      * Spend the recovery code that answered the challenge, which ends nothing, refusing when another answer spent it first.
      *
      * @throws AccountChangeRefusedException

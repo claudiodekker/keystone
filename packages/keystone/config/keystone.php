@@ -136,6 +136,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Require Recovery Codes
+    |--------------------------------------------------------------------------
+    |
+    | While recovery codes are required, an account keeps its last code for
+    | account recovery, so the challenge refuses it rather than spend it.
+    | Set it to false to let the last code sign in like any other code.
+    |
+    */
+
+    'require_recovery_codes' => true,
+
+    /*
+    |--------------------------------------------------------------------------
     | Session
     |--------------------------------------------------------------------------
     |

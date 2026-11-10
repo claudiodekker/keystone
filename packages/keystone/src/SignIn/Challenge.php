@@ -25,6 +25,7 @@ use ClaudioDekker\Keystone\Session\PendingSignIn;
 use ClaudioDekker\Keystone\Session\SessionState;
 use ClaudioDekker\Keystone\Session\Stage;
 use ClaudioDekker\Keystone\Status;
+use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Contracts\Validation\Factory as ValidationFactory;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Validation\ValidationException;
@@ -49,6 +50,7 @@ class Challenge
         protected SessionState $session,
         protected TimingFloor $floor,
         protected CredentialTypes $types,
+        protected Config $config,
         protected ValidationFactory $validation,
     ) {
         //
@@ -85,7 +87,7 @@ class Challenge
      * @throws ThrottledException
      * @throws ValidationException
      */
-    public function answer(CredentialType $type, array $input): SignedIn|Refused|NoPendingSignIn
+    public function answer(CredentialType $type, array $input): SignedIn|Refused|LastRecoveryCodeKept|NoPendingSignIn
     {
         $pending = $this->session->pendingSignIn();
         $account = $this->resume($pending);
@@ -98,7 +100,7 @@ class Challenge
 
         return $this->floor->hold(
             fn () => $this->prove($type, $validated, $pending, $account),
-            fn (SignedIn|Refused $outcome) => $outcome instanceof SignedIn,
+            fn (SignedIn|Refused|LastRecoveryCodeKept $outcome) => $outcome instanceof SignedIn,
         );
     }
 
@@ -161,7 +163,7 @@ class Challenge
      *
      * @throws ThrottledException
      */
-    protected function prove(CredentialType $type, array $validated, PendingSignIn $pending, KeystoneUser $account): SignedIn|Refused
+    protected function prove(CredentialType $type, array $validated, PendingSignIn $pending, KeystoneUser $account): SignedIn|Refused|LastRecoveryCodeKept
     {
         $attempt = $this->limiter->takeFailedAttempt($type, Surface::CHALLENGE, $account);
 
@@ -183,7 +185,7 @@ class Challenge
      *
      * @param  array<string, mixed>  $validated
      */
-    protected function spend(RecoveryCodeType $type, array $validated, PendingSignIn $pending, KeystoneUser $account, FailedAttempt $attempt): SignedIn|Refused
+    protected function spend(RecoveryCodeType $type, array $validated, PendingSignIn $pending, KeystoneUser $account, FailedAttempt $attempt): SignedIn|Refused|LastRecoveryCodeKept
     {
         $codes = UserRecoveryCode::query()
             ->where('user_id', $account->getAuthIdentifier())
@@ -203,12 +205,46 @@ class Challenge
         }
 
         try {
-            $this->accountChanges->change($account, fn (AccountChange $change) => $change->spendRecoveryCode($code), $pending);
+            $spent = $this->accountChanges->change($account, fn (AccountChange $change) => $this->spendUnlessLast($change, $code), $pending);
         } catch (AccountChangeRefusedException) {
             return $this->proofs->refuse($account, $answer);
         }
 
+        if (! $spent) {
+            return $this->keepLast($account, $answer);
+        }
+
         return $this->proofs->signIn($account, $answer, writer: $pending);
+    }
+
+    /**
+     * Spend the code, unless recovery codes are required and it is the account's last, and determine if it was spent.
+     */
+    protected function spendUnlessLast(AccountChange $change, UserRecoveryCode $code): bool
+    {
+        if ($this->config->boolean('keystone.require_recovery_codes') && $change->holdsLastRecoveryCode()) {
+            return false;
+        }
+
+        $change->spendRecoveryCode($code);
+
+        return true;
+    }
+
+    /**
+     * Refuse the account's last recovery code, keeping it and its counted attempt, and record the refusal.
+     */
+    protected function keepLast(KeystoneUser $account, Answer $answer): LastRecoveryCodeKept
+    {
+        $this->recorder->record(
+            SecurityEventType::PROOF_REJECTED,
+            account: $account,
+            surface: $answer->surface,
+            credentialType: $answer->type,
+            reason: 'recovery-code.last_code',
+        );
+
+        return new LastRecoveryCodeKept;
     }
 
     /**

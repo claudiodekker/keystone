@@ -44,6 +44,14 @@ class ChallengeController extends KeystoneChallengeController
     }
 
     /**
+     * Return to the challenge with the message on the code's field, flashing back no input.
+     */
+    protected function sendLastRecoveryCodeKept(Request $request, string $field, string $message): RedirectResponse
+    {
+        return to_route('login.challenge')->withErrors([$field => $message]);
+    }
+
+    /**
      * Send the user on to where the sign-in lands.
      */
     protected function sendSignedIn(Request $request, string $redirectTo): RedirectResponse
