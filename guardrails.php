@@ -95,7 +95,7 @@ return [
         'packages/keystone/src/Http/RequestContext.php' => 'The request context is where the client is read, once per request.',
     ]),
     (new CredentialWritesThroughAccountChange)->allowing([
-        'packages/keystone/src/Accounts/AccountChange.php' => 'The account change is the one place that writes credentials.',
+        'packages/keystone/src/Accounts/AccountChange.php' => 'The account change is the one place that writes credentials and recovery codes.',
     ]),
     (new NoContainerLookups)->allowing([
         'packages/keystone/src/Notifications/SecurityAlert.php' => 'An alert is built from its event alone, and its mail is built on the queue worker, so neither step can take SessionInfo or IpLocation through injection.',

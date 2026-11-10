@@ -4,6 +4,7 @@ use ClaudioDekker\Keystone\Accounts\AccountChange;
 use ClaudioDekker\Keystone\Accounts\AccountChanges;
 use ClaudioDekker\Keystone\AppTests\Support\RecoveryCodeSupport;
 use ClaudioDekker\Keystone\Methods\Surface;
+use ClaudioDekker\Keystone\Models\UserCredential;
 use ClaudioDekker\Keystone\Models\UserRecoveryCode;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use ClaudioDekker\Keystone\Session\Flow;
@@ -250,3 +251,20 @@ it('refuses an imported Fortify code typed in another case or without its dash',
     'in lower case' => ['ab3de6gh9j-k1mn3pq5st'],
     'without its dash' => ['aB3dE6gH9jK1mN3pQ5sT'],
 ]);
+
+it('spends no code on an answer sent once the account no longer holds a second factor', function () {
+    $user = $this->createUser();
+    $support = $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);
+    $codes = (new RecoveryCodeSupport)->arrangeCredential(Surface::CHALLENGE, $user);
+    $this->passFirstFactor($user);
+
+    UserCredential::query()->where('type', $support->type()->name())->delete();
+    $dropped = $this->answerChallenge($user, $codes);
+
+    $support->arrangeCredential(Surface::CHALLENGE, $user);
+    $this->passFirstFactor($user);
+    $unspent = $this->answerChallenge($user, $codes);
+
+    $this->assertNoPendingSignIn($dropped);
+    $this->assertSignedIn($unspent, '/');
+});

@@ -85,6 +85,22 @@ it('boots with plain HTTP location drivers allowed', function () {
     expect($this->bootFailures())->toBe([]);
 });
 
+it('refuses require_recovery_codes when it is not a boolean', function (mixed $value) {
+    config(['keystone.require_recovery_codes' => $value]);
+
+    expect($this->bootFailures())->toBe(['keystone.require_recovery_codes must be true or false.']);
+})->with([
+    'a string' => 'yes',
+    'one' => 1,
+    'null' => null,
+]);
+
+it('boots with recovery codes not required', function () {
+    config(['keystone.require_recovery_codes' => false]);
+
+    expect($this->bootFailures())->toBe([]);
+});
+
 it('refuses a log channel that the logging config does not hold', function (mixed $value) {
     config(['keystone.log_channel' => $value]);
 
