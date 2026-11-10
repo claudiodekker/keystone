@@ -9,6 +9,7 @@
         "laravel/framework": "^13.0"
     },
     "require-dev": {
+        "claudiodekker/firewatch": "^1.0",
         "claudiodekker/keystone-inertia-vue": "self.version",
         "claudiodekker/keystone-password": "self.version",
         "claudiodekker/keystone-totp": "self.version",
@@ -72,7 +73,15 @@
             "pest packages/*/app-tests",
             "@composer audit",
             "npm audit"
+        ],
+        "firewatch": [
+            "@putenv FIREWATCH_ENABLED=true",
+            "@putenv KEYSTONE_ADAPTER=keystone-inertia-vue",
+            "pest packages/*/app-tests"
         ]
+    },
+    "scripts-descriptions": {
+        "firewatch": "Run every AppTest through the Inertia-Vue stubs with Firewatch capturing, labelled with the current commit, so its MCP server can tell what that commit's code costs."
     },
     "config": {
         "allow-plugins": {

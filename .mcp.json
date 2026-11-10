@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "firewatch": {
+      "command": "php",
+      "args": ["vendor/bin/testbench", "firewatch:server", "--env=testing"]
+    }
+  }
+}
