@@ -28,15 +28,15 @@ class SignInDecision
     }
 
     /**
-     * Get the account the proof names, or null when it names nobody the subject could sign in as.
+     * Determine if the proof proves a credential of the type that the account holds, read again from its row; a rejection names none.
      */
-    public function decide(Proof $proof, CredentialType $type, ?KeystoneUser $subject): ?KeystoneUser
+    public function proves(Proof $proof, CredentialType $type, KeystoneUser $account): bool
     {
-        if ($subject === null || ! $this->holds($subject, $proof, $type)) {
-            return null;
-        }
-
-        return $subject;
+        return UserCredential::query()
+            ->whereKey($proof->credential)
+            ->where('type', $type->name())
+            ->where('user_id', $account->getAuthIdentifier())
+            ->exists();
     }
 
     /**
@@ -76,15 +76,11 @@ class SignInDecision
     }
 
     /**
-     * Get the account an answer to the pending sign-in's challenge proves, or null when it proves nobody: a credential of the first factor's type or of another account.
+     * Determine if the proof answers the pending sign-in's challenge: a credential the held account holds, of another type than the first factor's.
      */
-    public function answer(Proof $proof, CredentialType $type, PendingSignIn $pending, KeystoneUser $account): ?KeystoneUser
+    public function answers(Proof $proof, CredentialType $type, PendingSignIn $pending, KeystoneUser $account): bool
     {
-        if ($type->name() === $pending->firstFactor) {
-            return null;
-        }
-
-        return $this->decide($proof, $type, $account);
+        return $type->name() !== $pending->firstFactor && $this->proves($proof, $type, $account);
     }
 
     /**
@@ -95,17 +91,5 @@ class SignInDecision
         return match ($stage) {
             Stage::CHALLENGE => $this->holdings->holdsSecondFactor($account),
         };
-    }
-
-    /**
-     * Determine if the account holds the proven credential of the type, read again from its row; a rejection names no credential, so it holds none.
-     */
-    protected function holds(KeystoneUser $account, Proof $proof, CredentialType $type): bool
-    {
-        return UserCredential::query()
-            ->whereKey($proof->credential)
-            ->where('type', $type->name())
-            ->where('user_id', $account->getAuthIdentifier())
-            ->exists();
     }
 }
