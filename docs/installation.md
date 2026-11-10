@@ -6,7 +6,7 @@ Install Keystone with Composer:
 
 ## Inertia and Vue
 
-The Inertia and Vue adapter gives your app a sign-in page and a sign-out button as files you own. Keystone runs the flow, and your controllers and pages decide what users see, so you can restyle or rewrite them freely.
+The Inertia and Vue adapter gives your app a sign-in page, a [challenge](challenge.md) page and a sign-out button as files you own. Keystone runs the flow, and your controllers and pages decide what users see, so you can restyle or rewrite them freely.
 
 ### Requirements
 
@@ -35,7 +35,7 @@ Sign-in lives at `/login`. Browsers keep Keystone's session cookie only over HTT
 
 ### What the installer changes
 
-The installer copies the sign-in and sign-out controllers, the Vue pages and components, the routes and the test setup into your app, in the folders a Laravel app already uses. It copies the files for each method you have installed, so a password app gets the password form.
+The installer copies the sign-in, challenge and sign-out controllers, the Vue pages and components, the routes and the test setup into your app, in the folders a Laravel app already uses. It copies the files for each method you have installed, so a password app gets the password form and a [TOTP](totp.md) app gets the code form on the challenge page.
 
 It then wires the app up to run them. Your routes file requires the new `routes/keystone.php`. It replaces `app/Models/User.php` with a `User` model that implements `KeystoneUser` and uses `HasKeystone`. Your default guard uses the `keystone` driver. The session cookie is named `__Host-<your app>-session` and marked secure in `.env` and `.env.example`. `phpunit.xml` gets a `Keystone` test suite, and `composer.json` maps the packages' tests so they run from `vendor`. Your Pest setup binds those tests to the test case it copies to `tests/Keystone`.
 

@@ -29,6 +29,7 @@ This file raises the view allowance and keeps every other allowance at its defau
 | `rate_limits.requests_per_minute.submit` | `10` | A higher number lets more sign-in submits through from one address. |
 | `rate_limits.requests_per_minute.view` | `60` | A higher number lets more page views through from one address. |
 | `session.absolute_lifetime_seconds` | `12 * 60 * 60` | A longer lifetime keeps a stolen session alive longer while it stays busy, and `null` keeps it alive for as long as it stays busy. |
+| `totp.window_steps` | `1`, with `keystone-totp` installed | Each step either side accepts two more codes, so a guess succeeds with about (2n + 1) in a million for a window of n steps. |
 | `trusted_origins` | `[]` | Any page on a listed origin can sign users in and out. |
 
 `Cross-Origin-Opener-Policy` and `base-uri` have no setting. The [security page](security.md) says what each key does, and the [security events page](security-events.md#alerts) covers the alert slots and IP locations.
@@ -118,6 +119,7 @@ The checks set no ceilings. In every environment, they refuse a value of the wro
 | `hardening.frame_ancestors` | A list of single CSP sources, such as `'self'` or `https://portal.example.com`. |
 | `methods` | `null`, or a list of installed types by name, each alone or with a non-empty list of surfaces the type serves. No type may be named twice. |
 | `session.absolute_lifetime_seconds` | `null`, or an integer of at least 1. |
+| `totp.window_steps` | An integer of at least 0, with `keystone-totp` installed. |
 | `trusted_origins` | A list of origins, each a scheme and a host with nothing after it. |
 
 It also refuses two packages that register one credential type name, and a user model on a database connection other than the default one, because Keystone's tables are migrated on the default connection.
