@@ -53,6 +53,20 @@ class FakeCeremonyType extends FakeChallengeType implements StartsCeremony
     }
 
     /**
+     * Show what the ceremony kept, on its surface, for the account.
+     *
+     * @param  array<string, mixed>  $ceremony
+     * @return array<string, mixed>
+     */
+    public function page(Surface $surface, array $ceremony, string $account): array
+    {
+        return [
+            'shown' => $ceremony['challenge'].' on '.$surface->value,
+            'account' => $account,
+        ];
+    }
+
+    /**
      * Make the next start throw, as a type whose provider is down would.
      */
     public function failNextStart(): void

@@ -146,3 +146,15 @@ it("ends the type's earlier ceremony on the surface when a start fails", functio
     expect($failure)->toBeInstanceOf(RuntimeException::class)
         ->and($session->ceremony($type, Surface::CHALLENGE))->toBeNull();
 });
+
+it("draws the page from the type's live ceremony on each read, without starting it again", function () {
+    $type = new FakeCeremonyType;
+    $session = app(SessionState::class);
+    $session->startCeremony($type, Surface::ENROLLMENT);
+
+    $first = $session->ceremonyPage($type, Surface::ENROLLMENT, 'ada@example.com');
+    $second = $session->ceremonyPage($type, Surface::ENROLLMENT, 'ada@example.com');
+
+    expect($first)->toBe(['shown' => 'challenge-only ceremony 1 on enrollment', 'account' => 'ada@example.com'])
+        ->and($second)->toBe($first);
+});

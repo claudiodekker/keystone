@@ -194,6 +194,16 @@ class SessionState
     }
 
     /**
+     * Get what the page shows of the type's live ceremony on the surface for the account, or null when none is live.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function ceremonyPage(CredentialType&StartsCeremony $type, Surface $surface, string $account): ?array
+    {
+        return $type->page($surface, $this->ceremony($type, $surface), $account);
+    }
+
+    /**
      * Get the session's pending sign-in, unless it has none or it outlived its lifetime.
      */
     public function pendingSignIn(): ?PendingSignIn
