@@ -1,10 +1,10 @@
 # TOTP
 
-The `keystone-totp` package answers the [challenge](challenge.md) with a code from an authenticator app. Install it with Composer:
+The `keystone-totp` package answers the [challenge](challenge.md) with a code from an authenticator app, and sets one up at [enrollment](enrollment.md). Install it with Composer:
 
     composer require claudiodekker/keystone-totp
 
-The package registers the `totp` credential type for the challenge, and a code never proves two factors on its own. Your challenge page posts the `code` to the `login.challenge.submit` route of the `totp` type:
+The package registers the `totp` credential type for the challenge and for enrollment, and a code never proves two factors on its own. Your challenge page posts the `code` to the `login.challenge.submit` route of the `totp` type:
 
 ```blade
 <form method="POST" action="{{ route('login.challenge.submit', 'totp') }}">
@@ -15,6 +15,12 @@ The package registers the `totp` credential type for the challenge, and a code n
 ```
 
 A code that isn't six digits is a validation error on the `code` field, and isn't counted as a failed attempt.
+
+## Enrolling a key
+
+At [enrollment](enrollment.md), Keystone starts a new 160-bit key for the user, kept in the session until its first code is right. The type's `ceremony` on the enrollment page holds the key in Base32, for typing into an authenticator app, and as an `otpauth://` URI for an app to open or a QR code to carry. The URI's label is your app's `app.name` and the account's first address that alerts go to, such as `otpauth://totp/Acme%3Aada%40example.com?secret=...&issuer=Acme`. A reload shows the same key until it expires, 10 minutes after it was started.
+
+The user posts the `code` their app shows to the `login.enrollment.submit` route of the `totp` type. A code within the window stores the key, with that code's step accepted, so the same code can't answer the next challenge. A wrong code keeps the key, and a code after the key expired starts a new one.
 
 ## Codes
 
@@ -70,4 +76,12 @@ $this->passFirstFactor($user);
 $this->post(route('login.challenge.submit', 'totp'), ['code' => $support->code(1, 'JBSWY3DPEHPK3PXP')]);
 ```
 
-`code()` takes the number of steps from now, and the key, which is the fixture key unless you give one.
+`code()` takes the number of steps from now, and the key, which is the fixture key unless you give one. At enrollment, read the key the page shows and make its code:
+
+```php
+$this->passFirstFactor($user);
+
+$ceremony = $this->shownCeremony($this->get(route('login.enrollment')), 'totp');
+
+$this->post(route('login.enrollment.submit', 'totp'), ['code' => (new TotpSupport)->code(key: $ceremony['key'])]);
+```

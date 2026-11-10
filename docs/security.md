@@ -10,9 +10,9 @@ Each endpoint is one kind of step, and each kind has its own allowance a minute,
 
 | Step kind | Endpoints | Allowance |
 |---|---|---|
-| `view` | The sign-in page and the challenge page | 60 a minute |
-| `submit` | The sign-in submit and a challenge answer | 10 a minute |
-| `change` | Signing out and cancelling a challenge | 10 a minute |
+| `view` | The sign-in, challenge and enrollment pages | 60 a minute |
+| `submit` | The sign-in submit, a challenge answer and an enrollment answer | 10 a minute |
+| `change` | Signing out and cancelling a challenge or enrollment | 10 a minute |
 
 An IPv4 address counts on its own. An IPv6 address counts together with every other address in its /64, and an IPv4-mapped IPv6 address counts as the IPv4 address it wraps. Every request without a usable address shares one count, so a broken proxy setup throttles those requests together rather than not at all.
 
@@ -20,7 +20,7 @@ The limit is middleware the controller declares through `HasMiddleware`, so it s
 
 ### The failed-attempt limit
 
-An account gets 20 failed attempts an hour per credential type and flow. Sign-in and the [challenge](challenge.md) are separate flows, so wrong answers at the challenge never spend the sign-in's count. The attempt is counted before the type verifies anything, so wrong answers sent at the same time never get more verify calls than the allowance. The count is given back only when the attempt signs in or the type throws, and only inside the hour it was counted in. A refused attempt stays counted, a proof the type accepts for an account Keystone refuses stays counted, and nothing ever resets a count: counts only expire.
+An account gets 20 failed attempts an hour per credential type and flow. Sign-in, the [challenge](challenge.md) and [enrollment](enrollment.md) are separate flows, so wrong answers at the challenge never spend the sign-in's count. The attempt is counted before the type verifies anything, so wrong answers sent at the same time never get more verify calls than the allowance. The count is given back only when the attempt signs in or the type throws, and only inside the hour it was counted in. A refused attempt stays counted, a proof the type accepts for an account Keystone refuses stays counted, and nothing ever resets a count: counts only expire.
 
 A one-time code, such as a [TOTP](totp.md) code, can be guessed, so its failures also count against a ceiling of 100 a day per account, type and flow, which `rate_limits` doesn't change. Only the attempts the hourly limit let through count toward the ceiling, and an attempt that signs in gives back both counts.
 
