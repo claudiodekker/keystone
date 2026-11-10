@@ -64,6 +64,7 @@ describe('composer.json', function () {
             'ClaudioDekker\\Keystone\\AppTests\\' => 'vendor/claudiodekker/keystone/app-tests/',
             'ClaudioDekker\\Keystone\\InertiaVue\\AppTests\\' => 'vendor/claudiodekker/keystone-inertia-vue/app-tests/',
             'ClaudioDekker\\Keystone\\Password\\AppTests\\' => 'vendor/claudiodekker/keystone-password/app-tests/',
+            'ClaudioDekker\\Keystone\\Totp\\AppTests\\' => 'vendor/claudiodekker/keystone-totp/app-tests/',
         ])->and($manifest['autoload']['psr-4'])->not->toHaveKey('ClaudioDekker\\Keystone\\AppTests\\');
     });
 
@@ -93,7 +94,8 @@ describe('composer.json', function () {
             '            "Tests\\\\": "tests/",',
             '            "ClaudioDekker\\\\Keystone\\\\AppTests\\\\": "vendor/claudiodekker/keystone/app-tests/",',
             '            "ClaudioDekker\\\\Keystone\\\\InertiaVue\\\\AppTests\\\\": "vendor/claudiodekker/keystone-inertia-vue/app-tests/",',
-            '            "ClaudioDekker\\\\Keystone\\\\Password\\\\AppTests\\\\": "vendor/claudiodekker/keystone-password/app-tests/"',
+            '            "ClaudioDekker\\\\Keystone\\\\Password\\\\AppTests\\\\": "vendor/claudiodekker/keystone-password/app-tests/",',
+            '            "ClaudioDekker\\\\Keystone\\\\Totp\\\\AppTests\\\\": "vendor/claudiodekker/keystone-totp/app-tests/"',
         ]);
     });
 

@@ -2,9 +2,11 @@
 
 namespace ClaudioDekker\Keystone\Session;
 
+use ClaudioDekker\Keystone\Accounts\AccountLookup;
 use ClaudioDekker\Keystone\Accounts\CredentialEpoch;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Keystone;
+use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Status;
 use Illuminate\Auth\Events\Login;
@@ -36,9 +38,15 @@ class SessionState
     protected const string EPOCH = 'keystone.epoch';
 
     /**
+     * The session key that holds the session's one phase, such as a pending sign-in.
+     */
+    protected const string PHASE = 'keystone.phase';
+
+    /**
      * Create the session state over the request's session.
      */
     public function __construct(
+        protected AccountLookup $accounts,
         protected Session $session,
         protected UrlGenerator $urls,
         protected Dispatcher $events,
@@ -101,11 +109,72 @@ class SessionState
     }
 
     /**
-     * Complete a sign-in for the account, and get the path to send the user to.
+     * Hold the sign-in of the account at the stage it owes, in place of whatever phase the session held.
+     */
+    public function hold(KeystoneUser $account, CredentialType $firstFactor, Stage $stage): void
+    {
+        $pending = new PendingSignIn(
+            account: $account->getAuthIdentifier(),
+            firstFactor: $firstFactor->name(),
+            stage: $stage,
+            intendedPath: $this->intendedPath(),
+            epoch: CredentialEpoch::of($account->getAuthIdentifier()),
+            heldAt: Date::now()->getTimestamp(),
+        );
+
+        $this->changeAuthLevel();
+
+        $this->session->put(static::PHASE, $pending->toSession());
+    }
+
+    /**
+     * Get the session's pending sign-in, unless it has none or it outlived its lifetime.
+     */
+    public function pendingSignIn(): ?PendingSignIn
+    {
+        $phase = $this->session->get(static::PHASE);
+
+        if (! is_array($phase)) {
+            return null;
+        }
+
+        $pending = PendingSignIn::fromSession($phase);
+
+        if ($pending?->hasExpiredAt(Date::now()->getTimestamp()) !== false) {
+            return null;
+        }
+
+        return $pending;
+    }
+
+    /**
+     * Get the account the session's pending sign-in holds, if any.
+     */
+    public function heldAccount(): ?KeystoneUser
+    {
+        $pending = $this->pendingSignIn();
+
+        if ($pending === null) {
+            return null;
+        }
+
+        return $this->accounts->find($pending->account);
+    }
+
+    /**
+     * Drop the session's pending sign-in, leaving a guest.
+     */
+    public function dropPendingSignIn(): void
+    {
+        $this->changeAuthLevel();
+    }
+
+    /**
+     * Complete a sign-in for the account, and get the path to send the user to, the one its pending sign-in kept if it has one.
      */
     public function signIn(KeystoneUser $account): string
     {
-        $redirectTo = $this->intendedPath();
+        $redirectTo = $this->pendingSignIn()->intendedPath ?? $this->intendedPath();
 
         $this->changeAuthLevel();
         $this->enter($account);
@@ -141,17 +210,19 @@ class SessionState
     public function flow(?Surface $surface): ?Flow
     {
         return match ($surface) {
+            Surface::CHALLENGE => Flow::CHALLENGE,
             Surface::SIGN_IN => Flow::SIGN_IN,
             default => null,
         };
     }
 
     /**
-     * Give the session a new id and CSRF token, so nothing that knew the old id reaches the new level.
+     * Give the session a new id and CSRF token and forget its phase, so nothing that knew the old id or phase reaches the new level.
      */
     protected function changeAuthLevel(): void
     {
         $this->session->regenerate(true);
+        $this->session->forget(static::PHASE);
     }
 
     /**

@@ -23,6 +23,10 @@
             <directory>packages/keystone-password/app-tests</directory>
             <directory>packages/keystone-password/tests</directory>
         </testsuite>
+        <testsuite name="keystone-totp">
+            <directory>packages/keystone-totp/app-tests</directory>
+            <directory>packages/keystone-totp/tests</directory>
+        </testsuite>
         <testsuite name="tooling">
             <directory>tests</directory>
         </testsuite>

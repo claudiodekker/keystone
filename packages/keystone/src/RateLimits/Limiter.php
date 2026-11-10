@@ -56,7 +56,7 @@ class Limiter
     }
 
     /**
-     * Count a request of the step kind against the IP address and, separately, the signed-in account, and refuse it once either count is spent.
+     * Count a request of the step kind against the IP address and, separately, the signed-in or held account, and refuse it once either count is spent.
      *
      * A store failure is reported and lets the request through.
      *
@@ -66,7 +66,7 @@ class Limiter
     {
         $allowance = $this->config->integer('keystone.rate_limits.requests_per_minute.'.$kind->value);
         $keys = [$this->key(Limit::REQUEST, [$kind->value, 'address', $this->address()])];
-        $account = $this->session->account();
+        $account = $this->session->account() ?? $this->session->heldAccount();
 
         if ($account !== null) {
             $keys[] = $this->key(Limit::REQUEST, [$kind->value, 'account', (string) $account->getAuthIdentifier()]);
@@ -89,16 +89,18 @@ class Limiter
     }
 
     /**
-     * Count a failed attempt of the type before it verifies anything, and refuse it once the account's count is spent.
+     * Count a failed attempt of the type before it verifies anything, and refuse it once the subject's count is spent.
      *
+     * The subject is the account the attempt names, or the identifier it was given when that names none.
      * A one-time code is also counted against a daily ceiling, but only once the hourly count let it through. A store failure is reported and refuses the attempt.
      *
      * @throws ThrottledException
      */
-    public function takeFailedAttempt(CredentialType $type, Surface $surface, ?KeystoneUser $account, string $identifier): FailedAttempt
+    public function takeFailedAttempt(CredentialType $type, Surface $surface, KeystoneUser|string $subject): FailedAttempt
     {
         $flow = $this->session->flow($surface) ?? throw MissingFlowException::forSurface($surface);
-        $parts = [...$this->subject($account, $identifier), $type->name(), $flow->value];
+        $account = $subject instanceof KeystoneUser ? $subject : null;
+        $parts = [...$this->subject($subject), $type->name(), $flow->value];
         $allowance = $this->config->integer('keystone.rate_limits.failed_attempts_per_hour');
 
         $counts = [$this->takeWithin(Limit::FAILED_ATTEMPT, $parts, $allowance, $account, $surface, $type)];
@@ -206,13 +208,13 @@ class Limiter
      *
      * @return array{string, string}
      */
-    protected function subject(?KeystoneUser $account, string $identifier): array
+    protected function subject(KeystoneUser|string $subject): array
     {
-        if ($account !== null) {
-            return ['account', (string) $account->getAuthIdentifier()];
+        if ($subject instanceof KeystoneUser) {
+            return ['account', (string) $subject->getAuthIdentifier()];
         }
 
-        return ['identifier', EmailAddress::normalize($identifier)];
+        return ['identifier', EmailAddress::normalize($subject)];
     }
 
     /**

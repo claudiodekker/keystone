@@ -16,7 +16,7 @@ it('copies a partial only for each installed credential type', function () {
 
     expect($this->fresh->has('resources/js/partials/Pin.vue'))->toBeTrue()
         ->and($this->fresh->has('resources/js/partials/shapes/Form.vue'))->toBeTrue()
-        ->and($this->fresh->has('resources/js/partials/Totp.vue'))->toBeFalse();
+        ->and($this->fresh->has('resources/js/partials/Hotp.vue'))->toBeFalse();
 });
 
 it('installs without any credential type, copying no partial', function () {
@@ -27,5 +27,5 @@ it('installs without any credential type, copying no partial', function () {
 
     expect($this->fresh->has('routes/keystone.php'))->toBeTrue()
         ->and($this->fresh->has('resources/js/partials/Pin.vue'))->toBeFalse()
-        ->and($this->fresh->has('resources/js/partials/Totp.vue'))->toBeFalse();
+        ->and($this->fresh->has('resources/js/partials/Hotp.vue'))->toBeFalse();
 });

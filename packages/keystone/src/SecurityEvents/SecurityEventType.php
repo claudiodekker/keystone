@@ -16,4 +16,6 @@ enum SecurityEventType: string
     case SESSION_ENDED = 'session.ended';
     case SIGNED_IN = 'signed_in';
     case SIGNED_OUT = 'signed_out';
+    case SIGN_IN_HELD = 'sign_in.held';
+    case SIGN_IN_VOIDED = 'sign_in.voided';
 }

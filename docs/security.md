@@ -2,17 +2,17 @@
 
 ## Rate limits
 
-Keystone has one rate limiter with two limits. Every Keystone endpoint takes the request limit first, before validation runs. Every sign-in attempt then takes the failed-attempt limit before the credential type verifies anything. Methods and controllers never see a key, a count or an allowance.
+Keystone has one rate limiter with two limits. Every Keystone endpoint takes the request limit first, before validation runs. Every sign-in attempt and challenge answer then takes the failed-attempt limit before the credential type verifies anything. Methods and controllers never see a key, a count or an allowance.
 
 ### The request limit
 
-Each endpoint is one kind of step, and each kind has its own allowance a minute, counted per IP address and, separately, per signed-in account.
+Each endpoint is one kind of step, and each kind has its own allowance a minute, counted per IP address and, separately, per account: the signed-in account, or the account a pending sign-in holds.
 
 | Step kind | Endpoints | Allowance |
 |---|---|---|
-| `view` | The sign-in page | 60 a minute |
-| `submit` | The sign-in submit | 10 a minute |
-| `change` | Signing out | 10 a minute |
+| `view` | The sign-in page and the challenge page | 60 a minute |
+| `submit` | The sign-in submit and a challenge answer | 10 a minute |
+| `change` | Signing out and cancelling a challenge | 10 a minute |
 
 An IPv4 address counts on its own. An IPv6 address counts together with every other address in its /64, and an IPv4-mapped IPv6 address counts as the IPv4 address it wraps. Every request without a usable address shares one count, so a broken proxy setup throttles those requests together rather than not at all.
 
@@ -20,7 +20,9 @@ The limit is middleware the controller declares through `HasMiddleware`, so it s
 
 ### The failed-attempt limit
 
-An account gets 20 failed attempts an hour per credential type and flow. The attempt is counted before the type verifies anything, so wrong answers sent at the same time never get more verify calls than the allowance. The count is given back only when the attempt signs in or the type throws, and only inside the hour it was counted in. A refused attempt stays counted, a proof the type accepts for an account Keystone refuses stays counted, and nothing ever resets a count: counts only expire.
+An account gets 20 failed attempts an hour per credential type and flow. Sign-in and the [challenge](challenge.md) are separate flows, so wrong answers at the challenge never spend the sign-in's count. The attempt is counted before the type verifies anything, so wrong answers sent at the same time never get more verify calls than the allowance. The count is given back only when the attempt signs in or the type throws, and only inside the hour it was counted in. A refused attempt stays counted, a proof the type accepts for an account Keystone refuses stays counted, and nothing ever resets a count: counts only expire.
+
+A one-time code, such as a [TOTP](totp.md) code, can be guessed, so its failures also count against a ceiling of 100 a day per account, type and flow, which `rate_limits` doesn't change. Only the attempts the hourly limit let through count toward the ceiling, and an attempt that signs in gives back both counts.
 
 A typed address that names no account is counted under the address itself, normalized the way the account lookup compares it. A made-up address locks exactly like a real one, and two spellings share a count exactly when they would name the same account.
 
@@ -66,11 +68,11 @@ Every key is an HMAC-SHA256 of its parts under a key derived from your app key, 
 
 ### When a limit trips
 
-The first refused attempt of each count's window records a `limit.tripped` security event, for the named or signed-in account when there is one, with a reason naming the limit: `keystone.failed_attempt_limit` or `keystone.request_limit`. The same trip dispatches Laravel's `Illuminate\Auth\Events\Lockout` event, so a listener written for Fortify keeps working. A listener that fails is reported, and the refusal stands.
+The first refused attempt of each count's window records a `limit.tripped` security event, for the named or signed-in account when there is one, with a reason naming the limit: `keystone.daily_failed_attempt_limit`, `keystone.failed_attempt_limit` or `keystone.request_limit`. The same trip dispatches Laravel's `Illuminate\Auth\Events\Lockout` event, so a listener written for Fortify keeps working. A listener that fails is reported, and the refusal stands.
 
 ### Testing
 
-Keystone's AppTests count limits in a fresh in-memory store for each test, so the store your app limits in carries no counts from one test to the next. They read every allowance from your live config through `failedAttemptAllowance()` and `requestAllowance()`, so an app that tunes a limit still passes. A throttled answer is checked through `assertSignInThrottled()` and `assertSignOutThrottled()`. Redefine them in your assertion traits when your app renders a throttled refusal differently.
+Keystone's AppTests count limits in a fresh in-memory store for each test, so the store your app limits in carries no counts from one test to the next. They read every allowance from your live config through `failedAttemptAllowance()` and `requestAllowance()`, so an app that tunes a limit still passes. A throttled answer is checked through `assertSignInThrottled()`, `assertSignOutThrottled()` and, at the challenge, `assertThrottled()`. Redefine them in your assertion traits when your app renders a throttled refusal differently.
 
 ## Hardening
 

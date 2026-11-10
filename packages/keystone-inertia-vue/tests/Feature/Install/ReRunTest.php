@@ -32,19 +32,19 @@ it('finishes a run that stopped part way', function () {
 it('adds the partial of a credential type installed since', function () {
     $this->app->instance(Stubs::class, new Stubs(dirname(__DIR__, 2).'/Fixtures/stubs'));
     $this->artisan('keystone:install')->assertSuccessful();
-    expect($this->fresh->has('resources/js/partials/Totp.vue'))->toBeFalse();
+    expect($this->fresh->has('resources/js/partials/Hotp.vue'))->toBeFalse();
 
     app(CredentialTypeRegistry::class)->register(new class extends FakePinType
     {
         public function name(): string
         {
-            return 'totp';
+            return 'hotp';
         }
     });
 
     $this->artisan('keystone:install')->assertSuccessful();
 
-    expect($this->fresh->has('resources/js/partials/Totp.vue'))->toBeTrue();
+    expect($this->fresh->has('resources/js/partials/Hotp.vue'))->toBeTrue();
 });
 
 it('maps the AppTests of a Keystone package installed since', function () {

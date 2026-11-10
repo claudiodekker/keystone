@@ -37,6 +37,14 @@ class SignInController extends BaseSignInController
     }
 
     /**
+     * Send the user whose first factor was held to the challenge.
+     */
+    protected function sendHeldForChallenge(Request $request): Response
+    {
+        return to_route('login.challenge');
+    }
+
+    /**
      * Return to the sign-in page with the message on the identifier, flashing back all input as a careless app would.
      */
     protected function sendSignInRefused(Request $request, string $message): Response

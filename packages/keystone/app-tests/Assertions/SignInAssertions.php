@@ -66,6 +66,14 @@ trait SignInAssertions
     }
 
     /**
+     * Assert the response sent the user whose first factor was held to the challenge.
+     */
+    public function assertHeldForChallenge(TestResponse $response): void
+    {
+        $response->assertRedirectToRoute('login.challenge');
+    }
+
+    /**
      * Assert the response sent the signed-in user on to the given path.
      */
     public function assertSignedIn(TestResponse $response, string $redirectTo): void

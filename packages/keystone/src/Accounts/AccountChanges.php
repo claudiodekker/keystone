@@ -3,8 +3,10 @@
 namespace ClaudioDekker\Keystone\Accounts;
 
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
+use ClaudioDekker\Keystone\Exceptions\AccountChangeRefusedException;
 use ClaudioDekker\Keystone\SecurityEvents\Recorder;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
+use ClaudioDekker\Keystone\Session\PendingSignIn;
 use Closure;
 use Illuminate\Database\Connection;
 
@@ -28,13 +30,20 @@ class AccountChanges
      * Apply a change to the account while its row is locked, moving its credential epoch when the change ends its sessions.
      *
      * The change records its events only once the outermost transaction commits, so one that rolls back records nothing. Their alerts go to the addresses the account held before the change.
+     * A change a pending sign-in writes is refused, writing nothing, once the account left the credential epoch it was held on or was barred.
      *
      * @param  Closure(AccountChange): void  $apply
+     *
+     * @throws AccountChangeRefusedException
      */
-    public function change(KeystoneUser $account, Closure $apply): void
+    public function change(KeystoneUser $account, Closure $apply, ?PendingSignIn $writer = null): void
     {
-        $change = $this->connection->transaction(function () use ($account, $apply) {
+        $change = $this->connection->transaction(function () use ($account, $apply, $writer) {
             CredentialEpoch::lock($account->getAuthIdentifier());
+
+            if ($writer !== null && CredentialEpoch::of($account->getAuthIdentifier()) !== $writer->epoch) {
+                throw AccountChangeRefusedException::writerEnded();
+            }
 
             $recipients = $this->alertRecipients->of($account);
 

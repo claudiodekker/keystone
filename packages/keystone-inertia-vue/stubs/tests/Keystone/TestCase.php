@@ -3,6 +3,7 @@
 namespace Tests\Keystone;
 
 use ClaudioDekker\Keystone\AppTests\TestCase as KeystoneTestCase;
+use Tests\Keystone\Assertions\ChallengeAssertions;
 use Tests\Keystone\Assertions\CrossSiteAssertions;
 use Tests\Keystone\Assertions\GuestStepAssertions;
 use Tests\Keystone\Assertions\SessionExpiryAssertions;
@@ -15,6 +16,7 @@ use Tests\Keystone\Assertions\ThrottledAssertions;
  */
 abstract class TestCase extends KeystoneTestCase
 {
+    use ChallengeAssertions;
     use CrossSiteAssertions;
     use GuestStepAssertions;
     use SessionExpiryAssertions;

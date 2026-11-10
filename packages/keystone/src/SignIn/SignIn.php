@@ -2,27 +2,14 @@
 
 namespace ClaudioDekker\Keystone\SignIn;
 
-use ClaudioDekker\Keystone\Accounts\AccountChange;
-use ClaudioDekker\Keystone\Accounts\AccountChanges;
 use ClaudioDekker\Keystone\Accounts\AccountLookup;
-use ClaudioDekker\Keystone\Auth\KeystoneUser;
-use ClaudioDekker\Keystone\Exceptions\AccountChangeRefusedException;
 use ClaudioDekker\Keystone\Exceptions\ThrottledException;
 use ClaudioDekker\Keystone\Methods\CredentialType;
-use ClaudioDekker\Keystone\Methods\Proof;
 use ClaudioDekker\Keystone\Methods\Surface;
-use ClaudioDekker\Keystone\Methods\Verification;
-use ClaudioDekker\Keystone\Models\UserCredential;
-use ClaudioDekker\Keystone\RateLimits\FailedAttempt;
 use ClaudioDekker\Keystone\RateLimits\Limiter;
-use ClaudioDekker\Keystone\SecurityEvents\Recorder;
-use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
-use ClaudioDekker\Keystone\Session\SessionState;
 use Illuminate\Contracts\Validation\Factory as ValidationFactory;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
-use Throwable;
 
 /**
  * @internal
@@ -33,12 +20,10 @@ class SignIn
      * Create the sign-in.
      */
     public function __construct(
-        protected AccountChanges $accountChanges,
         protected AccountLookup $accounts,
         protected SignInDecision $decision,
         protected Limiter $limiter,
-        protected Recorder $recorder,
-        protected SessionState $session,
+        protected Proofs $proofs,
         protected TimingFloor $floor,
         protected ValidationFactory $validation,
     ) {
@@ -53,13 +38,13 @@ class SignIn
      * @throws ThrottledException
      * @throws ValidationException
      */
-    public function attempt(CredentialType $type, array $input): SignedIn|Refused
+    public function attempt(CredentialType $type, array $input): SignedIn|Held|Refused
     {
         $validated = $this->validate($type, $input);
 
         return $this->floor->hold(
             fn () => $this->prove($type, $validated),
-            fn (SignedIn|Refused $outcome) => $outcome instanceof SignedIn,
+            fn (SignedIn|Held|Refused $outcome) => ! $outcome instanceof Refused,
         );
     }
 
@@ -82,163 +67,33 @@ class SignIn
     }
 
     /**
-     * Sign in the account the identifier names when the type proves one of its credentials, then write the proof's rehash.
+     * Sign in, or hold for what it owes, the account the identifier names when the type proves one of its credentials.
      *
      * @param  array<string, mixed>  $validated
      *
      * @throws ThrottledException
      */
-    protected function prove(CredentialType $type, array $validated): SignedIn|Refused
+    protected function prove(CredentialType $type, array $validated): SignedIn|Held|Refused
     {
         $account = $this->accounts->resolve($validated['identifier']);
 
-        $attempt = $this->limiter->takeFailedAttempt($type, Surface::SIGN_IN, $account, $validated['identifier']);
+        $attempt = $this->limiter->takeFailedAttempt($type, Surface::SIGN_IN, $account ?? $validated['identifier']);
 
-        $credentials = $this->credentials($type, $account);
+        $input = Arr::except($validated, 'identifier');
+        $answer = $this->proofs->verify($type, Surface::SIGN_IN, $account, $input, $attempt);
 
-        $proof = $this->verify($type, $credentials, $validated, $attempt);
-
-        $owner = $this->decision->decide($proof, $type, $account);
+        $owner = $this->decision->decide($answer->proof, $type, $account);
 
         if ($owner === null) {
-            return $this->refuse($type, $account);
+            return $this->proofs->refuse($account, $answer);
         }
 
-        if (! $this->advance($owner, $proof, $credentials)) {
-            return $this->refuse($type, $account);
+        $stage = $this->decision->owed($owner, $type);
+
+        if ($stage !== null) {
+            return $this->proofs->hold($owner, $answer, $stage);
         }
 
-        $redirectTo = $this->session->signIn($owner);
-
-        $this->limiter->giveBack($attempt);
-
-        $this->recorder->record(
-            SecurityEventType::SIGNED_IN,
-            account: $owner,
-            surface: Surface::SIGN_IN,
-            credentialType: $type,
-            credential: $proof->credential,
-        );
-
-        $this->rehash($owner, $proof, $credentials);
-
-        return new SignedIn($redirectTo);
-    }
-
-    /**
-     * Refuse the sign-in, recording the rejected proof for the account the identifier named.
-     */
-    protected function refuse(CredentialType $type, ?KeystoneUser $account): Refused
-    {
-        $this->recorder->record(
-            SecurityEventType::PROOF_REJECTED,
-            account: $account,
-            surface: Surface::SIGN_IN,
-            credentialType: $type,
-        );
-
-        return new Refused;
-    }
-
-    /**
-     * Let the type verify the input against the account's credentials, giving the attempt back when the type throws.
-     *
-     * @param  Collection<int, UserCredential>  $credentials
-     * @param  array<string, mixed>  $validated
-     */
-    protected function verify(CredentialType $type, Collection $credentials, array $validated, FailedAttempt $attempt): Proof
-    {
-        $verification = new Verification(
-            surface: Surface::SIGN_IN,
-            input: Arr::except($validated, 'identifier'),
-            credentials: $credentials->map->toCredential()->values()->all(),
-        );
-
-        try {
-            return $type->verify($verification);
-        } catch (Throwable $exception) {
-            $this->limiter->giveBack($attempt);
-
-            throw $exception;
-        }
-    }
-
-    /**
-     * Get the account's credentials of the type, none when there is no account.
-     *
-     * @return Collection<int, UserCredential>
-     */
-    protected function credentials(CredentialType $type, ?KeystoneUser $account): Collection
-    {
-        if ($account === null) {
-            return new Collection;
-        }
-
-        return UserCredential::query()
-            ->where('user_id', $account->getAuthIdentifier())
-            ->where('type', $type->name())
-            ->get();
-    }
-
-    /**
-     * Advance the proven credential to the secret the proof carries, and determine if the proof still holds.
-     *
-     * @param  Collection<int, UserCredential>  $credentials
-     */
-    protected function advance(KeystoneUser $owner, Proof $proof, Collection $credentials): bool
-    {
-        $secret = $proof->advancedSecret();
-
-        if ($secret === null) {
-            return true;
-        }
-
-        $credential = $credentials->find($proof->credential);
-
-        if ($credential === null) {
-            return false;
-        }
-
-        try {
-            $this->accountChanges->change($owner, fn (AccountChange $change) => $change->advance($credential, $secret));
-        } catch (AccountChangeRefusedException) {
-            return false;
-        }
-
-        return true;
-    }
-
-    /**
-     * Write the proof's rehash over the credential it proved, reporting a failure without undoing the sign-in.
-     *
-     * @param  Collection<int, UserCredential>  $credentials
-     */
-    protected function rehash(KeystoneUser $owner, Proof $proof, Collection $credentials): void
-    {
-        $credential = $credentials->find($proof->credential);
-
-        if ($credential === null) {
-            return;
-        }
-
-        rescue(fn () => $this->writeRehash($owner, $proof, $credential));
-    }
-
-    /**
-     * Make the proof's rehash and write it over the proven credential, unless its secret changed meanwhile.
-     */
-    protected function writeRehash(KeystoneUser $owner, Proof $proof, UserCredential $credential): void
-    {
-        $secret = $proof->rehashed();
-
-        if ($secret === null) {
-            return;
-        }
-
-        try {
-            $this->accountChanges->change($owner, fn (AccountChange $change) => $change->rehash($credential, $secret));
-        } catch (AccountChangeRefusedException) {
-            //
-        }
+        return $this->proofs->signIn($owner, $answer);
     }
 }
