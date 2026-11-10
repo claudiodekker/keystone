@@ -2,6 +2,7 @@
 
 use ClaudioDekker\Keystone\Methods\CredentialTypeRegistry;
 use ClaudioDekker\Keystone\Methods\Surface;
+use ClaudioDekker\Keystone\Tests\Fixtures\Methods\FakeEnrollmentType;
 use ClaudioDekker\Keystone\Tests\Fixtures\Methods\FakeFormType;
 use ClaudioDekker\Keystone\Tests\Fixtures\Methods\FakeSurfacesType;
 
@@ -100,6 +101,7 @@ it('boots outside production, or without requiring a second factor, while no lis
 
 it('boots in production requiring a second factor while a listed type can be enrolled as one', function () {
     $this->app->detectEnvironment(fn () => 'production');
+    app(CredentialTypeRegistry::class)->register(new FakeEnrollmentType);
 
     expect($this->bootFailures())->toBe([]);
 });

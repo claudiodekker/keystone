@@ -108,7 +108,7 @@ it('offers every type the account can enroll that also answers the challenge, th
     $enrollable = collect($this->supportsFor(Surface::ENROLLMENT))
         ->map(fn (CredentialTypeSupport $support) => $support->type())
         ->first(fn (CredentialType $type) => $type->initiateShape(Surface::CHALLENGE) !== null)
-        ->name();
+        ?->name() ?? $this->markTestSkipped('No installed credential type with test support can be enrolled as a second factor.');
 
     $this->passFirstFactor($user);
 
