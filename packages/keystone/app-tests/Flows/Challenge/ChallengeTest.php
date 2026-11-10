@@ -220,6 +220,23 @@ it('counts challenge requests against the held account, whatever the address', f
     $this->assertThrottled($response);
 });
 
+it('records a spent request limit on the challenge against the held account', function () {
+    $user = $this->createUser();
+    $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);
+    $this->passFirstFactor($user);
+
+    foreach (range(1, $this->requestAllowance(StepKind::VIEW)) as $i) {
+        $this->withServerVariables(['REMOTE_ADDR' => "10.1.{$i}.1"])->get(route('login.challenge'));
+    }
+
+    $this->withServerVariables(['REMOTE_ADDR' => '10.2.0.1'])->get(route('login.challenge'));
+
+    $tripped = $this->securityEvents()->for($user)->last();
+
+    expect($tripped->type)->toBe(SecurityEventType::LIMIT_TRIPPED)
+        ->and($tripped->reason)->toBe('keystone.request_limit');
+});
+
 it('gives a held first factor its own count back, and no more', function () {
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
