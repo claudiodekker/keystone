@@ -4,11 +4,14 @@ use ClaudioDekker\Keystone\AppTests\Support\CredentialTypeSupport;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Jobs\EndSessions;
 use ClaudioDekker\Keystone\Jobs\SuspendAccount;
+use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Models\UserCredential;
 use ClaudioDekker\Keystone\RateLimits\StepKind;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use ClaudioDekker\Keystone\Session\Flow;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Sleep;
 
@@ -103,6 +106,18 @@ it('records the sign-in with the type that answered the challenge', function () 
     expect($signedIn->type)->toBe(SecurityEventType::SIGNED_IN)
         ->and($signedIn->flow)->toBe(Flow::CHALLENGE)
         ->and($signedIn->credential_type)->toBe($support->type()->name());
+});
+
+it("signs the held user in with a valid answer while the app's global scopes hide the account", function () {
+    $user = $this->createUser();
+    $support = $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);
+    $this->beforeApplicationDestroyed(fn () => Model::clearBootedModels());
+    $this->passFirstFactor($user);
+
+    Keystone::userModel()::addGlobalScope('hidden', fn (Builder $query) => $query->whereKeyNot($user->getAuthIdentifier()));
+    $response = $this->answerChallenge($user, $support);
+
+    $this->assertSignedIn($response, '/');
 });
 
 it('lands on the URL the user was going to before the first factor', function () {
