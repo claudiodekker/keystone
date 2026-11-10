@@ -50,7 +50,7 @@ class EnrollmentController extends BaseEnrollmentController
     }
 
     /**
-     * Return to enrollment with the message on the type's field, flashing back all input as a careless app would.
+     * Return to enrollment, which shows the ceremony that started afresh, with the message on the type's field, flashing back all input as a careless app would.
      */
     protected function sendEnrollmentExpired(Request $request, string $field, string $message): Response
     {

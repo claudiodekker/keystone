@@ -4,8 +4,8 @@ namespace ClaudioDekker\Keystone\Auth;
 
 use ClaudioDekker\Keystone\Accounts\CredentialEpoch;
 use ClaudioDekker\Keystone\Exceptions\SessionGuardSignInException;
-use ClaudioDekker\Keystone\Http\Middleware\ClearSiteData;
 use ClaudioDekker\Keystone\Http\EndedSession;
+use ClaudioDekker\Keystone\Http\Middleware\ClearSiteData;
 use ClaudioDekker\Keystone\SecurityEvents\Recorder;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use ClaudioDekker\Keystone\Session\SessionState;
@@ -46,7 +46,7 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Get the signed-in user, ending a session past its absolute lifetime, off its account's credential epoch or whose account newly owes enrollment first, so the request reads it as a guest's.
+     * Get the signed-in user, first ending a session that may no longer stand, so the request reads it as a guest's.
      */
     public function user(): ?Authenticatable
     {

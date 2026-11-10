@@ -1,6 +1,6 @@
 <?php
 
-// Races and retries of storing a second factor: driven through core's fake, whose verify runs another write while this answer waits on it.
+// Fault injection through the fake type: only core's fake runs another write while this answer's verify waits on it, so no AppTest can race storing a second factor.
 
 use ClaudioDekker\Keystone\Accounts\AccountChange;
 use ClaudioDekker\Keystone\Accounts\AccountChanges;

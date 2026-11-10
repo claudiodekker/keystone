@@ -38,7 +38,7 @@ readonly class TotpSecret
             return null;
         }
 
-        if (! is_array($value)) {
+        if (! is_array($value) || ! is_string($value['key'] ?? null)) {
             return null;
         }
 
@@ -48,7 +48,7 @@ readonly class TotpSecret
             return null;
         }
 
-        $secret = is_string($value['key'] ?? null) ? static::fromKey($value['key']) : null;
+        $secret = static::fromKey($value['key']);
 
         if ($secret === null) {
             return null;

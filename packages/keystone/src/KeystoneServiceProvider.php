@@ -14,18 +14,17 @@ use ClaudioDekker\Keystone\Contracts\SessionInfo;
 use ClaudioDekker\Keystone\Devices\DeviceDetectorSessionInfo;
 use ClaudioDekker\Keystone\Devices\NullSessionInfo;
 use ClaudioDekker\Keystone\Exceptions\KeystoneMisconfiguredException;
+use ClaudioDekker\Keystone\Http\EndedSession;
 use ClaudioDekker\Keystone\Http\Middleware\ApplyHardeningFloor;
 use ClaudioDekker\Keystone\Http\Middleware\CaptureRequestContext;
 use ClaudioDekker\Keystone\Http\Middleware\ClearSiteData;
 use ClaudioDekker\Keystone\Http\Middleware\RefuseCrossSiteRequests;
 use ClaudioDekker\Keystone\Http\Responses\UnauthenticatedResponse;
-use ClaudioDekker\Keystone\Http\EndedSession;
 use ClaudioDekker\Keystone\Locations\NullIpLocation;
 use ClaudioDekker\Keystone\Locations\StevebaumanIpLocation;
 use ClaudioDekker\Keystone\Methods\CredentialTypeRegistry;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\MethodAllowList;
-use ClaudioDekker\Keystone\Status;
 use DeviceDetector\DeviceDetector;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Contracts\Debug\ExceptionHandler;
@@ -201,7 +200,7 @@ class KeystoneServiceProvider extends ServiceProvider
     }
 
     /**
-     * Render the app's expiry or demotion response, through Laravel's exception handler, for a request that needs a user whose session Keystone ended during it.
+     * Answer a request that needs a user whose session Keystone ended during it with the app's expiry or demotion response.
      */
     protected function answerEndedSessions(): void
     {

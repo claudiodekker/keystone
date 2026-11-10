@@ -189,7 +189,7 @@ class Enrollment
     }
 
     /**
-     * Get the name the account signs in with, as an authenticator app labels its entry: its first address alerts go to.
+     * Get the account's label in an authenticator app: the first address its alerts go to, else its identifier.
      */
     protected function label(KeystoneUser $account): string
     {
