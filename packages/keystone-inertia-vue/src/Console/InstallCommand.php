@@ -13,6 +13,7 @@ use ClaudioDekker\Keystone\InertiaVue\Install\Edits\SetSessionCookie;
 use ClaudioDekker\Keystone\InertiaVue\Install\Edits\UseKeystoneGuard;
 use ClaudioDekker\Keystone\InertiaVue\Install\Stubs;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
+use ClaudioDekker\Keystone\RecoveryCodes\RecoveryCodeType;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Process\ProcessResult;
@@ -268,13 +269,13 @@ class InstallCommand extends Command
     }
 
     /**
-     * Copy the stubs the app lacks, or every stub when forced.
+     * Copy the stubs the app lacks, or every stub when forced, with a partial for each installed type and core's recovery codes.
      */
     protected function copy(Stubs $stubs, Filesystem $files, CredentialTypes $types): void
     {
         $skipped = [];
 
-        foreach ($stubs->for($types->names()) as $path) {
+        foreach ($stubs->for([...$types->names(), RecoveryCodeType::NAME]) as $path) {
             $target = $this->laravel->basePath($path);
 
             if ($files->exists($target) && ! $this->option('force')) {
