@@ -224,3 +224,29 @@ it('spends a code once when another answer spends it after the first read it', f
         SecurityEventType::PROOF_REJECTED,
     ]);
 });
+
+it('matches an imported Fortify code exactly as it was typed', function () {
+    $user = $this->createUser();
+    $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);
+    (new RecoveryCodeSupport)->arrangeCredential(Surface::CHALLENGE, $user)->arrangeFortifyCode($user, 'aB3dE6gH9j-K1mN3pQ5sT');
+    $this->passFirstFactor($user);
+
+    $response = $this->post(route('login.challenge.submit', 'recovery-code'), ['recovery_code' => 'aB3dE6gH9j-K1mN3pQ5sT']);
+
+    $this->assertSignedIn($response, '/');
+});
+
+it('refuses an imported Fortify code typed in another case or without its dash', function (string $typed) {
+    $user = $this->createUser();
+    $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);
+    (new RecoveryCodeSupport)->arrangeCredential(Surface::CHALLENGE, $user)->arrangeFortifyCode($user, 'aB3dE6gH9j-K1mN3pQ5sT');
+    $this->passFirstFactor($user);
+
+    $response = $this->post(route('login.challenge.submit', 'recovery-code'), ['recovery_code' => $typed]);
+
+    $this->assertChallengeRefused($response, 'recovery_code', __('keystone::messages.credential-invalid'));
+})->with([
+    'in upper case' => ['AB3DE6GH9J-K1MN3PQ5ST'],
+    'in lower case' => ['ab3de6gh9j-k1mn3pq5st'],
+    'without its dash' => ['aB3dE6gH9jK1mN3pQ5sT'],
+]);

@@ -34,4 +34,14 @@ class UserRecoveryCodeFactory extends Factory
             'digest' => RecoveryCode::fromInput($code)->digest(),
         ]);
     }
+
+    /**
+     * Store the digest of the given code Laravel Fortify generated, which matches only as typed.
+     */
+    public function fortifyCode(string $code): static
+    {
+        return $this->state([
+            'digest' => hash('sha256', $code),
+        ]);
+    }
 }

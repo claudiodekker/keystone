@@ -60,6 +60,21 @@ class RecoveryCodeSupport implements CredentialTypeSupport
     }
 
     /**
+     * Give the user a recovery code Laravel Fortify generated, as the Fortify backfill writes one.
+     */
+    public function arrangeFortifyCode(KeystoneUser $user, string $code): static
+    {
+        UserRecoveryCode::factory()
+            ->for($user, 'user')
+            ->fortifyCode($code)
+            ->create();
+
+        $this->codes[] = $code;
+
+        return $this;
+    }
+
+    /**
      * Get the fields that prove the first of the user's arranged codes, as it was shown.
      *
      * @return array<string, mixed>

@@ -21,6 +21,11 @@ class RecoveryCodeType implements CredentialType
     public const string NAME = 'recovery-code';
 
     /**
+     * The shape of a code Laravel Fortify generated, which matches only as typed.
+     */
+    protected const string FORTIFY_CODE = '/\A[A-Za-z0-9]{10}-[A-Za-z0-9]{10}\z/';
+
+    /**
      * Get the type's name.
      */
     public function name(): string
@@ -77,13 +82,19 @@ class RecoveryCodeType implements CredentialType
     }
 
     /**
-     * Get every digest the typed code may be stored under.
+     * Get every digest the typed code may be stored under: the code it normalizes to, and a Fortify code exactly as typed.
      *
      * @return list<string>
      */
     protected function digests(#[SensitiveParameter] string $input): array
     {
-        return [RecoveryCode::fromInput($input)->digest()];
+        $digests = [RecoveryCode::fromInput($input)->digest()];
+
+        if (preg_match(static::FORTIFY_CODE, $input) === 1) {
+            $digests[] = hash('sha256', $input);
+        }
+
+        return $digests;
     }
 
     /**
