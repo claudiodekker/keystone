@@ -158,3 +158,15 @@ it("draws the page from the type's live ceremony on each read, without starting 
     expect($first)->toBe(['shown' => 'challenge-only ceremony 1 on enrollment', 'account' => 'ada@example.com'])
         ->and($second)->toBe($first);
 });
+
+it('draws no page once the ceremony ended', function () {
+    $this->freezeSecond();
+    $type = new FakeCeremonyType;
+    $session = app(SessionState::class);
+    $session->startCeremony($type, Surface::ENROLLMENT);
+
+    $this->travel(10 * 60)->seconds();
+    $page = $session->ceremonyPage($type, Surface::ENROLLMENT, 'ada@example.com');
+
+    expect($page)->toBeNull();
+});

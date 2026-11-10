@@ -200,7 +200,13 @@ class SessionState
      */
     public function ceremonyPage(CredentialType&StartsCeremony $type, Surface $surface, string $account): ?array
     {
-        return $type->page($surface, $this->ceremony($type, $surface), $account);
+        $ceremony = $this->ceremony($type, $surface);
+
+        if ($ceremony === null) {
+            return null;
+        }
+
+        return $type->page($surface, $ceremony, $account);
     }
 
     /**
