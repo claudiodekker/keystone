@@ -2,15 +2,22 @@
 
 namespace ClaudioDekker\Keystone\SignIn;
 
+use ClaudioDekker\Keystone\Accounts\AccountChange;
+use ClaudioDekker\Keystone\Accounts\AccountChanges;
 use ClaudioDekker\Keystone\Accounts\AccountLookup;
 use ClaudioDekker\Keystone\Accounts\Holdings;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
+use ClaudioDekker\Keystone\Exceptions\AccountChangeRefusedException;
 use ClaudioDekker\Keystone\Exceptions\ThrottledException;
 use ClaudioDekker\Keystone\Http\Pages\ChallengePage;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
+use ClaudioDekker\Keystone\Methods\Verification;
+use ClaudioDekker\Keystone\Models\UserRecoveryCode;
+use ClaudioDekker\Keystone\RateLimits\FailedAttempt;
 use ClaudioDekker\Keystone\RateLimits\Limiter;
+use ClaudioDekker\Keystone\RecoveryCodes\RecoveryCodeType;
 use ClaudioDekker\Keystone\SecurityEvents\Recorder;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use ClaudioDekker\Keystone\Session\PendingSignIn;
@@ -18,6 +25,7 @@ use ClaudioDekker\Keystone\Session\SessionState;
 use ClaudioDekker\Keystone\Session\Stage;
 use ClaudioDekker\Keystone\Status;
 use Illuminate\Contracts\Validation\Factory as ValidationFactory;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -29,11 +37,13 @@ class Challenge
      * Create the challenge.
      */
     public function __construct(
+        protected AccountChanges $accountChanges,
         protected AccountLookup $accounts,
         protected SignInDecision $decision,
         protected Holdings $holdings,
         protected Limiter $limiter,
         protected Proofs $proofs,
+        protected RecoveryCodeType $recoveryCodeType,
         protected Recorder $recorder,
         protected SessionState $session,
         protected TimingFloor $floor,
@@ -41,6 +51,18 @@ class Challenge
         protected ValidationFactory $validation,
     ) {
         //
+    }
+
+    /**
+     * Find the type that answers the challenge by its name: a type offered there, or core's recovery codes.
+     */
+    public function type(string $name): ?CredentialType
+    {
+        if ($name === RecoveryCodeType::NAME) {
+            return $this->recoveryCodeType;
+        }
+
+        return $this->types->find($name, Surface::CHALLENGE);
     }
 
     /**
@@ -138,9 +160,46 @@ class Challenge
     {
         $attempt = $this->limiter->takeFailedAttempt($type, Surface::CHALLENGE, $account);
 
+        if ($type instanceof RecoveryCodeType) {
+            return $this->spend($type, $validated, $pending, $account, $attempt);
+        }
+
         $answer = $this->proofs->verify($type, Surface::CHALLENGE, $account, $validated, $attempt);
 
         if (! $this->decision->answers($answer->proof, $type, $pending, $account)) {
+            return $this->proofs->refuse($account, $answer);
+        }
+
+        return $this->proofs->signIn($account, $answer, writer: $pending);
+    }
+
+    /**
+     * Sign in the held account when the typed code is one of its recovery codes, spending it.
+     *
+     * @param  array<string, mixed>  $validated
+     */
+    protected function spend(RecoveryCodeType $type, array $validated, PendingSignIn $pending, KeystoneUser $account, FailedAttempt $attempt): SignedIn|Refused
+    {
+        $codes = UserRecoveryCode::query()
+            ->where('user_id', $account->getAuthIdentifier())
+            ->get();
+
+        $verification = new Verification(
+            surface: Surface::CHALLENGE,
+            input: $validated,
+            credentials: $codes->map->toCredential()->values()->all(),
+        );
+
+        $answer = new Answer($type, Surface::CHALLENGE, $type->verify($verification), new Collection, $attempt);
+        $code = $codes->find($answer->proof->credential);
+
+        if ($code === null) {
+            return $this->proofs->refuse($account, $answer);
+        }
+
+        try {
+            $this->accountChanges->change($account, fn (AccountChange $change) => $change->spendRecoveryCode($code), $pending);
+        } catch (AccountChangeRefusedException) {
             return $this->proofs->refuse($account, $answer);
         }
 

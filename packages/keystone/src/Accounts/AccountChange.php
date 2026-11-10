@@ -4,7 +4,10 @@ namespace ClaudioDekker\Keystone\Accounts;
 
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Exceptions\AccountChangeRefusedException;
+use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Models\UserCredential;
+use ClaudioDekker\Keystone\Models\UserRecoveryCode;
+use ClaudioDekker\Keystone\RecoveryCodes\RecoveryCodeType;
 use ClaudioDekker\Keystone\SecurityEvents\Recorder;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use Closure;
@@ -111,6 +114,31 @@ class AccountChange
     public function advance(UserCredential $credential, #[SensitiveParameter] string $secret): void
     {
         $this->replaceSecret($credential, $secret);
+    }
+
+    /**
+     * Spend the recovery code that answered the challenge, which ends nothing, refusing when another answer spent it first.
+     *
+     * @throws AccountChangeRefusedException
+     */
+    public function spendRecoveryCode(UserRecoveryCode $code): void
+    {
+        $deleted = UserRecoveryCode::query()
+            ->whereKey($code->getKey())
+            ->where('user_id', $this->account->getAuthIdentifier())
+            ->delete();
+
+        if ($deleted === 0) {
+            throw AccountChangeRefusedException::recoveryCodeSpent();
+        }
+
+        $this->events[] = fn (Recorder $recorder) => $recorder->record(
+            SecurityEventType::RECOVERY_CODE_USED,
+            account: $this->account,
+            surface: Surface::CHALLENGE,
+            credentialType: new RecoveryCodeType,
+            recipients: $this->recipients,
+        );
     }
 
     /**

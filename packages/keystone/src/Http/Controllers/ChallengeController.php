@@ -6,7 +6,6 @@ use ClaudioDekker\Keystone\Http\Middleware\FlashOnlyTheIdentifier;
 use ClaudioDekker\Keystone\Http\Middleware\LimitRequests;
 use ClaudioDekker\Keystone\Http\Pages\ChallengePage;
 use ClaudioDekker\Keystone\Methods\CredentialType;
-use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\RateLimits\StepKind;
 use ClaudioDekker\Keystone\SignIn\Challenge;
@@ -58,9 +57,9 @@ abstract class ChallengeController implements KeystoneController
     /**
      * Take an answer to the challenge of the credential type the route names.
      */
-    public function store(Request $request, string $type, Challenge $challenge, CredentialTypes $types): Response|Responsable
+    public function store(Request $request, string $type, Challenge $challenge): Response|Responsable
     {
-        $credentialType = $types->find($type, Surface::CHALLENGE) ?? throw new NotFoundHttpException;
+        $credentialType = $challenge->type($type) ?? throw new NotFoundHttpException;
 
         $outcome = $challenge->answer($credentialType, $request->all());
 

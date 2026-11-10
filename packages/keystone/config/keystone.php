@@ -104,6 +104,7 @@ return [
         'account.unsuspended' => SecurityAlert::class,
         'limit.tripped' => null,
         'proof.rejected' => null,
+        'recovery_code.used' => SecurityAlert::class,
         'request.rejected' => null,
         'session.ended' => null,
         'sessions.terminated' => SecurityAlert::class,
