@@ -250,12 +250,12 @@ class SessionState
     }
 
     /**
-     * Give the session a new id and CSRF token and forget its phase, so nothing that knew the old id or phase reaches the new level.
+     * Give the session a new id and CSRF token and forget its phase and ceremonies, so nothing that knew the old id, phase or ceremony reaches the new level.
      */
     protected function changeAuthLevel(): void
     {
         $this->session->regenerate(true);
-        $this->session->forget(static::PHASE);
+        $this->session->forget([static::PHASE, static::CEREMONIES]);
     }
 
     /**
