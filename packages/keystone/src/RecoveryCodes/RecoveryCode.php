@@ -23,6 +23,8 @@ readonly class RecoveryCode
 
     /**
      * The characters in each dash-separated block a code is shown in.
+     *
+     * @var positive-int
      */
     protected const int BLOCK_LENGTH = 5;
 
