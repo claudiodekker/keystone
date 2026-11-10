@@ -34,4 +34,12 @@ class AccountChangeRefusedException extends RuntimeException
     {
         return new static('The credential secret changed since it was read, so its rehash was refused.');
     }
+
+    /**
+     * Create the exception for a change written by a pending sign-in whose account left its credential epoch or was barred.
+     */
+    public static function writerEnded(): static
+    {
+        return new static('The pending sign-in writing the change ended, so the change was refused.');
+    }
 }

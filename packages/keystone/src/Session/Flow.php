@@ -7,5 +7,6 @@ namespace ClaudioDekker\Keystone\Session;
  */
 enum Flow: string
 {
+    case CHALLENGE = 'challenge';
     case SIGN_IN = 'sign-in';
 }

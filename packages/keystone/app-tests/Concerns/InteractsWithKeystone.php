@@ -3,6 +3,7 @@
 namespace ClaudioDekker\Keystone\AppTests\Concerns;
 
 use ClaudioDekker\Keystone\Accounts\EmailAddress;
+use ClaudioDekker\Keystone\AppTests\Assertions\ChallengeAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\CrossSiteAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\GuestStepAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\SessionExpiryAssertions;
@@ -47,6 +48,7 @@ use Symfony\Component\HttpFoundation\Cookie;
 trait InteractsWithKeystone
 {
     use AssertsHardening;
+    use ChallengeAssertions;
     use CrossSiteAssertions;
     use GuestStepAssertions;
     use LazilyRefreshDatabase;
@@ -197,6 +199,28 @@ trait InteractsWithKeystone
                 ...$support->rejectedProof(Surface::SIGN_IN),
             ]);
         }
+    }
+
+    /**
+     * Give the user a verified address and a credential of the first installed type that serves sign-in, and submit its valid proof.
+     */
+    public function passFirstFactor(KeystoneUser $user): TestResponse
+    {
+        $address = $this->addVerifiedAddress($user);
+        $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+        return $this->post(route('login.submit', $support->type()->name()), [
+            'identifier' => $address,
+            ...$support->validProof(Surface::SIGN_IN, $user),
+        ]);
+    }
+
+    /**
+     * Submit the valid proof of the user's credential of the supported type to the challenge.
+     */
+    public function answerChallenge(KeystoneUser $user, CredentialTypeSupport $support): TestResponse
+    {
+        return $this->post(route('login.challenge.submit', $support->type()->name()), $support->validProof(Surface::CHALLENGE, $user));
     }
 
     /**

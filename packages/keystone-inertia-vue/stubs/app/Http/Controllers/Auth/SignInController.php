@@ -44,6 +44,14 @@ class SignInController extends KeystoneSignInController
     }
 
     /**
+     * Send the user whose first factor was held to the challenge.
+     */
+    protected function sendHeldForChallenge(Request $request): RedirectResponse
+    {
+        return to_route('login.challenge');
+    }
+
+    /**
      * Return to the sign-in page with the message on the identifier.
      */
     protected function sendSignInRefused(Request $request, string $message): RedirectResponse

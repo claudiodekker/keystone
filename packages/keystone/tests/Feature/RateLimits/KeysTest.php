@@ -22,7 +22,7 @@ it('keeps no identifier or address, and no plain hash of either, in the limiter 
     $limiter = $this->app->make(Limiter::class);
 
     $limiter->takeRequest(StepKind::SUBMIT);
-    $limiter->takeFailedAttempt($type, Surface::SIGN_IN, null, 'grace@example.com');
+    $limiter->takeFailedAttempt($type, Surface::SIGN_IN, 'grace@example.com');
 
     $keys = $store->keys();
 

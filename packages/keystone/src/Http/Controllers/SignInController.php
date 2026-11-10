@@ -9,6 +9,8 @@ use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\RateLimits\StepKind;
 use ClaudioDekker\Keystone\Session\SessionState;
+use ClaudioDekker\Keystone\Session\Stage;
+use ClaudioDekker\Keystone\SignIn\Held;
 use ClaudioDekker\Keystone\SignIn\Refused;
 use ClaudioDekker\Keystone\SignIn\SignIn;
 use ClaudioDekker\Keystone\Status;
@@ -73,6 +75,12 @@ abstract class SignInController implements KeystoneController
             return $this->sendSignInRefused($request, Status::CREDENTIALS_REJECTED->label());
         }
 
+        if ($outcome instanceof Held) {
+            return match ($outcome->stage) {
+                Stage::CHALLENGE => $this->sendHeldForChallenge($request),
+            };
+        }
+
         return $this->sendSignedIn($request, $outcome->redirectTo);
     }
 
@@ -90,6 +98,11 @@ abstract class SignInController implements KeystoneController
      * Send the user on after a completed sign-in.
      */
     abstract protected function sendSignedIn(Request $request, string $redirectTo): Response|Responsable;
+
+    /**
+     * Send the user whose first factor was held to answer the challenge.
+     */
+    abstract protected function sendHeldForChallenge(Request $request): Response|Responsable;
 
     /**
      * Refuse the sign-in with the one translated message every refusal shares.

@@ -2,14 +2,21 @@
 
 namespace ClaudioDekker\Keystone\Tests\Fixtures\Methods;
 
-use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\InitiateShape;
-use ClaudioDekker\Keystone\Methods\Proof;
 use ClaudioDekker\Keystone\Methods\Surface;
-use ClaudioDekker\Keystone\Methods\Verification;
 
-class FakeChallengeType implements CredentialType
+class FakeChallengeType extends FakeFormType
 {
+    /**
+     * The secret every arranged credential holds.
+     */
+    protected const string SECRET = 'second horse';
+
+    /**
+     * The secret compared in place of a credential when there is none.
+     */
+    protected const string DECOY = 'decoy second horse';
+
     /**
      * Get the type's name.
      */
@@ -28,31 +35,5 @@ class FakeChallengeType implements CredentialType
         }
 
         return InitiateShape::FORM;
-    }
-
-    /**
-     * Determine if a proof proves two factors on its own, which it doesn't.
-     */
-    public function isMultiFactor(): bool
-    {
-        return false;
-    }
-
-    /**
-     * Get no rules, since nothing is submitted to it.
-     *
-     * @return array<string, mixed>
-     */
-    public function rules(Surface $surface): array
-    {
-        return [];
-    }
-
-    /**
-     * Reject every verification.
-     */
-    public function verify(Verification $verification): Proof
-    {
-        return Proof::rejected();
     }
 }

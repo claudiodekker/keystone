@@ -16,11 +16,13 @@ readonly class Proof
      * Create the proof.
      *
      * @param  (Closure(): string)|null  $rehash
+     * @param  string|null  $reason  the reason for a rejection, as a code prefixed by the type's name
      */
     protected function __construct(
         public int|string|null $credential,
         protected ?Closure $rehash = null,
         #[SensitiveParameter] protected ?string $advancedSecret = null,
+        public ?string $reason = null,
     ) {
         //
     }
@@ -46,11 +48,11 @@ readonly class Proof
     }
 
     /**
-     * Create a rejection.
+     * Create a rejection, with the reason core records when the type gives one, such as totp.replayed.
      */
-    public static function rejected(): static
+    public static function rejected(?string $reason = null): static
     {
-        return new static(null);
+        return new static(null, reason: $reason);
     }
 
     /**

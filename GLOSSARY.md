@@ -50,9 +50,25 @@ What a credential type's verify step returns: proven, naming one of the credenti
 
 A proven proof may also carry a rehash: the work that remakes the credential's secret under the type's current settings, such as a password hashed at an old cost. Core runs it only after the proof signed the account in, and writes the result only if nothing else changed the secret meanwhile. A failed rehash is reported and the sign-in stands. A rejection carries none.
 
+## Second factor
+
+A credential of a type offered on the challenge. Whether an account holds one is read from its credentials whenever a step asks, and never stored, so a type taken off the challenge stops counting and counts again once it is offered there again.
+
 ## Sign-in decision
 
-The one place core decides what a proof earns. Today a proof signs in its credential's owner when the owner is the subject and isn't suspended; holds join it later.
+The one place core decides what a proof earns: refused, a sign-in, or a hold at the stage the account owes. A first factor that doesn't prove two factors on its own is held at the challenge when its account holds a second factor. The decision runs again for a pending sign-in, as its account stands now, before each step is shown and before each answer is checked.
+
+## Pending sign-in
+
+A sign-in that passed its first factor and still owes a stage, such as the challenge. A session holds at most one, as its phase, with the account, the first factor's type, the stage, the intended URL and the account's credential epoch at the hold. It lasts a fixed 15 minutes. To every other page the session is a guest. A pending sign-in whose account's credential epoch moved, or whose account was suspended, is dropped and recorded voided; one whose account no longer owes its stage is dropped.
+
+## Challenge
+
+The stage where a pending sign-in answers with a second factor of another type than its first factor's. A right answer completes the sign-in. A wrong one is refused on the type's field, counted in the challenge flow and recorded, and the pending sign-in stays.
+
+## Session phase
+
+The one session value that says where a guest session is in the flows, such as a pending sign-in. A new phase replaces the old one, and every change of auth level forgets it: a hold, a sign-in and a cancel each give the session a new id.
 
 ## Verified address
 

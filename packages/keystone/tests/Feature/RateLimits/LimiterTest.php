@@ -14,11 +14,11 @@ it('asks to retry after the seconds left of the hour the failed attempts were co
     $limiter = $this->app->make(Limiter::class);
 
     foreach (range(1, config('keystone.rate_limits.failed_attempts_per_hour')) as $i) {
-        $limiter->takeFailedAttempt($type, Surface::SIGN_IN, null, 'grace@example.com');
+        $limiter->takeFailedAttempt($type, Surface::SIGN_IN, 'grace@example.com');
     }
 
     $this->travel(10)->minutes();
-    $refused = fn () => $limiter->takeFailedAttempt($type, Surface::SIGN_IN, null, 'grace@example.com');
+    $refused = fn () => $limiter->takeFailedAttempt($type, Surface::SIGN_IN, 'grace@example.com');
 
     expect($refused)->toThrow(fn (ThrottledException $exception) => expect($exception->getHeaders())->toBe(['Retry-After' => 50 * 60]));
 });
@@ -40,7 +40,7 @@ it('refuses to count a failed attempt on a surface that is in no flow', function
     $type = app(CredentialTypes::class)->find('form', Surface::SIGN_IN);
     $limiter = $this->app->make(Limiter::class);
 
-    $take = fn () => $limiter->takeFailedAttempt($type, Surface::CHALLENGE, null, 'grace@example.com');
+    $take = fn () => $limiter->takeFailedAttempt($type, Surface::ENROLLMENT, 'grace@example.com');
 
-    expect($take)->toThrow(MissingFlowException::class, 'No flow counts failed attempts on the [challenge] surface.');
+    expect($take)->toThrow(MissingFlowException::class, 'No flow counts failed attempts on the [enrollment] surface.');
 });
