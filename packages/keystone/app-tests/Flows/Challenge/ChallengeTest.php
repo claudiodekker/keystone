@@ -46,6 +46,37 @@ it('treats a held session as a guest on every other page', function () {
     expect($protected->getStatusCode())->toBe(401);
 });
 
+it('replaces an earlier pending sign-in in the session with a new one', function () {
+    $ada = $this->createUser();
+    $grace = $this->createUser();
+    $support = $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $ada);
+    $support->arrangeCredential(Surface::CHALLENGE, $grace);
+    $this->passFirstFactor($ada);
+    $this->passFirstFactor($grace);
+
+    $response = $this->answerChallenge($grace, $support);
+
+    $this->assertSignedIn($response, '/');
+    expect($this->securityEvents()->for($grace)->last()->type)->toBe(SecurityEventType::SIGNED_IN)
+        ->and($this->securityEvents()->for($ada)->pluck('type')->all())->toBe([SecurityEventType::SIGN_IN_HELD]);
+});
+
+it("signs in on the first factor alone while the second factor's type is taken off the challenge, and holds again once it is back", function () {
+    $user = $this->createUser();
+    $secondFactor = $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user)->type()->name();
+    $firstFactor = $this->supportFor(Surface::SIGN_IN)->type()->name();
+
+    config(['keystone.methods' => [$firstFactor]]);
+    $unlisted = $this->passFirstFactor($user);
+
+    $this->switchToFreshBrowser();
+    config(['keystone.methods' => [$firstFactor, $secondFactor]]);
+    $listed = $this->passFirstFactor($user);
+
+    $this->assertSignedIn($unlisted, '/');
+    $this->assertHeldForChallenge($listed);
+});
+
 it('signs the held user in with a valid answer', function () {
     $user = $this->createUser();
     $support = $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);
@@ -257,6 +288,16 @@ it('cancels the pending sign-in, back at sign-in with the cancelled status', fun
     $this->assertChallengeCancelled($response);
     $this->assertSignInPage($page, ['status' => __('keystone::messages.sign-in-cancelled')]);
     $this->assertNoPendingSignIn($answer);
+});
+
+it('counts cancels against the change allowance', function () {
+    foreach (range(1, $this->requestAllowance(StepKind::CHANGE)) as $i) {
+        $this->delete(route('login.challenge.cancel'));
+    }
+
+    $response = $this->delete(route('login.challenge.cancel'));
+
+    $this->assertThrottled($response);
 });
 
 it('gives the session a new id when it cancels', function () {
