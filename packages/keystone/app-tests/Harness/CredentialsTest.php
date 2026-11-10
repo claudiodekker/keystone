@@ -3,6 +3,7 @@
 use ClaudioDekker\Keystone\Methods\Surface;
 
 it("removes the user's credentials of the supported type, and leaves another user's alone", function () {
+    $this->withoutEnrollmentMandates();
     $ada = $this->createUser();
     $grace = $this->createUser();
     $support = $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $ada);

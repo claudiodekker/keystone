@@ -4,6 +4,10 @@ use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Password\AppTests\PasswordSupport;
 use Illuminate\Support\Facades\Auth;
 
+beforeEach(function () {
+    $this->withoutEnrollmentMandates();
+});
+
 it('signs in with a stored hash of another driver, and rehashes it to the app driver', function (string $stored, string $app) {
     $user = $this->createUser();
     config(['hashing.driver' => $app, 'hashing.bcrypt.verify' => true, 'hashing.argon.verify' => true]);

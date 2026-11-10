@@ -2,6 +2,10 @@
 
 use ClaudioDekker\Keystone\Methods\Surface;
 
+beforeEach(function () {
+    $this->withoutEnrollmentMandates();
+});
+
 it('matches a typed address to its account whatever its case, Unicode form or IDN spelling', function (string $typed) {
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'rené@bücher.example');

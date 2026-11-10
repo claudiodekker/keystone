@@ -78,6 +78,7 @@ abstract class SignInController implements KeystoneController
         if ($outcome instanceof Held) {
             return match ($outcome->stage) {
                 Stage::CHALLENGE => $this->sendHeldForChallenge($request),
+                Stage::ENROLLMENT => $this->sendHeldForEnrollment($request),
             };
         }
 
@@ -103,6 +104,11 @@ abstract class SignInController implements KeystoneController
      * Send the user whose first factor was held to answer the challenge.
      */
     abstract protected function sendHeldForChallenge(Request $request): Response|Responsable;
+
+    /**
+     * Send the user whose first factor was held to enroll what the account owes.
+     */
+    abstract protected function sendHeldForEnrollment(Request $request): Response|Responsable;
 
     /**
      * Refuse the sign-in with the one translated message every refusal shares.

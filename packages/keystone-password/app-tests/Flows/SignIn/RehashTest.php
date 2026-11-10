@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Exceptions;
 
 beforeEach(function () {
+    $this->withoutEnrollmentMandates();
+
     $this->user = $this->createUser();
 
     config(['hashing.driver' => 'argon2id']);

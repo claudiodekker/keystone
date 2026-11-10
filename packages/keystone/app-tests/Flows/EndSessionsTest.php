@@ -13,6 +13,10 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
+beforeEach(function () {
+    $this->withoutEnrollmentMandates();
+});
+
 dataset('ending the account\'s sessions', [
     'with the command' => [fn (KeystoneUser $user) => Artisan::call('keystone:end-sessions', ['user' => $user->getAuthIdentifier(), '--operator' => 'margaret'])],
     'through the job an admin panel dispatches' => [fn (KeystoneUser $user) => EndSessions::dispatchSync($user, operator: 'margaret')],

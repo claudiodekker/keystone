@@ -39,6 +39,7 @@ class KeyChecks
             ...$this->plaintextLocationDrivers(),
             ...$this->logChannel(),
             ...$this->requireRecoveryCodes(),
+            ...$this->requireSecondFactor(),
             ...$this->trustedOrigins(),
         ];
     }
@@ -117,6 +118,20 @@ class KeyChecks
         }
 
         return ['keystone.require_recovery_codes must be true or false.'];
+    }
+
+    /**
+     * Get the failure of require_second_factor when it isn't a boolean.
+     *
+     * @return list<string>
+     */
+    protected function requireSecondFactor(): array
+    {
+        if (is_bool($this->config->get('keystone.require_second_factor'))) {
+            return [];
+        }
+
+        return ['keystone.require_second_factor must be true or false.'];
     }
 
     /**

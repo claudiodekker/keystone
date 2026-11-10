@@ -5,6 +5,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
 
+beforeEach(function () {
+    $this->withoutEnrollmentMandates();
+});
+
 it("keeps Keystone's users columns out of the user model's array form", function () {
     $user = $this->createUser();
 

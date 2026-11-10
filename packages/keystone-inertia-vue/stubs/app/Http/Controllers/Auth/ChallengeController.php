@@ -52,6 +52,14 @@ class ChallengeController extends KeystoneChallengeController
     }
 
     /**
+     * Send the user to enroll what the account still owes.
+     */
+    protected function sendHeldForEnrollment(Request $request): RedirectResponse
+    {
+        return to_route('login.enrollment');
+    }
+
+    /**
      * Send the user on to where the sign-in lands.
      */
     protected function sendSignedIn(Request $request, string $redirectTo): RedirectResponse

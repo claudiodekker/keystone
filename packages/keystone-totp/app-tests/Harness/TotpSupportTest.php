@@ -12,6 +12,7 @@ it('gives the contract AppTests the test support of the installed TOTP type', fu
 });
 
 it('arranges an imported key, which signs in with its own code', function () {
+    $this->withoutEnrollmentMandates();
     $user = $this->createUser();
     $support = (new TotpSupport)->arrangeKey($user, 'JBSWY3DPEHPK3PXP');
     $this->passFirstFactor($user);

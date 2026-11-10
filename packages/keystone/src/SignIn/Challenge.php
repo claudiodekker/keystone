@@ -87,7 +87,7 @@ class Challenge
      * @throws ThrottledException
      * @throws ValidationException
      */
-    public function answer(CredentialType $type, array $input): SignedIn|Refused|LastRecoveryCodeKept|NoPendingSignIn
+    public function answer(CredentialType $type, array $input): SignedIn|Held|Refused|LastRecoveryCodeKept|NoPendingSignIn
     {
         $pending = $this->session->pendingSignIn();
         $account = $this->resume($pending);
@@ -100,7 +100,7 @@ class Challenge
 
         return $this->floor->hold(
             fn () => $this->prove($type, $validated, $pending, $account),
-            fn (SignedIn|Refused|LastRecoveryCodeKept $outcome) => $outcome instanceof SignedIn,
+            fn (SignedIn|Held|Refused|LastRecoveryCodeKept $outcome) => $outcome instanceof SignedIn || $outcome instanceof Held,
         );
     }
 
@@ -163,7 +163,7 @@ class Challenge
      *
      * @throws ThrottledException
      */
-    protected function prove(CredentialType $type, array $validated, PendingSignIn $pending, KeystoneUser $account): SignedIn|Refused|LastRecoveryCodeKept
+    protected function prove(CredentialType $type, array $validated, PendingSignIn $pending, KeystoneUser $account): SignedIn|Held|Refused|LastRecoveryCodeKept
     {
         $attempt = $this->limiter->takeFailedAttempt($type, Surface::CHALLENGE, $account);
 
@@ -177,7 +177,7 @@ class Challenge
             return $this->proofs->refuse($account, $answer);
         }
 
-        return $this->proofs->signIn($account, $answer, writer: $pending);
+        return $this->pass($account, $answer, $pending);
     }
 
     /**
@@ -185,7 +185,7 @@ class Challenge
      *
      * @param  array<string, mixed>  $validated
      */
-    protected function spend(RecoveryCodeType $type, array $validated, PendingSignIn $pending, KeystoneUser $account, FailedAttempt $attempt): SignedIn|Refused|LastRecoveryCodeKept
+    protected function spend(RecoveryCodeType $type, array $validated, PendingSignIn $pending, KeystoneUser $account, FailedAttempt $attempt): SignedIn|Held|Refused|LastRecoveryCodeKept
     {
         $codes = UserRecoveryCode::query()
             ->where('user_id', $account->getAuthIdentifier())
@@ -212,6 +212,18 @@ class Challenge
 
         if (! $spent) {
             return $this->keepLast($account, $answer);
+        }
+
+        return $this->pass($account, $answer, $pending);
+    }
+
+    /**
+     * Move the pending sign-in on to enrollment while its account owes it, else sign it in.
+     */
+    protected function pass(KeystoneUser $account, Answer $answer, PendingSignIn $pending): SignedIn|Held|Refused
+    {
+        if ($this->decision->isOwed($account, Stage::ENROLLMENT)) {
+            return $this->proofs->passSecondFactor($account, $answer, $pending);
         }
 
         return $this->proofs->signIn($account, $answer, writer: $pending);

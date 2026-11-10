@@ -4,13 +4,16 @@ namespace ClaudioDekker\Keystone\Accounts;
 
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Exceptions\AccountChangeRefusedException;
+use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Models\UserCredential;
 use ClaudioDekker\Keystone\Models\UserRecoveryCode;
+use ClaudioDekker\Keystone\RecoveryCodes\RecoveryCode;
 use ClaudioDekker\Keystone\RecoveryCodes\RecoveryCodeType;
 use ClaudioDekker\Keystone\SecurityEvents\Recorder;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use Closure;
+use Illuminate\Support\Facades\Date;
 use SensitiveParameter;
 
 /**
@@ -114,6 +117,62 @@ class AccountChange
     public function advance(UserCredential $credential, #[SensitiveParameter] string $secret): void
     {
         $this->replaceSecret($credential, $secret);
+    }
+
+    /**
+     * Give the account a new credential of the type holding the secret, enrolled on the surface, which ends nothing, and alert its owner.
+     */
+    public function addCredential(CredentialType $type, #[SensitiveParameter] string $secret, Surface $surface): UserCredential
+    {
+        $credential = UserCredential::query()->forceCreate([
+            'user_id' => $this->account->getAuthIdentifier(),
+            'type' => $type->name(),
+            'secret' => $secret,
+        ]);
+
+        $this->events[] = fn (Recorder $recorder) => $recorder->record(
+            SecurityEventType::CREDENTIAL_ADDED,
+            account: $this->account,
+            surface: $surface,
+            credentialType: $type,
+            credential: $credential->getKey(),
+            recipients: $this->recipients,
+        );
+
+        return $credential;
+    }
+
+    /**
+     * Give the account its first set of recovery codes, stored as their digests, which ends nothing and alerts nobody, refusing when it already holds codes.
+     *
+     * @param  list<RecoveryCode>  $codes
+     *
+     * @throws AccountChangeRefusedException
+     */
+    public function saveRecoveryCodes(array $codes): void
+    {
+        $id = $this->account->getAuthIdentifier();
+
+        if (UserRecoveryCode::query()->where('user_id', $id)->exists()) {
+            throw AccountChangeRefusedException::recoveryCodesHeld();
+        }
+
+        $now = Date::now();
+
+        UserRecoveryCode::query()->insert(array_map(fn (RecoveryCode $code) => [
+            'user_id' => $id,
+            'digest' => $code->digest(),
+            'created_at' => $now,
+            'updated_at' => $now,
+        ], $codes));
+
+        $this->events[] = fn (Recorder $recorder) => $recorder->record(
+            SecurityEventType::RECOVERY_CODES_GENERATED,
+            account: $this->account,
+            surface: Surface::ENROLLMENT,
+            credentialType: new RecoveryCodeType,
+            recipients: [],
+        );
     }
 
     /**

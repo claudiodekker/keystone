@@ -3,6 +3,8 @@
 use ClaudioDekker\Keystone\Methods\Surface;
 
 beforeEach(function () {
+    $this->withoutEnrollmentMandates();
+
     if ($this->supportsFor(Surface::CHALLENGE) === []) {
         $this->markTestSkipped('No installed credential type with test support serves the challenge.');
     }

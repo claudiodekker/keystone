@@ -6,6 +6,7 @@ use ClaudioDekker\Keystone\Methods\Credential;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\InitiateShape;
 use ClaudioDekker\Keystone\Methods\Proof;
+use ClaudioDekker\Keystone\Methods\StartsCeremony;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Methods\Verification;
 use SensitiveParameter;
@@ -13,7 +14,7 @@ use SensitiveParameter;
 /**
  * @internal
  */
-class RecoveryCodeType implements CredentialType
+class RecoveryCodeType implements CredentialType, StartsCeremony
 {
     /**
      * The name core reserves for its recovery codes.
@@ -79,6 +80,59 @@ class RecoveryCodeType implements CredentialType
         }
 
         return Proof::rejected();
+    }
+
+    /**
+     * Stage a new set of codes, kept as they are shown until one is typed back.
+     *
+     * @return array{codes: list<string>}
+     */
+    public function start(Surface $surface): array
+    {
+        $codes = array_map(fn (RecoveryCode $code) => $code->format(), RecoveryCode::generateSet());
+
+        return ['codes' => $codes];
+    }
+
+    /**
+     * Show the staged codes.
+     *
+     * @param  array<string, mixed>  $ceremony
+     * @return array{codes: list<string>}
+     */
+    public function page(Surface $surface, array $ceremony, string $account): array
+    {
+        $codes = array_map(fn (RecoveryCode $code) => $code->format(), $this->staged($ceremony));
+
+        return ['codes' => $codes];
+    }
+
+    /**
+     * Get the codes the staging kept.
+     *
+     * @param  array<string, mixed>  $ceremony
+     * @return list<RecoveryCode>
+     */
+    public function staged(array $ceremony): array
+    {
+        $codes = is_array($ceremony['codes'] ?? null) ? $ceremony['codes'] : [];
+
+        return array_values(array_map(
+            fn (string $code) => RecoveryCode::fromInput($code),
+            array_filter($codes, is_string(...)),
+        ));
+    }
+
+    /**
+     * Determine if the typed code is one of the staged codes.
+     *
+     * @param  array<string, mixed>  $ceremony
+     */
+    public function isStaged(array $ceremony, #[SensitiveParameter] string $input): bool
+    {
+        $typed = RecoveryCode::fromInput($input)->digest();
+
+        return array_any($this->staged($ceremony), fn (RecoveryCode $code) => hash_equals($code->digest(), $typed));
     }
 
     /**

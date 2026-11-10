@@ -29,15 +29,17 @@ Set `log_channel` to the name of a channel in your `logging.php` to send the log
 |---|---|
 | `account.suspended` | An operator suspended the account. |
 | `account.unsuspended` | An operator lifted the account's suspension. |
+| `credential.added` | A credential was added to the account, such as a second factor enrolled while a sign-in was held at enrollment. |
 | `limit.tripped` | A rate limit refused its first attempt of the window. The reason names the limit: `keystone.failed_attempt_limit` or `keystone.request_limit`. |
 | `proof.rejected` | A sign-in was refused for an account that the typed address named, or a challenge answer was refused for the held account. A TOTP code from a step already accepted has the reason `totp.replayed`, and an account's last recovery code, kept while recovery codes are required, has the reason `recovery-code.last_code`. |
 | `recovery_code.used` | A recovery code answered the challenge and was spent. |
+| `recovery_codes.generated` | A set of recovery codes was stored. A first set alerts nobody. |
 | `request.rejected` | A request was refused before it ran. The reason says why: `keystone.cross_site_request`. The event is anonymous. |
-| `session.ended` | Keystone ended the session. The reason says why: `keystone.expired` when it passed its absolute lifetime, `keystone.epoch` when an operator ended the account's sessions or suspended it after it signed in. |
+| `session.ended` | Keystone ended the session. The reason says why: `keystone.expired` when it passed its absolute lifetime, `keystone.epoch` when an operator ended the account's sessions or suspended it after it signed in, `keystone.demoted` when the account came to owe [enrollment](enrollment.md#signed-in-sessions-that-newly-owe). |
 | `sessions.terminated` | An operator ended every session of the account. Ending every account's sessions records one about nobody, with reason `keystone.every_account`. |
-| `sign_in.held` | A right first factor was held for what the account owes. The reason names the stage: `keystone.challenge`. |
+| `sign_in.held` | A right first factor was held for what the account owes. The reason names the stage: `keystone.challenge` or `keystone.enrollment`. A challenge answer that moves on to enrollment records it again. |
 | `sign_in.voided` | A pending sign-in was dropped because its account's credential epoch moved or the account was suspended since the hold. The reason is `keystone.epoch`. |
-| `signed_in` | A session signed in, on its first factor or at the challenge. |
+| `signed_in` | A session signed in, on its first factor, at the challenge or at the end of enrollment. |
 | `signed_out` | The user signed out. |
 
 ## Fields
@@ -51,7 +53,7 @@ Every event has the same fields, whatever its type. There is no free-form metada
 | `type` | One of the types above. |
 | `user_id` | The account the event is for, or null for an anonymous event. The column has no foreign key, so a removed account's rows keep its id. |
 | `actor` | Who made it happen: `user`, `operator` or `system`. An event an operator command or job records is the operator's. |
-| `flow` | The flow the request was in, `sign-in` or `challenge`, or null when it was in none, such as signing out. |
+| `flow` | The flow the request was in, `sign-in`, `challenge` or `enrollment`, or null when it was in none, such as signing out. |
 | `credential_type` | The name of the credential type involved, if any. |
 | `credential_id` | The credential involved, if any. A rejection names a credential only when it belongs to the account the attempt named. |
 | `credential_label` | The credential's label as it was at the time, when it has one. |
@@ -79,15 +81,17 @@ Keystone adds one piece of global middleware after the app's trusted-proxy middl
 
 ## Alerts
 
-An alert is a mail that tells an account's owner something happened to its security. Each type of event has a slot in `notifications`: the notification class Keystone sends for that type, or `null` to send none. Today `account.suspended`, `account.unsuspended`, `recovery_code.used` and `sessions.terminated` alert by default:
+An alert is a mail that tells an account's owner something happened to its security. Each type of event has a slot in `notifications`: the notification class Keystone sends for that type, or `null` to send none. Today `account.suspended`, `account.unsuspended`, `credential.added`, `recovery_code.used` and `sessions.terminated` alert by default:
 
 ```php
 'notifications' => [
     'account.suspended' => SecurityAlert::class,
     'account.unsuspended' => SecurityAlert::class,
+    'credential.added' => SecurityAlert::class,
     'limit.tripped' => null,
     'proof.rejected' => null,
     'recovery_code.used' => SecurityAlert::class,
+    'recovery_codes.generated' => null,
     'request.rejected' => null,
     'session.ended' => null,
     'sessions.terminated' => SecurityAlert::class,

@@ -60,15 +60,27 @@ A break-glass code core keeps for an account, of its reserved `recovery-code` ty
 
 ## Sign-in decision
 
-The one place core decides what a proof earns: refused, a sign-in, or a hold at the stage the account owes. A first factor that doesn't prove two factors on its own is held at the challenge when its account holds a second factor. The decision runs again for a pending sign-in, as its account stands now, before each step is shown and before each answer is checked.
+The one place core decides what a proof earns: refused, a sign-in, or a hold at the stage the account owes. A first factor that doesn't prove two factors on its own is held at the challenge when its account holds a second factor, and at enrollment when its account owes what a mandate requires. The decision runs again for a pending sign-in, as its account stands now, before each step is shown and before each answer is checked.
+
+## Mandate
+
+One of `require_second_factor` and `require_recovery_codes`, both on by default. While a mandate is on, an account that lacks what it requires owes enrollment: its sign-in is held at enrollment, and a signed-in session of it is demoted.
 
 ## Pending sign-in
 
-A sign-in that passed its first factor and still owes a stage, such as the challenge. A session holds at most one, as its phase, with the account, the first factor's type, the stage, the intended URL and the account's credential epoch at the hold. It lasts a fixed 15 minutes. To every other page the session is a guest. A pending sign-in whose account's credential epoch moved, or whose account was suspended, is dropped and recorded voided; one whose account no longer owes its stage is dropped.
+A sign-in that passed its first factor and still owes a stage: the challenge or enrollment. A session holds at most one, as its phase, with the account, the first factor's type, the stage, the intended URL, the account's credential epoch at the hold, and the type that passed its second factor once one did. It lasts a fixed 15 minutes. To every other page the session is a guest. A pending sign-in whose account's credential epoch moved, or whose account was suspended, is dropped and recorded voided; one whose account no longer owes its stage is dropped.
 
 ## Challenge
 
 The stage where a pending sign-in answers with a second factor of another type than its first factor's. A right answer completes the sign-in. A wrong one is refused on the type's field, counted in the challenge flow and recorded, and the pending sign-in stays.
+
+## Enrollment
+
+The stage where a pending sign-in sets up what its account owes before it signs in: first a second factor of a type offered on both enrollment and the challenge, then a set of recovery codes, staged in a ceremony slot until the user types one back. A second factor the pending sign-in neither answered nor enrolled itself, such as one added from another browser, drops it, so the next sign-in answers the challenge for it.
+
+## Demotion
+
+Ending a signed-in session whose account newly owes enrollment, such as after a mandate was turned on. The guard ends it like an expired one and records `session.ended` with the reason `keystone.demoted`. Nothing is enrolled on the strength of the earlier sign-in, so the user signs in again and enrolls.
 
 ## Session phase
 

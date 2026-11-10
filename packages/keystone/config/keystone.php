@@ -102,9 +102,11 @@ return [
     'notifications' => [
         'account.suspended' => SecurityAlert::class,
         'account.unsuspended' => SecurityAlert::class,
+        'credential.added' => SecurityAlert::class,
         'limit.tripped' => null,
         'proof.rejected' => null,
         'recovery_code.used' => SecurityAlert::class,
+        'recovery_codes.generated' => null,
         'request.rejected' => null,
         'session.ended' => null,
         'sessions.terminated' => SecurityAlert::class,
@@ -139,13 +141,26 @@ return [
     | Require Recovery Codes
     |--------------------------------------------------------------------------
     |
-    | While recovery codes are required, an account keeps its last code for
-    | account recovery, so the challenge refuses it rather than spend it.
-    | Set it to false to let the last code sign in like any other code.
+    | While recovery codes are required, a sign-in of an account holding no
+    | code saves a set before it gets in, and the challenge keeps its last
+    | code for account recovery. Set it to false to make codes optional.
     |
     */
 
     'require_recovery_codes' => true,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Require Second Factor
+    |--------------------------------------------------------------------------
+    |
+    | While a second factor is required, a sign-in of an account holding no
+    | second factor enrolls one before it gets in, and a session whose own
+    | account no longer holds one is signed out on its next request too.
+    |
+    */
+
+    'require_second_factor' => true,
 
     /*
     |--------------------------------------------------------------------------

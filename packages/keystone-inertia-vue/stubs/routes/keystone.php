@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\ChallengeController;
+use App\Http\Controllers\Auth\EnrollmentController;
 use App\Http\Controllers\Auth\SignInController;
 use App\Http\Controllers\Auth\SignOutController;
 use Illuminate\Support\Facades\Route;
@@ -13,6 +14,12 @@ Route::prefix('login')->group(function () {
         Route::get('/', [ChallengeController::class, 'show'])->name('login.challenge');
         Route::post('{type}', [ChallengeController::class, 'store'])->name('login.challenge.submit');
         Route::delete('/', [ChallengeController::class, 'destroy'])->name('login.challenge.cancel');
+    });
+
+    Route::prefix('enrollment')->group(function () {
+        Route::get('/', [EnrollmentController::class, 'show'])->name('login.enrollment');
+        Route::post('{type}', [EnrollmentController::class, 'store'])->name('login.enrollment.submit');
+        Route::delete('/', [EnrollmentController::class, 'destroy'])->name('login.enrollment.cancel');
     });
 });
 

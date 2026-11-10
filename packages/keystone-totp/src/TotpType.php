@@ -7,21 +7,31 @@ use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\InitiateShape;
 use ClaudioDekker\Keystone\Methods\OneTimeCode;
 use ClaudioDekker\Keystone\Methods\Proof;
+use ClaudioDekker\Keystone\Methods\StartsCeremony;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Methods\Verification;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Uri;
+use ParagonIE\ConstantTime\Base32;
 use SensitiveParameter;
 
 /**
  * @internal
  */
-class TotpType implements ChecksConfiguration, CredentialType, OneTimeCode
+class TotpType implements ChecksConfiguration, CredentialType, OneTimeCode, StartsCeremony
 {
     /**
      * The key a code is checked against when the subject holds no usable secret, so the check costs what a real one does.
      */
     protected const string DECOY_KEY = 'keystone-totp-decoy-key';
+
+    /**
+     * The bytes of a new key, 160 bits as RFC 4226 recommends.
+     *
+     * @var positive-int
+     */
+    protected const int KEY_BYTES = 20;
 
     /**
      * Create the type.
@@ -40,15 +50,14 @@ class TotpType implements ChecksConfiguration, CredentialType, OneTimeCode
     }
 
     /**
-     * Get the form shape on the challenge, and nothing on every other surface.
+     * Get the form shape on the challenge and on enrollment, and nothing on every other surface.
      */
     public function initiateShape(Surface $surface): ?InitiateShape
     {
-        if ($surface !== Surface::CHALLENGE) {
-            return null;
-        }
-
-        return InitiateShape::FORM;
+        return match ($surface) {
+            Surface::CHALLENGE, Surface::ENROLLMENT => InitiateShape::FORM,
+            default => null,
+        };
     }
 
     /**
@@ -73,9 +82,15 @@ class TotpType implements ChecksConfiguration, CredentialType, OneTimeCode
 
     /**
      * Prove the credential whose key makes the code within the window, advancing it to the code's step, unless that step was accepted already.
+     *
+     * On enrollment, enroll the key being set up once it makes the code, with the code's step accepted.
      */
     public function verify(Verification $verification): Proof
     {
+        if ($verification->surface === Surface::ENROLLMENT) {
+            return $this->enroll($verification);
+        }
+
         $code = (string) $verification->input['code'];
         $now = Totp::stepAt(Date::now()->getTimestamp());
         $usable = 0;
@@ -109,6 +124,38 @@ class TotpType implements ChecksConfiguration, CredentialType, OneTimeCode
     }
 
     /**
+     * Start setting up a new key, kept in Base32 until its first code is right.
+     *
+     * @return array{key: string}
+     */
+    public function start(Surface $surface): array
+    {
+        return ['key' => Base32::encodeUpperUnpadded(random_bytes(static::KEY_BYTES))];
+    }
+
+    /**
+     * Show the key being set up in Base32 for typing in, and as the otpauth:// URI an authenticator app scans, labelled with the app's name and the account.
+     *
+     * @param  array<string, mixed>  $ceremony
+     * @return array{key: string, uri: string}
+     */
+    public function page(Surface $surface, array $ceremony, string $account): array
+    {
+        $key = (string) ($ceremony['key'] ?? '');
+        $issuer = (string) $this->config->get('app.name');
+
+        $uri = Uri::of('otpauth://totp/'.rawurlencode($issuer.':'.$account))->withQuery([
+            'secret' => $key,
+            'issuer' => $issuer,
+        ]);
+
+        return [
+            'key' => $key,
+            'uri' => (string) $uri,
+        ];
+    }
+
+    /**
      * Get the failure of each problem with the type's config.
      *
      * @return list<string>
@@ -122,6 +169,31 @@ class TotpType implements ChecksConfiguration, CredentialType, OneTimeCode
         }
 
         return ['keystone.totp.window_steps must be a whole number of steps of at least 0.'];
+    }
+
+    /**
+     * Enroll the key the ceremony set up when it makes the code within the window, with that step accepted.
+     */
+    protected function enroll(Verification $verification): Proof
+    {
+        $code = (string) $verification->input['code'];
+        $now = Totp::stepAt(Date::now()->getTimestamp());
+        $key = $verification->ceremony['key'] ?? null;
+        $secret = is_string($key) ? TotpSecret::fromKey($key) : null;
+
+        if ($secret === null) {
+            $this->matchingStep(static::DECOY_KEY, $code, $now);
+
+            return Proof::rejected();
+        }
+
+        $step = $this->matchingStep($secret->key, $code, $now);
+
+        if ($step === null) {
+            return Proof::rejected();
+        }
+
+        return Proof::enrolled($secret->accepting($step)->toStored());
     }
 
     /**

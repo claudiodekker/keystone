@@ -101,6 +101,16 @@ it('boots with recovery codes not required', function () {
     expect($this->bootFailures())->toBe([]);
 });
 
+it('refuses require_second_factor when it is not a boolean', function (mixed $value) {
+    config(['keystone.require_second_factor' => $value]);
+
+    expect($this->bootFailures())->toBe(['keystone.require_second_factor must be true or false.']);
+})->with([
+    'a string' => 'yes',
+    'one' => 1,
+    'null' => null,
+]);
+
 it('refuses a log channel that the logging config does not hold', function (mixed $value) {
     config(['keystone.log_channel' => $value]);
 

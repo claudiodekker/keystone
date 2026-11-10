@@ -12,6 +12,10 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Sleep;
 
+beforeEach(function () {
+    $this->withoutEnrollmentMandates();
+});
+
 it("refuses a suspended account's right secret exactly like a wrong one", function () {
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');

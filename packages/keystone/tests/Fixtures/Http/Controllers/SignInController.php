@@ -45,6 +45,14 @@ class SignInController extends BaseSignInController
     }
 
     /**
+     * Send the user to enroll what the account owes.
+     */
+    protected function sendHeldForEnrollment(Request $request): Response
+    {
+        return to_route('login.enrollment');
+    }
+
+    /**
      * Return to the sign-in page with the message on the identifier, flashing back all input as a careless app would.
      */
     protected function sendSignInRefused(Request $request, string $message): Response

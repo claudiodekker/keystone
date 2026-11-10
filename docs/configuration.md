@@ -23,12 +23,13 @@ This file raises the view allowance and keeps every other allowance at its defau
 | `ip_location.allow_plaintext_driver` | `false` | `true` lets a `stevebauman/location` driver send IP addresses to a third party over plain HTTP. |
 | `log_channel` | `null` | None. It only picks where the security event lines go. |
 | `methods` | `null` | None. It only narrows: a type it leaves out is offered nowhere, and it can't offer a type on a surface the type doesn't serve. |
-| `notifications.<type>` | `SecurityAlert` for `account.suspended`, `account.unsuspended`, `recovery_code.used` and `sessions.terminated`, `null` for every other type | `null` stops the alert for that type, so its owner no longer hears about it. |
+| `notifications.<type>` | `SecurityAlert` for `account.suspended`, `account.unsuspended`, `credential.added`, `recovery_code.used` and `sessions.terminated`, `null` for every other type | `null` stops the alert for that type, so its owner no longer hears about it. |
 | `rate_limits.failed_attempts_per_hour` | `20` | A higher number gives an attacker more guesses per account. |
 | `rate_limits.requests_per_minute.change` | `10` | A higher number lets more sign-outs through from one address. |
 | `rate_limits.requests_per_minute.submit` | `10` | A higher number lets more sign-in submits through from one address. |
 | `rate_limits.requests_per_minute.view` | `60` | A higher number lets more page views through from one address. |
-| `require_recovery_codes` | `true` | `false` lets the last recovery code answer the challenge, which can leave an account without codes for recovery. |
+| `require_recovery_codes` | `true` | `false` lets an account sign in without recovery codes, and lets its last code answer the challenge, which can leave it without codes for recovery. |
+| `require_second_factor` | `true` | `false` lets an account sign in on its first factor alone while it holds no second factor. |
 | `session.absolute_lifetime_seconds` | `12 * 60 * 60` | A longer lifetime keeps a stolen session alive longer while it stays busy, and `null` keeps it alive for as long as it stays busy. |
 | `totp.window_steps` | `1`, with `keystone-totp` installed | Each step either side accepts two more codes, so a guess succeeds with about (2n + 1) in a million for a window of n steps. |
 | `trusted_origins` | `[]` | Any page on a listed origin can sign users in and out. |
@@ -115,6 +116,7 @@ The checks set no ceilings. In every environment, they refuse a value of the wro
 | `events.enabled` | `true` or `false`. |
 | `ip_location.allow_plaintext_driver` | `true` or `false`. |
 | `require_recovery_codes` | `true` or `false`. |
+| `require_second_factor` | `true` or `false`. |
 | `log_channel` | `null`, or the name of a channel in your `logging` config. |
 | `notifications` | A map of security event types, each to `null` or to a notification class whose constructor takes the event alone. `SecurityAlert` is refused on a type it has no mail for. |
 | `clear_site_data` | A list of `cache`, `cookies`, `executionContexts` and `storage`. |
@@ -124,6 +126,6 @@ The checks set no ceilings. In every environment, they refuse a value of the wro
 | `totp.window_steps` | An integer of at least 0, with `keystone-totp` installed. |
 | `trusted_origins` | A list of origins, each a scheme and a host with nothing after it. |
 
-It also refuses two packages that register one credential type name, and a user model on a database connection other than the default one, because Keystone's tables are migrated on the default connection.
+In production, it also refuses `require_second_factor` on while `methods` lists no type on both enrollment and the challenge, as [enrollment](enrollment.md#production) explains. It also refuses two packages that register one credential type name, and a user model on a database connection other than the default one, because Keystone's tables are migrated on the default connection.
 
 Keystone also refuses to boot an app whose HTTP kernel doesn't run Keystone's global middleware that captures the request context. Without it, Keystone can't read the client's address, so every request would count as coming from the same address.

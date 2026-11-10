@@ -13,12 +13,13 @@ it('registers totp as a plain instance it never binds, counted as a one-time cod
         ->and($this->app->bound(TotpType::class))->toBeFalse();
 });
 
-it('offers totp on the challenge alone', function () {
+it('offers totp on the challenge and enrollment alone', function () {
     $types = app(CredentialTypes::class);
 
-    expect($types->find('totp', Surface::SIGN_IN))->toBeNull()
-        ->and($types->find('totp', Surface::REGISTRATION))->toBeNull()
-        ->and($types->find('totp', Surface::ENROLLMENT))->toBeNull();
+    expect($types->find('totp', Surface::CHALLENGE))->toBeInstanceOf(TotpType::class)
+        ->and($types->find('totp', Surface::ENROLLMENT))->toBeInstanceOf(TotpType::class)
+        ->and($types->find('totp', Surface::SIGN_IN))->toBeNull()
+        ->and($types->find('totp', Surface::REGISTRATION))->toBeNull();
 });
 
 it('accepts one step either side of now by default', function () {

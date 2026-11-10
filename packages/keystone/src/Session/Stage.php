@@ -8,4 +8,5 @@ namespace ClaudioDekker\Keystone\Session;
 enum Stage: string
 {
     case CHALLENGE = 'challenge';
+    case ENROLLMENT = 'enrollment';
 }

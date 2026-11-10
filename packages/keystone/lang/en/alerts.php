@@ -12,6 +12,12 @@ return [
             'summary' => 'An administrator lifted the suspension of your account, so you can sign in again.',
         ],
     ],
+    'credential' => [
+        'added' => [
+            'subject' => 'A sign-in method was added',
+            'summary' => 'A new way to sign in was added to your account.',
+        ],
+    ],
     'device' => 'Device: :device',
     'device-name' => ':browser on :platform',
     'if-not-you' => "If this wasn't you, sign in and review your security settings.",

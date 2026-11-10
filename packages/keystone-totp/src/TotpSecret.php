@@ -48,13 +48,27 @@ readonly class TotpSecret
             return null;
         }
 
+        $secret = static::fromKey($value['key']);
+
+        if ($secret === null) {
+            return null;
+        }
+
+        return new static($secret->key, $lastStep);
+    }
+
+    /**
+     * Read a key from its Base32 form with no code accepted yet, or null when it holds none.
+     */
+    public static function fromKey(#[SensitiveParameter] string $base32): ?static
+    {
         try {
-            $key = Base32::decodeUpper($value['key']);
+            $key = Base32::decodeUpper($base32);
         } catch (RangeException) {
             return null;
         }
 
-        return $key === '' ? null : new static($key, $lastStep);
+        return $key === '' ? null : new static($key, lastStep: null);
     }
 
     /**

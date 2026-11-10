@@ -4,11 +4,13 @@ namespace ClaudioDekker\Keystone\Auth;
 
 use ClaudioDekker\Keystone\Accounts\CredentialEpoch;
 use ClaudioDekker\Keystone\Exceptions\SessionGuardSignInException;
+use ClaudioDekker\Keystone\Http\EndedSession;
 use ClaudioDekker\Keystone\Http\Middleware\ClearSiteData;
-use ClaudioDekker\Keystone\Http\SessionExpiry;
 use ClaudioDekker\Keystone\SecurityEvents\Recorder;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use ClaudioDekker\Keystone\Session\SessionState;
+use ClaudioDekker\Keystone\Session\Stage;
+use ClaudioDekker\Keystone\SignIn\SignInDecision;
 use ClaudioDekker\Keystone\Status;
 use Illuminate\Auth\SessionGuard;
 use Illuminate\Contracts\Auth\Authenticatable;
@@ -44,7 +46,7 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Get the signed-in user, ending a session past its absolute lifetime or its account's credential epoch first so the request reads it as a guest's.
+     * Get the signed-in user, first ending a session that may no longer stand, so the request reads it as a guest's.
      */
     public function user(): ?Authenticatable
     {
@@ -54,6 +56,10 @@ class KeystoneGuard extends SessionGuard
 
         if ($this->hasLeftEpoch()) {
             $this->endOffEpoch();
+        }
+
+        if ($this->namesUnreadUser()) {
+            $this->readUser();
         }
 
         return parent::user();
@@ -169,13 +175,33 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
+     * Read the user the session names, ending the session instead when its account owes enrollment while a mandate is on.
+     */
+    protected function readUser(): void
+    {
+        $account = $this->sessionAccount();
+
+        if ($account === null) {
+            return;
+        }
+
+        if ($this->container->make(SignInDecision::class)->isOwed($account, Stage::ENROLLMENT)) {
+            $this->demote($account);
+
+            return;
+        }
+
+        $this->setUser($account);
+    }
+
+    /**
      * End the expired session, and have the request that needs a user answered with the app's expiry response.
      */
     protected function expire(): void
     {
-        $this->end(Status::SESSION_EXPIRED, reason: 'keystone.expired');
+        $this->end(Status::SESSION_EXPIRED, reason: 'keystone.expired', account: $this->sessionAccount());
 
-        SessionExpiry::forResponseTo($this->request);
+        EndedSession::expired($this->request);
     }
 
     /**
@@ -183,16 +209,24 @@ class KeystoneGuard extends SessionGuard
      */
     protected function endOffEpoch(): void
     {
-        $this->end(Status::SESSION_ENDED, reason: 'keystone.epoch');
+        $this->end(Status::SESSION_ENDED, reason: 'keystone.epoch', account: $this->sessionAccount());
+    }
+
+    /**
+     * End the session of the account that newly owes enrollment, and have the request that needs a user answered with the app's demotion response.
+     */
+    protected function demote(KeystoneUser $account): void
+    {
+        $this->end(Status::SESSION_DEMOTED, reason: 'keystone.demoted', account: $account);
+
+        EndedSession::demoted($this->request);
     }
 
     /**
      * End the session, tell the user why on their next page and record it for the account, before anything answers the request.
      */
-    protected function end(Status $status, string $reason): void
+    protected function end(Status $status, string $reason, ?KeystoneUser $account): void
     {
-        $account = $this->sessionAccount();
-
         $this->loggedOut = true;
         $this->endSession();
 

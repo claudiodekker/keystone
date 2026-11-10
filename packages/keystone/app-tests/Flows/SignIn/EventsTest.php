@@ -13,6 +13,10 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Sleep;
 
+beforeEach(function () {
+    $this->withoutEnrollmentMandates();
+});
+
 afterEach(function () {
     Model::encryptUsing(null);
     TrustProxies::flushState();

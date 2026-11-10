@@ -3,6 +3,10 @@
 use ClaudioDekker\Keystone\Password\AppTests\PasswordSupport;
 use Illuminate\Support\Facades\Auth;
 
+beforeEach(function () {
+    $this->withoutEnrollmentMandates();
+});
+
 it('treats surrounding spaces as part of the password', function () {
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');

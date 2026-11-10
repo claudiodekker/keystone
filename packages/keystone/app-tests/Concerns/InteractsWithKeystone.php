@@ -5,6 +5,7 @@ namespace ClaudioDekker\Keystone\AppTests\Concerns;
 use ClaudioDekker\Keystone\Accounts\EmailAddress;
 use ClaudioDekker\Keystone\AppTests\Assertions\ChallengeAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\CrossSiteAssertions;
+use ClaudioDekker\Keystone\AppTests\Assertions\EnrollmentAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\GuestStepAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\SessionExpiryAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\SignInAssertions;
@@ -51,6 +52,7 @@ trait InteractsWithKeystone
     use AssertsHardening;
     use ChallengeAssertions;
     use CrossSiteAssertions;
+    use EnrollmentAssertions;
     use GuestStepAssertions;
     use LazilyRefreshDatabase;
     use SessionExpiryAssertions;
@@ -200,6 +202,17 @@ trait InteractsWithKeystone
                 ...$support->rejectedProof(Surface::SIGN_IN),
             ]);
         }
+    }
+
+    /**
+     * Turn the second-factor and recovery-code mandates off for the rest of the test, so an account holding neither signs in on its first factor alone.
+     */
+    public function withoutEnrollmentMandates(): void
+    {
+        config([
+            'keystone.require_recovery_codes' => false,
+            'keystone.require_second_factor' => false,
+        ]);
     }
 
     /**

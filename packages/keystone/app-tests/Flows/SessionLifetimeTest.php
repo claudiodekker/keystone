@@ -7,6 +7,10 @@ use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use Illuminate\Support\Facades\Auth;
 
+beforeEach(function () {
+    $this->withoutEnrollmentMandates();
+});
+
 it('signs out a session its absolute lifetime after the sign-in, and tells the user why', function () {
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');

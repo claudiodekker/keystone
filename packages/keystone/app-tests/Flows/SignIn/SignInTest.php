@@ -6,6 +6,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Event;
 
 beforeEach(function () {
+    $this->withoutEnrollmentMandates();
+
     Event::fake([Login::class]);
 });
 
