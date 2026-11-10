@@ -107,7 +107,12 @@ class SignInDecision
             return HoldEnded::VOIDED;
         }
 
-        if (! $this->isOwed($account, $pending->stage) || $this->holdsUnprovenSecondFactor($pending, $account)) {
+        $isOwed = match ($pending->stage) {
+            Stage::CHALLENGE => $this->isOwed($account, Stage::CHALLENGE),
+            Stage::ENROLLMENT => $this->owesEnrollment($pending, $account),
+        };
+
+        if (! $isOwed) {
             return HoldEnded::UNNEEDED;
         }
 
@@ -123,13 +128,31 @@ class SignInDecision
     }
 
     /**
-     * Determine if the pending sign-in waits at enrollment while its account holds a second factor it neither answered nor enrolled itself.
+     * Determine if the pending sign-in, resumed at enrollment, enrolls its second factor next rather than its recovery codes.
+     *
+     * Resuming dropped every hold whose account holds a second factor the pending sign-in didn't pass, so one that passed none holds none.
      */
-    protected function holdsUnprovenSecondFactor(PendingSignIn $pending, KeystoneUser $account): bool
+    public function enrollsSecondFactor(PendingSignIn $pending): bool
     {
-        return $pending->stage === Stage::ENROLLMENT
-            && $pending->secondFactor === null
-            && $this->holdings->holdsSecondFactor($account);
+        return $pending->secondFactor === null && $this->config->boolean('keystone.require_second_factor');
+    }
+
+    /**
+     * Determine if the pending sign-in still owes enrollment, reading each of its account's holdings once: never once its account holds a second factor the pending sign-in neither answered nor enrolled itself.
+     */
+    protected function owesEnrollment(PendingSignIn $pending, KeystoneUser $account): bool
+    {
+        $holdsSecondFactor = $this->holdings->holdsSecondFactor($account);
+
+        if ($pending->secondFactor === null && $holdsSecondFactor) {
+            return false;
+        }
+
+        if ($this->config->boolean('keystone.require_second_factor') && ! $holdsSecondFactor) {
+            return true;
+        }
+
+        return $this->owesRecoveryCodes($account);
     }
 
     /**

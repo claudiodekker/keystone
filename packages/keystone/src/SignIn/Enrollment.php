@@ -124,7 +124,7 @@ class Enrollment
             return new NoPendingSignIn;
         }
 
-        if ($this->decision->owesSecondFactor($account)) {
+        if ($this->decision->enrollsSecondFactor($pending)) {
             return $this->secondFactorPage($account);
         }
 
@@ -218,7 +218,7 @@ class Enrollment
      */
     protected function step(CredentialType $type, array $validated, PendingSignIn $pending, KeystoneUser $account): SignedIn|Held|Refused|RecoveryCodeIncorrect|EnrollmentExpired
     {
-        if (! $this->decision->owesSecondFactor($account)) {
+        if (! $this->decision->enrollsSecondFactor($pending)) {
             return $type instanceof RecoveryCodeType
                 ? $this->saveRecoveryCodes($type, (string) $validated['recovery_code'], $pending, $account)
                 : new Refused;
@@ -232,7 +232,7 @@ class Enrollment
     }
 
     /**
-     * Store the second factor the type's live ceremony proves the user set up, then move on to the recovery codes or sign in.
+     * Store the second factor the type's live ceremony proves the user set up, then move on to the recovery codes while the account owes them, else sign in.
      *
      * @param  array<string, mixed>  $validated
      *
@@ -260,7 +260,13 @@ class Enrollment
 
         $this->limiter->giveBack($attempt);
 
-        return $this->complete($type, $pending, $account);
+        if ($this->decision->owesRecoveryCodes($account)) {
+            $this->session->passSecondFactor($pending, $type);
+
+            return new Held(Stage::ENROLLMENT);
+        }
+
+        return $this->signIn($type, $account);
     }
 
     /**
@@ -280,7 +286,7 @@ class Enrollment
     /**
      * Store the staged recovery codes once the user typed one of them back, then sign in.
      */
-    protected function saveRecoveryCodes(RecoveryCodeType $type, #[SensitiveParameter] string $typed, PendingSignIn $pending, KeystoneUser $account): SignedIn|Held|Refused|RecoveryCodeIncorrect|EnrollmentExpired
+    protected function saveRecoveryCodes(RecoveryCodeType $type, #[SensitiveParameter] string $typed, PendingSignIn $pending, KeystoneUser $account): SignedIn|Refused|RecoveryCodeIncorrect|EnrollmentExpired
     {
         $ceremony = $this->session->ceremony($type, Surface::ENROLLMENT);
 
@@ -298,20 +304,14 @@ class Enrollment
             return new Refused;
         }
 
-        return $this->complete($type, $pending, $account);
+        return $this->signIn($type, $account);
     }
 
     /**
-     * Move the pending sign-in on to the recovery codes while the account owes them, else sign it in.
+     * Complete the sign-in of the account whose enrollment the type finished.
      */
-    protected function complete(CredentialType $type, PendingSignIn $pending, KeystoneUser $account): SignedIn|Held
+    protected function signIn(CredentialType $type, KeystoneUser $account): SignedIn
     {
-        if ($this->decision->owesRecoveryCodes($account)) {
-            $this->session->passSecondFactor($pending, $type);
-
-            return new Held(Stage::ENROLLMENT);
-        }
-
         $redirectTo = $this->session->signIn($account);
 
         $this->recorder->record(
