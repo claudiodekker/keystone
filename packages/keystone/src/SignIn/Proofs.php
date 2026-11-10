@@ -51,6 +51,7 @@ class Proofs
             surface: $surface,
             input: $input,
             credentials: $credentials->map->toCredential()->values()->all(),
+            ceremony: $this->session->ceremony($type, $surface),
         );
 
         try {

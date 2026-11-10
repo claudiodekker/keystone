@@ -7,6 +7,7 @@ use ClaudioDekker\Keystone\Accounts\CredentialEpoch;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\CredentialType;
+use ClaudioDekker\Keystone\Methods\StartsCeremony;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Status;
 use Illuminate\Auth\Events\Login;
@@ -41,6 +42,11 @@ class SessionState
      * The session key that holds the session's one phase, such as a pending sign-in.
      */
     protected const string PHASE = 'keystone.phase';
+
+    /**
+     * The session key that holds the ceremony slots, keyed by surface and credential type.
+     */
+    protected const string CEREMONIES = 'keystone.ceremonies';
 
     /**
      * Create the session state over the request's session.
@@ -125,6 +131,32 @@ class SessionState
         $this->changeAuthLevel();
 
         $this->session->put(static::PHASE, $pending->toSession());
+    }
+
+    /**
+     * Start the type's ceremony on the surface, keeping what the start returned in its slot in place of any earlier one, and get it.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function startCeremony(CredentialType&StartsCeremony $type, Surface $surface): ?array
+    {
+        $ceremony = $type->start($surface);
+
+        $this->session->put(static::CEREMONIES, [
+            $this->slot($type, $surface) => $ceremony,
+        ]);
+
+        return $ceremony;
+    }
+
+    /**
+     * Get what the type's live ceremony on the surface kept, or null when none is live.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function ceremony(CredentialType $type, Surface $surface): ?array
+    {
+        return $this->session->get(static::CEREMONIES)[$this->slot($type, $surface)] ?? null;
     }
 
     /**
@@ -223,6 +255,14 @@ class SessionState
     {
         $this->session->regenerate(true);
         $this->session->forget(static::PHASE);
+    }
+
+    /**
+     * Get the key of the type's ceremony slot on the surface.
+     */
+    protected function slot(CredentialType $type, Surface $surface): string
+    {
+        return $surface->value.':'.$type->name();
     }
 
     /**
