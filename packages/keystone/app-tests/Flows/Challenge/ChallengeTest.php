@@ -6,7 +6,6 @@ use ClaudioDekker\Keystone\Jobs\EndSessions;
 use ClaudioDekker\Keystone\Jobs\SuspendAccount;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\Surface;
-use ClaudioDekker\Keystone\Models\UserCredential;
 use ClaudioDekker\Keystone\RateLimits\StepKind;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use ClaudioDekker\Keystone\Session\Flow;
@@ -422,7 +421,7 @@ it('drops the hold once the account no longer holds a second factor', function (
     $support = $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);
     $this->passFirstFactor($user);
 
-    UserCredential::query()->where('type', $support->type()->name())->delete();
+    $this->removeCredentials($user, $support);
     $response = $step($this, $user, $support);
 
     $this->assertNoPendingSignIn($response);

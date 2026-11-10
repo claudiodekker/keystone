@@ -27,18 +27,21 @@ class AccountChanges
     }
 
     /**
-     * Apply a change to the account while its row is locked, moving its credential epoch when the change ends its sessions.
+     * Apply a change to the account while its row is locked, moving its credential epoch when the change ends its sessions, and get what the change returned.
      *
      * The change records its events only once the outermost transaction commits, so one that rolls back records nothing. Their alerts go to the addresses the account held before the change.
      * A change a pending sign-in writes is refused, writing nothing, once the account left the credential epoch it was held on or was barred.
      *
-     * @param  Closure(AccountChange): void  $apply
+     * @template TResult
+     *
+     * @param  Closure(AccountChange): TResult  $apply
+     * @return TResult
      *
      * @throws AccountChangeRefusedException
      */
-    public function change(KeystoneUser $account, Closure $apply, ?PendingSignIn $writer = null): void
+    public function change(KeystoneUser $account, Closure $apply, ?PendingSignIn $writer = null): mixed
     {
-        $change = $this->connection->transaction(function () use ($account, $apply, $writer) {
+        [$change, $result] = $this->connection->transaction(function () use ($account, $apply, $writer) {
             $epoch = CredentialEpoch::lock($account->getAuthIdentifier());
 
             if ($writer !== null && $epoch !== $writer->epoch) {
@@ -49,16 +52,18 @@ class AccountChanges
 
             $change = new AccountChange($account, $recipients);
 
-            $apply($change);
+            $result = $apply($change);
 
             if ($change->movesEpoch()) {
                 CredentialEpoch::move($account->getAuthIdentifier());
             }
 
-            return $change;
+            return [$change, $result];
         });
 
         $this->connection->afterCommit(fn () => $change->record($this->recorder));
+
+        return $result;
     }
 
     /**

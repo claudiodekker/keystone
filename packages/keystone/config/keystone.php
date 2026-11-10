@@ -104,6 +104,7 @@ return [
         'account.unsuspended' => SecurityAlert::class,
         'limit.tripped' => null,
         'proof.rejected' => null,
+        'recovery_code.used' => SecurityAlert::class,
         'request.rejected' => null,
         'session.ended' => null,
         'sessions.terminated' => SecurityAlert::class,
@@ -132,6 +133,19 @@ return [
             'view' => 60,
         ],
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Require Recovery Codes
+    |--------------------------------------------------------------------------
+    |
+    | While recovery codes are required, an account keeps its last code for
+    | account recovery, so the challenge refuses it rather than spend it.
+    | Set it to false to let the last code sign in like any other code.
+    |
+    */
+
+    'require_recovery_codes' => true,
 
     /*
     |--------------------------------------------------------------------------

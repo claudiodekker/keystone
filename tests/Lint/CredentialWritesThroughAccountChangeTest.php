@@ -59,3 +59,16 @@ it('passes writes in source code that never names the credential model', functio
 
     expect($file->lines(new CredentialWritesThroughAccountChange))->toBe([]);
 });
+
+it('fails every write in source code that names the recovery code model', function () {
+    $file = TestFile::of(Kind::SOURCE, 'packages/keystone/src/Example.php', <<<'PHP'
+        <?php
+
+        use ClaudioDekker\Keystone\Models\UserRecoveryCode;
+
+        UserRecoveryCode::query()->whereKey(1)->delete();
+        UserRecoveryCode::query()->insert(['digest' => 'x']);
+        PHP);
+
+    expect($file->lines(new CredentialWritesThroughAccountChange))->toBe([5, 6]);
+});

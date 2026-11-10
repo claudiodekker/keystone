@@ -54,6 +54,10 @@ A proven proof may also carry a rehash: the work that remakes the credential's s
 
 A credential of a type offered on the challenge. Whether an account holds one is read from its credentials whenever a step asks, and never stored, so a type taken off the challenge stops counting and counts again once it is offered there again.
 
+## Recovery code
+
+A break-glass code core keeps for an account, of its reserved `recovery-code` type, stored as the digest of the code and spent when it answers the challenge. A recovery code never counts as a second factor. While recovery codes are required, an account's last code is kept for account recovery rather than spent.
+
 ## Sign-in decision
 
 The one place core decides what a proof earns: refused, a sign-in, or a hold at the stage the account owes. A first factor that doesn't prove two factors on its own is held at the challenge when its account holds a second factor. The decision runs again for a pending sign-in, as its account stands now, before each step is shown and before each answer is checked.

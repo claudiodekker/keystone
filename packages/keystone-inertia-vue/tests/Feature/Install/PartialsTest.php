@@ -19,7 +19,7 @@ it('copies a partial only for each installed credential type', function () {
         ->and($this->fresh->has('resources/js/partials/Hotp.vue'))->toBeFalse();
 });
 
-it('installs without any credential type, copying no partial', function () {
+it('installs without any credential type, copying no partial of a method type', function () {
     expect(app(CredentialTypes::class)->names())->not->toBeEmpty();
     $this->app->instance(CredentialTypeRegistry::class, new CredentialTypeRegistry);
 
@@ -28,4 +28,12 @@ it('installs without any credential type, copying no partial', function () {
     expect($this->fresh->has('routes/keystone.php'))->toBeTrue()
         ->and($this->fresh->has('resources/js/partials/Pin.vue'))->toBeFalse()
         ->and($this->fresh->has('resources/js/partials/Hotp.vue'))->toBeFalse();
+});
+
+it("copies the recovery code partial without any credential type, as recovery codes are core's own", function () {
+    $this->app->instance(CredentialTypeRegistry::class, new CredentialTypeRegistry);
+
+    $this->artisan('keystone:install')->assertSuccessful();
+
+    expect($this->fresh->has('resources/js/partials/RecoveryCode.vue'))->toBeTrue();
 });

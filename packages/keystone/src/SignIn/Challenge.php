@@ -2,22 +2,32 @@
 
 namespace ClaudioDekker\Keystone\SignIn;
 
+use ClaudioDekker\Keystone\Accounts\AccountChange;
+use ClaudioDekker\Keystone\Accounts\AccountChanges;
 use ClaudioDekker\Keystone\Accounts\AccountLookup;
 use ClaudioDekker\Keystone\Accounts\Holdings;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
+use ClaudioDekker\Keystone\Exceptions\AccountChangeRefusedException;
 use ClaudioDekker\Keystone\Exceptions\ThrottledException;
 use ClaudioDekker\Keystone\Http\Pages\ChallengePage;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
+use ClaudioDekker\Keystone\Methods\InitiateShape;
 use ClaudioDekker\Keystone\Methods\Surface;
+use ClaudioDekker\Keystone\Methods\Verification;
+use ClaudioDekker\Keystone\Models\UserRecoveryCode;
+use ClaudioDekker\Keystone\RateLimits\FailedAttempt;
 use ClaudioDekker\Keystone\RateLimits\Limiter;
+use ClaudioDekker\Keystone\RecoveryCodes\RecoveryCodeType;
 use ClaudioDekker\Keystone\SecurityEvents\Recorder;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use ClaudioDekker\Keystone\Session\PendingSignIn;
 use ClaudioDekker\Keystone\Session\SessionState;
 use ClaudioDekker\Keystone\Session\Stage;
 use ClaudioDekker\Keystone\Status;
+use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Contracts\Validation\Factory as ValidationFactory;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -29,22 +39,37 @@ class Challenge
      * Create the challenge.
      */
     public function __construct(
+        protected AccountChanges $accountChanges,
         protected AccountLookup $accounts,
         protected SignInDecision $decision,
         protected Holdings $holdings,
         protected Limiter $limiter,
         protected Proofs $proofs,
+        protected RecoveryCodeType $recoveryCodeType,
         protected Recorder $recorder,
         protected SessionState $session,
         protected TimingFloor $floor,
         protected CredentialTypes $types,
+        protected Config $config,
         protected ValidationFactory $validation,
     ) {
         //
     }
 
     /**
-     * Open the challenge of the session's pending sign-in: the second-factor types its account can answer with, the first one preselected.
+     * Find the type that answers the challenge by its name: a type offered there, or core's recovery codes.
+     */
+    public function type(string $name): ?CredentialType
+    {
+        if ($name === RecoveryCodeType::NAME) {
+            return $this->recoveryCodeType;
+        }
+
+        return $this->types->find($name, Surface::CHALLENGE);
+    }
+
+    /**
+     * Open the challenge of the session's pending sign-in: the second-factor types its account can answer with, then its recovery codes, the first one preselected.
      */
     public function open(): ChallengePage|NoPendingSignIn
     {
@@ -62,7 +87,7 @@ class Challenge
      * @throws ThrottledException
      * @throws ValidationException
      */
-    public function answer(CredentialType $type, array $input): SignedIn|Refused|NoPendingSignIn
+    public function answer(CredentialType $type, array $input): SignedIn|Refused|LastRecoveryCodeKept|NoPendingSignIn
     {
         $pending = $this->session->pendingSignIn();
         $account = $this->resume($pending);
@@ -75,7 +100,7 @@ class Challenge
 
         return $this->floor->hold(
             fn () => $this->prove($type, $validated, $pending, $account),
-            fn (SignedIn|Refused $outcome) => $outcome instanceof SignedIn,
+            fn (SignedIn|Refused|LastRecoveryCodeKept $outcome) => $outcome instanceof SignedIn,
         );
     }
 
@@ -108,6 +133,10 @@ class Challenge
             ->values()
             ->all();
 
+        if ($this->holdings->holdsRecoveryCodes($account)) {
+            $types[] = ['name' => RecoveryCodeType::NAME, 'shape' => InitiateShape::FORM->value];
+        }
+
         return new ChallengePage(
             types: $types,
             preselected: $types[0]['name'] ?? null,
@@ -134,9 +163,13 @@ class Challenge
      *
      * @throws ThrottledException
      */
-    protected function prove(CredentialType $type, array $validated, PendingSignIn $pending, KeystoneUser $account): SignedIn|Refused
+    protected function prove(CredentialType $type, array $validated, PendingSignIn $pending, KeystoneUser $account): SignedIn|Refused|LastRecoveryCodeKept
     {
         $attempt = $this->limiter->takeFailedAttempt($type, Surface::CHALLENGE, $account);
+
+        if ($type instanceof RecoveryCodeType) {
+            return $this->spend($type, $validated, $pending, $account, $attempt);
+        }
 
         $answer = $this->proofs->verify($type, Surface::CHALLENGE, $account, $validated, $attempt);
 
@@ -145,6 +178,73 @@ class Challenge
         }
 
         return $this->proofs->signIn($account, $answer, writer: $pending);
+    }
+
+    /**
+     * Sign in the held account when the typed code is one of its recovery codes, spending it.
+     *
+     * @param  array<string, mixed>  $validated
+     */
+    protected function spend(RecoveryCodeType $type, array $validated, PendingSignIn $pending, KeystoneUser $account, FailedAttempt $attempt): SignedIn|Refused|LastRecoveryCodeKept
+    {
+        $codes = UserRecoveryCode::query()
+            ->where('user_id', $account->getAuthIdentifier())
+            ->get();
+
+        $verification = new Verification(
+            surface: Surface::CHALLENGE,
+            input: $validated,
+            credentials: $codes->map->toCredential()->values()->all(),
+        );
+
+        $answer = new Answer($type, Surface::CHALLENGE, $type->verify($verification), new Collection, $attempt);
+        $code = $codes->find($answer->proof->credential);
+
+        if ($code === null) {
+            return $this->proofs->refuse($account, $answer);
+        }
+
+        try {
+            $spent = $this->accountChanges->change($account, fn (AccountChange $change) => $this->spendUnlessLast($change, $code), $pending);
+        } catch (AccountChangeRefusedException) {
+            return $this->proofs->refuse($account, $answer);
+        }
+
+        if (! $spent) {
+            return $this->keepLast($account, $answer);
+        }
+
+        return $this->proofs->signIn($account, $answer, writer: $pending);
+    }
+
+    /**
+     * Spend the code unless the account must keep it as its last, and determine if it was spent.
+     */
+    protected function spendUnlessLast(AccountChange $change, UserRecoveryCode $code): bool
+    {
+        if ($this->config->boolean('keystone.require_recovery_codes') && $change->isLastRecoveryCode($code)) {
+            return false;
+        }
+
+        $change->spendRecoveryCode($code);
+
+        return true;
+    }
+
+    /**
+     * Refuse the account's last recovery code, keeping it and its counted attempt.
+     */
+    protected function keepLast(KeystoneUser $account, Answer $answer): LastRecoveryCodeKept
+    {
+        $this->recorder->record(
+            SecurityEventType::PROOF_REJECTED,
+            account: $account,
+            surface: $answer->surface,
+            credentialType: $answer->type,
+            reason: 'recovery-code.last_code',
+        );
+
+        return new LastRecoveryCodeKept;
     }
 
     /**

@@ -28,6 +28,14 @@ class AccountChangeRefusedException extends RuntimeException
     }
 
     /**
+     * Create the exception for spending a recovery code another answer spent since it was read.
+     */
+    public static function recoveryCodeSpent(): static
+    {
+        return new static('The recovery code was spent since it was read, so it was refused.');
+    }
+
+    /**
      * Create the exception for a rehash over a secret another write changed since it was read.
      */
     public static function secretChanged(): static

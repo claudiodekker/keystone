@@ -3,10 +3,12 @@
 use Carbon\CarbonImmutable;
 use ClaudioDekker\Keystone\AppTests\IpLocationFake;
 use ClaudioDekker\Keystone\AppTests\SessionInfoFake;
+use ClaudioDekker\Keystone\AppTests\Support\RecoveryCodeSupport;
 use ClaudioDekker\Keystone\Contracts\IpLocation;
 use ClaudioDekker\Keystone\Contracts\SessionInfo;
 use ClaudioDekker\Keystone\Devices\Device;
 use ClaudioDekker\Keystone\Jobs\EndSessions;
+use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Notifications\SecurityAlert;
 use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Support\Facades\Mail;
@@ -60,6 +62,21 @@ it('says the device is unknown, and names the IP address alone, when neither is 
     expect($body)->toContain(e(__('keystone::alerts.device', ['device' => __('keystone::alerts.unknown-device')])))
         ->and($body)->toContain(e(__('keystone::alerts.ip-address', ['ip_address' => '203.0.113.9'])))
         ->and($body)->not->toContain('curl');
+});
+
+it('says how many recovery codes the account has left once one was spent', function () {
+    $user = $this->createUser();
+    $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);
+    $codes = (new RecoveryCodeSupport)->arrangeCredential(Surface::CHALLENGE, $user);
+    $this->passFirstFactor($user);
+
+    $this->answerChallenge($user, $codes);
+
+    $mail = Mail::mailer('array')->getSymfonyTransport()->messages()->sole()->getOriginalMessage();
+
+    expect($mail->getSubject())->toBe(__('keystone::alerts.recovery_code.used.subject'))
+        ->and($mail->getHtmlBody())->toContain(e(__('keystone::alerts.recovery_code.used.summary')))
+        ->and($mail->getHtmlBody())->toContain(e(trans_choice('keystone::alerts.recovery_code.used.left', 7)));
 });
 
 it('keeps the IP address, the user agent and the address out of the queued payload', function () {

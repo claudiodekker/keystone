@@ -38,6 +38,7 @@ class KeyChecks
             ...$this->frameAncestors(),
             ...$this->plaintextLocationDrivers(),
             ...$this->logChannel(),
+            ...$this->requireRecoveryCodes(),
             ...$this->trustedOrigins(),
         ];
     }
@@ -102,6 +103,20 @@ class KeyChecks
         }
 
         return ['keystone.ip_location.allow_plaintext_driver must be true or false.'];
+    }
+
+    /**
+     * Get the failure of require_recovery_codes when it isn't a boolean.
+     *
+     * @return list<string>
+     */
+    protected function requireRecoveryCodes(): array
+    {
+        if (is_bool($this->config->get('keystone.require_recovery_codes'))) {
+            return [];
+        }
+
+        return ['keystone.require_recovery_codes must be true or false.'];
     }
 
     /**

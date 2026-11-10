@@ -18,7 +18,10 @@ class CredentialWritesThroughAccountChange extends Check
     /**
      * The models whose rows only an account change writes.
      */
-    protected const MODELS = ['ClaudioDekker\Keystone\Models\UserCredential'];
+    protected const MODELS = [
+        'ClaudioDekker\Keystone\Models\UserCredential',
+        'ClaudioDekker\Keystone\Models\UserRecoveryCode',
+    ];
 
     /**
      * The Eloquent and query builder methods that write rows, lowercase.
@@ -61,7 +64,7 @@ class CredentialWritesThroughAccountChange extends Check
      */
     public function description(): string
     {
-        return 'No write in source code that names the credential model.';
+        return 'No write in source code that names the credential or recovery code model.';
     }
 
     /**
@@ -79,7 +82,7 @@ class CredentialWritesThroughAccountChange extends Check
      */
     public function message(): string
     {
-        return 'Write credentials through an account change, so the write locks the account and moves its epoch when it ends anything.';
+        return 'Write credentials and recovery codes through an account change, so the write locks the account and moves its epoch when it ends anything.';
     }
 
     /**

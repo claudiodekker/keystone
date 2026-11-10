@@ -17,6 +17,13 @@ return [
     'if-not-you' => "If this wasn't you, sign in and review your security settings.",
     'ip-address' => 'IP address: :ip_address',
     'ip-address-at' => 'IP address: :ip_address (:location)',
+    'recovery_code' => [
+        'used' => [
+            'left' => '{0} You have no recovery codes left.|{1} You have 1 recovery code left.|[2,*] You have :count recovery codes left.',
+            'subject' => 'A recovery code was used',
+            'summary' => 'A recovery code was used to sign in to your account.',
+        ],
+    ],
     'sessions' => [
         'terminated' => [
             'subject' => 'You were signed out everywhere',

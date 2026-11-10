@@ -18,6 +18,7 @@ use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
+use ClaudioDekker\Keystone\Models\UserCredential;
 use ClaudioDekker\Keystone\Models\UserEmail;
 use ClaudioDekker\Keystone\RateLimits\StepKind;
 use Closure;
@@ -221,6 +222,17 @@ trait InteractsWithKeystone
     public function answerChallenge(KeystoneUser $user, CredentialTypeSupport $support): TestResponse
     {
         return $this->post(route('login.challenge.submit', $support->type()->name()), $support->validProof(Surface::CHALLENGE, $user));
+    }
+
+    /**
+     * Remove the user's credentials of the supported type, as if the user had removed them.
+     */
+    public function removeCredentials(KeystoneUser $user, CredentialTypeSupport $support): void
+    {
+        UserCredential::query()
+            ->where('user_id', $user->getAuthIdentifier())
+            ->where('type', $support->type()->name())
+            ->delete();
     }
 
     /**

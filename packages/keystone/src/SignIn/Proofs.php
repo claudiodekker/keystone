@@ -80,7 +80,7 @@ class Proofs
             account: $account,
             surface: $answer->surface,
             credentialType: $answer->type,
-            credential: $answer->proof->credential,
+            credential: $answer->credential()?->getKey(),
         );
 
         $this->rehash($account, $answer);

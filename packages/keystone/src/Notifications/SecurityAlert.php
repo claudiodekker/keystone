@@ -7,6 +7,7 @@ use ClaudioDekker\Keystone\Contracts\IpLocation;
 use ClaudioDekker\Keystone\Contracts\SessionInfo;
 use ClaudioDekker\Keystone\Devices\Device;
 use ClaudioDekker\Keystone\Exceptions\KeystoneMisconfiguredException;
+use ClaudioDekker\Keystone\Models\UserRecoveryCode;
 use ClaudioDekker\Keystone\Models\UserSecurityEvent;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use Illuminate\Bus\Queueable;
@@ -31,6 +32,7 @@ class SecurityAlert extends Notification implements ShouldBeEncrypted, ShouldQue
     protected const array VIEWS = [
         'account.suspended' => 'keystone::alerts.account.suspended',
         'account.unsuspended' => 'keystone::alerts.account.unsuspended',
+        'recovery_code.used' => 'keystone::alerts.recovery_code.used',
         'sessions.terminated' => 'keystone::alerts.sessions.terminated',
     ];
 
@@ -55,6 +57,11 @@ class SecurityAlert extends Notification implements ShouldBeEncrypted, ShouldQue
     public ?Device $device;
 
     /**
+     * The number of recovery codes the account holds after spending one, for an alert about a spent code.
+     */
+    public ?int $recoveryCodesLeft;
+
+    /**
      * Create the alert about the event, parsing its user agent so the queue never carries it.
      */
     public function __construct(UserSecurityEvent $event)
@@ -63,6 +70,7 @@ class SecurityAlert extends Notification implements ShouldBeEncrypted, ShouldQue
         $this->occurredAt = $event->occurred_at;
         $this->ipAddress = $event->ip_address;
         $this->device = $this->device($event->user_agent);
+        $this->recoveryCodesLeft = $this->recoveryCodesLeft($event);
     }
 
     /**
@@ -87,6 +95,7 @@ class SecurityAlert extends Notification implements ShouldBeEncrypted, ShouldQue
             ->view(static::view($this->type), [
                 'device' => $this->deviceLine(),
                 'ipAddress' => $this->ipAddressLine(),
+                'recoveryCodesLeft' => $this->recoveryCodesLeft,
                 'when' => $this->whenLine(),
             ]);
     }
@@ -147,6 +156,20 @@ class SecurityAlert extends Notification implements ShouldBeEncrypted, ShouldQue
         }
 
         return app(SessionInfo::class)->device($userAgent);
+    }
+
+    /**
+     * Get how many recovery codes the event's account holds now, when the event spent one.
+     */
+    protected function recoveryCodesLeft(UserSecurityEvent $event): ?int
+    {
+        if ($event->type !== SecurityEventType::RECOVERY_CODE_USED) {
+            return null;
+        }
+
+        return UserRecoveryCode::query()
+            ->where('user_id', $event->user_id)
+            ->count();
     }
 
     /**
