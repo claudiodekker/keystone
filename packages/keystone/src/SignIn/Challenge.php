@@ -140,13 +140,11 @@ class Challenge
 
         $answer = $this->proofs->verify($type, Surface::CHALLENGE, $account, $validated, $attempt);
 
-        $owner = $this->decision->answer($answer->proof, $type, $pending, $account);
-
-        if ($owner === null) {
+        if (! $this->decision->answers($answer->proof, $type, $pending, $account)) {
             return $this->proofs->refuse($account, $answer);
         }
 
-        return $this->proofs->signIn($owner, $answer, writer: $pending);
+        return $this->proofs->signIn($account, $answer, writer: $pending);
     }
 
     /**

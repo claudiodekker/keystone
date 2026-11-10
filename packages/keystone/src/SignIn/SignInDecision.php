@@ -28,21 +28,15 @@ class SignInDecision
     }
 
     /**
-     * Get the account the proof names, or null when it names nobody the subject could sign in as.
+     * Determine if the proof proves a credential of the type that the account holds, read again from its row; a rejection names none.
      */
-    public function decide(Proof $proof, CredentialType $type, ?KeystoneUser $subject): ?KeystoneUser
+    public function proves(Proof $proof, CredentialType $type, KeystoneUser $account): bool
     {
-        if ($subject === null) {
-            return null;
-        }
-
-        $owner = $this->owner($proof, $type);
-
-        if ($owner?->getAuthIdentifier() !== $subject->getAuthIdentifier()) {
-            return null;
-        }
-
-        return $owner;
+        return UserCredential::query()
+            ->whereKey($proof->credential)
+            ->where('type', $type->name())
+            ->where('user_id', $account->getAuthIdentifier())
+            ->exists();
     }
 
     /**
@@ -82,15 +76,11 @@ class SignInDecision
     }
 
     /**
-     * Get the account an answer to the pending sign-in's challenge proves, or null when it proves nobody: a credential of the first factor's type or of another account.
+     * Determine if the proof answers the pending sign-in's challenge: a credential the held account holds, of another type than the first factor's.
      */
-    public function answer(Proof $proof, CredentialType $type, PendingSignIn $pending, KeystoneUser $account): ?KeystoneUser
+    public function answers(Proof $proof, CredentialType $type, PendingSignIn $pending, KeystoneUser $account): bool
     {
-        if ($type->name() === $pending->firstFactor) {
-            return null;
-        }
-
-        return $this->decide($proof, $type, $account);
+        return $type->name() !== $pending->firstFactor && $this->proves($proof, $type, $account);
     }
 
     /**
@@ -101,18 +91,5 @@ class SignInDecision
         return match ($stage) {
             Stage::CHALLENGE => $this->holdings->holdsSecondFactor($account),
         };
-    }
-
-    /**
-     * Re-read the proven credential of the type and get the account that holds it; a rejection names no credential, so it has none.
-     */
-    protected function owner(Proof $proof, CredentialType $type): ?KeystoneUser
-    {
-        $credential = UserCredential::query()
-            ->whereKey($proof->credential)
-            ->where('type', $type->name())
-            ->first();
-
-        return $credential?->user;
     }
 }

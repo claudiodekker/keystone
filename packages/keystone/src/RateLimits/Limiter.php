@@ -66,10 +66,11 @@ class Limiter
     {
         $allowance = $this->config->integer('keystone.rate_limits.requests_per_minute.'.$kind->value);
         $keys = [$this->key(Limit::REQUEST, [$kind->value, 'address', $this->address()])];
-        $account = $this->session->account() ?? $this->session->heldAccount();
+        $signedIn = $this->session->account();
+        $accountId = $signedIn?->getAuthIdentifier() ?? $this->session->pendingSignIn()?->account;
 
-        if ($account !== null) {
-            $keys[] = $this->key(Limit::REQUEST, [$kind->value, 'account', (string) $account->getAuthIdentifier()]);
+        if ($accountId !== null) {
+            $keys[] = $this->key(Limit::REQUEST, [$kind->value, 'account', (string) $accountId]);
         }
 
         $spent = collect($keys)
@@ -82,7 +83,7 @@ class Limiter
         }
 
         if ($spent->contains(fn (CountedAttempt $attempt) => $attempt->isFirstOver($allowance))) {
-            $this->trip(Limit::REQUEST, $account);
+            $this->trip(Limit::REQUEST, $signedIn ?? $this->session->heldAccount());
         }
 
         throw ThrottledException::retryAfter($this->secondsUntil($spent->max('availableAt')));

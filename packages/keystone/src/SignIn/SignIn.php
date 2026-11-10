@@ -82,18 +82,16 @@ class SignIn
         $input = Arr::except($validated, 'identifier');
         $answer = $this->proofs->verify($type, Surface::SIGN_IN, $account, $input, $attempt);
 
-        $owner = $this->decision->decide($answer->proof, $type, $account);
-
-        if ($owner === null) {
+        if ($account === null || ! $this->decision->proves($answer->proof, $type, $account)) {
             return $this->proofs->refuse($account, $answer);
         }
 
-        $stage = $this->decision->owed($owner, $type);
+        $stage = $this->decision->owed($account, $type);
 
         if ($stage !== null) {
-            return $this->proofs->hold($owner, $answer, $stage);
+            return $this->proofs->hold($account, $answer, $stage);
         }
 
-        return $this->proofs->signIn($owner, $answer);
+        return $this->proofs->signIn($account, $answer);
     }
 }

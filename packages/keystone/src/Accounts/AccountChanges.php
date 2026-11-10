@@ -39,9 +39,9 @@ class AccountChanges
     public function change(KeystoneUser $account, Closure $apply, ?PendingSignIn $writer = null): void
     {
         $change = $this->connection->transaction(function () use ($account, $apply, $writer) {
-            CredentialEpoch::lock($account->getAuthIdentifier());
+            $epoch = CredentialEpoch::lock($account->getAuthIdentifier());
 
-            if ($writer !== null && CredentialEpoch::of($account->getAuthIdentifier()) !== $writer->epoch) {
+            if ($writer !== null && $epoch !== $writer->epoch) {
                 throw AccountChangeRefusedException::writerEnded();
             }
 

@@ -28,11 +28,19 @@ class CredentialEpoch
     }
 
     /**
-     * Lock the row of the account with the id until the transaction ends, so changes to one account run one after another.
+     * Lock the row of the account with the id until the transaction ends, so changes to one account run one after another, and get its epoch as of() reads it.
      */
-    public static function lock(int|string $id): void
+    public static function lock(int|string $id): ?int
     {
-        static::account($id)->lockForUpdate()->value(static::COLUMN);
+        $row = static::account($id)
+            ->lockForUpdate()
+            ->first([static::COLUMN, Suspension::COLUMN]);
+
+        if ($row === null || $row->{Suspension::COLUMN} !== null) {
+            return null;
+        }
+
+        return (int) $row->{static::COLUMN};
     }
 
     /**
