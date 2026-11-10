@@ -92,6 +92,14 @@ readonly class PendingSignIn
      */
     public function hasExpiredAt(int $now): bool
     {
-        return $now >= $this->heldAt + static::LIFETIME_SECONDS;
+        return $now >= $this->endsAt();
+    }
+
+    /**
+     * Get the Unix second the pending sign-in ends at.
+     */
+    public function endsAt(): int
+    {
+        return $this->heldAt + static::LIFETIME_SECONDS;
     }
 }

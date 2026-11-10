@@ -7,10 +7,13 @@ use ClaudioDekker\Keystone\Accounts\CredentialEpoch;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\CredentialType;
+use ClaudioDekker\Keystone\Methods\StartsCeremony;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Status;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Contracts\Config\Repository as Config;
+use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Contracts\Encryption\Encrypter;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Contracts\Routing\UrlGenerator;
 use Illuminate\Contracts\Session\Session;
@@ -43,6 +46,16 @@ class SessionState
     protected const string PHASE = 'keystone.phase';
 
     /**
+     * The session key that holds the ceremony slots, keyed by surface and credential type.
+     */
+    protected const string CEREMONIES = 'keystone.ceremonies';
+
+    /**
+     * How long a ceremony lasts after its start, in seconds.
+     */
+    protected const int CEREMONY_LIFETIME_SECONDS = 10 * 60;
+
+    /**
      * Create the session state over the request's session.
      */
     public function __construct(
@@ -51,6 +64,7 @@ class SessionState
         protected UrlGenerator $urls,
         protected Dispatcher $events,
         protected Config $config,
+        protected Encrypter $encrypter,
     ) {
         //
     }
@@ -125,6 +139,58 @@ class SessionState
         $this->changeAuthLevel();
 
         $this->session->put(static::PHASE, $pending->toSession());
+    }
+
+    /**
+     * Start the type's ceremony on the surface in place of any earlier one, and get what it kept.
+     *
+     * A start that throws leaves the surface with no ceremony.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function startCeremony(CredentialType&StartsCeremony $type, Surface $surface): ?array
+    {
+        $this->forgetCeremony($type, $surface);
+
+        $ceremony = $type->start($surface);
+
+        $slot = $this->encrypter->encrypt([
+            'ceremony' => $ceremony,
+            'ends_at' => $this->ceremonyEndsAt(),
+        ]);
+
+        $this->session->put(static::CEREMONIES, [
+            ...$this->session->get(static::CEREMONIES, []),
+            $this->slot($type, $surface) => $slot,
+        ]);
+
+        return $ceremony;
+    }
+
+    /**
+     * Get what the type's live ceremony on the surface kept, or null when none is live.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function ceremony(CredentialType $type, Surface $surface): ?array
+    {
+        $encrypted = $this->session->get(static::CEREMONIES)[$this->slot($type, $surface)] ?? null;
+
+        if ($encrypted === null) {
+            return null;
+        }
+
+        try {
+            $slot = $this->encrypter->decrypt($encrypted);
+        } catch (DecryptException) {
+            return null;
+        }
+
+        if (Date::now()->getTimestamp() >= $slot['ends_at']) {
+            return null;
+        }
+
+        return $slot['ceremony'];
     }
 
     /**
@@ -217,12 +283,42 @@ class SessionState
     }
 
     /**
-     * Give the session a new id and CSRF token and forget its phase, so nothing that knew the old id or phase reaches the new level.
+     * Give the session a new id and CSRF token and forget its phase and ceremonies, so nothing that knew the old id, phase or ceremony reaches the new level.
      */
     protected function changeAuthLevel(): void
     {
         $this->session->regenerate(true);
-        $this->session->forget(static::PHASE);
+        $this->session->forget([static::PHASE, static::CEREMONIES]);
+    }
+
+    /**
+     * End the type's ceremony on the surface.
+     */
+    protected function forgetCeremony(CredentialType $type, Surface $surface): void
+    {
+        $ceremonies = $this->session->get(static::CEREMONIES, []);
+
+        unset($ceremonies[$this->slot($type, $surface)]);
+
+        $this->session->put(static::CEREMONIES, $ceremonies);
+    }
+
+    /**
+     * Get the Unix second a ceremony started now ends at: its lifetime after now, or the end of the pending sign-in it was started under when that comes first.
+     */
+    protected function ceremonyEndsAt(): int
+    {
+        $endsAt = Date::now()->getTimestamp() + static::CEREMONY_LIFETIME_SECONDS;
+
+        return min($endsAt, $this->pendingSignIn()?->endsAt() ?? $endsAt);
+    }
+
+    /**
+     * Get the key of the type's ceremony slot on the surface.
+     */
+    protected function slot(CredentialType $type, Surface $surface): string
+    {
+        return $surface->value.':'.$type->name();
     }
 
     /**
