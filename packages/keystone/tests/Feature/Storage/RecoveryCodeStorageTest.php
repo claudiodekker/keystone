@@ -1,6 +1,6 @@
 <?php
 
-// Storage shape: how a spend writes the recovery codes table, which the CI runs on every supported database.
+// Storage shape: what a spend leaves in the recovery codes table and what the model exposes, which no app can see through a page.
 
 use ClaudioDekker\Keystone\Accounts\AccountChange;
 use ClaudioDekker\Keystone\Accounts\AccountChanges;

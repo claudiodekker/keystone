@@ -42,7 +42,7 @@ readonly class RecoveryCode
     }
 
     /**
-     * Generate a set of codes, each drawn on its own.
+     * Generate a set of codes.
      *
      * @return list<static>
      */

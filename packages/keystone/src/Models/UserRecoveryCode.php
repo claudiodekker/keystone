@@ -38,7 +38,7 @@ class UserRecoveryCode extends Model
     }
 
     /**
-     * Get the code as the recovery code type sees it, its digest as the secret.
+     * Get the code as the recovery code type sees it.
      */
     public function toCredential(): Credential
     {

@@ -57,7 +57,7 @@ class SecurityAlert extends Notification implements ShouldBeEncrypted, ShouldQue
     public ?Device $device;
 
     /**
-     * The recovery codes the account holds once a code was spent, for an alert about a spent code.
+     * The number of recovery codes the account holds after spending one, for an alert about a spent code.
      */
     public ?int $recoveryCodesLeft;
 

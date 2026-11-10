@@ -60,7 +60,7 @@ class RecoveryCodeSupport implements CredentialTypeSupport
     }
 
     /**
-     * Give the user a recovery code Laravel Fortify generated, as the Fortify backfill writes one.
+     * Give the user a recovery code Laravel Fortify generated, stored as an imported Fortify code is.
      */
     public function arrangeFortifyCode(KeystoneUser $user, string $code): static
     {

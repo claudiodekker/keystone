@@ -218,7 +218,7 @@ class Challenge
     }
 
     /**
-     * Spend the code, unless recovery codes are required and it is the account's last, and determine if it was spent.
+     * Spend the code unless the account must keep it as its last, and determine if it was spent.
      */
     protected function spendUnlessLast(AccountChange $change, UserRecoveryCode $code): bool
     {
@@ -232,7 +232,7 @@ class Challenge
     }
 
     /**
-     * Refuse the account's last recovery code, keeping it and its counted attempt, and record the refusal.
+     * Refuse the account's last recovery code, keeping it and its counted attempt.
      */
     protected function keepLast(KeystoneUser $account, Answer $answer): LastRecoveryCodeKept
     {
