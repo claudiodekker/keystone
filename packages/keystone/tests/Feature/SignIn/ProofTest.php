@@ -44,6 +44,23 @@ it("signs nobody in with a proof of the account's credential of another type", f
         ->and(Keystone::guard()->check())->toBeFalse();
 });
 
+it('signs nobody in, and stores nothing, with a proof that enrolls a new credential', function () {
+    $ada = User::factory()->create();
+    UserEmail::factory()->for($ada, 'user')->verified()->create(['address' => 'ada@example.com']);
+    UserCredential::factory()->for($ada, 'user')->create(['type' => 'form', 'secret' => 'correct horse']);
+    $type = app(CredentialTypes::class)->find('form', Surface::SIGN_IN);
+    $type->enrollNextProof('enrolled horse');
+
+    $outcome = $this->app->make(SignIn::class)->attempt($type, [
+        'identifier' => 'ada@example.com',
+        'secret' => 'correct horse',
+    ]);
+
+    expect($outcome)->toBeInstanceOf(Refused::class)
+        ->and(Keystone::guard()->check())->toBeFalse()
+        ->and(UserCredential::query()->pluck('secret')->all())->toBe(['correct horse']);
+});
+
 it('signs nobody in with a proof when the identifier names no account', function () {
     $grace = User::factory()->create();
     $graces = UserCredential::factory()->for($grace, 'user')->create(['type' => 'form', 'secret' => 'grace horse']);

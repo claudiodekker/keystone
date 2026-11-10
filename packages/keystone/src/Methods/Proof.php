@@ -22,6 +22,7 @@ readonly class Proof
         public int|string|null $credential,
         protected ?Closure $rehash = null,
         #[SensitiveParameter] protected ?string $advancedSecret = null,
+        #[SensitiveParameter] protected ?string $enrolledSecret = null,
         public ?string $reason = null,
     ) {
         //
@@ -45,6 +46,16 @@ readonly class Proof
     public static function advanced(Credential $credential, #[SensitiveParameter] string $secret): static
     {
         return new static($credential->id, advancedSecret: $secret);
+    }
+
+    /**
+     * Create a proof of a new credential the subject doesn't hold yet, such as a TOTP key whose first code was right.
+     *
+     * Core signs nobody in with it, because it names none of the credentials the type was given.
+     */
+    public static function enrolled(#[SensitiveParameter] string $secret): static
+    {
+        return new static(null, enrolledSecret: $secret);
     }
 
     /**
