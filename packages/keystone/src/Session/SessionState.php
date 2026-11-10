@@ -12,6 +12,7 @@ use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Status;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Contracts\Config\Repository as Config;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Contracts\Encryption\Encrypter;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Contracts\Routing\UrlGenerator;
@@ -175,7 +176,11 @@ class SessionState
             return null;
         }
 
-        $slot = $this->encrypter->decrypt($encrypted);
+        try {
+            $slot = $this->encrypter->decrypt($encrypted);
+        } catch (DecryptException) {
+            return null;
+        }
 
         if (Date::now()->getTimestamp() >= $slot['ends_at']) {
             return null;

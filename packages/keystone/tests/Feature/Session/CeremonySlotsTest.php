@@ -123,3 +123,14 @@ it('keeps a ceremony encrypted in the session', function () {
     expect(serialize(session()->all()))->not->toContain('challenge-only ceremony 1')
         ->and($session->ceremony($type, Surface::CHALLENGE))->toBe(['challenge' => 'challenge-only ceremony 1', 'surface' => 'challenge']);
 });
+
+it('reads a ceremony kept under an app key since rotated away as none', function () {
+    $type = new FakeCeremonyType;
+    app(SessionState::class)->startCeremony($type, Surface::CHALLENGE);
+    config(['app.key' => 'base64:'.base64_encode(random_bytes(32))]);
+    $this->app->forgetInstance('encrypter');
+
+    $ceremony = app(SessionState::class)->ceremony($type, Surface::CHALLENGE);
+
+    expect($ceremony)->toBeNull();
+});
