@@ -7,6 +7,7 @@ use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Models\UserCredential;
+use ClaudioDekker\Keystone\Models\UserRecoveryCode;
 
 /**
  * @internal
@@ -46,5 +47,15 @@ class Holdings
     public function holdsSecondFactor(KeystoneUser $account): bool
     {
         return $this->secondFactors($account) !== [];
+    }
+
+    /**
+     * Determine if the account holds an unspent recovery code.
+     */
+    public function holdsRecoveryCodes(KeystoneUser $account): bool
+    {
+        return UserRecoveryCode::query()
+            ->where('user_id', $account->getAuthIdentifier())
+            ->exists();
     }
 }

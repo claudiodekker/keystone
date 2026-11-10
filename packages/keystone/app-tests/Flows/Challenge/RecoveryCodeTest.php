@@ -3,6 +3,7 @@
 use ClaudioDekker\Keystone\AppTests\Support\RecoveryCodeSupport;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
+use ClaudioDekker\Keystone\Session\Flow;
 use Illuminate\Support\Facades\Notification;
 
 it('signs the held user in with one of their recovery codes, alerting the owner with the codes left', function () {
@@ -50,3 +51,96 @@ it('matches a code typed in lower case, with or without its dashes and with spac
     'with spaces for dashes' => ['7KQ2M XW9PD 4HNRT B3ZCF 6JVGL 8'],
     'with spaces around it' => [" 7KQ2M-XW9PD-4HNRT-B3ZCF-6JVGL-8\n"],
 ]);
+
+it("offers recovery codes after the account's other second factors", function () {
+    $user = $this->createUser();
+    $support = $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);
+    (new RecoveryCodeSupport)->arrangeCredential(Surface::CHALLENGE, $user);
+    $this->passFirstFactor($user);
+
+    $response = $this->get(route('login.challenge'));
+
+    $this->assertChallengePage($response, [
+        'preselected' => $support->type()->name(),
+        'types' => [
+            ['name' => $support->type()->name(), 'shape' => 'form'],
+            ['name' => 'recovery-code', 'shape' => 'form'],
+        ],
+    ]);
+});
+
+it('signs in on the first factor alone an account that holds recovery codes and no second factor', function () {
+    $user = $this->createUser();
+    (new RecoveryCodeSupport)->arrangeCredential(Surface::CHALLENGE, $user);
+
+    $response = $this->passFirstFactor($user);
+
+    $this->assertSignedIn($response, '/');
+});
+
+it('records the sign-in with the recovery code type, naming no credential', function () {
+    $user = $this->createUser();
+    $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);
+    $codes = (new RecoveryCodeSupport)->arrangeCredential(Surface::CHALLENGE, $user);
+    $this->passFirstFactor($user);
+
+    $this->answerChallenge($user, $codes);
+
+    $events = $this->securityEvents()->for($user);
+    $signedIn = $events->last();
+
+    expect($events->pluck('type')->all())->toBe([SecurityEventType::SIGN_IN_HELD, SecurityEventType::RECOVERY_CODE_USED, SecurityEventType::SIGNED_IN])
+        ->and($signedIn->flow)->toBe(Flow::CHALLENGE)
+        ->and($signedIn->credential_type)->toBe('recovery-code')
+        ->and($signedIn->credential_id)->toBeNull();
+});
+
+it('refuses a code the account does not hold, recording it as a rejected recovery code', function () {
+    $user = $this->createUser();
+    $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);
+    $codes = (new RecoveryCodeSupport)->arrangeCredential(Surface::CHALLENGE, $user);
+    $this->passFirstFactor($user);
+
+    $response = $this->post(route('login.challenge.submit', 'recovery-code'), $codes->rejectedProof(Surface::CHALLENGE));
+
+    $rejected = $this->securityEvents()->for($user)->last();
+
+    $this->assertChallengeRefused($response, 'recovery_code', __('keystone::messages.credential-invalid'));
+    expect($rejected->type)->toBe(SecurityEventType::PROOF_REJECTED)
+        ->and($rejected->flow)->toBe(Flow::CHALLENGE)
+        ->and($rejected->credential_type)->toBe('recovery-code');
+});
+
+it("accepts a recovery code once wrong answers of the other second factor spent that type's allowance", function () {
+    $user = $this->createUser();
+    $support = $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);
+    $codes = (new RecoveryCodeSupport)->arrangeCredential(Surface::CHALLENGE, $user);
+    $this->passFirstFactor($user);
+
+    foreach (range(1, $this->failedAttemptAllowance()) as $i) {
+        $this->travel(7)->seconds();
+        $this->withServerVariables(['REMOTE_ADDR' => "10.1.{$i}.1"])
+            ->post(route('login.challenge.submit', $support->type()->name()), $support->rejectedProof(Surface::CHALLENGE));
+    }
+
+    $response = $this->withServerVariables(['REMOTE_ADDR' => '10.2.0.1'])->answerChallenge($user, $codes);
+
+    $this->assertSignedIn($response, '/');
+});
+
+it('refuses even a right code as throttled once wrong codes spent their allowance', function () {
+    $user = $this->createUser();
+    $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);
+    $codes = (new RecoveryCodeSupport)->arrangeCredential(Surface::CHALLENGE, $user);
+    $this->passFirstFactor($user);
+
+    foreach (range(1, $this->failedAttemptAllowance()) as $i) {
+        $this->travel(7)->seconds();
+        $this->withServerVariables(['REMOTE_ADDR' => "10.1.{$i}.1"])
+            ->post(route('login.challenge.submit', 'recovery-code'), $codes->rejectedProof(Surface::CHALLENGE));
+    }
+
+    $response = $this->withServerVariables(['REMOTE_ADDR' => '10.2.0.1'])->answerChallenge($user, $codes);
+
+    $this->assertThrottled($response);
+});

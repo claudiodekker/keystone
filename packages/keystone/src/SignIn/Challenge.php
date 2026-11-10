@@ -12,6 +12,7 @@ use ClaudioDekker\Keystone\Exceptions\ThrottledException;
 use ClaudioDekker\Keystone\Http\Pages\ChallengePage;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
+use ClaudioDekker\Keystone\Methods\InitiateShape;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Methods\Verification;
 use ClaudioDekker\Keystone\Models\UserRecoveryCode;
@@ -66,7 +67,7 @@ class Challenge
     }
 
     /**
-     * Open the challenge of the session's pending sign-in: the second-factor types its account can answer with, the first one preselected.
+     * Open the challenge of the session's pending sign-in: the second-factor types its account can answer with, then its recovery codes, the first one preselected.
      */
     public function open(): ChallengePage|NoPendingSignIn
     {
@@ -129,6 +130,10 @@ class Challenge
             ->filter(fn (array $type) => in_array($type['name'], $offered, true))
             ->values()
             ->all();
+
+        if ($this->holdings->holdsRecoveryCodes($account)) {
+            $types[] = ['name' => RecoveryCodeType::NAME, 'shape' => InitiateShape::FORM->value];
+        }
 
         return new ChallengePage(
             types: $types,
