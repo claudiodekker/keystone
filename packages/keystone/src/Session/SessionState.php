@@ -142,6 +142,18 @@ class SessionState
     }
 
     /**
+     * Move the pending sign-in on to enrollment once the type answered its challenge or was enrolled, keeping its lifetime and intended URL.
+     */
+    public function passSecondFactor(PendingSignIn $pending, CredentialType $secondFactor): void
+    {
+        $passed = $pending->passedBy($secondFactor->name());
+
+        $this->changeAuthLevel();
+
+        $this->session->put(static::PHASE, $passed->toSession());
+    }
+
+    /**
      * Start the type's ceremony on the surface in place of any earlier one, and get what it kept.
      *
      * A start that throws leaves the surface with no ceremony.
@@ -293,6 +305,7 @@ class SessionState
     {
         return match ($surface) {
             Surface::CHALLENGE => Flow::CHALLENGE,
+            Surface::ENROLLMENT => Flow::ENROLLMENT,
             Surface::SIGN_IN => Flow::SIGN_IN,
             default => null,
         };

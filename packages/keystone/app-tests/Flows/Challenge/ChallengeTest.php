@@ -14,6 +14,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Sleep;
 
+beforeEach(function () {
+    $this->withoutEnrollmentMandates();
+});
+
 it('holds a correct first factor for the challenge when the account holds a second factor', function () {
     $user = $this->createUser();
     $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);

@@ -21,6 +21,7 @@ it('passes the first factor of a user with a second factor, holding them for the
 });
 
 it('answers the challenge of a held user with their second factor, signing them in', function () {
+    $this->withoutEnrollmentMandates();
     $user = $this->createUser();
     $support = $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);
     $this->passFirstFactor($user);

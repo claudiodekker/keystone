@@ -21,6 +21,7 @@ readonly class PendingSignIn
      * @param  string  $firstFactor  the name of the credential type that passed the first factor
      * @param  int|null  $epoch  the account's credential epoch at the hold
      * @param  int  $heldAt  the Unix second of the hold
+     * @param  string|null  $secondFactor  the name of the credential type that answered the challenge or was enrolled, null until one did
      */
     public function __construct(
         public int|string $account,
@@ -29,6 +30,7 @@ readonly class PendingSignIn
         public string $intendedPath,
         public ?int $epoch,
         public int $heldAt,
+        public ?string $secondFactor = null,
     ) {
         //
     }
@@ -40,7 +42,7 @@ readonly class PendingSignIn
      */
     public static function fromSession(array $value): ?static
     {
-        $value += array_fill_keys(['account', 'first_factor', 'stage', 'intended_path', 'epoch', 'held_at'], null);
+        $value += array_fill_keys(['account', 'first_factor', 'stage', 'intended_path', 'epoch', 'held_at', 'second_factor'], null);
 
         $stage = is_string($value['stage']) ? Stage::tryFrom($value['stage']) : null;
 
@@ -49,6 +51,10 @@ readonly class PendingSignIn
         }
 
         if (! is_int($value['epoch']) && $value['epoch'] !== null) {
+            return null;
+        }
+
+        if (! is_string($value['second_factor']) && $value['second_factor'] !== null) {
             return null;
         }
 
@@ -67,13 +73,14 @@ readonly class PendingSignIn
             intendedPath: $value['intended_path'],
             epoch: $value['epoch'],
             heldAt: $value['held_at'],
+            secondFactor: $value['second_factor'],
         );
     }
 
     /**
      * Get the pending sign-in as its session value.
      *
-     * @return array{account: int|string, first_factor: string, stage: string, intended_path: string, epoch: int|null, held_at: int}
+     * @return array{account: int|string, first_factor: string, stage: string, intended_path: string, epoch: int|null, held_at: int, second_factor: string|null}
      */
     public function toSession(): array
     {
@@ -84,7 +91,24 @@ readonly class PendingSignIn
             'intended_path' => $this->intendedPath,
             'epoch' => $this->epoch,
             'held_at' => $this->heldAt,
+            'second_factor' => $this->secondFactor,
         ];
+    }
+
+    /**
+     * Get the pending sign-in held at enrollment once the named type answered its challenge or was enrolled, keeping its lifetime.
+     */
+    public function passedBy(string $secondFactor): static
+    {
+        return new static(
+            account: $this->account,
+            firstFactor: $this->firstFactor,
+            stage: Stage::ENROLLMENT,
+            intendedPath: $this->intendedPath,
+            epoch: $this->epoch,
+            heldAt: $this->heldAt,
+            secondFactor: $secondFactor,
+        );
     }
 
     /**

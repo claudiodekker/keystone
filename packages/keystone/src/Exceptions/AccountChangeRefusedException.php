@@ -28,6 +28,14 @@ class AccountChangeRefusedException extends RuntimeException
     }
 
     /**
+     * Create the exception for saving recovery codes for an account that already holds some.
+     */
+    public static function recoveryCodesHeld(): static
+    {
+        return new static('The account already holds recovery codes, so the new set was refused.');
+    }
+
+    /**
      * Create the exception for spending a recovery code another answer spent since it was read.
      */
     public static function recoveryCodeSpent(): static
@@ -41,6 +49,14 @@ class AccountChangeRefusedException extends RuntimeException
     public static function secretChanged(): static
     {
         return new static('The credential secret changed since it was read, so its rehash was refused.');
+    }
+
+    /**
+     * Create the exception for enrolling a second factor for an account that already holds one.
+     */
+    public static function secondFactorHeld(): static
+    {
+        return new static('The account already holds a second factor, so the new one was refused.');
     }
 
     /**

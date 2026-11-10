@@ -3,6 +3,7 @@ import type { Component } from 'vue'
 
 const partials = import.meta.glob<Component>('./*.vue', { eager: true, import: 'default' })
 const shapes = import.meta.glob<Component>('./shapes/*.vue', { eager: true, import: 'default' })
+const enrollments = import.meta.glob<Component>('./enrollment/*.vue', { eager: true, import: 'default' })
 
 const studly = (value: string) =>
   value
@@ -12,4 +13,8 @@ const studly = (value: string) =>
 
 export function componentFor(type: SignInType): Component | undefined {
   return partials[`./${studly(type.name)}.vue`] ?? shapes[`./shapes/${studly(type.shape)}.vue`]
+}
+
+export function enrollmentComponentFor(type: SignInType): Component | undefined {
+  return enrollments[`./enrollment/${studly(type.name)}.vue`]
 }

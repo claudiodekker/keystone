@@ -74,6 +74,14 @@ trait SignInAssertions
     }
 
     /**
+     * Assert the response sent the user whose first factor was held to enroll what the account owes.
+     */
+    public function assertHeldForEnrollment(TestResponse $response): void
+    {
+        $response->assertRedirectToRoute('login.enrollment');
+    }
+
+    /**
      * Assert the response sent the signed-in user on to the given path.
      */
     public function assertSignedIn(TestResponse $response, string $redirectTo): void

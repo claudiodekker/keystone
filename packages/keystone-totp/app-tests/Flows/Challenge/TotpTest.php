@@ -4,6 +4,10 @@ use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use ClaudioDekker\Keystone\Totp\AppTests\TotpSupport;
 
+beforeEach(function () {
+    $this->withoutEnrollmentMandates();
+});
+
 it('accepts the code of the step before and after now by default', function (int $steps) {
     $user = $this->createUser();
     $support = (new TotpSupport)->arrangeCredential(Surface::CHALLENGE, $user);

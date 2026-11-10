@@ -19,3 +19,18 @@ export type ChallengePage = {
   preselected: string | null
   types: ChallengeType[]
 }
+
+export type EnrollmentType = {
+  name: string
+  shape: InitiateShape
+  ceremony: Record<string, string> | null
+}
+
+export type EnrollmentPage = {
+  preselected: string | null
+  types: EnrollmentType[]
+}
+
+export type RecoveryCodesPage = {
+  codes: string[]
+}

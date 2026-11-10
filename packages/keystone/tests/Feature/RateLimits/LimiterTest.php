@@ -9,6 +9,10 @@ use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\RateLimits\Limiter;
 use ClaudioDekker\Keystone\RateLimits\StepKind;
 
+beforeEach(function () {
+    config(['keystone.require_recovery_codes' => false, 'keystone.require_second_factor' => false]);
+});
+
 it('asks to retry after the seconds left of the hour the failed attempts were counted in', function () {
     $type = app(CredentialTypes::class)->find('form', Surface::SIGN_IN);
     $limiter = $this->app->make(Limiter::class);
@@ -40,7 +44,7 @@ it('refuses to count a failed attempt on a surface that is in no flow', function
     $type = app(CredentialTypes::class)->find('form', Surface::SIGN_IN);
     $limiter = $this->app->make(Limiter::class);
 
-    $take = fn () => $limiter->takeFailedAttempt($type, Surface::ENROLLMENT, 'grace@example.com');
+    $take = fn () => $limiter->takeFailedAttempt($type, Surface::REGISTRATION, 'grace@example.com');
 
-    expect($take)->toThrow(MissingFlowException::class, 'No flow counts failed attempts on the [enrollment] surface.');
+    expect($take)->toThrow(MissingFlowException::class, 'No flow counts failed attempts on the [registration] surface.');
 });

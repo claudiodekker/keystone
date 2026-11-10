@@ -72,7 +72,7 @@ class Stubs
      */
     protected function isCopiedFor(string $path, Collection $partials): bool
     {
-        if (preg_match('#^resources/js/partials/([^/]+)\.vue$#', $path, $match) !== 1) {
+        if (preg_match('#^resources/js/partials/(?:enrollment/)?([^/]+)\.vue$#', $path, $match) !== 1) {
             return true;
         }
 

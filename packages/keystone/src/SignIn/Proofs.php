@@ -115,6 +115,31 @@ class Proofs
     }
 
     /**
+     * Move the pending sign-in on to enrollment once the answer proved its second factor and it is admitted, then write the proof's rehash.
+     */
+    public function passSecondFactor(KeystoneUser $account, Answer $answer, PendingSignIn $pending): Held|Refused
+    {
+        if (! $this->admit($account, $answer, $pending)) {
+            return $this->refuse($account, $answer);
+        }
+
+        $this->session->passSecondFactor($pending, $answer->type);
+
+        $this->recorder->record(
+            SecurityEventType::SIGN_IN_HELD,
+            account: $account,
+            surface: $answer->surface,
+            credentialType: $answer->type,
+            credential: $answer->proof->credential,
+            reason: 'keystone.'.Stage::ENROLLMENT->value,
+        );
+
+        $this->rehash($account, $answer);
+
+        return new Held(Stage::ENROLLMENT);
+    }
+
+    /**
      * Refuse the answer, recording the rejected proof for the account it was given for.
      */
     public function refuse(?KeystoneUser $account, Answer $answer): Refused

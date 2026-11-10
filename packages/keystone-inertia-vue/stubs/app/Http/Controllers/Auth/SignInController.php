@@ -52,6 +52,14 @@ class SignInController extends KeystoneSignInController
     }
 
     /**
+     * Send the user to enroll what the account owes.
+     */
+    protected function sendHeldForEnrollment(Request $request): RedirectResponse
+    {
+        return to_route('login.enrollment');
+    }
+
+    /**
      * Return to the sign-in page with the message on the identifier.
      */
     protected function sendSignInRefused(Request $request, string $message): RedirectResponse

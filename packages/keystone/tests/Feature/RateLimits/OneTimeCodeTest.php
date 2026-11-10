@@ -12,6 +12,10 @@ use ClaudioDekker\Keystone\SignIn\SignIn;
 use ClaudioDekker\Keystone\Tests\Fixtures\Methods\FakeCodeType;
 use ClaudioDekker\Keystone\Tests\Fixtures\Models\User;
 
+beforeEach(function () {
+    config(['keystone.require_recovery_codes' => false, 'keystone.require_second_factor' => false]);
+});
+
 it('refuses the 101st failed one-time code in a day, with the hourly allowance left', function () {
     $ada = User::factory()->create();
     UserEmail::factory()->for($ada, 'user')->verified()->create(['address' => 'ada@example.com']);

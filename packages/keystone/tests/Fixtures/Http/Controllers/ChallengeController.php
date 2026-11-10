@@ -49,6 +49,14 @@ class ChallengeController extends BaseChallengeController
     }
 
     /**
+     * Send the user to enroll what the account still owes.
+     */
+    protected function sendHeldForEnrollment(Request $request): Response
+    {
+        return to_route('login.enrollment');
+    }
+
+    /**
      * Send the user on to where the sign-in lands.
      */
     protected function sendSignedIn(Request $request, string $redirectTo): Response

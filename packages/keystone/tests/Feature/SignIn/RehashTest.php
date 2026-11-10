@@ -10,6 +10,10 @@ use ClaudioDekker\Keystone\Tests\Fixtures\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Exceptions;
 
+beforeEach(function () {
+    config(['keystone.require_recovery_codes' => false, 'keystone.require_second_factor' => false]);
+});
+
 it('signs in with the secret the type rehashed the credential to', function () {
     $ada = User::factory()->create();
     UserEmail::factory()->for($ada, 'user')->verified()->create(['address' => 'ada@example.com']);

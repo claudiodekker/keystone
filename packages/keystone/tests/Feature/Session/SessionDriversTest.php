@@ -9,6 +9,10 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Testing\TestResponse;
 
+beforeEach(function () {
+    config(['keystone.require_recovery_codes' => false, 'keystone.require_second_factor' => false]);
+});
+
 it("signs out another session on its next request once the operator ends the account's sessions", function (string $driver) {
     config(['session.driver' => $driver]);
     $ada = User::factory()->create();

@@ -102,9 +102,11 @@ return [
     'notifications' => [
         'account.suspended' => SecurityAlert::class,
         'account.unsuspended' => SecurityAlert::class,
+        'credential.added' => SecurityAlert::class,
         'limit.tripped' => null,
         'proof.rejected' => null,
         'recovery_code.used' => SecurityAlert::class,
+        'recovery_codes.generated' => null,
         'request.rejected' => null,
         'session.ended' => null,
         'sessions.terminated' => SecurityAlert::class,

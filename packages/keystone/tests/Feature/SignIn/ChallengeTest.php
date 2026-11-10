@@ -18,6 +18,10 @@ use ClaudioDekker\Keystone\SignIn\SignIn;
 use ClaudioDekker\Keystone\Tests\Fixtures\Methods\FakeFormType;
 use ClaudioDekker\Keystone\Tests\Fixtures\Models\User;
 
+beforeEach(function () {
+    config(['keystone.require_recovery_codes' => false, 'keystone.require_second_factor' => false]);
+});
+
 it("signs nobody in with an answer of the first factor's type", function () {
     $ada = User::factory()->create();
     UserCredential::factory()->for($ada, 'user')->create(['type' => 'challenge-only', 'secret' => 'second horse']);
