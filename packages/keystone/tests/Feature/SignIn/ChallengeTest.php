@@ -45,6 +45,20 @@ it("signs nobody in with an answer that proves another account's credential", fu
         ->and(Keystone::guard()->check())->toBeFalse();
 });
 
+it('signs nobody in, and stores nothing, with an answer that enrolls a new credential', function () {
+    $ada = User::factory()->create();
+    UserCredential::factory()->for($ada, 'user')->create(['type' => 'challenge-only', 'secret' => 'second horse']);
+    $type = app(CredentialTypes::class)->find('challenge-only', Surface::CHALLENGE);
+    $type->enrollNextProof('enrolled horse');
+    app(SessionState::class)->hold($ada, app(CredentialTypes::class)->find('form', Surface::SIGN_IN), Stage::CHALLENGE);
+
+    $outcome = $this->app->make(Challenge::class)->answer($type, ['secret' => 'second horse']);
+
+    expect($outcome)->toBeInstanceOf(Refused::class)
+        ->and(Keystone::guard()->check())->toBeFalse()
+        ->and(UserCredential::query()->pluck('secret')->all())->toBe(['second horse']);
+});
+
 it("writes no advanced secret for a pending sign-in whose account's credential epoch moved while the type was verifying", function () {
     $ada = User::factory()->create();
     $credential = UserCredential::factory()->for($ada, 'user')->create(['type' => 'challenge-only', 'secret' => 'second horse']);

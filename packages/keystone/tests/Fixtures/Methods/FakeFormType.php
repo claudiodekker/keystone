@@ -60,6 +60,11 @@ class FakeFormType implements CredentialType, CredentialTypeSupport
     protected ?string $nextAdvance = null;
 
     /**
+     * The secret of the new credential the next proof enrolls.
+     */
+    protected ?string $nextEnrollment = null;
+
+    /**
      * Get the type's name.
      */
     public function name(): string
@@ -182,6 +187,14 @@ class FakeFormType implements CredentialType, CredentialTypeSupport
     }
 
     /**
+     * Make the next proof the type proves enroll a new credential with the secret instead.
+     */
+    public function enrollNextProof(string $secret): void
+    {
+        $this->nextEnrollment = $secret;
+    }
+
+    /**
      * Get the type this supports, which is itself.
      */
     public function type(): CredentialType
@@ -224,14 +237,20 @@ class FakeFormType implements CredentialType, CredentialTypeSupport
     }
 
     /**
-     * Prove the credential, carrying the queued advance or rehash once.
+     * Prove the credential with the outcome queued for the next proof, once.
      */
     protected function proven(Credential $credential): Proof
     {
         $advance = $this->nextAdvance;
+        $enrollment = $this->nextEnrollment;
         $rehash = $this->nextRehash;
         $this->nextAdvance = null;
+        $this->nextEnrollment = null;
         $this->nextRehash = null;
+
+        if ($enrollment !== null) {
+            return Proof::enrolled($enrollment);
+        }
 
         if ($advance !== null) {
             return Proof::advanced($credential, $advance);

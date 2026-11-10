@@ -22,6 +22,7 @@ readonly class Proof
         public int|string|null $credential,
         protected ?Closure $rehash = null,
         #[SensitiveParameter] protected ?string $advancedSecret = null,
+        #[SensitiveParameter] protected ?string $enrolledSecret = null,
         public ?string $reason = null,
     ) {
         //
@@ -48,6 +49,16 @@ readonly class Proof
     }
 
     /**
+     * Create a proof of a new credential the subject doesn't hold yet, such as a TOTP key whose first code was right.
+     *
+     * Core signs nobody in with it, because it names none of the credentials the type was given.
+     */
+    public static function enrolled(#[SensitiveParameter] string $secret): static
+    {
+        return new static(null, enrolledSecret: $secret);
+    }
+
+    /**
      * Create a rejection, with the reason core records when the type gives one, such as totp.replayed.
      */
     public static function rejected(?string $reason = null): static
@@ -61,6 +72,14 @@ readonly class Proof
     public function advancedSecret(): ?string
     {
         return $this->advancedSecret;
+    }
+
+    /**
+     * Get the secret of the new credential the proof enrolls, or null when it enrolls none.
+     */
+    public function enrolledSecret(): ?string
+    {
+        return $this->enrolledSecret;
     }
 
     /**
