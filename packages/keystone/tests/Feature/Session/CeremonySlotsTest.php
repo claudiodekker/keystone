@@ -43,3 +43,14 @@ it("keeps each type's ceremony on each surface in a slot of its own", function (
 
     expect($ceremony)->toBe(['challenge' => 'challenge-only ceremony 1', 'surface' => 'challenge']);
 });
+
+it("replaces the type's ceremony on the surface when it starts again", function () {
+    $type = new FakeCeremonyType;
+    $session = app(SessionState::class);
+    $session->startCeremony($type, Surface::CHALLENGE);
+    $session->startCeremony($type, Surface::CHALLENGE);
+
+    $ceremony = $session->ceremony($type, Surface::CHALLENGE);
+
+    expect($ceremony)->toBe(['challenge' => 'challenge-only ceremony 2', 'surface' => 'challenge']);
+});
