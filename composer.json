@@ -12,7 +12,7 @@
         "claudiodekker/keystone-inertia-vue": "self.version",
         "claudiodekker/keystone-password": "self.version",
         "claudiodekker/keystone-totp": "self.version",
-        "claudiodekker/laravel-guardrails": "^1.3.0",
+        "claudiodekker/laravel-guardrails": "^1.4.1",
         "larastan/larastan": "^3.13",
         "laravel/laravel": "^13.0",
         "laravel/pint": "^1.32",
