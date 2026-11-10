@@ -3,6 +3,7 @@
 namespace ClaudioDekker\Keystone\Configuration;
 
 use ClaudioDekker\Keystone\Methods\AllowListEntry;
+use ClaudioDekker\Keystone\Methods\ChecksConfiguration;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypeRegistry;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
@@ -34,6 +35,7 @@ class MethodChecks
 
         return [
             ...$this->clashes(),
+            ...$this->configurations(),
             ...$allowList->problems,
             ...$this->unservedSurfaces($allowList),
             ...$this->unregistered($allowList),
@@ -52,6 +54,24 @@ class MethodChecks
         foreach ($this->registry->clashes() as $name => $types) {
             $classes = collect($types)->map(fn (CredentialType $type) => $type::class)->join(', ', ' and ');
             $failures[] = "Two packages register the credential type [{$name}]: {$classes}.";
+        }
+
+        return $failures;
+    }
+
+    /**
+     * Get the failure of each problem a registered type finds with its own config.
+     *
+     * @return list<string>
+     */
+    protected function configurations(): array
+    {
+        $failures = [];
+
+        foreach ($this->registry->types() as $type) {
+            if ($type instanceof ChecksConfiguration) {
+                $failures = [...$failures, ...$type->configurationFailures()];
+            }
         }
 
         return $failures;

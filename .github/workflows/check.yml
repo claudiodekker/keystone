@@ -176,7 +176,7 @@ jobs:
 
       - run: composer update --prefer-stable --no-interaction --no-progress
 
-      - run: composer remove --dev --no-interaction --no-progress claudiodekker/keystone-inertia-vue claudiodekker/keystone-password
+      - run: composer remove --dev --no-interaction --no-progress claudiodekker/keystone-inertia-vue claudiodekker/keystone-password claudiodekker/keystone-totp
 
       - run: vendor/bin/pest --testsuite=app-tests,contract,keystone
 
@@ -197,7 +197,7 @@ jobs:
 
       - run: composer update --prefer-stable --no-interaction --no-progress
 
-      - run: composer remove --dev --no-interaction --no-progress claudiodekker/keystone-password
+      - run: composer remove --dev --no-interaction --no-progress claudiodekker/keystone-password claudiodekker/keystone-totp
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -228,6 +228,25 @@ jobs:
       - run: composer update --prefer-stable --no-interaction --no-progress
 
       - run: vendor/bin/pest --testsuite=contract,keystone-password
+
+  keystone-totp:
+    name: PHP 8.5, keystone-totp, SQLite
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: '8.5'
+          extensions: intl, pdo_sqlite
+          coverage: none
+
+      - run: composer update --prefer-stable --no-interaction --no-progress
+
+      - run: vendor/bin/pest --testsuite=contract,keystone-totp
 
   inertia-vue-app:
     name: PHP 8.5, keystone-inertia-vue in a fresh Laravel app, ${{ matrix.methods }}, SQLite
