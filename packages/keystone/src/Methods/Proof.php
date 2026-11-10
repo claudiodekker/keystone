@@ -75,6 +75,14 @@ readonly class Proof
     }
 
     /**
+     * Get the secret of the new credential the proof enrolls, or null when it enrolls none.
+     */
+    public function enrolledSecret(): ?string
+    {
+        return $this->enrolledSecret;
+    }
+
+    /**
      * Get the proven credential's new secret, or null when the proof carries no rehash.
      */
     public function rehashed(): ?string
