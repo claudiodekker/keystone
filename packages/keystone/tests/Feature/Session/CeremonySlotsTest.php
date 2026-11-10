@@ -80,3 +80,18 @@ it('ends every ceremony at each change of auth level', function (Closure $change
     'a sign-in' => [fn (SessionState $session, User $ada) => $session->signIn($ada)],
     'a cancel' => [fn (SessionState $session) => $session->dropPendingSignIn()],
 ]);
+
+it('ends a ceremony 10 minutes after its start', function () {
+    $this->freezeSecond();
+    $type = new FakeCeremonyType;
+    $session = app(SessionState::class);
+    $session->startCeremony($type, Surface::CHALLENGE);
+
+    $this->travel(10 * 60 - 1)->seconds();
+    $lastSecond = $session->ceremony($type, Surface::CHALLENGE);
+    $this->travel(1)->seconds();
+    $ended = $session->ceremony($type, Surface::CHALLENGE);
+
+    expect($lastSecond)->not->toBeNull()
+        ->and($ended)->toBeNull();
+});

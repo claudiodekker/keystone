@@ -49,6 +49,11 @@ class SessionState
     protected const string CEREMONIES = 'keystone.ceremonies';
 
     /**
+     * How long a ceremony lasts after its start, in seconds.
+     */
+    protected const int CEREMONY_LIFETIME_SECONDS = 10 * 60;
+
+    /**
      * Create the session state over the request's session.
      */
     public function __construct(
@@ -142,9 +147,14 @@ class SessionState
     {
         $ceremony = $type->start($surface);
 
+        $slot = [
+            'ceremony' => $ceremony,
+            'ends_at' => Date::now()->getTimestamp() + static::CEREMONY_LIFETIME_SECONDS,
+        ];
+
         $this->session->put(static::CEREMONIES, [
             ...$this->session->get(static::CEREMONIES, []),
-            $this->slot($type, $surface) => $ceremony,
+            $this->slot($type, $surface) => $slot,
         ]);
 
         return $ceremony;
@@ -157,7 +167,13 @@ class SessionState
      */
     public function ceremony(CredentialType $type, Surface $surface): ?array
     {
-        return $this->session->get(static::CEREMONIES)[$this->slot($type, $surface)] ?? null;
+        $slot = $this->session->get(static::CEREMONIES)[$this->slot($type, $surface)] ?? null;
+
+        if ($slot === null || Date::now()->getTimestamp() >= $slot['ends_at']) {
+            return null;
+        }
+
+        return $slot['ceremony'];
     }
 
     /**
