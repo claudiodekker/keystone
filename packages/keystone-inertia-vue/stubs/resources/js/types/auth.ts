@@ -9,3 +9,13 @@ export type SignInPage = {
   status: string | null
   types: SignInType[]
 }
+
+export type ChallengeType = {
+  name: string
+  shape: InitiateShape
+}
+
+export type ChallengePage = {
+  preselected: string | null
+  types: ChallengeType[]
+}
