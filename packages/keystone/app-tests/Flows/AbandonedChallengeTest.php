@@ -164,3 +164,14 @@ it('alerts the owners of two accounts whose sign-ins one browser held in turn an
     expect($this->securityEvents()->for($ada)->where('type', SecurityEventType::CHALLENGE_ABANDONED))->toHaveCount(1)
         ->and($this->securityEvents()->for($grace)->where('type', SecurityEventType::CHALLENGE_ABANDONED))->toHaveCount(1);
 });
+
+it('sends no alert about a sign-in held at enrollment rather than at the challenge', function () {
+    config(['keystone.require_second_factor' => true]);
+    $user = $this->createUser();
+    $this->passFirstFactor($user);
+
+    $this->travel(7)->minutes();
+    $this->artisan('keystone:alert-abandoned-challenges');
+
+    expect($this->securityEvents()->for($user)->where('type', SecurityEventType::CHALLENGE_ABANDONED))->toBeEmpty();
+});
