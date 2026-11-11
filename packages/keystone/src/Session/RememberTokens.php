@@ -49,7 +49,7 @@ class RememberTokens
     }
 
     /**
-     * Get the account the browser's remember-me cookie remembers, if any.
+     * Get the account the browser's remember-me cookie remembers, if its lifetime has yet to pass.
      */
     public function account(): ?KeystoneUser
     {
@@ -59,7 +59,10 @@ class RememberTokens
             return null;
         }
 
-        $token = UserRememberToken::query()->where('digest', $sent->digest())->first();
+        $token = UserRememberToken::query()
+            ->where('digest', $sent->digest())
+            ->where('expires_at', '>', Date::now())
+            ->first();
 
         if ($token === null) {
             return null;

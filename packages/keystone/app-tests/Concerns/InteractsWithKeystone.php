@@ -210,6 +210,20 @@ trait InteractsWithKeystone
     }
 
     /**
+     * Get how many seconds a remember-me cookie restores for after its sign-in as the app configures it, skipping the test when the app turned remember me off.
+     */
+    public function rememberLifetimeSeconds(): int
+    {
+        $lifetime = config()->integer('keystone.remember.lifetime_seconds');
+
+        if ($lifetime === 0) {
+            $this->markTestSkipped('The app turned remember me off.');
+        }
+
+        return $lifetime;
+    }
+
+    /**
      * Get how many requests of the step kind one IP address or one signed-in account gets in a minute, as the app configures it.
      */
     public function requestAllowance(StepKind $kind): int
