@@ -183,7 +183,7 @@ class Recorder
     }
 
     /**
-     * Mail the entry's alert to each recipient, unless its type's slot is null.
+     * Mail the entry's alert to each recipient, unless its type's slot is null or it came from a known device.
      *
      * @param  list<string>|null  $recipients
      */
@@ -191,7 +191,7 @@ class Recorder
     {
         $slot = $this->config->get('keystone.notifications')[$entry->type->value] ?? null;
 
-        if ($slot === null) {
+        if ($slot === null || $entry->known_device === true) {
             return;
         }
 

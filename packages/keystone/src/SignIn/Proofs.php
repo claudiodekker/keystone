@@ -6,6 +6,7 @@ use ClaudioDekker\Keystone\Accounts\AccountChange;
 use ClaudioDekker\Keystone\Accounts\AccountChanges;
 use ClaudioDekker\Keystone\Accounts\Suspension;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
+use ClaudioDekker\Keystone\Devices\KnownDevices;
 use ClaudioDekker\Keystone\Exceptions\AccountChangeRefusedException;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\Surface;
@@ -31,6 +32,7 @@ class Proofs
      */
     public function __construct(
         protected AccountChanges $accountChanges,
+        protected KnownDevices $devices,
         protected Limiter $limiter,
         protected Recorder $recorder,
         protected SessionState $session,
@@ -74,6 +76,7 @@ class Proofs
             return $this->refuse($account, $answer);
         }
 
+        $knownDevice = $this->devices->signIn($account);
         $redirectTo = $this->session->signIn($account);
 
         $this->recorder->record(
@@ -82,7 +85,7 @@ class Proofs
             surface: $answer->surface,
             credentialType: $answer->type,
             credential: $answer->credential()?->getKey(),
-            knownDevice: false,
+            knownDevice: $knownDevice,
         );
 
         $this->rehash($account, $answer);

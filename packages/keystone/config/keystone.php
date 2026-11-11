@@ -164,6 +164,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Retention
+    |--------------------------------------------------------------------------
+    |
+    | How many seconds Keystone keeps knowing a browser after the account's
+    | last sign-in from it. Signing in from a browser it no longer knows
+    | alerts the owner, and the nightly prune deletes what it forgot.
+    |
+    */
+
+    'retention' => [
+        'known_devices_seconds' => 60 * 60 * 24 * 90,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Session
     |--------------------------------------------------------------------------
     |

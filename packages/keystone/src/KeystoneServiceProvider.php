@@ -11,6 +11,7 @@ use ClaudioDekker\Keystone\Contracts\IpLocation;
 use ClaudioDekker\Keystone\Contracts\SessionDemotedResponse;
 use ClaudioDekker\Keystone\Contracts\SessionExpiredResponse;
 use ClaudioDekker\Keystone\Contracts\SessionInfo;
+use ClaudioDekker\Keystone\Devices\DeviceCookie;
 use ClaudioDekker\Keystone\Devices\DeviceDetectorSessionInfo;
 use ClaudioDekker\Keystone\Devices\NullSessionInfo;
 use ClaudioDekker\Keystone\Exceptions\KeystoneMisconfiguredException;
@@ -30,6 +31,7 @@ use Illuminate\Auth\AuthenticationException;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Http\Kernel;
+use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Exceptions\Handler;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Redirector;
@@ -108,6 +110,7 @@ class KeystoneServiceProvider extends ServiceProvider
 
         $this->answerEndedSessions();
         $this->captureRequestContext();
+        $this->excludeDeviceCookieFromEncryption();
         $this->hardenResponses();
         $this->refuseCrossSiteRequests();
 
@@ -223,6 +226,14 @@ class KeystoneServiceProvider extends ServiceProvider
     protected function captureRequestContext(): void
     {
         $this->app->make(Kernel::class)->pushMiddleware(CaptureRequestContext::class);
+    }
+
+    /**
+     * Leave the device cookie unencrypted, since only its digest is checked and a value Keystone never handed out matches nothing.
+     */
+    protected function excludeDeviceCookieFromEncryption(): void
+    {
+        EncryptCookies::except(DeviceCookie::NAME);
     }
 
     /**
