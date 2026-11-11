@@ -22,6 +22,7 @@ use ClaudioDekker\Keystone\RecoveryCodes\RecoveryCodeType;
 use ClaudioDekker\Keystone\SecurityEvents\Recorder;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use ClaudioDekker\Keystone\Session\PendingSignIn;
+use ClaudioDekker\Keystone\Session\RememberTokens;
 use ClaudioDekker\Keystone\Session\SessionState;
 use ClaudioDekker\Keystone\Session\Stage;
 use ClaudioDekker\Keystone\Status;
@@ -49,6 +50,7 @@ class Enrollment
         protected Proofs $proofs,
         protected RecoveryCodeType $recoveryCodeType,
         protected Recorder $recorder,
+        protected RememberTokens $rememberTokens,
         protected SessionState $session,
         protected TimingFloor $floor,
         protected CredentialTypes $types,
@@ -269,7 +271,7 @@ class Enrollment
             return new Held(Stage::ENROLLMENT);
         }
 
-        return $this->signIn($type, $account);
+        return $this->signIn($type, $account, $pending);
     }
 
     /**
@@ -307,16 +309,20 @@ class Enrollment
             return new Refused;
         }
 
-        return $this->signIn($type, $account);
+        return $this->signIn($type, $account, $pending);
     }
 
     /**
-     * Complete the sign-in of the account whose enrollment the type finished.
+     * Complete the sign-in of the account whose enrollment the type finished, remembering the browser when the pending sign-in asked to.
      */
-    protected function signIn(CredentialType $type, KeystoneUser $account): SignedIn
+    protected function signIn(CredentialType $type, KeystoneUser $account, PendingSignIn $pending): SignedIn
     {
         $knownDevice = $this->devices->signIn($account);
         $redirectTo = $this->session->signIn($account);
+
+        if ($pending->remember) {
+            $this->session->keepRememberToken($this->rememberTokens->issue($account));
+        }
 
         $this->pendingChallenges->forget($account);
 

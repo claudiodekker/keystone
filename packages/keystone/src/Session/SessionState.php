@@ -134,9 +134,9 @@ class SessionState
     }
 
     /**
-     * Hold the sign-in of the account at the stage it owes, in place of whatever phase the session held.
+     * Hold the sign-in of the account at the stage it owes, in place of whatever phase the session held, keeping whether the user ticked remember me.
      */
-    public function hold(KeystoneUser $account, CredentialType $firstFactor, Stage $stage): void
+    public function hold(KeystoneUser $account, CredentialType $firstFactor, Stage $stage, bool $remember = false): void
     {
         $pending = new PendingSignIn(
             account: $account->getAuthIdentifier(),
@@ -145,6 +145,7 @@ class SessionState
             intendedPath: $this->intendedPath(),
             epoch: CredentialEpoch::of($account->getAuthIdentifier()),
             heldAt: Date::now()->getTimestamp(),
+            remember: $remember,
         );
 
         $this->changeAuthLevel();

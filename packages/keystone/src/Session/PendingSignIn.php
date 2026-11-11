@@ -22,6 +22,7 @@ readonly class PendingSignIn
      * @param  int|null  $epoch  the account's credential epoch at the hold
      * @param  int  $heldAt  the Unix second of the hold
      * @param  string|null  $secondFactor  the name of the credential type that answered the challenge or was enrolled, null until one did
+     * @param  bool  $remember  whether the user ticked remember me
      */
     public function __construct(
         public int|string $account,
@@ -31,6 +32,7 @@ readonly class PendingSignIn
         public ?int $epoch,
         public int $heldAt,
         public ?string $secondFactor = null,
+        public bool $remember = false,
     ) {
         //
     }
@@ -42,7 +44,7 @@ readonly class PendingSignIn
      */
     public static function fromSession(array $value): ?static
     {
-        $value += array_fill_keys(['account', 'first_factor', 'stage', 'intended_path', 'epoch', 'held_at', 'second_factor'], null);
+        $value += array_fill_keys(['account', 'first_factor', 'stage', 'intended_path', 'epoch', 'held_at', 'second_factor', 'remember'], null);
 
         $stage = is_string($value['stage']) ? Stage::tryFrom($value['stage']) : null;
 
@@ -62,6 +64,7 @@ readonly class PendingSignIn
             || ! is_string($value['first_factor'])
             || ! is_string($value['intended_path'])
             || ! is_int($value['held_at'])
+            || ! is_bool($value['remember'])
         ) {
             return null;
         }
@@ -74,13 +77,14 @@ readonly class PendingSignIn
             epoch: $value['epoch'],
             heldAt: $value['held_at'],
             secondFactor: $value['second_factor'],
+            remember: $value['remember'],
         );
     }
 
     /**
      * Get the pending sign-in as its session value.
      *
-     * @return array{account: int|string, first_factor: string, stage: string, intended_path: string, epoch: int|null, held_at: int, second_factor: string|null}
+     * @return array{account: int|string, first_factor: string, stage: string, intended_path: string, epoch: int|null, held_at: int, second_factor: string|null, remember: bool}
      */
     public function toSession(): array
     {
@@ -92,6 +96,7 @@ readonly class PendingSignIn
             'epoch' => $this->epoch,
             'held_at' => $this->heldAt,
             'second_factor' => $this->secondFactor,
+            'remember' => $this->remember,
         ];
     }
 
@@ -108,6 +113,7 @@ readonly class PendingSignIn
             epoch: $this->epoch,
             heldAt: $this->heldAt,
             secondFactor: $secondFactor,
+            remember: $this->remember,
         );
     }
 

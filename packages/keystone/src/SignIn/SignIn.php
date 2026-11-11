@@ -89,7 +89,7 @@ class SignIn
         $stage = $this->decision->owed($account, $type);
 
         if ($stage !== null) {
-            return $this->proofs->hold($account, $answer, $stage);
+            return $this->proofs->hold($account, $answer, $stage, $remember);
         }
 
         return $this->proofs->signIn($account, $answer, remember: $remember);

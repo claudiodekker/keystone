@@ -103,15 +103,15 @@ class Proofs
     }
 
     /**
-     * Hold the sign-in of the account the answer proved at the stage it owes, once it is admitted, then write the proof's rehash.
+     * Hold the sign-in of the account the answer proved at the stage it owes, once it is admitted, keeping whether to remember the browser, then write the proof's rehash.
      */
-    public function hold(KeystoneUser $account, Answer $answer, Stage $stage): Held|Refused
+    public function hold(KeystoneUser $account, Answer $answer, Stage $stage, bool $remember): Held|Refused
     {
         if (! $this->admit($account, $answer, writer: null)) {
             return $this->refuse($account, $answer);
         }
 
-        $this->session->hold($account, $answer->type, $stage);
+        $this->session->hold($account, $answer->type, $stage, $remember);
 
         if ($stage === Stage::CHALLENGE) {
             $this->pendingChallenges->hold($account);

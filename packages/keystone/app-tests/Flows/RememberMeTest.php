@@ -360,3 +360,50 @@ it("tells the app a request was signed in through remember me, as Laravel's Logi
     Event::assertDispatched(Login::class, fn (Login $login) => $login->remember && $login->user->is($user));
     expect($response->json())->toBe(['user' => $user->getAuthIdentifier(), 'via_remember' => true]);
 });
+
+it('remembers a browser that ticked remember me once it answers the challenge', function () {
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $firstFactor = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+    $secondFactor = $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);
+
+    $this->post(route('login.submit', $firstFactor->type()->name()), [
+        'identifier' => 'ada@example.com',
+        'remember' => true,
+        ...$firstFactor->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $signedIn = $this->answerChallenge($user, $secondFactor);
+
+    $this->keepCookiesFrom($signedIn);
+    $this->switchBackTo($this->browserWithCopiedCookies());
+
+    $response = $this->get(route('login'));
+
+    $this->assertAlreadySignedIn($response);
+});
+
+it('remembers a browser that ticked remember me once it saves the recovery codes its account owed', function () {
+    config(['keystone.require_recovery_codes' => true]);
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $firstFactor = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+    $secondFactor = $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);
+
+    $this->post(route('login.submit', $firstFactor->type()->name()), [
+        'identifier' => 'ada@example.com',
+        'remember' => true,
+        ...$firstFactor->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $this->answerChallenge($user, $secondFactor);
+    $codes = $this->shownRecoveryCodes($this->get(route('login.enrollment')));
+    $signedIn = $this->post(route('login.enrollment.submit', 'recovery-code'), ['recovery_code' => $codes[3]]);
+
+    $this->keepCookiesFrom($signedIn);
+    $this->switchBackTo($this->browserWithCopiedCookies());
+
+    $response = $this->get(route('login'));
+
+    $this->assertAlreadySignedIn($response);
+});

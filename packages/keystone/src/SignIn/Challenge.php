@@ -226,7 +226,7 @@ class Challenge
             return $this->proofs->passSecondFactor($account, $answer, $pending);
         }
 
-        return $this->proofs->signIn($account, $answer, writer: $pending);
+        return $this->proofs->signIn($account, $answer, writer: $pending, remember: $pending->remember);
     }
 
     /**
