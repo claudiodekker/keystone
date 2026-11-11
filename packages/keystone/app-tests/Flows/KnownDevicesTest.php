@@ -76,3 +76,47 @@ it('hands the browser a host-only device cookie that only HTTPS carries, scripts
         ->and($cookie->getSameSite())->toBe('lax')
         ->and($cookie->getExpiresTime())->toBe(now()->getTimestamp() + 3542400);
 });
+
+it('sends no alert when a browser the account knows signs in from a new network', function () {
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $first = $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.23'])->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $this->keepCookiesFrom($first);
+    $this->post(route('logout'));
+
+    $response = $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.71'])->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $this->assertSignedIn($response, '/');
+    expect($this->sentAlerts())->toHaveCount(1);
+});
+
+it('alerts the owner when a browser the account has not seen signs in from a network it has', function () {
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $first = $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.23'])->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $this->keepCookiesFrom($first);
+    $this->switchToFreshBrowser();
+
+    $response = $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.23'])->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $this->assertSignedIn($response, '/');
+    expect($this->sentAlerts()->pluck('alert.type')->all())->toBe([SecurityEventType::SIGNED_IN, SecurityEventType::SIGNED_IN]);
+});
