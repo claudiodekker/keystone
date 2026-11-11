@@ -2,6 +2,8 @@
 
 use ClaudioDekker\Keystone\Jobs\EndSessions;
 use ClaudioDekker\Keystone\Methods\Surface;
+use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
+use Illuminate\Support\Facades\Auth;
 
 beforeEach(function () {
     $this->withoutEnrollmentMandates();
@@ -144,4 +146,26 @@ it('forgets only the remember-me cookie of the browser that signs out', function
 
     $this->assertSignInPage($signedOut, ['status' => null]);
     $this->assertAlreadySignedIn($remembered);
+});
+
+it('restores a session past its absolute lifetime silently while the remember-me cookie is live', function () {
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $signedIn = $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        'remember' => true,
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $this->keepCookiesFrom($signedIn);
+    Auth::forgetGuards();
+    $this->travel($this->absoluteLifetimeSeconds())->seconds();
+
+    $response = $this->get(route('login'));
+
+    $this->assertAlreadySignedIn($response);
+    $this->assertSiteDataKept($response);
+    expect($this->securityEvents()->for($user)->where('type', SecurityEventType::SESSION_ENDED))->toBeEmpty();
 });

@@ -47,11 +47,11 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Get the signed-in user, first ending a session that may no longer stand, so the request reads it as a guest's.
+     * Get the signed-in user, first ending a session that may no longer stand, so the request reads it as a guest's, unless a live remember-me cookie restores it.
      */
     public function user(): ?Authenticatable
     {
-        if ($this->hasExpired()) {
+        if ($this->hasExpired() && ! $this->restore()) {
             $this->expire();
         }
 
@@ -190,20 +190,22 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Sign the browser back in as the account its live remember-me cookie remembers, if any.
+     * Sign the browser back in as the account its live remember-me cookie remembers, and determine if it did.
      */
-    protected function restore(): void
+    protected function restore(): bool
     {
         $token = $this->container->make(RememberTokens::class)->find();
         $account = $token === null ? null : $this->provider->retrieveById($token->user_id);
 
         if (! $account instanceof KeystoneUser) {
-            return;
+            return false;
         }
 
         $this->viaRemember = true;
 
         $this->state()->restore($account, $token);
+
+        return true;
     }
 
     /**
