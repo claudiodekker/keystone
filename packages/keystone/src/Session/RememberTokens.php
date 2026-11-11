@@ -148,7 +148,7 @@ class RememberTokens
     }
 
     /**
-     * Make the cookie with the value, which the browser keeps until the Unix second, out of reach of scripts and other sites.
+     * Make the cookie with the value, which the browser keeps until the Unix second, kept from scripts and from requests other sites send in the background.
      */
     protected function makeCookie(string $value, int $expire): Cookie
     {

@@ -325,7 +325,7 @@ class SessionState
     }
 
     /**
-     * Remember the remember-me token the session issued, so ending the session forgets it.
+     * Remember the remember-me token the session issued or restored from, so ending the session forgets it.
      */
     public function keepRememberToken(UserRememberToken $token): void
     {

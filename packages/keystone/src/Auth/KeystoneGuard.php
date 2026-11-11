@@ -192,7 +192,7 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Sign the browser back in as the account its live remember-me cookie remembers, once a request and only once its session has started, and determine if it did.
+     * Sign the browser back in as the account its live remember-me cookie remembers, and determine if it did.
      *
      * A return whose account owes enrollment is refused and its token forgotten, since nothing a session enrolls may rest on an earlier sign-in.
      */
@@ -227,7 +227,7 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Record the account's remembered return, from a device it knows or not, reading the device cookie without re-keying it.
+     * Record the account's remembered return, and whether it came from a device the account knows.
      */
     protected function recordReturn(KeystoneUser $account): void
     {
