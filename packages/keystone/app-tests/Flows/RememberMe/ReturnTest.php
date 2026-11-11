@@ -4,6 +4,8 @@ use ClaudioDekker\Keystone\AppTests\Support\Browser;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use Illuminate\Auth\Events\Login;
+use Illuminate\Contracts\Http\Kernel;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
@@ -158,4 +160,32 @@ it('ignores a cookie issued earlier while the remember-me lifetime is zero, and 
     $this->assertSignInPage($whileOff, ['status' => null]);
     $this->assertAlreadySignedIn($onceBackOn);
     expect($this->securityEvents()->for($user)->where('type', SecurityEventType::REQUEST_REJECTED))->toBeEmpty();
+});
+
+it('restores once the session has started, so a global middleware asking earlier sees a guest', function () {
+    $askedEarly = [];
+    $this->app->make(Kernel::class)->pushMiddleware(function (Request $request, Closure $next) use (&$askedEarly) {
+        $askedEarly[] = Auth::id();
+
+        return $next($request);
+    });
+
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $signedIn = $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        'remember' => true,
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $this->keepCookiesFrom($signedIn);
+    $this->switchBackTo($this->browserWithCopiedCookies());
+
+    $response = $this->get(route('login'));
+
+    $this->assertAlreadySignedIn($response);
+    expect($askedEarly)->toBe([null, null])
+        ->and($this->securityEvents()->for($user)->where('type', SecurityEventType::SIGNED_IN))->toHaveCount(2);
 });

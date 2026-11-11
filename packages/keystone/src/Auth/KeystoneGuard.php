@@ -192,13 +192,13 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Sign the browser back in as the account its live remember-me cookie remembers, once a request, and determine if it did.
+     * Sign the browser back in as the account its live remember-me cookie remembers, once a request and only once its session has started, and determine if it did.
      *
      * A return whose account owes enrollment is refused and its token forgotten, since nothing a session enrolls may rest on an earlier sign-in.
      */
     protected function restore(): bool
     {
-        if ($this->recallAttempted) {
+        if ($this->recallAttempted || ! $this->session->isStarted()) {
             return false;
         }
 
