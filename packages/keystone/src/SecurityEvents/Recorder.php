@@ -115,11 +115,16 @@ class Recorder
      */
     public function recordEarlier(SecurityEventType $type, KeystoneUser $account, Surface $surface, array $occurrences): void
     {
-        if ($this->config->get('keystone.events.enabled') === false || $occurrences === []) {
+        if ($this->config->get('keystone.events.enabled') === false) {
             return;
         }
 
-        $entries = array_values(array_map(fn (array $occurrence) => $this->makeEarlierEntry($type, $account, $surface, $occurrence), $occurrences));
+        $entries = array_map(fn (array $occurrence) => rescue(fn () => $this->makeEarlierEntry($type, $account, $surface, $occurrence)), $occurrences);
+        $entries = array_values(array_filter($entries));
+
+        if ($entries === []) {
+            return;
+        }
 
         foreach ($entries as $entry) {
             rescue(fn () => $this->log($entry));
@@ -227,7 +232,7 @@ class Recorder
     }
 
     /**
-     * Mail one alert about the entries, all of one type, to each recipient, unless their type's slot is null or the first came from a known device.
+     * Mail one alert about the entries, all of one type, to each recipient, unless their type's slot is null or they came from a known device.
      *
      * @param  non-empty-list<UserSecurityEvent>  $entries
      * @param  list<string>|null  $recipients
