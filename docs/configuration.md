@@ -28,6 +28,7 @@ This file raises the view allowance and keeps every other allowance at its defau
 | `rate_limits.requests_per_minute.change` | `10` | A higher number lets more sign-outs through from one address. |
 | `rate_limits.requests_per_minute.submit` | `10` | A higher number lets more sign-in submits through from one address. |
 | `rate_limits.requests_per_minute.view` | `60` | A higher number lets more page views through from one address. |
+| `remember.lifetime_seconds` | `60 * 60 * 24 * 30` | A longer lifetime lets a stolen [remember-me](remember-me.md) cookie sign in for longer without either factor. `0` turns remember me off. |
 | `retention.known_devices_seconds` | `60 * 60 * 24 * 90` | A longer retention keeps a browser known, with its own failed-attempt count and no new-device alert, for longer after its last sign-in. |
 | `require_recovery_codes` | `true` | `false` lets an account sign in without recovery codes, and lets its last code answer the challenge, which can leave it without codes for recovery. |
 | `require_second_factor` | `true` | `false` lets an account sign in on its first factor alone while it holds no second factor. |
@@ -62,7 +63,7 @@ Two timers end a session. Laravel's `session.lifetime`, in minutes in `config/se
 
 With this file, a user who signs in at 9:00 is signed out on the first request after 17:00 that asks who is signed in, however busy they kept the session. A user who stops using the app is signed out by `session.lifetime` first. `null` turns the absolute lifetime off, and `0` is refused at boot. Keystone stamps the sign-in time whether or not the lifetime is on, so turning it on later counts from each session's own sign-in.
 
-When the absolute lifetime has passed, Keystone ends the session, records `session.ended` with the reason `keystone.expired` and clears the browser's site data, before your code sees the user. From then on the request is a guest's:
+When the absolute lifetime has passed and the browser holds a live [remember-me](remember-me.md) cookie, Keystone signs it in again on a fresh session, with nothing recorded as ended and no notice. Otherwise, Keystone ends the session, records `session.ended` with the reason `keystone.expired` and clears the browser's site data, before your code sees the user. From then on the request is a guest's:
 
 - A page behind the `auth` middleware sends the user where Laravel sends guests. `redirectGuestsTo()` still decides where that is, and the page they wanted is kept, so signing in takes them back to it. The sign-in page then says "Your session has expired. Please sign in again."
 - A JSON request to such a page gets a `401` with `{"message": "Your session has expired. Please sign in again.", "reason": "expired"}`, so a client can tell an expiry from never having signed in. A request counts as JSON when `expectsJson()` says so.
@@ -109,7 +110,7 @@ Keystone checks its config when you cache it, and on every boot of an app that h
 
 An app that runs from a cached config pays nothing for the checks per request, so run `config:cache` (or `optimize`) in your deploy, as Laravel recommends. Your test suite boots without a cached config, so it runs the checks on every test boot, and your CI catches a change to your bindings or middleware that fails one.
 
-The checks set no ceilings. In every environment, they refuse a value of the wrong type, and a `0` or `null` that would switch a control off, except the `null` that turns off the absolute session lifetime:
+The checks set no ceilings. In every environment, they refuse a value of the wrong type, and a `0` or `null` that would switch a control off, except the `null` that turns off the absolute session lifetime and the `0` that turns off remember me:
 
 | Key | Refused unless it is |
 |---|---|
@@ -118,6 +119,7 @@ The checks set no ceilings. In every environment, they refuse a value of the wro
 | `ip_location.allow_plaintext_driver` | `true` or `false`. |
 | `require_recovery_codes` | `true` or `false`. |
 | `require_second_factor` | `true` or `false`. |
+| `remember.lifetime_seconds` | An integer of at least 0. |
 | `retention.known_devices_seconds` | An integer of at least 1. |
 | `log_channel` | `null`, or the name of a channel in your `logging` config. |
 | `notifications` | A map of security event types, each to `null` or to a notification class whose constructor takes the event alone. `SecurityAlert` is refused on a type it has no mail for. |

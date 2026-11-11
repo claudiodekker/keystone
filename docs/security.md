@@ -152,7 +152,7 @@ When Keystone ends a session, the response to that request carries `Clear-Site-D
 'clear_site_data' => ['cache', 'storage'],
 ```
 
-The kinds are `cache`, `cookies`, `storage` and `executionContexts`. Clearing `cookies` signs the browser out of everything it holds a cookie for on your domain. An empty list sends no header. Keystone refuses to boot when the value isn't a list of those kinds.
+The kinds are `cache`, `cookies`, `storage` and `executionContexts`. Clearing `cookies` signs the browser out of everything it holds a cookie for on your domain, and deletes its [remember-me](remember-me.md) and device cookies. A session that passes its absolute lifetime while its remember-me cookie is live is signed in again instead, and sends no header, so the cookie that signed it in survives. An empty list sends no header. Keystone refuses to boot when the value isn't a list of those kinds.
 
 ### Testing
 
