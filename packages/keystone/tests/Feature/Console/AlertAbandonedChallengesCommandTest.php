@@ -82,3 +82,29 @@ it("records each of an account's abandoned challenges, and alerts its owner once
     expect($counts->all())->toEqualCanonicalizing(['ada@example.com' => 3, 'grace@example.com' => 1])
         ->and(UserSecurityEvent::query()->where('type', SecurityEventType::CHALLENGE_ABANDONED)->count())->toBe(4);
 });
+
+it('sends nothing more on the next sweep', function () {
+    $ada = User::factory()->create();
+    UserEmail::factory()->for($ada, 'user')->verified()->create(['address' => 'ada@example.com']);
+    UserPendingChallenge::factory()->for($ada, 'user')->create(['created_at' => now()->subMinutes(9)]);
+    $this->artisan('keystone:alert-abandoned-challenges')->assertSuccessful();
+
+    $this->travel(5)->minutes();
+    $this->artisan('keystone:alert-abandoned-challenges')->assertSuccessful();
+
+    Notification::assertSentOnDemandTimes(SecurityAlert::class, 1);
+    expect(UserSecurityEvent::query()->count())->toBe(1);
+});
+
+it('deletes the abandoned challenges of a deleted account without recording or mailing anything', function () {
+    $ada = User::factory()->create();
+    UserEmail::factory()->for($ada, 'user')->verified()->create(['address' => 'ada@example.com']);
+    UserPendingChallenge::factory()->for($ada, 'user')->create(['created_at' => now()->subMinutes(9)]);
+    $ada->delete();
+
+    $this->artisan('keystone:alert-abandoned-challenges')->assertSuccessful();
+
+    Notification::assertNothingSent();
+    $this->assertDatabaseCount(UserPendingChallenge::class, 0);
+    $this->assertDatabaseCount(UserSecurityEvent::class, 0);
+});
