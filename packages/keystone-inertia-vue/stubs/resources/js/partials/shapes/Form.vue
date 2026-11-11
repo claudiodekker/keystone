@@ -6,6 +6,7 @@ import type { SignInType } from '@/types/auth'
 
 defineProps<{
   type: SignInType
+  remember: boolean
 }>()
 </script>
 
@@ -25,6 +26,11 @@ defineProps<{
     </div>
 
     <slot :errors="errors" />
+
+    <label v-if="remember" :for="`${type.name}-remember`" class="flex items-center gap-2 text-sm text-gray-700">
+      <input :id="`${type.name}-remember`" name="remember" type="checkbox" value="1" class="rounded border-gray-300" />
+      Remember me
+    </label>
 
     <button
       type="submit"

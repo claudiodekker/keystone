@@ -22,6 +22,7 @@ class SignInController extends KeystoneSignInController
         Inertia::encryptHistory();
 
         return Inertia::render('auth/Login', [
+            'remember' => $page->remember,
             'status' => $page->status,
             'types' => $page->types,
         ]);

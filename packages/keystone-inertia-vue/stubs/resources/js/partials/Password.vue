@@ -5,11 +5,12 @@ import type { SignInType } from '@/types/auth'
 
 defineProps<{
   type: SignInType
+  remember: boolean
 }>()
 </script>
 
 <template>
-  <FormShape :type="type">
+  <FormShape :type="type" :remember="remember">
     <template #default="{ errors }">
       <div class="grid gap-2">
         <div class="flex items-center justify-between">

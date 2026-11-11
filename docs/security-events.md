@@ -36,12 +36,12 @@ Set `log_channel` to the name of a channel in your `logging.php` to send the log
 | `proof.rejected` | A sign-in was refused for an account that the typed address named, or a challenge answer was refused for the held account. A TOTP code from a step already accepted has the reason `totp.replayed`, and an account's last recovery code, kept while recovery codes are required, has the reason `recovery-code.last_code`. |
 | `recovery_code.used` | A recovery code answered the challenge and was spent. |
 | `recovery_codes.generated` | A set of recovery codes was stored. A first set alerts nobody. |
-| `request.rejected` | A request was refused before it ran. The reason says why: `keystone.cross_site_request`. The event is anonymous. |
+| `request.rejected` | A request was refused before it ran. The reason says why: `keystone.cross_site_request` for a cross-site request, which is anonymous, `keystone.dead_remember_cookie` for a [remember-me](remember-me.md) cookie that can no longer sign in, against its account when its token was found, and `keystone.enrollment_owed` for a remembered return whose account owes enrollment. |
 | `session.ended` | Keystone ended the session. The reason says why: `keystone.expired` when it passed its absolute lifetime, `keystone.epoch` when an operator ended the account's sessions or suspended it after it signed in, `keystone.demoted` when the account came to owe [enrollment](enrollment.md#signed-in-sessions-that-newly-owe). |
 | `sessions.terminated` | An operator ended every session of the account. Ending every account's sessions records one about nobody, with reason `keystone.every_account`. |
 | `sign_in.held` | A right first factor was held for what the account owes. The reason names the stage: `keystone.challenge` or `keystone.enrollment`. A challenge answer that moves on to enrollment records it again. |
 | `sign_in.voided` | A pending sign-in was dropped because its account's credential epoch moved or the account was suspended since the hold. The reason is `keystone.epoch`. |
-| `signed_in` | A session signed in, on its first factor, at the challenge or at the end of enrollment. `known_device` says whether the browser was a [known device](#new-devices) of the account. |
+| `signed_in` | A session signed in, on its first factor, at the challenge or at the end of enrollment, or a [remember-me](remember-me.md) cookie signed it in again, with the reason `keystone.remembered`. `known_device` says whether the browser was a [known device](#new-devices) of the account. |
 | `signed_out` | The user signed out. |
 
 ## Fields

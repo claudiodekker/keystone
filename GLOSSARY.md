@@ -138,6 +138,14 @@ A browser an account signed in from within the retention, recognised by the `__H
 
 A sign-in held at the challenge from a browser that isn't a known device of its account, kept as a row until the browser passes the challenge or signs in to the account without it. Cancelling, expiry and an epoch move keep it, and a browser that holds the account's sign-in again keeps its first one. Once it has waited 7 minutes, a sweep every 5 minutes records it as `challenge.abandoned`, alerts the owner once about all of the account's, and deletes it.
 
+## Remember-me token
+
+A row of `user_remember_tokens` for a browser whose user ticked "Remember me": the digest of its `__Host-keystone_remember` cookie, the account's credential epoch at the sign-in and an expiry a fixed lifetime after it. Nothing extends it. It dies at its expiry, when the browser signs out or its session is demoted, and when the account's epoch moves or the account is suspended, and a dead one is deleted when its cookie is next presented.
+
+## Remembered return
+
+A request from a browser with no signed-in session that a live remember-me token signs in again as its account, on a fresh session id with an absolute lifetime of its own. It proves no factor, records `signed_in` with the reason `keystone.remembered`, and changes neither the token nor the device cookie. A return whose account owes enrollment is refused and its token deleted.
+
 ## Slot
 
 The notification class `keystone.notifications` names for one type of security event, or null to send no alert of that type.

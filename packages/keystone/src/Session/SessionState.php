@@ -9,6 +9,7 @@ use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\StartsCeremony;
 use ClaudioDekker\Keystone\Methods\Surface;
+use ClaudioDekker\Keystone\Models\UserRememberToken;
 use ClaudioDekker\Keystone\Status;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Contracts\Config\Repository as Config;
@@ -54,6 +55,11 @@ class SessionState
      * The session key that holds the id of the pending challenge held from the session's browser, which outlives the pending sign-in it was held for.
      */
     protected const string PENDING_CHALLENGE = 'keystone.pending_challenge';
+
+    /**
+     * The session key that holds the id of the remember-me token the session issued or restored from.
+     */
+    protected const string REMEMBER_TOKEN = 'keystone.remember_token';
 
     /**
      * How long a ceremony lasts after its start, in seconds.
@@ -128,9 +134,9 @@ class SessionState
     }
 
     /**
-     * Hold the sign-in of the account at the stage it owes, in place of whatever phase the session held.
+     * Hold the sign-in of the account at the stage it owes, in place of whatever phase the session held, keeping whether the user ticked remember me.
      */
-    public function hold(KeystoneUser $account, CredentialType $firstFactor, Stage $stage): void
+    public function hold(KeystoneUser $account, CredentialType $firstFactor, Stage $stage, bool $remember = false): void
     {
         $pending = new PendingSignIn(
             account: $account->getAuthIdentifier(),
@@ -139,6 +145,7 @@ class SessionState
             intendedPath: $this->intendedPath(),
             epoch: CredentialEpoch::of($account->getAuthIdentifier()),
             heldAt: Date::now()->getTimestamp(),
+            remember: $remember,
         );
 
         $this->changeAuthLevel();
@@ -308,6 +315,44 @@ class SessionState
     }
 
     /**
+     * Restore the full sign-in of the account the remember-me token remembers, on a fresh session id.
+     */
+    public function restore(KeystoneUser $account, UserRememberToken $token): void
+    {
+        $this->changeAuthLevel();
+        $this->enter($account, remember: true);
+        $this->keepRememberToken($token);
+    }
+
+    /**
+     * Remember the remember-me token the session issued or restored from, so ending the session forgets it.
+     */
+    public function keepRememberToken(UserRememberToken $token): void
+    {
+        $this->session->put(static::REMEMBER_TOKEN, $token->getKey());
+    }
+
+    /**
+     * Get the account's credential epoch the session's sign-in was stamped with, if any.
+     */
+    public function epoch(): ?int
+    {
+        $epoch = $this->session->get(static::EPOCH);
+
+        return is_int($epoch) ? $epoch : null;
+    }
+
+    /**
+     * Get the id of the remember-me token the session issued or restored from, if any.
+     */
+    public function rememberToken(): int|string|null
+    {
+        $id = $this->session->get(static::REMEMBER_TOKEN);
+
+        return is_int($id) || is_string($id) ? $id : null;
+    }
+
+    /**
      * End the session and leave the signed-out status for the sign-in page, and get who was signed in, if anyone.
      */
     public function signOut(): ?KeystoneUser
@@ -384,7 +429,7 @@ class SessionState
     /**
      * Stamp the sign-in time and the account's credential epoch, and put the account on the guard's session key and on the guard for the rest of the request.
      */
-    protected function enter(KeystoneUser $account): void
+    protected function enter(KeystoneUser $account, bool $remember = false): void
     {
         $guard = Keystone::guard();
 
@@ -393,7 +438,7 @@ class SessionState
         $this->session->put(static::EPOCH, CredentialEpoch::of($account->getAuthIdentifier()));
         $guard->setUser($account);
 
-        $this->events->dispatch(new Login($guard->getName(), $account, false));
+        $this->events->dispatch(new Login($guard->getName(), $account, $remember));
     }
 
     /**

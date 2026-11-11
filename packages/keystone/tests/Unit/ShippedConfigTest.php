@@ -39,3 +39,9 @@ it('keeps knowing a browser for ninety days after its last sign-in by default', 
 
     expect($shipped['retention']['known_devices_seconds'])->toBe(7776000);
 });
+
+it('remembers a browser for thirty days after the sign-in that ticked remember me by default', function () {
+    $shipped = require dirname(__DIR__, 2).'/config/keystone.php';
+
+    expect($shipped['remember']['lifetime_seconds'])->toBe(2592000);
+});

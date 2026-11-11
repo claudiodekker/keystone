@@ -8,6 +8,7 @@ use ClaudioDekker\Keystone\Http\Pages\SignInPage;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\RateLimits\StepKind;
+use ClaudioDekker\Keystone\Session\RememberTokens;
 use ClaudioDekker\Keystone\Session\SessionState;
 use ClaudioDekker\Keystone\Session\Stage;
 use ClaudioDekker\Keystone\SignIn\Held;
@@ -44,7 +45,7 @@ abstract class SignInController implements KeystoneController
     /**
      * Show the sign-in page to a guest.
      */
-    public function show(Request $request, SessionState $session, CredentialTypes $types): Response|Responsable
+    public function show(Request $request, SessionState $session, CredentialTypes $types, RememberTokens $rememberTokens): Response|Responsable
     {
         if ($session->isSignedIn()) {
             return $this->sendAlreadySignedIn($request);
@@ -53,6 +54,7 @@ abstract class SignInController implements KeystoneController
         $page = new SignInPage(
             types: $types->shapes(Surface::SIGN_IN),
             status: $session->status()?->label(),
+            remember: $rememberTokens->isOn(),
         );
 
         return $this->sendSignInPage($request, $page);
@@ -69,7 +71,7 @@ abstract class SignInController implements KeystoneController
 
         $credentialType = $types->find($type, Surface::SIGN_IN) ?? throw new NotFoundHttpException;
 
-        $outcome = $signIn->attempt($credentialType, $request->all());
+        $outcome = $signIn->attempt($credentialType, $request->all(), remember: $request->boolean('remember'));
 
         if ($outcome instanceof Refused) {
             return $this->sendSignInRefused($request, Status::CREDENTIALS_REJECTED->label());

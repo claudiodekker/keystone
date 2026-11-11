@@ -28,6 +28,7 @@ use ClaudioDekker\Keystone\Locations\StevebaumanIpLocation;
 use ClaudioDekker\Keystone\Methods\CredentialTypeRegistry;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\MethodAllowList;
+use ClaudioDekker\Keystone\Session\RememberCookie;
 use DeviceDetector\DeviceDetector;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Console\Scheduling\Schedule;
@@ -113,7 +114,7 @@ class KeystoneServiceProvider extends ServiceProvider
 
         $this->answerEndedSessions();
         $this->captureRequestContext();
-        $this->excludeDeviceCookieFromEncryption();
+        $this->excludeKeystoneCookiesFromEncryption();
         $this->hardenResponses();
         $this->refuseCrossSiteRequests();
         $this->schedule();
@@ -248,11 +249,11 @@ class KeystoneServiceProvider extends ServiceProvider
     }
 
     /**
-     * Leave the device cookie unencrypted, since only its digest is checked and a value Keystone never handed out matches nothing.
+     * Leave the device and remember-me cookies unencrypted, since only their digests are checked and a value Keystone never handed out matches nothing.
      */
-    protected function excludeDeviceCookieFromEncryption(): void
+    protected function excludeKeystoneCookiesFromEncryption(): void
     {
-        EncryptCookies::except(DeviceCookie::NAME);
+        EncryptCookies::except([DeviceCookie::NAME, RememberCookie::NAME]);
     }
 
     /**

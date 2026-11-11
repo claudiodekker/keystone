@@ -25,7 +25,7 @@ trait SignInAssertions
 
         $response->assertInertia(fn (AssertableInertia $page) => $page
             ->component('auth/Login')
-            ->hasAll(['status', 'types'])
+            ->hasAll(['remember', 'status', 'types'])
             ->whereAll($fields));
 
         PHPUnit::assertArrayHasKey('encryptHistory', $response->inertiaPage(), 'The browser history is not encrypted.');

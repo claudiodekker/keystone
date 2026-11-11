@@ -3,11 +3,14 @@
 namespace ClaudioDekker\Keystone\Auth;
 
 use ClaudioDekker\Keystone\Accounts\CredentialEpoch;
+use ClaudioDekker\Keystone\Devices\KnownDevices;
 use ClaudioDekker\Keystone\Exceptions\SessionGuardSignInException;
 use ClaudioDekker\Keystone\Http\EndedSession;
 use ClaudioDekker\Keystone\Http\Middleware\ClearSiteData;
+use ClaudioDekker\Keystone\Models\UserRememberToken;
 use ClaudioDekker\Keystone\SecurityEvents\Recorder;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
+use ClaudioDekker\Keystone\Session\RememberTokens;
 use ClaudioDekker\Keystone\Session\SessionState;
 use ClaudioDekker\Keystone\Session\Stage;
 use ClaudioDekker\Keystone\SignIn\SignInDecision;
@@ -46,11 +49,11 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Get the signed-in user, first ending a session that may no longer stand, so the request reads it as a guest's.
+     * Get the signed-in user, first ending a session that may no longer stand, so the request reads it as a guest's, unless a live remember-me cookie restores it.
      */
     public function user(): ?Authenticatable
     {
-        if ($this->hasExpired()) {
+        if ($this->hasExpired() && ! $this->restore()) {
             $this->expire();
         }
 
@@ -60,6 +63,10 @@ class KeystoneGuard extends SessionGuard
 
         if ($this->namesUnreadUser()) {
             $this->readUser();
+        }
+
+        if ($this->isGuest()) {
+            $this->restore();
         }
 
         return parent::user();
@@ -175,6 +182,75 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
+     * Determine if the session names no user, unless this request already set or signed one out.
+     */
+    protected function isGuest(): bool
+    {
+        return ! $this->loggedOut
+            && $this->user === null
+            && ! $this->session->has($this->getName());
+    }
+
+    /**
+     * Sign the browser back in as the account its live remember-me cookie remembers, and determine if it did.
+     *
+     * A return whose account owes enrollment is refused and its token forgotten, since nothing a session enrolls may rest on an earlier sign-in.
+     */
+    protected function restore(): bool
+    {
+        if ($this->recallAttempted || ! $this->session->isStarted()) {
+            return false;
+        }
+
+        $this->recallAttempted = true;
+
+        $token = $this->container->make(RememberTokens::class)->find();
+        $account = $token === null ? null : $this->provider->retrieveById($token->user_id);
+
+        if (! $account instanceof KeystoneUser) {
+            return false;
+        }
+
+        if ($this->container->make(SignInDecision::class)->isOwed($account, Stage::ENROLLMENT)) {
+            $this->refuseOwedReturn($account, $token);
+
+            return false;
+        }
+
+        $this->viaRemember = true;
+
+        $this->state()->restore($account, $token);
+
+        $this->recordReturn($account);
+
+        return true;
+    }
+
+    /**
+     * Record the account's remembered return, and whether it came from a device the account knows.
+     */
+    protected function recordReturn(KeystoneUser $account): void
+    {
+        $knownDevice = $this->container->make(KnownDevices::class)->isKnown($account);
+
+        $recorder = $this->container->make(Recorder::class);
+        $recorder->record(SecurityEventType::SIGNED_IN, account: $account, reason: 'keystone.remembered', knownDevice: $knownDevice);
+    }
+
+    /**
+     * Forget the remember-me token of the account that owes enrollment, and send the user to sign in again.
+     */
+    protected function refuseOwedReturn(KeystoneUser $account, UserRememberToken $token): void
+    {
+        $this->container->make(RememberTokens::class)->forget($token->getKey());
+
+        $this->state()->leaveStatus(Status::ENROLLMENT_OWED);
+
+        $recorder = $this->container->make(Recorder::class);
+        $recorder->record(SecurityEventType::REQUEST_REJECTED, account: $account, reason: 'keystone.enrollment_owed');
+    }
+
+    /**
      * Read the user the session names, ending the session instead when its account owes enrollment while a mandate is on.
      */
     protected function readUser(): void
@@ -237,10 +313,16 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * End the whole session and clear the browser's site data, so nothing it held outlives it.
+     * End the whole session, its remember-me token included, and clear the browser's site data, so nothing it held outlives it.
      */
     protected function endSession(): void
     {
+        $token = $this->state()->rememberToken();
+
+        if ($token !== null) {
+            $this->container->make(RememberTokens::class)->forget($token);
+        }
+
         $this->session->invalidate();
         $this->session->regenerateToken();
 

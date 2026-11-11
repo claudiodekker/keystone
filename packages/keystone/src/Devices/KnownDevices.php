@@ -158,7 +158,7 @@ class KnownDevices
     }
 
     /**
-     * Make the cookie the browser keeps for the retention, out of reach of scripts and other sites.
+     * Make the cookie the browser keeps for the retention, kept from scripts and from requests other sites send in the background.
      */
     protected function makeCookie(DeviceCookie $cookie): Cookie
     {

@@ -38,6 +38,7 @@ class KeyChecks
             ...$this->frameAncestors(),
             ...$this->plaintextLocationDrivers(),
             ...$this->logChannel(),
+            ...$this->rememberLifetime(),
             ...$this->requireRecoveryCodes(),
             ...$this->requireSecondFactor(),
             ...$this->retention(),
@@ -133,6 +134,22 @@ class KeyChecks
         }
 
         return ['keystone.require_second_factor must be true or false.'];
+    }
+
+    /**
+     * Get the failure of remember.lifetime_seconds when it is neither zero nor a positive integer.
+     *
+     * @return list<string>
+     */
+    protected function rememberLifetime(): array
+    {
+        $lifetime = $this->config->get('keystone.remember.lifetime_seconds');
+
+        if ($lifetime === 0 || $this->isPositiveInteger($lifetime)) {
+            return [];
+        }
+
+        return ['keystone.remember.lifetime_seconds must be zero or a positive integer.'];
     }
 
     /**

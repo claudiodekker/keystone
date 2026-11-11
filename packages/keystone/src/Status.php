@@ -13,6 +13,7 @@ enum Status: string
     case CREDENTIAL_INVALID = 'credential-invalid';
     case ENROLLMENT_CANCELLED = 'enrollment-cancelled';
     case ENROLLMENT_EXPIRED = 'enrollment-expired';
+    case ENROLLMENT_OWED = 'enrollment-owed';
     case LAST_RECOVERY_CODE = 'last-recovery-code';
     case RECOVERY_CODE_INCORRECT = 'recovery-code-incorrect';
     case SESSION_DEMOTED = 'session-demoted';

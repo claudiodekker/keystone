@@ -8,7 +8,7 @@ End every session of one account when it may be in the wrong hands, such as afte
 
     php artisan keystone:end-sessions 42 --operator="Margaret Hamilton"
 
-`42` is the account's id. Each of its sessions ends on its next request, on every session driver, cookie sessions included. The browser is sent to sign in again, and the sign-in page says "Your session has ended. Please sign in again." Sessions of other accounts carry on.
+`42` is the account's id. Each of its sessions ends on its next request, on every session driver, cookie sessions included. The browser is sent to sign in again, and the sign-in page says "Your session has ended. Please sign in again." Its [remember-me](remember-me.md) cookies stop signing it in too. Sessions of other accounts carry on.
 
 End every session of every account, yours included, with `--all`:
 
@@ -68,7 +68,7 @@ Ending your own account's sessions, or every account's, ends the session you are
 
 ### How it works
 
-Every account has a credential epoch, a counter in the `credential_epoch` column Keystone adds to your users table. Each sign-in stamps the session with the account's epoch at that moment. Ending sessions moves the epoch, and the `keystone` guard ends any session stamped with another epoch the next time something asks who is signed in. It reads the epoch fresh from the database on every such request, past your user model's global scopes.
+Every account has a credential epoch, a counter in the `credential_epoch` column Keystone adds to your users table. Each sign-in stamps the session, and the remember-me token it issues, with the account's epoch at that moment. Ending sessions moves the epoch, and the `keystone` guard ends any session stamped with another epoch the next time something asks who is signed in. It reads the epoch fresh from the database on every such request, past your user model's global scopes.
 
 Because the check runs when the user is resolved, a page that never asks who is signed in keeps an ended session until one that does. Sessions from before Keystone carry no epoch, so they end on their first request.
 
@@ -135,7 +135,7 @@ Suspending records `account.suspended`, and lifting the suspension records `acco
 
 ## Pruning
 
-Keystone deletes what it keeps past its retention every night with `keystone:prune`. Today that is every [known device](security-events.md#new-devices) no account signed in from within `retention.known_devices_seconds`. Keystone schedules the command itself, daily at midnight on one server, so your app registers nothing. It needs Laravel's scheduler running, as Laravel's [scheduling docs](https://laravel.com/docs/scheduling#running-the-scheduler) describe, and a cache store every server shares for `onOneServer()`.
+Keystone deletes what it keeps past its retention or lifetime every night with `keystone:prune`. Today that is every [known device](security-events.md#new-devices) no account signed in from within `retention.known_devices_seconds`, and every [remember-me](remember-me.md) token past its expiry. Keystone schedules the command itself, daily at midnight on one server, so your app registers nothing. It needs Laravel's scheduler running, as Laravel's [scheduling docs](https://laravel.com/docs/scheduling#running-the-scheduler) describe, and a cache store every server shares for `onOneServer()`.
 
 Run it by hand at any time:
 
