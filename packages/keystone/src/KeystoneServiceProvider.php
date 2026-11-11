@@ -115,8 +115,8 @@ class KeystoneServiceProvider extends ServiceProvider
         $this->captureRequestContext();
         $this->excludeDeviceCookieFromEncryption();
         $this->hardenResponses();
-        $this->pruneNightly();
         $this->refuseCrossSiteRequests();
+        $this->schedule();
 
         $this->loadMigrationsFrom(dirname(__DIR__).'/database/migrations');
         $this->loadTranslationsFrom(dirname(__DIR__).'/lang', 'keystone');
@@ -235,11 +235,12 @@ class KeystoneServiceProvider extends ServiceProvider
     }
 
     /**
-     * Schedule the prune every night on one server, so the app registers nothing.
+     * Schedule the prune every night and the abandoned-challenge alerts every 5 minutes, each on one server, so the app registers nothing.
      */
-    protected function pruneNightly(): void
+    protected function schedule(): void
     {
         $this->callAfterResolving(Schedule::class, function (Schedule $schedule) {
+            $schedule->command(AlertAbandonedChallengesCommand::class)->everyFiveMinutes()->onOneServer()->withoutOverlapping();
             $schedule->command(PruneCommand::class)->daily()->onOneServer();
         });
     }
