@@ -95,6 +95,16 @@ class RememberTokens
     }
 
     /**
+     * Delete every token whose lifetime has passed, and get how many.
+     */
+    public function prune(): int
+    {
+        return UserRememberToken::query()
+            ->where('expires_at', '<=', Date::now())
+            ->delete();
+    }
+
+    /**
      * Determine if the token's lifetime has yet to pass and its account is still on the credential epoch it was issued on, which a barred account never is.
      */
     protected function isLive(UserRememberToken $token): bool
@@ -125,16 +135,6 @@ class RememberTokens
     protected function forgetCookie(): void
     {
         $this->cookies->queue($this->makeCookie('', expire: 1));
-    }
-
-    /**
-     * Delete every token whose lifetime has passed, and get how many.
-     */
-    public function prune(): int
-    {
-        return UserRememberToken::query()
-            ->where('expires_at', '<=', Date::now())
-            ->delete();
     }
 
     /**
