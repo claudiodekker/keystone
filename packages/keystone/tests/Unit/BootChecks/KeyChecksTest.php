@@ -226,3 +226,23 @@ it('boots with the absolute lifetime off or at its smallest', function (?int $se
     'off' => null,
     'one second' => 1,
 ]);
+
+it('refuses a known-device retention that is not a positive integer', function (mixed $value) {
+    config(['keystone.retention.known_devices_seconds' => $value]);
+
+    expect($this->bootFailures())->toBe(['keystone.retention.known_devices_seconds must be a positive integer.']);
+})->with([
+    'zero' => 0,
+    'negative' => -1,
+    'null' => null,
+    'a numeric string' => '7776000',
+    'a float' => 7776000.5,
+    'true' => true,
+    'a list' => [[7776000]],
+]);
+
+it('boots with the smallest known-device retention', function () {
+    config(['keystone.retention.known_devices_seconds' => 1]);
+
+    expect($this->bootFailures())->toBe([]);
+});

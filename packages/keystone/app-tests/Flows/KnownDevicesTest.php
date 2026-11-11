@@ -361,7 +361,7 @@ it("alerts at the owner's next sign-in once the operator ended the account's ses
     expect($this->sentAlerts()->pluck('alert.type')->filter(fn (SecurityEventType $type) => $type === SecurityEventType::SIGNED_IN)->values()->all())->toBe([SecurityEventType::SIGNED_IN, SecurityEventType::SIGNED_IN]);
 })->with([
     "ending the account's sessions" => [fn (KeystoneUser $user) => Artisan::call('keystone:end-sessions', ['user' => $user->getAuthIdentifier(), '--operator' => 'margaret'])],
-    "ending them without an alert" => [fn (KeystoneUser $user) => Artisan::call('keystone:end-sessions', ['user' => $user->getAuthIdentifier(), '--operator' => 'margaret', '--no-alert' => true])],
+    'ending them without an alert' => [fn (KeystoneUser $user) => Artisan::call('keystone:end-sessions', ['user' => $user->getAuthIdentifier(), '--operator' => 'margaret', '--no-alert' => true])],
     "ending every account's sessions" => [fn () => Artisan::call('keystone:end-sessions', ['--all' => true, '--operator' => 'margaret'])],
 ]);
 

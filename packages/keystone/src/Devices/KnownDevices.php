@@ -77,6 +77,16 @@ class KnownDevices
     }
 
     /**
+     * Delete every device no account signed in from within the retention, which no sign-in counts as known any more, and get how many.
+     */
+    public function prune(): int
+    {
+        return UserKnownDevice::query()
+            ->where('last_seen_at', '<=', $this->seenSince())
+            ->delete();
+    }
+
+    /**
      * Get the device cookie the browser sent, or null when it sent none Keystone could have handed out.
      */
     protected function sentCookie(): ?DeviceCookie
