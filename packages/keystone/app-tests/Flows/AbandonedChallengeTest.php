@@ -112,3 +112,23 @@ it('still alerts the owner about a challenge left by one browser once another br
     expect($this->sentAlerts()->pluck('alert.type')->unique()->all())->toBe([SecurityEventType::CHALLENGE_ABANDONED])
         ->and($abandoned->pluck('ip_address')->all())->toBe(['198.51.100.23']);
 });
+
+it('still alerts the owner about a challenge left in a browser where another account, which knows the browser, then passed its own', function () {
+    config(['keystone.notifications.signed_in' => null]);
+    $ada = $this->createUser();
+    $grace = $this->createUser();
+    $support = $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $ada);
+    $support->arrangeCredential(Surface::CHALLENGE, $grace);
+    $this->passFirstFactor($grace);
+    $this->keepCookiesFrom($this->answerChallenge($grace, $support));
+    $this->post(route('logout'));
+    $this->travel(5)->minutes();
+    $this->passFirstFactor($ada);
+    $this->passFirstFactor($grace);
+    $this->answerChallenge($grace, $support);
+
+    $this->travel(7)->minutes();
+    $this->artisan('keystone:alert-abandoned-challenges');
+
+    expect($this->securityEvents()->for($ada)->where('type', SecurityEventType::CHALLENGE_ABANDONED))->toHaveCount(1);
+});

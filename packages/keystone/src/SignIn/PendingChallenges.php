@@ -58,12 +58,13 @@ class PendingChallenges
     }
 
     /**
-     * Forget the pending challenge the browser left once it passed the challenge.
+     * Forget the pending challenge the browser left for the account once it passed the account's challenge.
      */
     public function pass(KeystoneUser $account): void
     {
         UserPendingChallenge::query()
             ->whereKey($this->session->pendingChallenge())
+            ->where('user_id', $account->getAuthIdentifier())
             ->delete();
 
         $this->session->forgetPendingChallenge();
