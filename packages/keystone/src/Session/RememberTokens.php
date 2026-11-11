@@ -41,9 +41,9 @@ class RememberTokens
     }
 
     /**
-     * Hand the browser signing in to the account a remember-me cookie for the lifetime, on the account's credential epoch, and get its token.
+     * Hand the browser signing in to the account a remember-me cookie for the lifetime, on the credential epoch the sign-in stamped, and get its token.
      */
-    public function issue(KeystoneUser $account): UserRememberToken
+    public function issue(KeystoneUser $account, ?int $epoch): UserRememberToken
     {
         $cookie = RememberCookie::generate();
         $lifetime = $this->config->integer('keystone.remember.lifetime_seconds');
@@ -51,7 +51,7 @@ class RememberTokens
         $token = UserRememberToken::query()->forceCreate([
             'user_id' => $account->getAuthIdentifier(),
             'digest' => $cookie->digest(),
-            'epoch' => CredentialEpoch::of($account->getAuthIdentifier()),
+            'epoch' => $epoch,
             'expires_at' => Date::now()->addSeconds($lifetime),
         ]);
 

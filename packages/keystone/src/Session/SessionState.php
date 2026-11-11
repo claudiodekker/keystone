@@ -333,6 +333,16 @@ class SessionState
     }
 
     /**
+     * Get the account's credential epoch the session's sign-in was stamped with, if any.
+     */
+    public function epoch(): ?int
+    {
+        $epoch = $this->session->get(static::EPOCH);
+
+        return is_int($epoch) ? $epoch : null;
+    }
+
+    /**
      * Get the id of the remember-me token the session issued or restored from, if any.
      */
     public function rememberToken(): int|string|null

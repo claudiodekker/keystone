@@ -83,7 +83,7 @@ class Proofs
         $redirectTo = $this->session->signIn($account);
 
         if ($remember && $this->rememberTokens->isOn()) {
-            $this->session->keepRememberToken($this->rememberTokens->issue($account));
+            $this->session->keepRememberToken($this->rememberTokens->issue($account, $this->session->epoch()));
         }
 
         $this->pendingChallenges->forget($account);

@@ -2,17 +2,15 @@
 
 // Storage shape: what sits in the remember-me tokens table at rest, which no app can see through a page.
 
-use ClaudioDekker\Keystone\Accounts\CredentialEpoch;
 use ClaudioDekker\Keystone\Models\UserRememberToken;
 use ClaudioDekker\Keystone\Session\RememberTokens;
 use ClaudioDekker\Keystone\Tests\Fixtures\Models\User;
 
-it("keeps the SHA-256 digest of the browser's cookie with the account's credential epoch and the expiry, never the cookie itself", function () {
+it("keeps the SHA-256 digest of the browser's cookie with the sign-in's credential epoch and the expiry, never the cookie itself", function () {
     config(['keystone.remember.lifetime_seconds' => 9 * 24 * 60 * 60]);
     $user = User::factory()->create();
-    $user->newQuery()->whereKey($user->getKey())->update([CredentialEpoch::COLUMN => 7]);
 
-    app(RememberTokens::class)->issue($user);
+    app(RememberTokens::class)->issue($user, epoch: 7);
 
     $handed = app('cookie')->queued('__Host-keystone_remember')->getValue();
     $stored = UserRememberToken::query()->toBase()->where('user_id', $user->getKey())->sole();
