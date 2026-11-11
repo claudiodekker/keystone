@@ -6,6 +6,7 @@ export type SignInType = {
 }
 
 export type SignInPage = {
+  remember: boolean
   status: string | null
   types: SignInType[]
 }

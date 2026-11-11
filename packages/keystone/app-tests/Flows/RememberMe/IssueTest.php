@@ -131,3 +131,14 @@ it('hands the browser a host-only remember-me cookie of 256 random bits that onl
         ->and($cookie->getSameSite())->toBe('lax')
         ->and($cookie->getExpiresTime())->toBe(now()->getTimestamp() + 1468800);
 });
+
+it('offers the remember-me box on the sign-in page only while remember me is on', function (int $lifetime, bool $offered) {
+    config(['keystone.remember.lifetime_seconds' => $lifetime]);
+
+    $response = $this->get(route('login'));
+
+    $this->assertSignInPage($response, ['remember' => $offered]);
+})->with([
+    'on' => [60 * 60, true],
+    'off' => [0, false],
+]);

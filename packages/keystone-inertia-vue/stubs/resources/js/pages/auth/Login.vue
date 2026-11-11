@@ -16,5 +16,5 @@ defineProps<SignInPage>()
 
   <p v-if="status" class="text-sm text-green-700">{{ status }}</p>
 
-  <component :is="componentFor(type)" v-for="type in types" :key="type.name" :type="type" />
+  <component :is="componentFor(type)" v-for="type in types" :key="type.name" :type="type" :remember="remember" />
 </template>
