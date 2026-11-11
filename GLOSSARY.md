@@ -134,6 +134,10 @@ A mail that tells an account's owner something happened to its security. The rec
 
 A browser an account signed in from within the retention, recognised by the `__Host-keystone_device` cookie: a device part that never changes and a part every sign-in replaces. Each account keeps the digests of both. A sign-in from a browser that isn't one alerts, and a cookie naming a device of the account with a value a later sign-in replaced records `device_cookie.reused`. Being known only gives the browser a failed-attempt count of its own.
 
+## Pending challenge
+
+A sign-in held at the challenge from a browser that isn't a known device of its account, kept as a row until the browser passes the challenge or signs in to the account without it. Cancelling, expiry and an epoch move keep it, and a browser that holds the account's sign-in again keeps its first one. Once it has waited 7 minutes, a sweep every 5 minutes records it as `challenge.abandoned`, alerts the owner once about all of the account's, and deletes it.
+
 ## Slot
 
 The notification class `keystone.notifications` names for one type of security event, or null to send no alert of that type.

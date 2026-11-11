@@ -12,6 +12,12 @@ return [
             'summary' => 'An administrator lifted the suspension of your account, so you can sign in again.',
         ],
     ],
+    'challenge' => [
+        'abandoned' => [
+            'subject' => 'Someone got partway into your account',
+            'summary' => "{1} Someone passed the first step of signing in to your account from a browser it doesn't know, and never finished the second.|[2,*] Someone passed the first step of signing in to your account :count times from browsers it doesn't know, and never finished the second.",
+        ],
+    ],
     'credential' => [
         'added' => [
             'subject' => 'A sign-in method was added',
@@ -35,6 +41,8 @@ return [
             'summary' => 'Someone got your sign-in wrong too many times, so further attempts are refused for a while. Browsers you signed in from before can still sign in.',
         ],
     ],
+    'more-devices' => '{1} And 1 more device.|[2,*] And :count more devices.',
+    'more-ip-addresses' => '{1} And 1 more IP address.|[2,*] And :count more IP addresses.',
     'recovery_code' => [
         'used' => [
             'left' => '{0} You have no recovery codes left.|{1} You have 1 recovery code left.|[2,*] You have :count recovery codes left.',

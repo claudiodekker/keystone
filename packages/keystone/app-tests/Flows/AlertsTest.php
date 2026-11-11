@@ -174,8 +174,8 @@ it('queues the alert encrypted, with the device parsed from the user agent and n
 
     expect($alert)->toBeInstanceOf(ShouldQueue::class)
         ->and($alert)->toBeInstanceOf(ShouldBeEncrypted::class)
-        ->and($alert->ipAddress)->toBe('203.0.113.9')
-        ->and($alert->device)->toEqual(new Device(platform: 'Mac', browser: 'Chrome'))
+        ->and($alert->ipAddresses)->toBe(['203.0.113.9'])
+        ->and($alert->devices)->toEqual([new Device(platform: 'Mac', browser: 'Chrome')])
         ->and(serialize($alert))->not->toContain('Mozilla');
 });
 

@@ -4,6 +4,7 @@ namespace ClaudioDekker\Keystone;
 
 use ClaudioDekker\Keystone\Auth\KeystoneGuard;
 use ClaudioDekker\Keystone\Configuration\BootChecks;
+use ClaudioDekker\Keystone\Console\AlertAbandonedChallengesCommand;
 use ClaudioDekker\Keystone\Console\EndSessionsCommand;
 use ClaudioDekker\Keystone\Console\PruneCommand;
 use ClaudioDekker\Keystone\Console\SuspendCommand;
@@ -114,8 +115,8 @@ class KeystoneServiceProvider extends ServiceProvider
         $this->captureRequestContext();
         $this->excludeDeviceCookieFromEncryption();
         $this->hardenResponses();
-        $this->pruneNightly();
         $this->refuseCrossSiteRequests();
+        $this->schedule();
 
         $this->loadMigrationsFrom(dirname(__DIR__).'/database/migrations');
         $this->loadTranslationsFrom(dirname(__DIR__).'/lang', 'keystone');
@@ -123,6 +124,7 @@ class KeystoneServiceProvider extends ServiceProvider
 
         if ($this->app->runningInConsole()) {
             $this->commands([
+                AlertAbandonedChallengesCommand::class,
                 EndSessionsCommand::class,
                 PruneCommand::class,
                 SuspendCommand::class,
@@ -233,11 +235,14 @@ class KeystoneServiceProvider extends ServiceProvider
     }
 
     /**
-     * Schedule the prune every night on one server, so the app registers nothing.
+     * Schedule core's maintenance commands, each on one server, so the app registers nothing.
+     *
+     * The sweep's overlap lock lasts 10 minutes rather than the scheduler's day, so a sweep that died holding it delays the alerts by one run.
      */
-    protected function pruneNightly(): void
+    protected function schedule(): void
     {
         $this->callAfterResolving(Schedule::class, function (Schedule $schedule) {
+            $schedule->command(AlertAbandonedChallengesCommand::class)->everyFiveMinutes()->onOneServer()->withoutOverlapping(expiresAt: 10);
             $schedule->command(PruneCommand::class)->daily()->onOneServer();
         });
     }

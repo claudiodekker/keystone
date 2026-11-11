@@ -142,3 +142,13 @@ Run it by hand at any time:
     php artisan keystone:prune
 
 A browser unseen for the retention counts as new whether or not the prune has deleted its row yet, so a late or missed run never changes who gets an alert.
+
+## Abandoned challenges
+
+Keystone alerts the owner of an account whose [challenge](security-events.md#abandoned-challenges) a browser it doesn't know left unanswered with `keystone:alert-abandoned-challenges`. Keystone schedules the command itself, every 5 minutes on one server and never overlapping itself, so your app registers nothing. Like the prune, it needs the scheduler running and a shared cache store. It runs without a queue worker, though the alerts it sends are queued like any other.
+
+Run it by hand at any time:
+
+    php artisan keystone:alert-abandoned-challenges
+
+It records `challenge.abandoned` for every challenge left 7 minutes or more, sends each account one alert about all of its own, and deletes them. A late run sends the alert late, and a missed run leaves the rows for the next. A run that died without releasing its overlap lock holds the next ones off for at most 10 minutes.

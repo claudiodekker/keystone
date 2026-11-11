@@ -34,6 +34,7 @@ class Proofs
         protected AccountChanges $accountChanges,
         protected KnownDevices $devices,
         protected Limiter $limiter,
+        protected PendingChallenges $pendingChallenges,
         protected Recorder $recorder,
         protected SessionState $session,
     ) {
@@ -79,6 +80,8 @@ class Proofs
         $knownDevice = $this->devices->signIn($account);
         $redirectTo = $this->session->signIn($account);
 
+        $this->pendingChallenges->forget($account);
+
         $this->recorder->record(
             SecurityEventType::SIGNED_IN,
             account: $account,
@@ -104,6 +107,10 @@ class Proofs
 
         $this->session->hold($account, $answer->type, $stage);
 
+        if ($stage === Stage::CHALLENGE) {
+            $this->pendingChallenges->hold($account);
+        }
+
         $this->recorder->record(
             SecurityEventType::SIGN_IN_HELD,
             account: $account,
@@ -128,6 +135,8 @@ class Proofs
         }
 
         $this->session->passSecondFactor($pending, $answer->type);
+
+        $this->pendingChallenges->forget($account);
 
         $this->recorder->record(
             SecurityEventType::SIGN_IN_HELD,

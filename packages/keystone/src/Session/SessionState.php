@@ -51,6 +51,11 @@ class SessionState
     protected const string CEREMONIES = 'keystone.ceremonies';
 
     /**
+     * The session key that holds the id of the pending challenge held from the session's browser, which outlives the pending sign-in it was held for.
+     */
+    protected const string PENDING_CHALLENGE = 'keystone.pending_challenge';
+
+    /**
      * How long a ceremony lasts after its start, in seconds.
      */
     protected const int CEREMONY_LIFETIME_SECONDS = 10 * 60;
@@ -253,6 +258,32 @@ class SessionState
         }
 
         return $this->accounts->find($pending->account);
+    }
+
+    /**
+     * Get the id of the pending challenge held from the session's browser, if any.
+     */
+    public function pendingChallenge(): int|string|null
+    {
+        $id = $this->session->get(static::PENDING_CHALLENGE);
+
+        return is_int($id) || is_string($id) ? $id : null;
+    }
+
+    /**
+     * Remember the id of the pending challenge held from the session's browser.
+     */
+    public function keepPendingChallenge(int|string $id): void
+    {
+        $this->session->put(static::PENDING_CHALLENGE, $id);
+    }
+
+    /**
+     * Forget the pending challenge held from the session's browser.
+     */
+    public function forgetPendingChallenge(): void
+    {
+        $this->session->forget(static::PENDING_CHALLENGE);
     }
 
     /**

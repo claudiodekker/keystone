@@ -3,10 +3,12 @@
 <body>
 <p>@yield('summary')</p>
 <p>{{ $when }}</p>
-@if ($ipAddress !== null)
+@foreach ($ipAddresses as $ipAddress)
 <p>{{ $ipAddress }}</p>
-@endif
+@endforeach
+@foreach ($devices as $device)
 <p>{{ $device }}</p>
+@endforeach
 <p>@yield('advice', __('keystone::alerts.if-not-you'))</p>
 </body>
 </html>
