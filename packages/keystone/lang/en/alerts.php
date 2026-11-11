@@ -29,6 +29,12 @@ return [
     'if-not-you' => "If this wasn't you, sign in and review your security settings.",
     'ip-address' => 'IP address: :ip_address',
     'ip-address-at' => 'IP address: :ip_address (:location)',
+    'limit' => [
+        'tripped' => [
+            'subject' => 'Too many failed sign-in attempts',
+            'summary' => 'Someone got your sign-in wrong too many times, so further attempts are refused for a while. Browsers you signed in from before can still sign in.',
+        ],
+    ],
     'recovery_code' => [
         'used' => [
             'left' => '{0} You have no recovery codes left.|{1} You have 1 recovery code left.|[2,*] You have :count recovery codes left.',

@@ -7,6 +7,7 @@ use ClaudioDekker\Keystone\Session\Flow;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Exceptions;
+use Illuminate\Support\Facades\Notification;
 
 beforeEach(function () {
     $this->withoutEnrollmentMandates();
@@ -260,4 +261,18 @@ it('keeps a count per credential type, so another type still signs the account i
 
     $this->assertSignInThrottled($throttled);
     $this->assertSignedIn($signIn, '/');
+});
+
+it("alerts the account's owner once when the failed-attempt limit trips", function () {
+    Notification::fake();
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $this->submitRejectedProofs($support, 'ada@example.com', $this->failedAttemptAllowance() + 3);
+
+    $alerts = $this->sentAlerts();
+
+    expect($alerts->pluck('address')->all())->toBe(['ada@example.com'])
+        ->and($alerts[0]['alert']->type)->toBe(SecurityEventType::LIMIT_TRIPPED);
 });

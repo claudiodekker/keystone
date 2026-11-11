@@ -34,6 +34,7 @@ class SecurityAlert extends Notification implements ShouldBeEncrypted, ShouldQue
         'account.unsuspended' => 'keystone::alerts.account.unsuspended',
         'credential.added' => 'keystone::alerts.credential.added',
         'device_cookie.reused' => 'keystone::alerts.device_cookie.reused',
+        'limit.tripped' => 'keystone::alerts.limit.tripped',
         'recovery_code.used' => 'keystone::alerts.recovery_code.used',
         'sessions.terminated' => 'keystone::alerts.sessions.terminated',
         'signed_in' => 'keystone::alerts.signed_in',

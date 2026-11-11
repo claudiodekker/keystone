@@ -175,7 +175,7 @@ class Limiter
     }
 
     /**
-     * Record the limit's trip and dispatch Laravel's lockout event, whose failing listener is reported and changes nothing.
+     * Record the limit's trip, alerting the owner when the limit does, and dispatch Laravel's lockout event, whose failing listener is reported and changes nothing.
      */
     protected function trip(Limit $limit, ?KeystoneUser $account, ?Surface $surface = null, ?CredentialType $type = null): void
     {
@@ -185,6 +185,7 @@ class Limiter
             surface: $surface,
             credentialType: $type,
             reason: $limit->reason(),
+            recipients: $limit->alertsOwner() ? null : [],
         );
 
         rescue(fn () => $this->events->dispatch(new Lockout($this->request)));

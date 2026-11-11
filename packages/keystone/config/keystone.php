@@ -104,7 +104,7 @@ return [
         'account.unsuspended' => SecurityAlert::class,
         'credential.added' => SecurityAlert::class,
         'device_cookie.reused' => SecurityAlert::class,
-        'limit.tripped' => null,
+        'limit.tripped' => SecurityAlert::class,
         'proof.rejected' => null,
         'recovery_code.used' => SecurityAlert::class,
         'recovery_codes.generated' => null,
