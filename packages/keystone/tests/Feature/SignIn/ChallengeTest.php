@@ -9,9 +9,11 @@ use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Models\UserCredential;
 use ClaudioDekker\Keystone\Models\UserEmail;
+use ClaudioDekker\Keystone\Models\UserPendingChallenge;
 use ClaudioDekker\Keystone\Session\SessionState;
 use ClaudioDekker\Keystone\Session\Stage;
 use ClaudioDekker\Keystone\SignIn\Challenge;
+use ClaudioDekker\Keystone\SignIn\PendingChallenges;
 use ClaudioDekker\Keystone\SignIn\Refused;
 use ClaudioDekker\Keystone\SignIn\SignedIn;
 use ClaudioDekker\Keystone\SignIn\SignIn;
@@ -107,4 +109,19 @@ it('signs in a first factor that proves two factors on its own, even when the ac
 
     expect($outcome)->toBeInstanceOf(SignedIn::class)
         ->and(Keystone::guard()->check())->toBeTrue();
+});
+
+it('keeps the pending challenge of an answer refused because another write advanced its credential while the type was verifying', function () {
+    $ada = User::factory()->create();
+    $credential = UserCredential::factory()->for($ada, 'user')->create(['type' => 'challenge-only', 'secret' => 'second horse']);
+    $type = app(CredentialTypes::class)->find('challenge-only', Surface::CHALLENGE);
+    $type->duringNextVerify(fn () => $credential->forceFill(['secret' => 'raced horse'])->save());
+    $type->advanceNextProof('advanced horse');
+    app(SessionState::class)->hold($ada, app(CredentialTypes::class)->find('form', Surface::SIGN_IN), Stage::CHALLENGE);
+    app(PendingChallenges::class)->hold($ada);
+
+    $outcome = $this->app->make(Challenge::class)->answer($type, ['secret' => 'second horse']);
+
+    expect($outcome)->toBeInstanceOf(Refused::class);
+    $this->assertDatabaseCount(UserPendingChallenge::class, 1);
 });

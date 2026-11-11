@@ -44,6 +44,7 @@ class Challenge
         protected SignInDecision $decision,
         protected Holdings $holdings,
         protected Limiter $limiter,
+        protected PendingChallenges $pendingChallenges,
         protected Proofs $proofs,
         protected RecoveryCodeType $recoveryCodeType,
         protected Recorder $recorder,
@@ -222,11 +223,15 @@ class Challenge
      */
     protected function pass(KeystoneUser $account, Answer $answer, PendingSignIn $pending): SignedIn|Held|Refused
     {
-        if ($this->decision->isOwed($account, Stage::ENROLLMENT)) {
-            return $this->proofs->passSecondFactor($account, $answer, $pending);
+        $outcome = $this->decision->isOwed($account, Stage::ENROLLMENT)
+            ? $this->proofs->passSecondFactor($account, $answer, $pending)
+            : $this->proofs->signIn($account, $answer, writer: $pending);
+
+        if (! $outcome instanceof Refused) {
+            $this->pendingChallenges->pass($account);
         }
 
-        return $this->proofs->signIn($account, $answer, writer: $pending);
+        return $outcome;
     }
 
     /**

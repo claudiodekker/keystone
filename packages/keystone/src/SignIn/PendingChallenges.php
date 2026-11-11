@@ -48,6 +48,16 @@ class PendingChallenges
     }
 
     /**
+     * Forget the account's pending challenge once the browser passed it.
+     */
+    public function pass(KeystoneUser $account): void
+    {
+        UserPendingChallenge::query()
+            ->where('user_id', $account->getAuthIdentifier())
+            ->delete();
+    }
+
+    /**
      * Record every challenge left unanswered for long enough as abandoned, alert each account's owner once about all of its own, and get how many there were.
      */
     public function alertAbandoned(): int

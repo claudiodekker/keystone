@@ -23,3 +23,17 @@ it('alerts the owner once a browser the account does not know has left the chall
     expect($this->sentAlerts()->pluck('alert.type')->all())->toBe([SecurityEventType::CHALLENGE_ABANDONED])
         ->and($abandoned->pluck('ip_address')->all())->toBe(['198.51.100.23']);
 });
+
+it('sends no alert once the challenge was passed', function () {
+    config(['keystone.notifications.signed_in' => null]);
+    $user = $this->createUser();
+    $support = $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);
+    $this->passFirstFactor($user);
+    $this->answerChallenge($user, $support);
+
+    $this->travel(7)->minutes();
+    $this->artisan('keystone:alert-abandoned-challenges');
+
+    expect($this->sentAlerts())->toBeEmpty()
+        ->and($this->securityEvents()->for($user)->where('type', SecurityEventType::CHALLENGE_ABANDONED))->toBeEmpty();
+});
