@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 class UserPendingChallengeFactory extends Factory
 {
     /**
-     * Get the default state of a challenge held just now from a browser the account doesn't know.
+     * Get the default state of a pending challenge held just now.
      *
      * @return array<string, mixed>
      */

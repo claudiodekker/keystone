@@ -37,7 +37,7 @@ class PendingChallenges
     }
 
     /**
-     * Keep the account's sign-in held at the challenge by the browser, until the challenge is passed, unless the browser is a known device.
+     * Keep a pending challenge for the account's sign-in held from the browser, unless the browser is a known device of the account.
      *
      * A browser that held the account's sign-in before keeps the pending challenge of that first hold, so holding again never puts its alert off.
      */
@@ -59,7 +59,7 @@ class PendingChallenges
     }
 
     /**
-     * Forget the pending challenge the browser left for the account once it passed the account's challenge.
+     * Forget the browser's pending challenge for the account once it passes the challenge.
      */
     public function pass(KeystoneUser $account): void
     {
@@ -72,7 +72,7 @@ class PendingChallenges
     }
 
     /**
-     * Record every challenge left unanswered for long enough as abandoned, alert each account's owner once about all of its own, and get how many there were.
+     * Record every challenge left unanswered for long enough as abandoned, alert each account's owner once about the account's, and get how many there were.
      */
     public function alertAbandoned(): int
     {
@@ -115,7 +115,7 @@ class PendingChallenges
     }
 
     /**
-     * Determine if the browser has left a pending challenge for the account that is still kept.
+     * Determine if the browser's pending challenge for the account still exists.
      */
     protected function hasPendingChallenge(KeystoneUser $account): bool
     {

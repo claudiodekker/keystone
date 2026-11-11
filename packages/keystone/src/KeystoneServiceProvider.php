@@ -235,7 +235,7 @@ class KeystoneServiceProvider extends ServiceProvider
     }
 
     /**
-     * Schedule the prune every night and the abandoned-challenge alerts every 5 minutes, each on one server, so the app registers nothing.
+     * Schedule core's maintenance commands, each on one server, so the app registers nothing.
      */
     protected function schedule(): void
     {

@@ -51,7 +51,7 @@ class SessionState
     protected const string CEREMONIES = 'keystone.ceremonies';
 
     /**
-     * The session key that holds the id of the pending challenge the session's browser left, which outlives the pending sign-in it was held for.
+     * The session key that holds the id of the pending challenge held from the session's browser, which outlives the pending sign-in it was held for.
      */
     protected const string PENDING_CHALLENGE = 'keystone.pending_challenge';
 
@@ -261,7 +261,7 @@ class SessionState
     }
 
     /**
-     * Get the id of the pending challenge the session's browser left, if any.
+     * Get the id of the pending challenge held from the session's browser, if any.
      */
     public function pendingChallenge(): int|string|null
     {
@@ -271,7 +271,7 @@ class SessionState
     }
 
     /**
-     * Remember the id of the pending challenge the session's browser left.
+     * Remember the id of the pending challenge held from the session's browser.
      */
     public function keepPendingChallenge(int|string $id): void
     {
@@ -279,7 +279,7 @@ class SessionState
     }
 
     /**
-     * Forget the pending challenge the session's browser left.
+     * Forget the pending challenge held from the session's browser.
      */
     public function forgetPendingChallenge(): void
     {

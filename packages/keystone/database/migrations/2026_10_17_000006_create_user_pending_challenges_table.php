@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Create the table of the challenges held from browsers their account doesn't know and not passed yet, one row per pending sign-in.
+     * Create the table of the pending challenges, held from browsers that aren't a known device of their account.
      */
     public function up(): void
     {

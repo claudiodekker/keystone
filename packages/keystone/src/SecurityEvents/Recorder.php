@@ -232,7 +232,7 @@ class Recorder
     }
 
     /**
-     * Mail one alert about the entries, all of one type, to each recipient, unless their type's slot is null or they came from a known device.
+     * Mail one alert about the entries, all of one type, to each recipient, unless their type's slot is null or the first came from a known device.
      *
      * @param  non-empty-list<UserSecurityEvent>  $entries
      * @param  list<string>|null  $recipients

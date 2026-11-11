@@ -44,7 +44,7 @@ class SecurityAlert extends Notification implements ShouldBeEncrypted, ShouldQue
     /**
      * The most IP addresses and devices an alert names, counting the rest.
      */
-    protected const int NAMED = 5;
+    protected const int MOST_NAMED = 5;
 
     /**
      * The type of the events the alert is about.
@@ -69,7 +69,7 @@ class SecurityAlert extends Notification implements ShouldBeEncrypted, ShouldQue
     public int $otherIpAddresses;
 
     /**
-     * The devices the requests' user agents name, each once and null for one not known, up to the most an alert names.
+     * The devices the requests' user agents name, each once and null for a user agent that names none, up to the most an alert names.
      *
      * @var array<int, Device|null>
      */
@@ -111,9 +111,9 @@ class SecurityAlert extends Notification implements ShouldBeEncrypted, ShouldQue
         $this->count = $events->count();
         $this->type = $event->type;
         $this->occurredAt = $event->occurred_at;
-        $this->ipAddresses = $ipAddresses->take(static::NAMED)->all();
+        $this->ipAddresses = $ipAddresses->take(static::MOST_NAMED)->all();
         $this->otherIpAddresses = $ipAddresses->count() - count($this->ipAddresses);
-        $this->devices = $devices->take(static::NAMED)->all();
+        $this->devices = $devices->take(static::MOST_NAMED)->all();
         $this->otherDevices = $devices->count() - count($this->devices);
         $this->recoveryCodesLeft = $this->recoveryCodesLeft($event);
     }
