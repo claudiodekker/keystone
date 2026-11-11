@@ -49,7 +49,7 @@ class RememberTokens
     }
 
     /**
-     * Get the account the browser's remember-me cookie remembers, if its lifetime has yet to pass.
+     * Get the account the browser's remember-me cookie remembers, if its lifetime has yet to pass and the account is still on the epoch it was issued on.
      */
     public function account(): ?KeystoneUser
     {
@@ -64,7 +64,7 @@ class RememberTokens
             ->where('expires_at', '>', Date::now())
             ->first();
 
-        if ($token === null) {
+        if ($token === null || CredentialEpoch::of($token->user_id) !== $token->epoch) {
             return null;
         }
 
