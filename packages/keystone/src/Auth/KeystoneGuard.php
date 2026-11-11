@@ -3,6 +3,7 @@
 namespace ClaudioDekker\Keystone\Auth;
 
 use ClaudioDekker\Keystone\Accounts\CredentialEpoch;
+use ClaudioDekker\Keystone\Devices\KnownDevices;
 use ClaudioDekker\Keystone\Exceptions\SessionGuardSignInException;
 use ClaudioDekker\Keystone\Http\EndedSession;
 use ClaudioDekker\Keystone\Http\Middleware\ClearSiteData;
@@ -220,7 +221,20 @@ class KeystoneGuard extends SessionGuard
 
         $this->state()->restore($account, $token);
 
+        $this->recordReturn($account);
+
         return true;
+    }
+
+    /**
+     * Record the account's remembered return, from a device it knows or not, reading the device cookie without re-keying it.
+     */
+    protected function recordReturn(KeystoneUser $account): void
+    {
+        $knownDevice = $this->container->make(KnownDevices::class)->isKnown($account);
+
+        $recorder = $this->container->make(Recorder::class);
+        $recorder->record(SecurityEventType::SIGNED_IN, account: $account, reason: 'keystone.remembered', knownDevice: $knownDevice);
     }
 
     /**

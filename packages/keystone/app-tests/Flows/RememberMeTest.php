@@ -1,11 +1,13 @@
 <?php
 
+use ClaudioDekker\Keystone\AppTests\Support\Browser;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Jobs\EndSessions;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Models\UserRememberToken;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Notification;
 
 beforeEach(function () {
     $this->withoutEnrollmentMandates();
@@ -257,4 +259,74 @@ it('deletes a remember-me cookie no token matches, recording the refusal against
         ->and($lines)->toHaveCount(1)
         ->and($lines[0]['reason'])->toBe('keystone.dead_remember_cookie')
         ->and($lines[0]['user_id'])->toBeNull();
+});
+
+it('records a remembered return as signed_in with the reason remembered, from the device the account knows', function () {
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $signedIn = $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        'remember' => true,
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $this->keepCookiesFrom($signedIn);
+    $this->switchBackTo($this->browserWithCopiedCookies());
+
+    $this->get(route('login'));
+
+    $signIns = $this->securityEvents()->for($user)->where('type', SecurityEventType::SIGNED_IN);
+
+    expect($signIns->pluck('reason')->all())->toBe([null, 'keystone.remembered'])
+        ->and($signIns->pluck('known_device')->all())->toBe([false, true]);
+});
+
+it('alerts the owner when a copy of the remember-me cookie restores in a browser the account does not know', function () {
+    Notification::fake();
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $signedIn = $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        'remember' => true,
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $remember = $signedIn->getCookie('__Host-keystone_remember', decrypt: false)->getValue();
+    $this->switchBackTo(new Browser([], ['__Host-keystone_remember' => $remember]));
+
+    $response = $this->get(route('login'));
+
+    $this->assertAlreadySignedIn($response);
+    expect($this->sentAlerts()->pluck('alert.type')->all())->toBe([SecurityEventType::SIGNED_IN, SecurityEventType::SIGNED_IN])
+        ->and($this->securityEvents()->for($user)->where('type', SecurityEventType::SIGNED_IN)->pluck('known_device')->all())->toBe([false, false]);
+});
+
+it('signs every tab of a reopened browser back in at once, with no alert, since a return re-keys neither cookie', function () {
+    Notification::fake();
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $signedIn = $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        'remember' => true,
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $this->keepCookiesFrom($signedIn);
+    $reopened = $this->browserWithCopiedCookies();
+
+    $this->switchBackTo($reopened);
+    $firstTab = $this->get(route('login'));
+
+    $this->switchBackTo($reopened);
+    $secondTab = $this->get(route('login'));
+
+    $this->assertAlreadySignedIn($firstTab);
+    $this->assertAlreadySignedIn($secondTab);
+    expect($this->sentAlerts()->pluck('alert.type')->all())->toBe([SecurityEventType::SIGNED_IN]);
 });
