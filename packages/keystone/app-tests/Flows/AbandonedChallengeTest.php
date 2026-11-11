@@ -132,3 +132,20 @@ it('still alerts the owner about a challenge left in a browser where another acc
 
     expect($this->securityEvents()->for($ada)->where('type', SecurityEventType::CHALLENGE_ABANDONED))->toHaveCount(1);
 });
+
+it('keeps one pending challenge, at the time of the first hold, when the browser passes the first factor again', function () {
+    $user = $this->createUser();
+    $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);
+    $this->passFirstFactor($user);
+    $heldAt = now()->toDateTimeString();
+    $this->travel(4)->minutes();
+    $this->delete(route('login.challenge.cancel'));
+    $this->passFirstFactor($user);
+
+    $this->travel(10)->minutes();
+    $this->artisan('keystone:alert-abandoned-challenges');
+
+    $abandoned = $this->securityEvents()->for($user)->where('type', SecurityEventType::CHALLENGE_ABANDONED);
+
+    expect($abandoned->map(fn ($event) => $event->occurred_at->toDateTimeString())->values()->all())->toBe([$heldAt]);
+});

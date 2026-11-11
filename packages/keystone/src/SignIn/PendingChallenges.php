@@ -37,10 +37,12 @@ class PendingChallenges
 
     /**
      * Keep the account's sign-in held at the challenge by the browser, until the challenge is passed, unless the browser is a known device.
+     *
+     * A browser that held the account's sign-in before keeps the pending challenge of that first hold, so holding again never puts its alert off.
      */
     public function hold(KeystoneUser $account): void
     {
-        if ($this->devices->isKnown($account)) {
+        if ($this->devices->isKnown($account) || $this->hasPendingChallenge($account)) {
             return;
         }
 
@@ -68,6 +70,16 @@ class PendingChallenges
             ->delete();
 
         $this->session->forgetPendingChallenge();
+    }
+
+    /**
+     * Determine if the browser has left a pending challenge for the account that is still kept.
+     */
+    protected function hasPendingChallenge(KeystoneUser $account): bool
+    {
+        return UserPendingChallenge::query()
+            ->whereKey($this->session->pendingChallenge())
+            ->exists();
     }
 
     /**
