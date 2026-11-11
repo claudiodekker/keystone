@@ -24,6 +24,8 @@ An account gets 20 failed attempts an hour per credential type and flow. Sign-in
 
 A one-time code, such as a [TOTP](totp.md) code, can be guessed, so its failures also count against a ceiling of 100 a day per account, type and flow, which `rate_limits` doesn't change. Only the attempts the hourly limit let through count toward the ceiling, and an attempt that signs in gives back both counts.
 
+A browser the account signed in from in the last 90 days, a [known device](security-events.md#new-devices), keeps a count of its own, with the full allowance. Every other browser shares one count for the account. Someone who knows an account's address can spend that shared count from as many IP addresses as they like, and the owner still signs in from a browser they used before. A browser Keystone doesn't know yet, such as a new laptop, shares the count with everyone else, so it stays locked out until the hour is over. Being known earns nothing else: a known device is limited, challenged and alerted about like any other browser. A browser counts as known only to an account it signed in to, so a browser that knows one account shares the count of any other.
+
 A typed address that names no account is counted under the address itself, normalized the way the account lookup compares it. A made-up address locks exactly like a real one, and two spellings share a count exactly when they would name the same account.
 
 ### Configuration
@@ -68,7 +70,7 @@ Every key is an HMAC-SHA256 of its parts under a key derived from your app key, 
 
 ### When a limit trips
 
-The first refused attempt of each count's window records a `limit.tripped` security event, for the named or signed-in account when there is one, with a reason naming the limit: `keystone.daily_failed_attempt_limit`, `keystone.failed_attempt_limit` or `keystone.request_limit`. The same trip dispatches Laravel's `Illuminate\Auth\Events\Lockout` event, so a listener written for Fortify keeps working. A listener that fails is reported, and the refusal stands.
+The first refused attempt of each count's window records a `limit.tripped` security event, for the named or signed-in account when there is one, with a reason naming the limit: `keystone.daily_failed_attempt_limit`, `keystone.failed_attempt_limit` or `keystone.request_limit`. A failed-attempt trip also mails the account's owner an [alert](security-events.md#alerts), once for each count and window. A request-limit trip alerts nobody, since it names no credential and a busy shared network would mail owners for nothing. The same trip dispatches Laravel's `Illuminate\Auth\Events\Lockout` event, so a listener written for Fortify keeps working. A listener that fails is reported, and the refusal stands.
 
 ### Testing
 

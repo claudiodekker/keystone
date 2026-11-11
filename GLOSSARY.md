@@ -130,6 +130,10 @@ The one place that records security events. Core calls it inline from the code t
 
 A mail that tells an account's owner something happened to its security. The recorder sends one for an event about an account when the event's slot holds a notification, to the account's verified addresses, or to the ones counting as verified when it holds none, read before the change that caused the event.
 
+## Known device
+
+A browser an account signed in from within the retention, recognised by the `__Host-keystone_device` cookie: a device part that never changes and a part every sign-in replaces. Each account keeps the digests of both. A sign-in from a browser that isn't one alerts, and a cookie naming a device of the account with a value a later sign-in replaced records `device_cookie.reused`. Being known only gives the browser a failed-attempt count of its own.
+
 ## Slot
 
 The notification class `keystone.notifications` names for one type of security event, or null to send no alert of that type.
@@ -152,7 +156,7 @@ The rate limiter's count of requests per step kind, taken by controller middlewa
 
 ## Failed-attempt limit
 
-The rate limiter's count of attempts per account, credential type and flow, taken before the type verifies anything and given back only when the attempt signs in or the type throws, inside the window it was taken in. A refused attempt stays counted, and nothing ever resets a count.
+The rate limiter's count of attempts per account, credential type, flow and source, taken before the type verifies anything and given back only when the attempt signs in or the type throws, inside the window it was taken in. The source is the known device the browser is for the account the attempt names, else `other`, each with the full allowance. A refused attempt stays counted, and nothing ever resets a count.
 
 ## Step kind
 
