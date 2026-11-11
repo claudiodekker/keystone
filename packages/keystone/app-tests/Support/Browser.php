@@ -8,12 +8,15 @@ namespace ClaudioDekker\Keystone\AppTests\Support;
 readonly class Browser
 {
     /**
-     * Create the browser with the session it holds.
+     * Create the browser with the session and the cookies it holds.
      *
      * @param  array<string, mixed>  $session
+     * @param  array<string, string>  $cookies
      */
-    public function __construct(public array $session)
-    {
+    public function __construct(
+        public array $session,
+        public array $cookies = [],
+    ) {
         //
     }
 }
