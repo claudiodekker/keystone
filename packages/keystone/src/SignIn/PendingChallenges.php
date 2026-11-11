@@ -73,16 +73,6 @@ class PendingChallenges
     }
 
     /**
-     * Determine if the browser has left a pending challenge for the account that is still kept.
-     */
-    protected function hasPendingChallenge(KeystoneUser $account): bool
-    {
-        return UserPendingChallenge::query()
-            ->whereKey($this->session->pendingChallenge())
-            ->exists();
-    }
-
-    /**
      * Record every challenge left unanswered for long enough as abandoned, alert each account's owner once about all of its own, and get how many there were.
      */
     public function alertAbandoned(): int
@@ -114,5 +104,16 @@ class PendingChallenges
         }
 
         return $abandoned->count();
+    }
+
+    /**
+     * Determine if the browser has left a pending challenge for the account that is still kept.
+     */
+    protected function hasPendingChallenge(KeystoneUser $account): bool
+    {
+        return UserPendingChallenge::query()
+            ->whereKey($this->session->pendingChallenge())
+            ->where('user_id', $account->getAuthIdentifier())
+            ->exists();
     }
 }

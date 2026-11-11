@@ -149,3 +149,18 @@ it('keeps one pending challenge, at the time of the first hold, when the browser
 
     expect($abandoned->map(fn ($event) => $event->occurred_at->toDateTimeString())->values()->all())->toBe([$heldAt]);
 });
+
+it('alerts the owners of two accounts whose sign-ins one browser held in turn and left', function () {
+    $ada = $this->createUser();
+    $grace = $this->createUser();
+    $support = $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $ada);
+    $support->arrangeCredential(Surface::CHALLENGE, $grace);
+    $this->passFirstFactor($ada);
+    $this->passFirstFactor($grace);
+
+    $this->travel(7)->minutes();
+    $this->artisan('keystone:alert-abandoned-challenges');
+
+    expect($this->securityEvents()->for($ada)->where('type', SecurityEventType::CHALLENGE_ABANDONED))->toHaveCount(1)
+        ->and($this->securityEvents()->for($grace)->where('type', SecurityEventType::CHALLENGE_ABANDONED))->toHaveCount(1);
+});
