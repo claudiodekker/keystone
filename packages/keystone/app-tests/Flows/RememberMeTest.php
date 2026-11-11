@@ -6,8 +6,11 @@ use ClaudioDekker\Keystone\Jobs\EndSessions;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Models\UserRememberToken;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
+use Illuminate\Auth\Events\Login;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Route;
 
 beforeEach(function () {
     $this->withoutEnrollmentMandates();
@@ -329,4 +332,31 @@ it('signs every tab of a reopened browser back in at once, with no alert, since 
     $this->assertAlreadySignedIn($firstTab);
     $this->assertAlreadySignedIn($secondTab);
     expect($this->sentAlerts()->pluck('alert.type')->all())->toBe([SecurityEventType::SIGNED_IN]);
+});
+
+it("tells the app a request was signed in through remember me, as Laravel's Login event and Auth::viaRemember() do", function () {
+    Route::middleware('web')->get('/keystone/app-tests/via-remember', fn () => [
+        'user' => Auth::id(),
+        'via_remember' => Auth::viaRemember(),
+    ]);
+
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $signedIn = $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        'remember' => true,
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $this->keepCookiesFrom($signedIn);
+    $this->switchBackTo($this->browserWithCopiedCookies());
+    Event::fake([Login::class]);
+
+    $response = $this->get('/keystone/app-tests/via-remember');
+
+    Event::assertDispatchedTimes(Login::class, 1);
+    Event::assertDispatched(Login::class, fn (Login $login) => $login->remember && $login->user->is($user));
+    expect($response->json())->toBe(['user' => $user->getAuthIdentifier(), 'via_remember' => true]);
 });
