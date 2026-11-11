@@ -244,3 +244,17 @@ it('deletes a dead remember-me cookie and its token when the browser presents it
     'issued before an epoch move' => [fn ($test, KeystoneUser $user) => EndSessions::dispatchSync($user, operator: 'margaret')],
     'of a suspended account' => [fn ($test, KeystoneUser $user) => $user->newQuery()->whereKey($user->getAuthIdentifier())->update(['suspended_at' => now()])],
 ]);
+
+it('deletes a remember-me cookie no token matches, recording the refusal against nobody', function () {
+    $this->withUnencryptedCookie('__Host-keystone_remember', str_repeat('5e', 32));
+
+    $response = $this->get(route('login'));
+
+    $lines = collect($this->securityEvents()->logged())->where('type', 'request.rejected')->values();
+
+    $this->assertSignInPage($response, ['status' => null]);
+    expect($response->getCookie('__Host-keystone_remember', decrypt: false)?->isCleared())->toBeTrue()
+        ->and($lines)->toHaveCount(1)
+        ->and($lines[0]['reason'])->toBe('keystone.dead_remember_cookie')
+        ->and($lines[0]['user_id'])->toBeNull();
+});

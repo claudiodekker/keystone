@@ -65,11 +65,7 @@ class RememberTokens
 
         $token = UserRememberToken::query()->where('digest', $sent->digest())->first();
 
-        if ($token === null) {
-            return null;
-        }
-
-        if (! $this->isLive($token)) {
+        if ($token === null || ! $this->isLive($token)) {
             $this->refuseDead($token);
 
             return null;
@@ -85,7 +81,7 @@ class RememberTokens
     {
         UserRememberToken::query()->whereKey($id)->delete();
 
-        $this->cookies->queue($this->makeCookie('', expire: 1));
+        $this->forgetCookie();
     }
 
     /**
@@ -98,17 +94,27 @@ class RememberTokens
     }
 
     /**
-     * Forget the dead token and record the refusal against its account.
+     * Have the browser drop its dead cookie, forget the token it matched, if any, and record the refusal against that token's account.
      */
-    protected function refuseDead(UserRememberToken $token): void
+    protected function refuseDead(?UserRememberToken $token): void
     {
-        $this->forget($token->getKey());
+        $token?->delete();
+
+        $this->forgetCookie();
 
         $this->recorder->record(
             SecurityEventType::REQUEST_REJECTED,
-            account: $this->accounts->find($token->user_id),
+            account: $token === null ? null : $this->accounts->find($token->user_id),
             reason: 'keystone.dead_remember_cookie',
         );
+    }
+
+    /**
+     * Have the browser drop its remember-me cookie.
+     */
+    protected function forgetCookie(): void
+    {
+        $this->cookies->queue($this->makeCookie('', expire: 1));
     }
 
     /**
