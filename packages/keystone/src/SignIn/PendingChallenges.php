@@ -10,6 +10,7 @@ use ClaudioDekker\Keystone\Models\UserPendingChallenge;
 use ClaudioDekker\Keystone\SecurityEvents\Recorder;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use ClaudioDekker\Keystone\Session\SessionState;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Date;
 
@@ -48,13 +49,11 @@ class PendingChallenges
 
         $context = RequestContext::of($this->request);
 
-        $challenge = new UserPendingChallenge;
-
-        $challenge->forceFill([
+        $challenge = UserPendingChallenge::query()->forceCreate([
             'user_id' => $account->getAuthIdentifier(),
             'ip_address' => $context?->ipAddress,
             'user_agent' => $context?->userAgent,
-        ])->save();
+        ]);
 
         $this->session->keepPendingChallenge($challenge->getKey());
     }
@@ -85,25 +84,34 @@ class PendingChallenges
             ->get();
 
         foreach ($abandoned->groupBy('user_id') as $challenges) {
-            $account = $challenges->first()->user;
-
-            if ($account !== null) {
-                $this->recorder->recordEarlier(
-                    SecurityEventType::CHALLENGE_ABANDONED,
-                    account: $account,
-                    surface: Surface::CHALLENGE,
-                    occurrences: $challenges->map(fn (UserPendingChallenge $challenge) => [
-                        'ip_address' => $challenge->ip_address,
-                        'occurred_at' => $challenge->created_at,
-                        'user_agent' => $challenge->user_agent,
-                    ])->all(),
-                );
-            }
+            $this->alert($challenges);
 
             UserPendingChallenge::query()->whereKey($challenges->modelKeys())->delete();
         }
 
         return $abandoned->count();
+    }
+
+    /**
+     * Record each of one account's abandoned challenges and alert its owner once about all of them, unless the account is gone.
+     *
+     * @param  Collection<int, UserPendingChallenge>  $challenges
+     */
+    protected function alert(Collection $challenges): void
+    {
+        $account = $challenges->first()?->user;
+
+        if ($account === null) {
+            return;
+        }
+
+        $occurrences = $challenges->map(fn (UserPendingChallenge $challenge) => [
+            'ip_address' => $challenge->ip_address,
+            'occurred_at' => $challenge->created_at,
+            'user_agent' => $challenge->user_agent,
+        ]);
+
+        $this->recorder->recordEarlier(SecurityEventType::CHALLENGE_ABANDONED, $account, Surface::CHALLENGE, $occurrences->all());
     }
 
     /**

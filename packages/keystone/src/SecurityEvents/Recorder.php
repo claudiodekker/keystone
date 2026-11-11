@@ -111,15 +111,15 @@ class Recorder
      *
      * Each event keeps the time, IP address and user agent of its request, and names the system as its actor, since no request of the user's records it.
      *
-     * @param  non-empty-list<array{ip_address: string|null, occurred_at: CarbonImmutable, user_agent: string|null}>  $occurrences
+     * @param  array<int, array{ip_address: string|null, occurred_at: CarbonImmutable, user_agent: string|null}>  $occurrences
      */
     public function recordEarlier(SecurityEventType $type, KeystoneUser $account, Surface $surface, array $occurrences): void
     {
-        if ($this->config->get('keystone.events.enabled') === false) {
+        if ($this->config->get('keystone.events.enabled') === false || $occurrences === []) {
             return;
         }
 
-        $entries = array_map(fn (array $occurrence) => $this->makeEarlierEntry($type, $account, $surface, $occurrence), $occurrences);
+        $entries = array_values(array_map(fn (array $occurrence) => $this->makeEarlierEntry($type, $account, $surface, $occurrence), $occurrences));
 
         foreach ($entries as $entry) {
             rescue(fn () => $this->log($entry));
