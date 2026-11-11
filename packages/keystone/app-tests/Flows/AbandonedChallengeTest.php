@@ -175,3 +175,19 @@ it('sends no alert about a sign-in held at enrollment rather than at the challen
 
     expect($this->securityEvents()->for($user)->where('type', SecurityEventType::CHALLENGE_ABANDONED))->toBeEmpty();
 });
+
+it('sends no alert once the browser signed in to the account without owing the challenge any more', function () {
+    config(['keystone.notifications.signed_in' => null]);
+    $user = $this->createUser();
+    $support = $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);
+    $this->passFirstFactor($user);
+    $this->removeCredentials($user, $support);
+    $this->passFirstFactor($user);
+
+    $this->travel(7)->minutes();
+    $this->artisan('keystone:alert-abandoned-challenges');
+
+    $this->assertAuthenticated();
+    expect($this->sentAlerts())->toBeEmpty()
+        ->and($this->securityEvents()->for($user)->where('type', SecurityEventType::CHALLENGE_ABANDONED))->toBeEmpty();
+});

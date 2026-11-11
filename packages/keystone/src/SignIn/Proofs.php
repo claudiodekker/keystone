@@ -80,6 +80,8 @@ class Proofs
         $knownDevice = $this->devices->signIn($account);
         $redirectTo = $this->session->signIn($account);
 
+        $this->pendingChallenges->forget($account);
+
         $this->recorder->record(
             SecurityEventType::SIGNED_IN,
             account: $account,
@@ -133,6 +135,8 @@ class Proofs
         }
 
         $this->session->passSecondFactor($pending, $answer->type);
+
+        $this->pendingChallenges->forget($account);
 
         $this->recorder->record(
             SecurityEventType::SIGN_IN_HELD,

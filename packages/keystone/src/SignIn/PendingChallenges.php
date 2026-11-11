@@ -59,12 +59,18 @@ class PendingChallenges
     }
 
     /**
-     * Forget the browser's pending challenge for the account once it passes the challenge.
+     * Forget the browser's pending challenge for the account, once the browser passed the challenge or signed in to the account without it.
      */
-    public function pass(KeystoneUser $account): void
+    public function forget(KeystoneUser $account): void
     {
+        $id = $this->session->pendingChallenge();
+
+        if ($id === null) {
+            return;
+        }
+
         UserPendingChallenge::query()
-            ->whereKey($this->session->pendingChallenge())
+            ->whereKey($id)
             ->where('user_id', $account->getAuthIdentifier())
             ->delete();
 
@@ -119,8 +125,14 @@ class PendingChallenges
      */
     protected function hasPendingChallenge(KeystoneUser $account): bool
     {
+        $id = $this->session->pendingChallenge();
+
+        if ($id === null) {
+            return false;
+        }
+
         return UserPendingChallenge::query()
-            ->whereKey($this->session->pendingChallenge())
+            ->whereKey($id)
             ->where('user_id', $account->getAuthIdentifier())
             ->exists();
     }
