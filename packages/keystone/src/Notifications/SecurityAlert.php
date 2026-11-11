@@ -67,10 +67,16 @@ class SecurityAlert extends Notification implements ShouldBeEncrypted, ShouldQue
     public ?int $recoveryCodesLeft;
 
     /**
-     * Create the alert about the event, parsing its user agent so the queue never carries it.
+     * The number of events the alert is about, more than one when it sums up several of one type.
      */
-    public function __construct(UserSecurityEvent $event)
+    public int $count;
+
+    /**
+     * Create the alert about the event and any others of its type it sums up, parsing the user agent so the queue never carries it.
+     */
+    public function __construct(UserSecurityEvent $event, UserSecurityEvent ...$others)
     {
+        $this->count = 1 + count($others);
         $this->type = $event->type;
         $this->occurredAt = $event->occurred_at;
         $this->ipAddress = $event->ip_address;

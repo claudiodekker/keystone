@@ -64,3 +64,21 @@ it('runs every 5 minutes on one server, never overlapping itself, with nothing f
         ->and($events->first()->onOneServer)->toBeTrue()
         ->and($events->first()->withoutOverlapping)->toBeTrue();
 });
+
+it("records each of an account's abandoned challenges, and alerts its owner once about all of them", function () {
+    $ada = User::factory()->create();
+    $grace = User::factory()->create();
+    UserEmail::factory()->for($ada, 'user')->verified()->create(['address' => 'ada@example.com']);
+    UserEmail::factory()->for($grace, 'user')->verified()->create(['address' => 'grace@example.com']);
+    UserPendingChallenge::factory()->for($ada, 'user')->count(3)->create(['created_at' => now()->subMinutes(9)]);
+    UserPendingChallenge::factory()->for($grace, 'user')->create(['created_at' => now()->subMinutes(9)]);
+
+    $this->artisan('keystone:alert-abandoned-challenges')->assertSuccessful();
+
+    $counts = collect(Notification::sentNotifications()[AnonymousNotifiable::class])
+        ->flatten(2)
+        ->mapWithKeys(fn (array $sent) => [$sent['notifiable']->routes['mail'] => $sent['notification']->count]);
+
+    expect($counts->all())->toEqualCanonicalizing(['ada@example.com' => 3, 'grace@example.com' => 1])
+        ->and(UserSecurityEvent::query()->where('type', SecurityEventType::CHALLENGE_ABANDONED)->count())->toBe(4);
+});
