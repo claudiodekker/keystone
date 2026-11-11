@@ -76,7 +76,6 @@ class SessionState
         protected Dispatcher $events,
         protected Config $config,
         protected Encrypter $encrypter,
-        protected RememberTokens $rememberTokens,
     ) {
         //
     }
@@ -325,7 +324,7 @@ class SessionState
     }
 
     /**
-     * Remember the remember-me token the session issued, so signing out forgets it.
+     * Remember the remember-me token the session issued, so ending the session forgets it.
      */
     public function keepRememberToken(UserRememberToken $token): void
     {
@@ -333,18 +332,23 @@ class SessionState
     }
 
     /**
-     * End the session, forget its remember-me token and leave the signed-out status for the sign-in page, and get who was signed in, if anyone.
+     * Get the id of the remember-me token the session issued or restored from, if any.
+     */
+    public function rememberToken(): int|string|null
+    {
+        $id = $this->session->get(static::REMEMBER_TOKEN);
+
+        return is_int($id) || is_string($id) ? $id : null;
+    }
+
+    /**
+     * End the session and leave the signed-out status for the sign-in page, and get who was signed in, if anyone.
      */
     public function signOut(): ?KeystoneUser
     {
         $account = $this->account();
-        $token = $this->session->get(static::REMEMBER_TOKEN);
 
         Keystone::guard()->logout();
-
-        if (is_int($token) || is_string($token)) {
-            $this->rememberTokens->forget($token);
-        }
 
         $this->leaveStatus(Status::SIGNED_OUT);
 

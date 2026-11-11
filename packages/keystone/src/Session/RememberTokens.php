@@ -2,9 +2,12 @@
 
 namespace ClaudioDekker\Keystone\Session;
 
+use ClaudioDekker\Keystone\Accounts\AccountLookup;
 use ClaudioDekker\Keystone\Accounts\CredentialEpoch;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Models\UserRememberToken;
+use ClaudioDekker\Keystone\SecurityEvents\Recorder;
+use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Contracts\Cookie\QueueingFactory as CookieJar;
 use Illuminate\Http\Request;
@@ -20,8 +23,10 @@ class RememberTokens
      * Create the remember-me tokens.
      */
     public function __construct(
+        protected AccountLookup $accounts,
         protected Config $config,
         protected CookieJar $cookies,
+        protected Recorder $recorder,
         protected Request $request,
     ) {
         //
@@ -48,7 +53,7 @@ class RememberTokens
     }
 
     /**
-     * Get the token of the browser's remember-me cookie, if its lifetime has yet to pass and its account is still on the epoch it was issued on.
+     * Get the token of the browser's remember-me cookie while it is live, forgetting a dead one and recording its refusal.
      */
     public function find(): ?UserRememberToken
     {
@@ -58,12 +63,15 @@ class RememberTokens
             return null;
         }
 
-        $token = UserRememberToken::query()
-            ->where('digest', $sent->digest())
-            ->where('expires_at', '>', Date::now())
-            ->first();
+        $token = UserRememberToken::query()->where('digest', $sent->digest())->first();
 
-        if ($token === null || CredentialEpoch::of($token->user_id) !== $token->epoch) {
+        if ($token === null) {
+            return null;
+        }
+
+        if (! $this->isLive($token)) {
+            $this->refuseDead($token);
+
             return null;
         }
 
@@ -78,6 +86,29 @@ class RememberTokens
         UserRememberToken::query()->whereKey($id)->delete();
 
         $this->cookies->queue($this->makeCookie('', expire: 1));
+    }
+
+    /**
+     * Determine if the token's lifetime has yet to pass and its account is still on the credential epoch it was issued on, which a barred account never is.
+     */
+    protected function isLive(UserRememberToken $token): bool
+    {
+        return $token->expires_at->isFuture()
+            && CredentialEpoch::of($token->user_id) === $token->epoch;
+    }
+
+    /**
+     * Forget the dead token and record the refusal against its account.
+     */
+    protected function refuseDead(UserRememberToken $token): void
+    {
+        $this->forget($token->getKey());
+
+        $this->recorder->record(
+            SecurityEventType::REQUEST_REJECTED,
+            account: $this->accounts->find($token->user_id),
+            reason: 'keystone.dead_remember_cookie',
+        );
     }
 
     /**

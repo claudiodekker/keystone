@@ -1,7 +1,9 @@
 <?php
 
+use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Jobs\EndSessions;
 use ClaudioDekker\Keystone\Methods\Surface;
+use ClaudioDekker\Keystone\Models\UserRememberToken;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use Illuminate\Support\Facades\Auth;
 
@@ -215,3 +217,30 @@ it('forgets the remember-me token of a return refused because its account owed e
 
     $this->assertSignInPage($response, ['status' => null]);
 });
+
+it('deletes a dead remember-me cookie and its token when the browser presents it, and records the refusal', function (Closure $kill) {
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $signedIn = $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        'remember' => true,
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $this->keepCookiesFrom($signedIn);
+    $this->switchBackTo($this->browserWithCopiedCookies());
+    $kill($this, $user);
+
+    $response = $this->get(route('login'));
+
+    $this->assertSignInPage($response, ['status' => null]);
+    expect($response->getCookie('__Host-keystone_remember', decrypt: false)?->isCleared())->toBeTrue()
+        ->and(UserRememberToken::query()->where('user_id', $user->getAuthIdentifier())->exists())->toBeFalse()
+        ->and($this->securityEvents()->for($user)->where('type', SecurityEventType::REQUEST_REJECTED)->pluck('reason')->all())->toBe(['keystone.dead_remember_cookie']);
+})->with([
+    'past its lifetime' => [fn ($test) => $test->travel($test->rememberLifetimeSeconds())->seconds()],
+    'issued before an epoch move' => [fn ($test, KeystoneUser $user) => EndSessions::dispatchSync($user, operator: 'margaret')],
+    'of a suspended account' => [fn ($test, KeystoneUser $user) => $user->newQuery()->whereKey($user->getAuthIdentifier())->update(['suspended_at' => now()])],
+]);

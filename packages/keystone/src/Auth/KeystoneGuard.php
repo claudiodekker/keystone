@@ -299,10 +299,16 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * End the whole session and clear the browser's site data, so nothing it held outlives it.
+     * End the whole session, its remember-me token included, and clear the browser's site data, so nothing it held outlives it.
      */
     protected function endSession(): void
     {
+        $token = $this->state()->rememberToken();
+
+        if ($token !== null) {
+            $this->container->make(RememberTokens::class)->forget($token);
+        }
+
         $this->session->invalidate();
         $this->session->regenerateToken();
 
