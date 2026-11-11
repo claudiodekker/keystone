@@ -90,3 +90,23 @@ it("restores nothing once the account's credential epoch moved since the sign-in
 
     $this->assertSignInPage($response, ['status' => null]);
 });
+
+it("restores nothing for an account suspended on the credential epoch its cookie was issued on", function () {
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $signedIn = $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        'remember' => true,
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $this->keepCookiesFrom($signedIn);
+    $this->switchBackTo($this->browserWithCopiedCookies());
+    $user->newQuery()->whereKey($user->getAuthIdentifier())->update(['suspended_at' => now()]);
+
+    $response = $this->get(route('login'));
+
+    $this->assertSignInPage($response, ['status' => null]);
+});
