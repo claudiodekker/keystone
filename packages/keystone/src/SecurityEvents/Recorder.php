@@ -67,7 +67,7 @@ class Recorder
     /**
      * Record the security event, as a log line alone when it is anonymous.
      *
-     * Naming an operator records the event as theirs rather than the user's.
+     * Naming an operator records the event as theirs rather than the user's. A sign-in says whether its browser was a known device of the account.
      * The alert goes to the given recipients, read before the change that caused the event, or to the account's addresses as they are now.
      *
      * @param  list<string>|null  $recipients
@@ -81,12 +81,13 @@ class Recorder
         ?string $reason = null,
         ?string $operator = null,
         ?array $recipients = null,
+        ?bool $knownDevice = null,
     ): void {
         if ($this->config->get('keystone.events.enabled') === false) {
             return;
         }
 
-        $entry = rescue(fn () => $this->makeEntry($type, $account, $surface, $credentialType, $credential, $reason, $operator));
+        $entry = rescue(fn () => $this->makeEntry($type, $account, $surface, $credentialType, $credential, $reason, $operator, $knownDevice));
 
         if ($entry === null) {
             return;
@@ -115,6 +116,7 @@ class Recorder
         int|string|null $credential,
         ?string $reason,
         ?string $operator,
+        ?bool $knownDevice,
     ): UserSecurityEvent {
         $context = RequestContext::of($this->request);
 
@@ -132,7 +134,7 @@ class Recorder
             'ip_address' => $context?->ipAddress,
             'location' => null,
             'user_agent' => $context?->userAgent,
-            'known_device' => null,
+            'known_device' => $knownDevice,
             'request_id' => $context?->requestId,
             'operator' => $operator === null ? null : $this->operator($operator),
         ]);
@@ -181,7 +183,7 @@ class Recorder
     }
 
     /**
-     * Mail the entry's alert to each recipient, unless its type's slot is null.
+     * Mail the entry's alert to each recipient, unless its type's slot is null or it came from a known device.
      *
      * @param  list<string>|null  $recipients
      */
@@ -189,7 +191,7 @@ class Recorder
     {
         $slot = $this->config->get('keystone.notifications')[$entry->type->value] ?? null;
 
-        if ($slot === null) {
+        if ($slot === null || $entry->known_device === true) {
             return;
         }
 

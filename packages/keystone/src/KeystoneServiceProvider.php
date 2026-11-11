@@ -5,12 +5,14 @@ namespace ClaudioDekker\Keystone;
 use ClaudioDekker\Keystone\Auth\KeystoneGuard;
 use ClaudioDekker\Keystone\Configuration\BootChecks;
 use ClaudioDekker\Keystone\Console\EndSessionsCommand;
+use ClaudioDekker\Keystone\Console\PruneCommand;
 use ClaudioDekker\Keystone\Console\SuspendCommand;
 use ClaudioDekker\Keystone\Console\UnsuspendCommand;
 use ClaudioDekker\Keystone\Contracts\IpLocation;
 use ClaudioDekker\Keystone\Contracts\SessionDemotedResponse;
 use ClaudioDekker\Keystone\Contracts\SessionExpiredResponse;
 use ClaudioDekker\Keystone\Contracts\SessionInfo;
+use ClaudioDekker\Keystone\Devices\DeviceCookie;
 use ClaudioDekker\Keystone\Devices\DeviceDetectorSessionInfo;
 use ClaudioDekker\Keystone\Devices\NullSessionInfo;
 use ClaudioDekker\Keystone\Exceptions\KeystoneMisconfiguredException;
@@ -27,9 +29,11 @@ use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\MethodAllowList;
 use DeviceDetector\DeviceDetector;
 use Illuminate\Auth\AuthenticationException;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Http\Kernel;
+use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Exceptions\Handler;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Redirector;
@@ -108,7 +112,9 @@ class KeystoneServiceProvider extends ServiceProvider
 
         $this->answerEndedSessions();
         $this->captureRequestContext();
+        $this->excludeDeviceCookieFromEncryption();
         $this->hardenResponses();
+        $this->pruneNightly();
         $this->refuseCrossSiteRequests();
 
         $this->loadMigrationsFrom(dirname(__DIR__).'/database/migrations');
@@ -118,6 +124,7 @@ class KeystoneServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 EndSessionsCommand::class,
+                PruneCommand::class,
                 SuspendCommand::class,
                 UnsuspendCommand::class,
             ]);
@@ -223,6 +230,24 @@ class KeystoneServiceProvider extends ServiceProvider
     protected function captureRequestContext(): void
     {
         $this->app->make(Kernel::class)->pushMiddleware(CaptureRequestContext::class);
+    }
+
+    /**
+     * Schedule the prune every night on one server, so the app registers nothing.
+     */
+    protected function pruneNightly(): void
+    {
+        $this->callAfterResolving(Schedule::class, function (Schedule $schedule) {
+            $schedule->command(PruneCommand::class)->daily()->onOneServer();
+        });
+    }
+
+    /**
+     * Leave the device cookie unencrypted, since only its digest is checked and a value Keystone never handed out matches nothing.
+     */
+    protected function excludeDeviceCookieFromEncryption(): void
+    {
+        EncryptCookies::except(DeviceCookie::NAME);
     }
 
     /**

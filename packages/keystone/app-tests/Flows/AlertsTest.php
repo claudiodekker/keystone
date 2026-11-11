@@ -140,6 +140,7 @@ it("sends the app's own class in place of Keystone's, built from the event", fun
 
 it("mails the account's addresses for a type that sends nothing by default once the app gives it a class", function () {
     $this->withoutEnrollmentMandates();
+    config(['keystone.notifications.signed_in' => null]);
     config(['keystone.notifications' => [...config('keystone.notifications'), 'signed_out' => AppAlert::class]]);
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');

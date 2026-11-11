@@ -24,6 +24,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property Actor $actor
  * @property Flow|null $flow
  * @property string|null $operator
+ * @property bool|null $known_device
  *
  * @api
  */

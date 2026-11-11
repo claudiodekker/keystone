@@ -24,6 +24,17 @@ enum Limit: string
     }
 
     /**
+     * Determine if a trip of the limit alerts the account's owner, which only a failed-attempt limit does, since a request limit names no credential.
+     */
+    public function alertsOwner(): bool
+    {
+        return match ($this) {
+            Limit::DAILY_FAILED_ATTEMPT, Limit::FAILED_ATTEMPT => true,
+            Limit::REQUEST => false,
+        };
+    }
+
+    /**
      * Get the reason a trip of the limit is recorded with.
      */
     public function reason(): string

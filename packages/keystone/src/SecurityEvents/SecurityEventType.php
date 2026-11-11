@@ -10,6 +10,7 @@ enum SecurityEventType: string
     case ACCOUNT_SUSPENDED = 'account.suspended';
     case ACCOUNT_UNSUSPENDED = 'account.unsuspended';
     case CREDENTIAL_ADDED = 'credential.added';
+    case DEVICE_COOKIE_REUSED = 'device_cookie.reused';
     case LIMIT_TRIPPED = 'limit.tripped';
     case PROOF_REJECTED = 'proof.rejected';
     case RECOVERY_CODES_GENERATED = 'recovery_codes.generated';

@@ -40,6 +40,7 @@ class KeyChecks
             ...$this->logChannel(),
             ...$this->requireRecoveryCodes(),
             ...$this->requireSecondFactor(),
+            ...$this->retention(),
             ...$this->trustedOrigins(),
         ];
     }
@@ -132,6 +133,20 @@ class KeyChecks
         }
 
         return ['keystone.require_second_factor must be true or false.'];
+    }
+
+    /**
+     * Get the failure of retention.known_devices_seconds when it isn't a positive integer.
+     *
+     * @return list<string>
+     */
+    protected function retention(): array
+    {
+        if ($this->isPositiveInteger($this->config->get('keystone.retention.known_devices_seconds'))) {
+            return [];
+        }
+
+        return ['keystone.retention.known_devices_seconds must be a positive integer.'];
     }
 
     /**

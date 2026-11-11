@@ -4,6 +4,7 @@ namespace ClaudioDekker\Keystone\Accounts;
 
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Exceptions\AccountChangeRefusedException;
+use ClaudioDekker\Keystone\Models\UserKnownDevice;
 use ClaudioDekker\Keystone\SecurityEvents\Recorder;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use ClaudioDekker\Keystone\Session\PendingSignIn;
@@ -67,11 +68,15 @@ class AccountChanges
     }
 
     /**
-     * End every account's sessions at once, for the operator who asked, recording one event without an account once the outermost transaction commits.
+     * End every account's sessions at once and forget every known device, for the operator who asked, recording one event without an account once the outermost transaction commits.
      */
     public function endAllSessions(string $operator): void
     {
-        CredentialEpoch::moveAll();
+        $this->connection->transaction(function () {
+            UserKnownDevice::query()->delete();
+
+            CredentialEpoch::moveAll();
+        });
 
         $this->connection->afterCommit(fn () => $this->recorder->record(
             SecurityEventType::SESSIONS_TERMINATED,

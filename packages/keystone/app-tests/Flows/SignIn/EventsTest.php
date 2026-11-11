@@ -351,7 +351,9 @@ it('still signs in and records nothing when the entry cannot be built', function
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
-    $encrypter = Mockery::mock(Crypt::getFacadeRoot())->makePartial();
+    $real = Crypt::getFacadeRoot();
+    $encrypter = Mockery::mock($real)->makePartial();
+    $encrypter->shouldReceive('encrypt')->twice()->andReturnUsing($real->encrypt(...));
     $encrypter->shouldReceive('encrypt')->once()->andThrow(new RuntimeException('The encryption key is lost.'));
     Model::encryptUsing($encrypter);
 

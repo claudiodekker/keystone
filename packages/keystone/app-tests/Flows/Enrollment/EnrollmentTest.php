@@ -99,6 +99,7 @@ it('saves only the shown codes, so a later challenge refuses a code the step nev
 
 it('records the saved codes in the enrollment flow, alerting nobody for a first set', function () {
     Notification::fake();
+    config(['keystone.notifications.signed_in' => null]);
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);

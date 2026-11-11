@@ -8,6 +8,7 @@ use ClaudioDekker\Keystone\Accounts\AccountLookup;
 use ClaudioDekker\Keystone\Accounts\AlertRecipients;
 use ClaudioDekker\Keystone\Accounts\Holdings;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
+use ClaudioDekker\Keystone\Devices\KnownDevices;
 use ClaudioDekker\Keystone\Exceptions\AccountChangeRefusedException;
 use ClaudioDekker\Keystone\Exceptions\ThrottledException;
 use ClaudioDekker\Keystone\Http\Pages\EnrollmentPage;
@@ -41,6 +42,7 @@ class Enrollment
         protected AccountLookup $accounts,
         protected AlertRecipients $alertRecipients,
         protected SignInDecision $decision,
+        protected KnownDevices $devices,
         protected Holdings $holdings,
         protected Limiter $limiter,
         protected Proofs $proofs,
@@ -312,6 +314,7 @@ class Enrollment
      */
     protected function signIn(CredentialType $type, KeystoneUser $account): SignedIn
     {
+        $knownDevice = $this->devices->signIn($account);
         $redirectTo = $this->session->signIn($account);
 
         $this->recorder->record(
@@ -319,6 +322,7 @@ class Enrollment
             account: $account,
             surface: Surface::ENROLLMENT,
             credentialType: $type,
+            knownDevice: $knownDevice,
         );
 
         return new SignedIn($redirectTo);

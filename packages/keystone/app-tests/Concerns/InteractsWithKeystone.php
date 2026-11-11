@@ -107,16 +107,44 @@ trait InteractsWithKeystone
     }
 
     /**
-     * Put the browser's session in place of the current one, and get the browser that held the current one.
+     * Keep the cookies the response set in this browser, so the requests from here on send them, as a browser does.
+     *
+     * The session cookie is left out, because the test's session already carries over from one request to the next.
+     */
+    public function keepCookiesFrom(TestResponse $response): void
+    {
+        foreach ($response->headers->getCookies() as $cookie) {
+            $name = $cookie->getName();
+
+            if ($name === config('session.cookie')) {
+                continue;
+            }
+
+            $this->withUnencryptedCookie($name, (string) $cookie->getValue());
+        }
+    }
+
+    /**
+     * Get a fresh browser holding a copy of this browser's cookies and none of its session, as one who copied them would.
+     */
+    public function browserWithCopiedCookies(): Browser
+    {
+        return new Browser([], $this->unencryptedCookies);
+    }
+
+    /**
+     * Put the browser's session and cookies in place of the current ones, and get the browser that held the current ones.
      */
     protected function switchTo(Browser $browser): Browser
     {
         $session = $this->app['session'];
-        $left = new Browser($session->all());
+        $left = new Browser($session->all(), $this->unencryptedCookies);
 
         Auth::forgetGuards();
         $session->flush();
         $session->put($browser->session);
+
+        $this->unencryptedCookies = $browser->cookies;
 
         return $left;
     }

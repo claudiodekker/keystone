@@ -33,3 +33,9 @@ it('ends a session twelve hours after its sign-in by default', function () {
 
     expect($shipped['session']['absolute_lifetime_seconds'])->toBe(43200);
 });
+
+it('keeps knowing a browser for ninety days after its last sign-in by default', function () {
+    $shipped = require dirname(__DIR__, 2).'/config/keystone.php';
+
+    expect($shipped['retention']['known_devices_seconds'])->toBe(7776000);
+});

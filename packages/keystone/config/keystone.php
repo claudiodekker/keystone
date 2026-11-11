@@ -103,7 +103,8 @@ return [
         'account.suspended' => SecurityAlert::class,
         'account.unsuspended' => SecurityAlert::class,
         'credential.added' => SecurityAlert::class,
-        'limit.tripped' => null,
+        'device_cookie.reused' => SecurityAlert::class,
+        'limit.tripped' => SecurityAlert::class,
         'proof.rejected' => null,
         'recovery_code.used' => SecurityAlert::class,
         'recovery_codes.generated' => null,
@@ -112,7 +113,7 @@ return [
         'sessions.terminated' => SecurityAlert::class,
         'sign_in.held' => null,
         'sign_in.voided' => null,
-        'signed_in' => null,
+        'signed_in' => SecurityAlert::class,
         'signed_out' => null,
     ],
 
@@ -161,6 +162,21 @@ return [
     */
 
     'require_second_factor' => true,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Retention
+    |--------------------------------------------------------------------------
+    |
+    | How many seconds Keystone keeps knowing a browser after the account's
+    | last sign-in from it. Signing in from a browser it no longer knows
+    | alerts the owner, and the nightly prune deletes what it forgot.
+    |
+    */
+
+    'retention' => [
+        'known_devices_seconds' => 60 * 60 * 24 * 90,
+    ],
 
     /*
     |--------------------------------------------------------------------------

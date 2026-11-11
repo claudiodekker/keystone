@@ -23,11 +23,12 @@ This file raises the view allowance and keeps every other allowance at its defau
 | `ip_location.allow_plaintext_driver` | `false` | `true` lets a `stevebauman/location` driver send IP addresses to a third party over plain HTTP. |
 | `log_channel` | `null` | None. It only picks where the security event lines go. |
 | `methods` | `null` | None. It only narrows: a type it leaves out is offered nowhere, and it can't offer a type on a surface the type doesn't serve. |
-| `notifications.<type>` | `SecurityAlert` for `account.suspended`, `account.unsuspended`, `credential.added`, `recovery_code.used` and `sessions.terminated`, `null` for every other type | `null` stops the alert for that type, so its owner no longer hears about it. |
+| `notifications.<type>` | `SecurityAlert` for `account.suspended`, `account.unsuspended`, `credential.added`, `device_cookie.reused`, `limit.tripped`, `recovery_code.used`, `sessions.terminated` and `signed_in`, `null` for every other type | `null` stops the alert for that type, so its owner no longer hears about it. |
 | `rate_limits.failed_attempts_per_hour` | `20` | A higher number gives an attacker more guesses per account. |
 | `rate_limits.requests_per_minute.change` | `10` | A higher number lets more sign-outs through from one address. |
 | `rate_limits.requests_per_minute.submit` | `10` | A higher number lets more sign-in submits through from one address. |
 | `rate_limits.requests_per_minute.view` | `60` | A higher number lets more page views through from one address. |
+| `retention.known_devices_seconds` | `60 * 60 * 24 * 90` | A longer retention keeps a browser known, with its own failed-attempt count and no new-device alert, for longer after its last sign-in. |
 | `require_recovery_codes` | `true` | `false` lets an account sign in without recovery codes, and lets its last code answer the challenge, which can leave it without codes for recovery. |
 | `require_second_factor` | `true` | `false` lets an account sign in on its first factor alone while it holds no second factor. |
 | `session.absolute_lifetime_seconds` | `12 * 60 * 60` | A longer lifetime keeps a stolen session alive longer while it stays busy, and `null` keeps it alive for as long as it stays busy. |
@@ -117,6 +118,7 @@ The checks set no ceilings. In every environment, they refuse a value of the wro
 | `ip_location.allow_plaintext_driver` | `true` or `false`. |
 | `require_recovery_codes` | `true` or `false`. |
 | `require_second_factor` | `true` or `false`. |
+| `retention.known_devices_seconds` | An integer of at least 1. |
 | `log_channel` | `null`, or the name of a channel in your `logging` config. |
 | `notifications` | A map of security event types, each to `null` or to a notification class whose constructor takes the event alone. `SecurityAlert` is refused on a type it has no mail for. |
 | `clear_site_data` | A list of `cache`, `cookies`, `executionContexts` and `storage`. |

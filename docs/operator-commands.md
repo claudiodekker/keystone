@@ -20,6 +20,8 @@ Keystone mails the account's owner an [alert](security-events.md#alerts) that an
 
 Ending every account's sessions with `--all` alerts nobody.
 
+Ending an account's sessions also makes it forget every browser it signed in from, so a browser holding a stolen [device cookie](security-events.md#new-devices) stops counting apart, and the owner's next sign-in from each browser alerts as new. `--all` forgets every account's browsers.
+
 `--operator` names who is ending the sessions, and it is required. Keystone records it on the security event, cut to 64 characters, with control characters replaced by spaces. Use a name your team will recognise in the logs, such as an email address.
 
 The account is found by its id whatever global scopes your user model has, so an account a scope hides still has its sessions ended.
@@ -130,3 +132,13 @@ Suspending sets the `suspended_at` column Keystone adds to your users table, and
 ### What gets recorded
 
 Suspending records `account.suspended`, and lifting the suspension records `account.unsuspended`, both with actor `operator` and the operator's name in the `operator` field. Each mails the account's owner an [alert](security-events.md#alerts). Set the type's slot in `notifications` to `null` to stop it.
+
+## Pruning
+
+Keystone deletes what it keeps past its retention every night with `keystone:prune`. Today that is every [known device](security-events.md#new-devices) no account signed in from within `retention.known_devices_seconds`. Keystone schedules the command itself, daily at midnight on one server, so your app registers nothing. It needs Laravel's scheduler running, as Laravel's [scheduling docs](https://laravel.com/docs/scheduling#running-the-scheduler) describe, and a cache store every server shares for `onOneServer()`.
+
+Run it by hand at any time:
+
+    php artisan keystone:prune
+
+A browser unseen for the retention counts as new whether or not the prune has deleted its row yet, so a late or missed run never changes who gets an alert.

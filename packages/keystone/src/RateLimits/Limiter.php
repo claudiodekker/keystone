@@ -4,6 +4,7 @@ namespace ClaudioDekker\Keystone\RateLimits;
 
 use ClaudioDekker\Keystone\Accounts\EmailAddress;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
+use ClaudioDekker\Keystone\Devices\KnownDevices;
 use ClaudioDekker\Keystone\Exceptions\MissingFlowException;
 use ClaudioDekker\Keystone\Exceptions\ThrottledException;
 use ClaudioDekker\Keystone\Http\RequestContext;
@@ -37,6 +38,11 @@ class Limiter
     protected const string UNKNOWN_ADDRESS = 'unknown';
 
     /**
+     * The key part of every failed attempt from a browser that isn't a known device of the account it names.
+     */
+    protected const string OTHER_SOURCE = 'other';
+
+    /**
      * The failed one-time codes an account gets in a day, across every hourly allowance.
      */
     protected const int DAILY_ONE_TIME_CODE_FAILURES = 100;
@@ -47,6 +53,7 @@ class Limiter
     public function __construct(
         protected Config $config,
         protected RateLimiter $counts,
+        protected KnownDevices $devices,
         protected Dispatcher $events,
         protected Recorder $recorder,
         protected Request $request,
@@ -93,6 +100,7 @@ class Limiter
      * Count a failed attempt of the type before it verifies anything, and refuse it once the subject's count is spent.
      *
      * The subject is the account the attempt names, or the identifier it was given when that names none.
+     * A known device of the account keeps a count of its own, and every other browser shares one, each with the full allowance.
      * A one-time code is also counted against a daily ceiling, but only once the hourly count let it through. A store failure is reported and refuses the attempt.
      *
      * @throws ThrottledException
@@ -101,7 +109,7 @@ class Limiter
     {
         $flow = $this->session->flow($surface) ?? throw MissingFlowException::forSurface($surface);
         $account = $subject instanceof KeystoneUser ? $subject : null;
-        $parts = [...$this->subject($subject), $type->name(), $flow->value];
+        $parts = [...$this->subject($subject), $this->source($account), $type->name(), $flow->value];
         $allowance = $this->config->integer('keystone.rate_limits.failed_attempts_per_hour');
 
         $counts = [$this->takeWithin(Limit::FAILED_ATTEMPT, $parts, $allowance, $account, $surface, $type)];
@@ -167,7 +175,7 @@ class Limiter
     }
 
     /**
-     * Record the limit's trip and dispatch Laravel's lockout event, whose failing listener is reported and changes nothing.
+     * Record the limit's trip, alerting the owner when the limit does, and dispatch Laravel's lockout event, whose failing listener is reported and changes nothing.
      */
     protected function trip(Limit $limit, ?KeystoneUser $account, ?Surface $surface = null, ?CredentialType $type = null): void
     {
@@ -177,6 +185,7 @@ class Limiter
             surface: $surface,
             credentialType: $type,
             reason: $limit->reason(),
+            recipients: $limit->alertsOwner() ? null : [],
         );
 
         rescue(fn () => $this->events->dispatch(new Lockout($this->request)));
@@ -216,6 +225,16 @@ class Limiter
         }
 
         return ['identifier', EmailAddress::normalize($subject)];
+    }
+
+    /**
+     * Get the key part of where an attempt comes from: one of its own for a known device of the account, a shared one for every other browser.
+     */
+    protected function source(?KeystoneUser $account): string
+    {
+        $device = $account === null ? null : $this->devices->idOf($account);
+
+        return $device === null ? static::OTHER_SOURCE : (string) $device;
     }
 
     /**

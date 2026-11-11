@@ -3,6 +3,7 @@
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\RateLimits\StepKind;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
+use Illuminate\Support\Facades\Notification;
 
 it('refuses the sign-in submit over the allowance before validation, even with an empty payload', function () {
     $support = $this->supportFor(Surface::SIGN_IN);
@@ -103,4 +104,17 @@ it('counts the requests of a signed-in account together, whatever address they c
     $response = $this->actingAs($user)->withServerVariables(['REMOTE_ADDR' => '10.1.0.1'])->get(route('login'));
 
     $this->assertSignInThrottled($response);
+});
+
+it('alerts nobody when the request limit of a signed-in account trips', function () {
+    Notification::fake();
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+
+    foreach (range(1, $this->requestAllowance(StepKind::VIEW) + 3) as $i) {
+        $this->actingAs($user)->get(route('login'));
+    }
+
+    expect($this->securityEvents()->for($user)->where('type', SecurityEventType::LIMIT_TRIPPED))->toHaveCount(1)
+        ->and($this->sentAlerts())->toBeEmpty();
 });

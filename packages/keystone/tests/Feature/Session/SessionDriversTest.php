@@ -19,7 +19,7 @@ it("signs out another session on its next request once the operator ends the acc
     UserEmail::factory()->for($ada, 'user')->verified()->create(['address' => 'ada@example.com']);
     UserCredential::factory()->for($ada, 'user')->create(['type' => 'form', 'secret' => 'correct horse']);
     $cookiesOf = fn (TestResponse $response) => collect($response->headers->getCookies())
-        ->mapWithKeys(fn ($cookie) => [$cookie->getName() => $response->getCookie($cookie->getName())->getValue()])
+        ->mapWithKeys(fn ($cookie) => [$cookie->getName() => $cookie->getValue()])
         ->all();
 
     $nextRequest = function (array $cookies) {
@@ -27,7 +27,7 @@ it("signs out another session on its next request once the operator ends the acc
         $this->app['session']->forgetDrivers();
         $this->app->forgetInstance('session.store');
 
-        return $this->withCookies($cookies)->get(route('login'));
+        return $this->withUnencryptedCookies($cookies)->get(route('login'));
     };
 
     $signedIn = $this->post(route('login.submit', 'form'), ['identifier' => 'ada@example.com', 'secret' => 'correct horse']);

@@ -7,6 +7,7 @@ use ClaudioDekker\Keystone\Exceptions\AccountChangeRefusedException;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Models\UserCredential;
+use ClaudioDekker\Keystone\Models\UserKnownDevice;
 use ClaudioDekker\Keystone\Models\UserRecoveryCode;
 use ClaudioDekker\Keystone\RecoveryCodes\RecoveryCode;
 use ClaudioDekker\Keystone\RecoveryCodes\RecoveryCodeType;
@@ -46,7 +47,7 @@ class AccountChange
     }
 
     /**
-     * End every session of the account, for the operator who asked, and alert its owner.
+     * End every session of the account and forget its known devices, for the operator who asked, and alert its owner.
      */
     public function endSessions(string $operator): void
     {
@@ -54,7 +55,7 @@ class AccountChange
     }
 
     /**
-     * End every session of the account, for the operator who asked, without alerting its owner.
+     * End every session of the account and forget its known devices, for the operator who asked, without alerting its owner.
      */
     public function endSessionsWithoutAlert(string $operator): void
     {
@@ -213,12 +214,16 @@ class AccountChange
     }
 
     /**
-     * End every session of the account, for the operator who asked, alerting the given addresses.
+     * End every session of the account and forget its known devices, for the operator who asked, alerting the given addresses.
      *
      * @param  list<string>  $recipients
      */
     protected function terminateSessions(string $operator, array $recipients): void
     {
+        UserKnownDevice::query()
+            ->where('user_id', $this->account->getAuthIdentifier())
+            ->delete();
+
         $this->movesEpoch = true;
 
         $this->recordForOperator(SecurityEventType::SESSIONS_TERMINATED, $operator, $recipients);
