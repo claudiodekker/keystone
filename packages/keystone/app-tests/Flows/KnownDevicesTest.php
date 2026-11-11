@@ -387,3 +387,74 @@ it('keeps knowing the browser through a suspension, which ends sessions without 
     $this->assertSignedIn($response, '/');
     expect($this->sentAlerts()->pluck('alert.type')->filter(fn (SecurityEventType $type) => $type === SecurityEventType::SIGNED_IN))->toHaveCount(1);
 });
+
+it('alerts again when a browser the account has not signed in from for the retention signs in', function () {
+    config(['keystone.retention.known_devices_seconds' => 17 * 24 * 60 * 60]);
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $this->keepCookiesFrom($this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]));
+
+    $this->post(route('logout'));
+    $this->travel(17 * 24 * 60 * 60)->seconds();
+
+    $response = $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $this->assertSignedIn($response, '/');
+    expect($this->sentAlerts()->pluck('alert.type')->all())->toBe([SecurityEventType::SIGNED_IN, SecurityEventType::SIGNED_IN]);
+});
+
+it('sends no alert when a browser the account knows signs in a second before the retention ends', function () {
+    config(['keystone.retention.known_devices_seconds' => 17 * 24 * 60 * 60]);
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $this->keepCookiesFrom($this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]));
+
+    $this->post(route('logout'));
+    $this->travel(17 * 24 * 60 * 60 - 1)->seconds();
+
+    $response = $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $this->assertSignedIn($response, '/');
+    expect($this->sentAlerts()->pluck('alert.type')->all())->toBe([SecurityEventType::SIGNED_IN]);
+});
+
+it('counts a browser the account has not signed in from for the retention with the other browsers', function () {
+    config(['keystone.retention.known_devices_seconds' => 17 * 24 * 60 * 60]);
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $this->keepCookiesFrom($this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]));
+
+    $this->post(route('logout'));
+    $this->travel(17 * 24 * 60 * 60)->seconds();
+    $owner = $this->switchToFreshBrowser();
+    $this->submitRejectedProofs($support, 'ada@example.com', $this->failedAttemptAllowance());
+    $this->switchBackTo($owner);
+
+    $response = $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $this->assertSignInThrottled($response);
+});
