@@ -104,7 +104,7 @@ An alert is a mail that tells an account's owner something happened to its secur
 ],
 ```
 
-Two of these alert only some of the time. `signed_in` alerts only for a browser the account doesn't know, as [New devices](#new-devices) explains. `limit.tripped` alerts only when a failed-attempt limit trips, never a request limit.
+Two of these alert only some of the time. `signed_in` alerts only for a browser the account doesn't know, as [New devices](#new-devices) explains. `limit.tripped` alerts only when a failed-attempt limit trips, never a request limit. Anyone who knows an address can trip its count on the sign-in page, so an owner can get one of these mails per credential type each hour. Set the slot to `null` if that is more than your users want.
 
 There is no switch that silences every alert at once. To stop one type, set its slot to `null`. Alerts are not de-duplicated, so each event sends its own.
 
