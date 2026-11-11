@@ -29,6 +29,7 @@ Set `log_channel` to the name of a channel in your `logging.php` to send the log
 |---|---|
 | `account.suspended` | An operator suspended the account. |
 | `account.unsuspended` | An operator lifted the account's suspension. |
+| `challenge.abandoned` | A browser that isn't a [known device](#new-devices) passed the account's first factor and never passed the challenge. A [sweep](#abandoned-challenges) records it once the challenge has waited 7 minutes, at the time of the hold and with that request's IP address and user agent, as the `system`. |
 | `credential.added` | A credential was added to the account, such as a second factor enrolled while a sign-in was held at enrollment. |
 | `device_cookie.reused` | A browser signed in with the device cookie of a [known device](#new-devices) whose value a later sign-in replaced, so two browsers may share it. |
 | `limit.tripped` | A rate limit refused its first attempt of the window. The reason names the limit: `keystone.daily_failed_attempt_limit`, `keystone.failed_attempt_limit` or `keystone.request_limit`. |
@@ -53,7 +54,7 @@ Every event has the same fields, whatever its type. There is no free-form metada
 | `occurred_at` | When the event happened, in UTC, whatever your app's timezone is. |
 | `type` | One of the types above. |
 | `user_id` | The account the event is for, or null for an anonymous event. The column has no foreign key, so a removed account's rows keep its id. |
-| `actor` | Who made it happen: `user`, `operator` or `system`. An event an operator command or job records is the operator's. |
+| `actor` | Who made it happen: `user`, `operator` or `system`. An event an operator command or job records is the operator's, and one a scheduled sweep records is the system's. |
 | `flow` | The flow the request was in, `sign-in`, `challenge` or `enrollment`, or null when it was in none, such as signing out. |
 | `credential_type` | The name of the credential type involved, if any. |
 | `credential_id` | The credential involved, if any. A rejection names a credential only when it belongs to the account the attempt named. |
@@ -63,7 +64,7 @@ Every event has the same fields, whatever its type. There is no free-form metada
 | `location` | The address's location, encrypted at rest, when it was looked up. |
 | `user_agent` | The client's user agent, cleaned of invalid UTF-8 and control characters, cut to 512 characters and encrypted at rest. |
 | `known_device` | Whether the browser was a [known device](#new-devices) of the account, on `signed_in`. Null on every other type. |
-| `request_id` | A ULID minted once per request, shared by every event the request records. |
+| `request_id` | A ULID minted once per request, shared by every event the request records. Null on an event a scheduled sweep records. |
 | `operator` | The operator a command or job names, cut to 64 characters with control characters replaced by spaces, or null when no operator acted. |
 
 The `ip_address`, `location` and `user_agent` fields are left out of the model's array form. Read them from the model's attributes when a page needs them.
@@ -82,12 +83,13 @@ Keystone adds one piece of global middleware after the app's trusted-proxy middl
 
 ## Alerts
 
-An alert is a mail that tells an account's owner something happened to its security. Each type of event has a slot in `notifications`: the notification class Keystone sends for that type, or `null` to send none. Today `account.suspended`, `account.unsuspended`, `credential.added`, `device_cookie.reused`, `limit.tripped`, `recovery_code.used`, `sessions.terminated` and `signed_in` alert by default:
+An alert is a mail that tells an account's owner something happened to its security. Each type of event has a slot in `notifications`: the notification class Keystone sends for that type, or `null` to send none. Today `account.suspended`, `account.unsuspended`, `challenge.abandoned`, `credential.added`, `device_cookie.reused`, `limit.tripped`, `recovery_code.used`, `sessions.terminated` and `signed_in` alert by default:
 
 ```php
 'notifications' => [
     'account.suspended' => SecurityAlert::class,
     'account.unsuspended' => SecurityAlert::class,
+    'challenge.abandoned' => SecurityAlert::class,
     'credential.added' => SecurityAlert::class,
     'device_cookie.reused' => SecurityAlert::class,
     'limit.tripped' => SecurityAlert::class,
@@ -106,7 +108,7 @@ An alert is a mail that tells an account's owner something happened to its secur
 
 Two of these alert only some of the time. `signed_in` alerts only for a browser the account doesn't know, as [New devices](#new-devices) explains. `limit.tripped` alerts only when a failed-attempt limit trips, never a request limit. Anyone who knows an address can trip its count on the sign-in page, so an owner can get one of these mails per credential type each hour. Set the slot to `null` if that is more than your users want.
 
-There is no switch that silences every alert at once. To stop one type, set its slot to `null`. Alerts are not de-duplicated, so each event sends its own.
+There is no switch that silences every alert at once. To stop one type, set its slot to `null`. Alerts are not de-duplicated, so each event sends its own, except the abandoned challenges one sweep finds for an account, which share [one mail](#abandoned-challenges).
 
 ### Who gets one
 
@@ -116,7 +118,7 @@ When a change to the account causes the event, Keystone reads the addresses befo
 
 ### What it says
 
-Every default slot is `ClaudioDekker\Keystone\Notifications\SecurityAlert`, which picks a view and translation keys for its type. The mail is plain HTML, with every value escaped and no links. It says what happened and when, in UTC, the IP address of the request that caused it and where that address is, and the device. The mail about a spent recovery code also says how many codes the account has left. It ends with "If this wasn't you, sign in and review your security settings.", except the mail about a suspension, which can't ask its owner to sign in and ends with "If you think this is a mistake, contact the site's administrators." Its wording sits in Keystone's `keystone::alerts` translations.
+Every default slot is `ClaudioDekker\Keystone\Notifications\SecurityAlert`, which picks a view and translation keys for its type. The mail is plain HTML, with every value escaped and no links. It says what happened and when, in UTC, the IP address of the request that caused it and where that address is, and the device. A mail that sums up several events names each IP address and device once, the first five of each, and counts the rest, and gives the time of the first. The mail about a spent recovery code also says how many codes the account has left. It ends with "If this wasn't you, sign in and review your security settings.", except the mail about a suspension, which can't ask its owner to sign in and ends with "If you think this is a mistake, contact the site's administrators." Its wording sits in Keystone's `keystone::alerts` translations.
 
 The device is the platform and browser parsed from the user agent, such as "Chrome on Mac", or "Unknown device". The alert parses the user agent while the request records the event, so the queue carries only the device and never the user agent. It looks the location up later, on the queue worker, while it builds the mail. A lookup during the request would slow down only the requests for accounts that exist, and tell an attacker which addresses have one.
 
@@ -153,9 +155,17 @@ Some sign-ins alert though nothing was copied. A browser that never got the resp
 
 A known device also keeps its own [failed-attempt count](security.md#the-failed-attempt-limit), so failures from other browsers never lock the owner out of a browser they used before.
 
+### Abandoned challenges
+
+Someone who passes an account's first factor and never answers its [challenge](challenge.md) may know its password. When a browser that isn't a known device of the account is held at the challenge, Keystone keeps a row in `user_pending_challenges` with the account, the IP address and the user agent, the last two encrypted. A browser whose device cookie holds a value a later sign-in replaced isn't known here either. Holding the sign-in at enrollment, or from a known device, keeps no row.
+
+Only passing the challenge deletes the row. Cancelling, letting the pending sign-in expire after 15 minutes, or an epoch move that voids it all keep it, so nobody can stop the alert by walking away. A browser that passes the first factor again keeps the row of its first hold and that hold's time.
+
+Every 5 minutes, Keystone runs `keystone:alert-abandoned-challenges` on one server, with no overlap, as the [operator commands](operator-commands.md#abandoned-challenges) page explains. It records `challenge.abandoned` for every row at least 7 minutes old and deletes the rows. Each account gets one mail for all of its own: how many there were, from which IP addresses and on which devices. The 7 minutes are fixed, with no setting. The rows of an account that was deleted go with it, with nothing recorded or mailed.
+
 ### Sending your own
 
-Name your own notification class in a slot to send it in place of Keystone's, or to alert for a type that sends nothing by default. Keystone builds it with the event as its only argument, so its constructor can't ask the container for anything else:
+Name your own notification class in a slot to send it in place of Keystone's, or to alert for a type that sends nothing by default. Keystone builds it with the event as its first argument, so its constructor can't ask the container for anything else. For `challenge.abandoned`, the other events the mail sums up follow as further arguments, which a variadic parameter such as `UserSecurityEvent ...$others` collects:
 
 ```php
 // config/keystone.php
