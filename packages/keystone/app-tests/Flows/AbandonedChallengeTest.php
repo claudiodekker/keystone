@@ -1,5 +1,7 @@
 <?php
 
+use ClaudioDekker\Keystone\Auth\KeystoneUser;
+use ClaudioDekker\Keystone\Jobs\EndSessions;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use Illuminate\Support\Facades\Notification;
@@ -37,3 +39,25 @@ it('sends no alert once the challenge was passed', function () {
     expect($this->sentAlerts())->toBeEmpty()
         ->and($this->securityEvents()->for($user)->where('type', SecurityEventType::CHALLENGE_ABANDONED))->toBeEmpty();
 });
+
+it('still alerts the owner once the pending sign-in was dropped without passing the challenge', function (Closure $drop) {
+    $user = $this->createUser();
+    $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);
+    $this->passFirstFactor($user);
+    $drop($this, $user);
+
+    $this->travel(15)->minutes();
+    $this->artisan('keystone:alert-abandoned-challenges');
+
+    expect($this->sentAlerts()->where('alert.type', SecurityEventType::CHALLENGE_ABANDONED))->toHaveCount(1);
+})->with([
+    'cancelled' => [fn ($test) => $test->delete(route('login.challenge.cancel'))],
+    'expired' => [function ($test) {
+        $test->travel(15)->minutes();
+        $test->get(route('login.challenge'));
+    }],
+    'voided by an epoch move' => [function ($test, KeystoneUser $user) {
+        EndSessions::dispatchSync($user, operator: 'margaret');
+        $test->get(route('login.challenge'));
+    }],
+]);
