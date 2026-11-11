@@ -246,3 +246,25 @@ it('boots with the smallest known-device retention', function () {
 
     expect($this->bootFailures())->toBe([]);
 });
+
+it('refuses a remember-me lifetime that is not zero or a positive integer', function (mixed $value) {
+    config(['keystone.remember.lifetime_seconds' => $value]);
+
+    expect($this->bootFailures())->toBe(['keystone.remember.lifetime_seconds must be zero or a positive integer.']);
+})->with([
+    'negative' => -1,
+    'null' => null,
+    'a numeric string' => '2592000',
+    'a float' => 2592000.5,
+    'false' => false,
+    'a list' => [[2592000]],
+]);
+
+it('boots with remember me off or at its smallest lifetime', function (int $seconds) {
+    config(['keystone.remember.lifetime_seconds' => $seconds]);
+
+    expect($this->bootFailures())->toBe([]);
+})->with([
+    'off' => 0,
+    'one second' => 1,
+]);
