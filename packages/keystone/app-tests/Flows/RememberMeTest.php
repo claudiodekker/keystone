@@ -452,3 +452,29 @@ it('ignores a cookie issued earlier while the remember-me lifetime is zero, and 
     $this->assertAlreadySignedIn($onceBackOn);
     expect($this->securityEvents()->for($user)->where('type', SecurityEventType::REQUEST_REJECTED))->toBeEmpty();
 });
+
+it('forgets the remember-me token of a session demoted because its account newly owes enrollment', function () {
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $signedIn = $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        'remember' => true,
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $this->keepCookiesFrom($signedIn);
+    $remembered = $this->browserWithCopiedCookies();
+    config(['keystone.require_second_factor' => true]);
+    Auth::forgetGuards();
+    $demoted = $this->get(route('login'));
+
+    config(['keystone.require_second_factor' => false]);
+    $this->switchBackTo($remembered);
+
+    $response = $this->get(route('login'));
+
+    $this->assertSignInPage($demoted, ['status' => __('keystone::messages.session-demoted')]);
+    $this->assertSignInPage($response, ['status' => null]);
+});
