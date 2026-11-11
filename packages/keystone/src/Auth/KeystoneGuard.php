@@ -6,6 +6,7 @@ use ClaudioDekker\Keystone\Accounts\CredentialEpoch;
 use ClaudioDekker\Keystone\Exceptions\SessionGuardSignInException;
 use ClaudioDekker\Keystone\Http\EndedSession;
 use ClaudioDekker\Keystone\Http\Middleware\ClearSiteData;
+use ClaudioDekker\Keystone\Models\UserRememberToken;
 use ClaudioDekker\Keystone\SecurityEvents\Recorder;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use ClaudioDekker\Keystone\Session\RememberTokens;
@@ -190,14 +191,28 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Sign the browser back in as the account its live remember-me cookie remembers, and determine if it did.
+     * Sign the browser back in as the account its live remember-me cookie remembers, once a request, and determine if it did.
+     *
+     * A return whose account owes enrollment is refused and its token forgotten, since nothing a session enrolls may rest on an earlier sign-in.
      */
     protected function restore(): bool
     {
+        if ($this->recallAttempted) {
+            return false;
+        }
+
+        $this->recallAttempted = true;
+
         $token = $this->container->make(RememberTokens::class)->find();
         $account = $token === null ? null : $this->provider->retrieveById($token->user_id);
 
         if (! $account instanceof KeystoneUser) {
+            return false;
+        }
+
+        if ($this->container->make(SignInDecision::class)->isOwed($account, Stage::ENROLLMENT)) {
+            $this->refuseOwedReturn($account, $token);
+
             return false;
         }
 
@@ -206,6 +221,19 @@ class KeystoneGuard extends SessionGuard
         $this->state()->restore($account, $token);
 
         return true;
+    }
+
+    /**
+     * Forget the remember-me token of the account that owes enrollment, and send the user to sign in again.
+     */
+    protected function refuseOwedReturn(KeystoneUser $account, UserRememberToken $token): void
+    {
+        $this->container->make(RememberTokens::class)->forget($token->getKey());
+
+        $this->state()->leaveStatus(Status::ENROLLMENT_OWED);
+
+        $recorder = $this->container->make(Recorder::class);
+        $recorder->record(SecurityEventType::REQUEST_REJECTED, account: $account, reason: 'keystone.enrollment_owed');
     }
 
     /**

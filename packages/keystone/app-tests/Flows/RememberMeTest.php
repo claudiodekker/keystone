@@ -169,3 +169,49 @@ it('restores a session past its absolute lifetime silently while the remember-me
     $this->assertSiteDataKept($response);
     expect($this->securityEvents()->for($user)->where('type', SecurityEventType::SESSION_ENDED))->toBeEmpty();
 });
+
+it('refuses a return whose account newly owes enrollment, and sends the user to sign in again', function () {
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $signedIn = $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        'remember' => true,
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $this->keepCookiesFrom($signedIn);
+    $this->switchBackTo($this->browserWithCopiedCookies());
+    config(['keystone.require_second_factor' => true]);
+
+    $response = $this->get(route('login'));
+
+    $this->assertSignInPage($response, ['status' => __('keystone::messages.enrollment-owed')]);
+    expect($this->securityEvents()->for($user)->where('type', SecurityEventType::REQUEST_REJECTED)->pluck('reason')->all())->toBe(['keystone.enrollment_owed']);
+});
+
+it('forgets the remember-me token of a return refused because its account owed enrollment', function () {
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $signedIn = $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        'remember' => true,
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $this->keepCookiesFrom($signedIn);
+    $remembered = $this->browserWithCopiedCookies();
+    $this->switchBackTo($remembered);
+    config(['keystone.require_second_factor' => true]);
+    $this->get(route('login'));
+
+    config(['keystone.require_second_factor' => false]);
+    $this->switchBackTo($remembered);
+
+    $response = $this->get(route('login'));
+
+    $this->assertSignInPage($response, ['status' => null]);
+});
