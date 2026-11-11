@@ -407,3 +407,48 @@ it('remembers a browser that ticked remember me once it saves the recovery codes
 
     $this->assertAlreadySignedIn($response);
 });
+
+it('ignores a ticked box while the remember-me lifetime is zero', function () {
+    config(['keystone.remember.lifetime_seconds' => 0]);
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $signedIn = $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        'remember' => true,
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $this->assertSignedIn($signedIn, '/');
+    expect($signedIn->getCookie('__Host-keystone_remember', decrypt: false))->toBeNull()
+        ->and(UserRememberToken::query()->exists())->toBeFalse();
+});
+
+it('ignores a cookie issued earlier while the remember-me lifetime is zero, and restores from it again once turned back on', function () {
+    $user = $this->createUser();
+    $this->addVerifiedAddress($user, 'ada@example.com');
+    $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
+
+    $signedIn = $this->post(route('login.submit', $support->type()->name()), [
+        'identifier' => 'ada@example.com',
+        'remember' => true,
+        ...$support->validProof(Surface::SIGN_IN, $user),
+    ]);
+
+    $this->keepCookiesFrom($signedIn);
+    $remembered = $this->browserWithCopiedCookies();
+    $lifetime = $this->rememberLifetimeSeconds();
+
+    config(['keystone.remember.lifetime_seconds' => 0]);
+    $this->switchBackTo($remembered);
+    $whileOff = $this->get(route('login'));
+
+    config(['keystone.remember.lifetime_seconds' => $lifetime]);
+    $this->switchBackTo($remembered);
+    $onceBackOn = $this->get(route('login'));
+
+    $this->assertSignInPage($whileOff, ['status' => null]);
+    $this->assertAlreadySignedIn($onceBackOn);
+    expect($this->securityEvents()->for($user)->where('type', SecurityEventType::REQUEST_REJECTED))->toBeEmpty();
+});

@@ -33,6 +33,14 @@ class RememberTokens
     }
 
     /**
+     * Determine if remember me is on, which a lifetime of zero turns off.
+     */
+    public function isOn(): bool
+    {
+        return $this->config->integer('keystone.remember.lifetime_seconds') > 0;
+    }
+
+    /**
      * Hand the browser signing in to the account a remember-me cookie for the lifetime, on the account's credential epoch, and get its token.
      */
     public function issue(KeystoneUser $account): UserRememberToken
@@ -54,12 +62,14 @@ class RememberTokens
 
     /**
      * Get the token of the browser's remember-me cookie while it is live, forgetting a dead one and recording its refusal.
+     *
+     * While remember me is off the cookie is not read, so a cookie issued earlier is left alone.
      */
     public function find(): ?UserRememberToken
     {
         $sent = $this->sentCookie();
 
-        if ($sent === null) {
+        if ($sent === null || ! $this->isOn()) {
             return null;
         }
 

@@ -320,7 +320,7 @@ class Enrollment
         $knownDevice = $this->devices->signIn($account);
         $redirectTo = $this->session->signIn($account);
 
-        if ($pending->remember) {
+        if ($pending->remember && $this->rememberTokens->isOn()) {
             $this->session->keepRememberToken($this->rememberTokens->issue($account));
         }
 

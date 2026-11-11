@@ -82,7 +82,7 @@ class Proofs
         $knownDevice = $this->devices->signIn($account);
         $redirectTo = $this->session->signIn($account);
 
-        if ($remember) {
+        if ($remember && $this->rememberTokens->isOn()) {
             $this->session->keepRememberToken($this->rememberTokens->issue($account));
         }
 
