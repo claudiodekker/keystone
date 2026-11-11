@@ -214,7 +214,7 @@ class AccountChange
     }
 
     /**
-     * End every session of the account and forget the browsers it signed in from, for the operator who asked, alerting the given addresses.
+     * End every session of the account and forget its known devices, for the operator who asked, alerting the given addresses.
      *
      * @param  list<string>  $recipients
      */

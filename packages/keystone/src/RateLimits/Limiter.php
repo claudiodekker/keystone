@@ -228,7 +228,7 @@ class Limiter
     }
 
     /**
-     * Get the key part of where an attempt comes from: the account's known device the browser is, by its id, else the part every other browser shares.
+     * Get the key part of where an attempt comes from: one of its own for a known device of the account, a shared one for every other browser.
      */
     protected function source(?KeystoneUser $account): string
     {

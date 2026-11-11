@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Date;
 class UserKnownDeviceFactory extends Factory
 {
     /**
-     * Get the default state: a device seen just now through a cookie no browser holds, with no labels, known to a new user from the app's factory.
+     * Get the default state of a device an account signed in from just now.
      *
      * @return array<string, mixed>
      */

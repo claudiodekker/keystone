@@ -24,7 +24,7 @@ enum Limit: string
     }
 
     /**
-     * Determine if a trip of the limit alerts the account's owner, which a request limit names no credential to warrant.
+     * Determine if a trip of the limit alerts the account's owner, which only a failed-attempt limit does, since a request limit names no credential.
      */
     public function alertsOwner(): bool
     {
