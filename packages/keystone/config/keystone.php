@@ -102,6 +102,7 @@ return [
     'notifications' => [
         'account.suspended' => SecurityAlert::class,
         'account.unsuspended' => SecurityAlert::class,
+        'challenge.abandoned' => SecurityAlert::class,
         'credential.added' => SecurityAlert::class,
         'device_cookie.reused' => SecurityAlert::class,
         'limit.tripped' => SecurityAlert::class,

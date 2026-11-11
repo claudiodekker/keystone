@@ -4,6 +4,7 @@ namespace ClaudioDekker\Keystone;
 
 use ClaudioDekker\Keystone\Auth\KeystoneGuard;
 use ClaudioDekker\Keystone\Configuration\BootChecks;
+use ClaudioDekker\Keystone\Console\AlertAbandonedChallengesCommand;
 use ClaudioDekker\Keystone\Console\EndSessionsCommand;
 use ClaudioDekker\Keystone\Console\PruneCommand;
 use ClaudioDekker\Keystone\Console\SuspendCommand;
@@ -123,6 +124,7 @@ class KeystoneServiceProvider extends ServiceProvider
 
         if ($this->app->runningInConsole()) {
             $this->commands([
+                AlertAbandonedChallengesCommand::class,
                 EndSessionsCommand::class,
                 PruneCommand::class,
                 SuspendCommand::class,

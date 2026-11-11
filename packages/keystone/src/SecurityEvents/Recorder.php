@@ -2,6 +2,7 @@
 
 namespace ClaudioDekker\Keystone\SecurityEvents;
 
+use Carbon\CarbonImmutable;
 use ClaudioDekker\Keystone\Accounts\AlertRecipients;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Events\SecurityEventRecorded;
@@ -101,8 +102,35 @@ class Recorder
 
         rescue(fn () => $this->log($entry));
         rescue(fn () => $entry->saveQuietly());
-        rescue(fn () => $this->alert($entry, $account, $recipients));
+        rescue(fn () => $this->alert([$entry], $account, $recipients));
         rescue(fn () => $this->events->dispatch(new SecurityEventRecorded($entry)));
+    }
+
+    /**
+     * Record the security event once for each time it happened to the account in an earlier request, and alert about them all at once.
+     *
+     * Each event keeps the time, IP address and user agent of its request, and names the system as its actor, since no request of the user's records it.
+     *
+     * @param  non-empty-list<array{ip_address: string|null, occurred_at: CarbonImmutable, user_agent: string|null}>  $occurrences
+     */
+    public function recordEarlier(SecurityEventType $type, KeystoneUser $account, Surface $surface, array $occurrences): void
+    {
+        if ($this->config->get('keystone.events.enabled') === false) {
+            return;
+        }
+
+        $entries = array_map(fn (array $occurrence) => $this->makeEarlierEntry($type, $account, $surface, $occurrence), $occurrences);
+
+        foreach ($entries as $entry) {
+            rescue(fn () => $this->log($entry));
+            rescue(fn () => $entry->saveQuietly());
+        }
+
+        rescue(fn () => $this->alert($entries, $account, recipients: null));
+
+        foreach ($entries as $entry) {
+            rescue(fn () => $this->events->dispatch(new SecurityEventRecorded($entry)));
+        }
     }
 
     /**
@@ -137,6 +165,22 @@ class Recorder
             'known_device' => $knownDevice,
             'request_id' => $context?->requestId,
             'operator' => $operator === null ? null : $this->operator($operator),
+        ]);
+    }
+
+    /**
+     * Build the entry of an event that happened in an earlier request, with that request's time, IP address and user agent.
+     *
+     * @param  array{ip_address: string|null, occurred_at: CarbonImmutable, user_agent: string|null}  $occurrence
+     */
+    protected function makeEarlierEntry(SecurityEventType $type, KeystoneUser $account, Surface $surface, array $occurrence): UserSecurityEvent
+    {
+        $entry = $this->makeEntry($type, $account, $surface, credentialType: null, credential: null, reason: null, operator: null, knownDevice: null);
+
+        return $entry->forceFill([
+            ...$occurrence,
+            'actor' => Actor::SYSTEM,
+            'request_id' => null,
         ]);
     }
 
@@ -183,22 +227,23 @@ class Recorder
     }
 
     /**
-     * Mail the entry's alert to each recipient, unless its type's slot is null or it came from a known device.
+     * Mail one alert about the entries, all of one type, to each recipient, unless their type's slot is null or the first came from a known device.
      *
+     * @param  non-empty-list<UserSecurityEvent>  $entries
      * @param  list<string>|null  $recipients
      */
-    protected function alert(UserSecurityEvent $entry, KeystoneUser $account, ?array $recipients): void
+    protected function alert(array $entries, KeystoneUser $account, ?array $recipients): void
     {
-        $slot = $this->config->get('keystone.notifications')[$entry->type->value] ?? null;
+        $slot = $this->config->get('keystone.notifications')[$entries[0]->type->value] ?? null;
 
-        if ($slot === null || $entry->known_device === true) {
+        if ($slot === null || $entries[0]->known_device === true) {
             return;
         }
 
         $addresses = $recipients ?? $this->alertRecipients->of($account);
         $notifiables = array_map($this->recipient(...), $addresses);
 
-        $this->notifications->send($notifiables, new $slot($entry));
+        $this->notifications->send($notifiables, new $slot(...$entries));
     }
 
     /**

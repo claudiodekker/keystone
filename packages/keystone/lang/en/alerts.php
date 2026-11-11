@@ -12,6 +12,12 @@ return [
             'summary' => 'An administrator lifted the suspension of your account, so you can sign in again.',
         ],
     ],
+    'challenge' => [
+        'abandoned' => [
+            'subject' => 'Someone got partway into your account',
+            'summary' => "Someone passed the first step of signing in to your account from a browser it doesn't know, and never finished the second.",
+        ],
+    ],
     'credential' => [
         'added' => [
             'subject' => 'A sign-in method was added',
