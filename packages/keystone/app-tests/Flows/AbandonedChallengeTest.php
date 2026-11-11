@@ -61,3 +61,36 @@ it('still alerts the owner once the pending sign-in was dropped without passing 
         $test->get(route('login.challenge'));
     }],
 ]);
+
+it('sends no alert about a challenge left by a browser the account knows', function () {
+    $user = $this->createUser();
+    $support = $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);
+    $this->passFirstFactor($user);
+    $this->keepCookiesFrom($this->answerChallenge($user, $support));
+    $this->post(route('logout'));
+    $this->passFirstFactor($user);
+
+    $this->travel(7)->minutes();
+    $this->artisan('keystone:alert-abandoned-challenges');
+
+    expect($this->sentAlerts()->where('alert.type', SecurityEventType::CHALLENGE_ABANDONED))->toBeEmpty();
+});
+
+it("alerts the owner about a challenge left by a copy of the device cookie that the owner's browser has since replaced", function () {
+    $user = $this->createUser();
+    $support = $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);
+    $this->passFirstFactor($user);
+    $this->keepCookiesFrom($this->answerChallenge($user, $support));
+    $copy = $this->browserWithCopiedCookies();
+    $this->post(route('logout'));
+    $this->travel(5)->minutes();
+    $this->passFirstFactor($user);
+    $this->keepCookiesFrom($this->answerChallenge($user, $support));
+    $this->switchBackTo($copy);
+    $this->passFirstFactor($user);
+
+    $this->travel(7)->minutes();
+    $this->artisan('keystone:alert-abandoned-challenges');
+
+    expect($this->sentAlerts()->where('alert.type', SecurityEventType::CHALLENGE_ABANDONED))->not->toBeEmpty();
+});

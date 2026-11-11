@@ -77,6 +77,14 @@ class KnownDevices
     }
 
     /**
+     * Determine if the browser is a known device of the account, by the whole value of its cookie.
+     */
+    public function isKnown(KeystoneUser $account): bool
+    {
+        return $this->idOf($account) !== null;
+    }
+
+    /**
      * Delete every device no account signed in from within the retention, and get how many.
      */
     public function prune(): int

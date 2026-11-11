@@ -3,6 +3,7 @@
 namespace ClaudioDekker\Keystone\SignIn;
 
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
+use ClaudioDekker\Keystone\Devices\KnownDevices;
 use ClaudioDekker\Keystone\Http\RequestContext;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Models\UserPendingChallenge;
@@ -25,6 +26,7 @@ class PendingChallenges
      * Create the pending challenges.
      */
     public function __construct(
+        protected KnownDevices $devices,
         protected Recorder $recorder,
         protected Request $request,
     ) {
@@ -32,10 +34,14 @@ class PendingChallenges
     }
 
     /**
-     * Keep the account's sign-in held at the challenge by the browser, until the challenge is passed.
+     * Keep the account's sign-in held at the challenge by the browser, until the challenge is passed, unless the browser is a known device.
      */
     public function hold(KeystoneUser $account): void
     {
+        if ($this->devices->isKnown($account)) {
+            return;
+        }
+
         $context = RequestContext::of($this->request);
 
         $challenge = new UserPendingChallenge;
