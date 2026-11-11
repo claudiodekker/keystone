@@ -191,3 +191,20 @@ it('sends no alert once the browser signed in to the account without owing the c
     expect($this->sentAlerts())->toBeEmpty()
         ->and($this->securityEvents()->for($user)->where('type', SecurityEventType::CHALLENGE_ABANDONED))->toBeEmpty();
 });
+
+it('sends no alert once the browser signed in to the account through enrollment instead of the challenge', function () {
+    config(['keystone.notifications.signed_in' => null, 'keystone.require_recovery_codes' => true]);
+    $user = $this->createUser();
+    $support = $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);
+    $this->passFirstFactor($user);
+    $this->removeCredentials($user, $support);
+    $this->passFirstFactor($user);
+    $codes = $this->shownRecoveryCodes($this->get(route('login.enrollment')));
+    $this->post(route('login.enrollment.submit', 'recovery-code'), ['recovery_code' => $codes[4]]);
+
+    $this->travel(7)->minutes();
+    $this->artisan('keystone:alert-abandoned-challenges');
+
+    $this->assertAuthenticated();
+    expect($this->securityEvents()->for($user)->where('type', SecurityEventType::CHALLENGE_ABANDONED))->toBeEmpty();
+});

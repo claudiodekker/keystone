@@ -45,6 +45,7 @@ class Enrollment
         protected KnownDevices $devices,
         protected Holdings $holdings,
         protected Limiter $limiter,
+        protected PendingChallenges $pendingChallenges,
         protected Proofs $proofs,
         protected RecoveryCodeType $recoveryCodeType,
         protected Recorder $recorder,
@@ -316,6 +317,8 @@ class Enrollment
     {
         $knownDevice = $this->devices->signIn($account);
         $redirectTo = $this->session->signIn($account);
+
+        $this->pendingChallenges->forget($account);
 
         $this->recorder->record(
             SecurityEventType::SIGNED_IN,
