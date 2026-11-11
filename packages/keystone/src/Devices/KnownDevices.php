@@ -41,8 +41,7 @@ class KnownDevices
      */
     public function signIn(KeystoneUser $account): bool
     {
-        $value = $this->request->cookie(DeviceCookie::NAME);
-        $sent = DeviceCookie::fromValue(is_string($value) ? $value : null);
+        $sent = $this->sentCookie();
         $fresh = $sent?->rekeyed() ?? DeviceCookie::generate();
         $device = $sent === null ? null : $this->deviceOf($account, $sent);
 
@@ -55,6 +54,36 @@ class KnownDevices
         }
 
         return $device !== null;
+    }
+
+    /**
+     * Get the id of the account's known device the browser is, by the whole value of its cookie, or null when it is none.
+     *
+     * A browser holding a value a later sign-in replaced is none, so a copy of a cookie never shares its owner's failed attempts.
+     */
+    public function idOf(KeystoneUser $account): int|string|null
+    {
+        $sent = $this->sentCookie();
+
+        if ($sent === null) {
+            return null;
+        }
+
+        return UserKnownDevice::query()
+            ->where('user_id', $account->getAuthIdentifier())
+            ->where('digest', $sent->digest())
+            ->where('last_seen_at', '>', $this->seenSince())
+            ->value('id');
+    }
+
+    /**
+     * Get the device cookie the browser sent, or null when it sent none Keystone could have handed out.
+     */
+    protected function sentCookie(): ?DeviceCookie
+    {
+        $value = $this->request->cookie(DeviceCookie::NAME);
+
+        return DeviceCookie::fromValue(is_string($value) ? $value : null);
     }
 
     /**
