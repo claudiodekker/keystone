@@ -82,6 +82,7 @@ class Proofs
             surface: $answer->surface,
             credentialType: $answer->type,
             credential: $answer->credential()?->getKey(),
+            knownDevice: false,
         );
 
         $this->rehash($account, $answer);

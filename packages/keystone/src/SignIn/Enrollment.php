@@ -319,6 +319,7 @@ class Enrollment
             account: $account,
             surface: Surface::ENROLLMENT,
             credentialType: $type,
+            knownDevice: false,
         );
 
         return new SignedIn($redirectTo);

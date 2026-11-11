@@ -56,7 +56,7 @@ it('refuses a notification class that the event alone cannot build', function (s
 ]);
 
 it('refuses SecurityAlert for a type it has no mail for', function () {
-    config(['keystone.notifications' => [...config('keystone.notifications'), 'signed_in' => SecurityAlert::class]]);
+    config(['keystone.notifications' => [...config('keystone.notifications'), 'signed_out' => SecurityAlert::class]]);
 
-    expect($this->bootFailures())->toBe(["keystone.notifications.signed_in names SecurityAlert, which has no mail for that type. Name a notification class of the app's own."]);
+    expect($this->bootFailures())->toBe(["keystone.notifications.signed_out names SecurityAlert, which has no mail for that type. Name a notification class of the app's own."]);
 });

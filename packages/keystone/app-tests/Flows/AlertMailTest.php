@@ -65,6 +65,7 @@ it('says the device is unknown, and names the IP address alone, when neither is 
 });
 
 it('says how many recovery codes the account has left once one was spent', function () {
+    config(['keystone.notifications.signed_in' => null]);
     $user = $this->createUser();
     $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);
     $codes = (new RecoveryCodeSupport)->arrangeCredential(Surface::CHALLENGE, $user);

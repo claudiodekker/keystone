@@ -36,6 +36,10 @@ return [
             'summary' => 'An administrator signed your account out of every session.',
         ],
     ],
+    'signed_in' => [
+        'subject' => 'New sign-in to your account',
+        'summary' => "Your account was signed in to from a browser it hasn't used before.",
+    ],
     'unknown-device' => 'Unknown device',
     'when' => 'When: :time UTC',
 ];

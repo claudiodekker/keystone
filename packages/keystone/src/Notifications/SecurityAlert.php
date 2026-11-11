@@ -35,6 +35,7 @@ class SecurityAlert extends Notification implements ShouldBeEncrypted, ShouldQue
         'credential.added' => 'keystone::alerts.credential.added',
         'recovery_code.used' => 'keystone::alerts.recovery_code.used',
         'sessions.terminated' => 'keystone::alerts.sessions.terminated',
+        'signed_in' => 'keystone::alerts.signed_in',
     ];
 
     /**

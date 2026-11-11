@@ -112,7 +112,7 @@ return [
         'sessions.terminated' => SecurityAlert::class,
         'sign_in.held' => null,
         'sign_in.voided' => null,
-        'signed_in' => null,
+        'signed_in' => SecurityAlert::class,
         'signed_out' => null,
     ],
 

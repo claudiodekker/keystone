@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Notification;
 
 it('signs the held user in with one of their recovery codes, alerting the owner with the codes left', function () {
     Notification::fake();
+    config(['keystone.notifications.signed_in' => null]);
     $user = $this->createUser();
     $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);
     $codes = (new RecoveryCodeSupport)->arrangeCredential(Surface::CHALLENGE, $user);
