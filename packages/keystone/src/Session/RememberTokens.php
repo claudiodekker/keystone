@@ -128,6 +128,16 @@ class RememberTokens
     }
 
     /**
+     * Delete every token whose lifetime has passed, and get how many.
+     */
+    public function prune(): int
+    {
+        return UserRememberToken::query()
+            ->where('expires_at', '<=', Date::now())
+            ->delete();
+    }
+
+    /**
      * Get the remember-me cookie the browser sent, or null when it sent none Keystone could have handed out.
      */
     protected function sentCookie(): ?RememberCookie

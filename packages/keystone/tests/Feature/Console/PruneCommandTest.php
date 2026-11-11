@@ -3,6 +3,7 @@
 // Unpublished command: what keystone:prune deletes, and the schedule core gives it, which no app changes.
 
 use ClaudioDekker\Keystone\Models\UserKnownDevice;
+use ClaudioDekker\Keystone\Models\UserRememberToken;
 use Illuminate\Console\Scheduling\Event;
 use Illuminate\Console\Scheduling\Schedule;
 
@@ -15,6 +16,16 @@ it('deletes the known devices no account signed in from for the retention, and k
 
     $this->assertModelMissing($stale);
     $this->assertModelExists($recent);
+});
+
+it('deletes the remember-me tokens whose lifetime has passed, and keeps the rest', function () {
+    $expired = UserRememberToken::factory()->create(['expires_at' => now()]);
+    $live = UserRememberToken::factory()->create(['expires_at' => now()->addSecond()]);
+
+    $this->artisan('keystone:prune')->assertSuccessful();
+
+    $this->assertModelMissing($expired);
+    $this->assertModelExists($live);
 });
 
 it('runs every night on one server, with nothing for the app to register', function () {
