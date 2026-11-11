@@ -59,14 +59,15 @@ it('records a challenge held exactly 7 minutes ago, and leaves one held a second
     expect(UserSecurityEvent::query()->pluck('user_id')->all())->toBe([$due->user_id]);
 });
 
-it('runs every 5 minutes on one server, never overlapping itself, with nothing for the app to register', function () {
+it('runs every 5 minutes on one server, never overlapping itself for more than 10 minutes, with nothing for the app to register', function () {
     $events = collect(app(Schedule::class)->events())
         ->filter(fn (Event $event) => str_contains($event->command, 'keystone:alert-abandoned-challenges'));
 
     expect($events)->toHaveCount(1)
         ->and($events->first()->expression)->toBe('*/5 * * * *')
         ->and($events->first()->onOneServer)->toBeTrue()
-        ->and($events->first()->withoutOverlapping)->toBeTrue();
+        ->and($events->first()->withoutOverlapping)->toBeTrue()
+        ->and($events->first()->expiresAt)->toBe(10);
 });
 
 it("records each of an account's abandoned challenges, and alerts its owner once about all of them", function () {

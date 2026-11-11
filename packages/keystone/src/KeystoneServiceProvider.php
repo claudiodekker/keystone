@@ -236,11 +236,13 @@ class KeystoneServiceProvider extends ServiceProvider
 
     /**
      * Schedule core's maintenance commands, each on one server, so the app registers nothing.
+     *
+     * The sweep's overlap lock lasts 10 minutes rather than the scheduler's day, so a sweep that died holding it delays the alerts by one run.
      */
     protected function schedule(): void
     {
         $this->callAfterResolving(Schedule::class, function (Schedule $schedule) {
-            $schedule->command(AlertAbandonedChallengesCommand::class)->everyFiveMinutes()->onOneServer()->withoutOverlapping();
+            $schedule->command(AlertAbandonedChallengesCommand::class)->everyFiveMinutes()->onOneServer()->withoutOverlapping(expiresAt: 10);
             $schedule->command(PruneCommand::class)->daily()->onOneServer();
         });
     }

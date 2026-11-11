@@ -151,4 +151,4 @@ Run it by hand at any time:
 
     php artisan keystone:alert-abandoned-challenges
 
-It records `challenge.abandoned` for every challenge left 7 minutes or more, sends each account one alert about all of its own, and deletes them. A late run sends the alert late, and a missed run leaves the rows for the next.
+It records `challenge.abandoned` for every challenge left 7 minutes or more, sends each account one alert about all of its own, and deletes them. A late run sends the alert late, and a missed run leaves the rows for the next. A run that died without releasing its overlap lock holds the next ones off for at most 10 minutes.

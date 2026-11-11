@@ -136,7 +136,7 @@ A browser an account signed in from within the retention, recognised by the `__H
 
 ## Pending challenge
 
-A sign-in held at the challenge from a browser that isn't a known device of its account, kept as a row until the browser passes the challenge. Cancelling, expiry and an epoch move keep it, and a browser that holds the account's sign-in again keeps its first one. Once it has waited 7 minutes, a sweep every 5 minutes records it as `challenge.abandoned`, alerts the owner once about all of the account's, and deletes it.
+A sign-in held at the challenge from a browser that isn't a known device of its account, kept as a row until the browser passes the challenge or signs in to the account without it. Cancelling, expiry and an epoch move keep it, and a browser that holds the account's sign-in again keeps its first one. Once it has waited 7 minutes, a sweep every 5 minutes records it as `challenge.abandoned`, alerts the owner once about all of the account's, and deletes it.
 
 ## Slot
 

@@ -29,7 +29,7 @@ Set `log_channel` to the name of a channel in your `logging.php` to send the log
 |---|---|
 | `account.suspended` | An operator suspended the account. |
 | `account.unsuspended` | An operator lifted the account's suspension. |
-| `challenge.abandoned` | A browser that isn't a [known device](#new-devices) passed the account's first factor and never passed the challenge. A [sweep](#abandoned-challenges) records it once the challenge has waited 7 minutes, at the time of the hold and with that request's IP address and user agent, as the `system`. |
+| `challenge.abandoned` | A browser that isn't a [known device](#new-devices) passed the account's first factor and never passed the challenge or signed in. A [sweep](#abandoned-challenges) records it once the challenge has waited 7 minutes, at the time of the hold and with that request's IP address and user agent, as the `system`. |
 | `credential.added` | A credential was added to the account, such as a second factor enrolled while a sign-in was held at enrollment. |
 | `device_cookie.reused` | A browser signed in with the device cookie of a [known device](#new-devices) whose value a later sign-in replaced, so two browsers may share it. |
 | `limit.tripped` | A rate limit refused its first attempt of the window. The reason names the limit: `keystone.daily_failed_attempt_limit`, `keystone.failed_attempt_limit` or `keystone.request_limit`. |
@@ -159,7 +159,7 @@ A known device also keeps its own [failed-attempt count](security.md#the-failed-
 
 Someone who passes an account's first factor and never answers its [challenge](challenge.md) may know its password. When a browser that isn't a known device of the account is held at the challenge, Keystone keeps a row in `user_pending_challenges` with the account, the IP address and the user agent, the last two encrypted. A browser whose device cookie holds a value a later sign-in replaced isn't known here either. Holding the sign-in at enrollment, or from a known device, keeps no row.
 
-Only passing the challenge deletes the row. Cancelling, letting the pending sign-in expire after 15 minutes, or an epoch move that voids it all keep it, so nobody can stop the alert by walking away. A browser that passes the first factor again keeps the row of its first hold and that hold's time.
+Only passing the challenge deletes the row, or signing in to the account from that browser without it, once the account no longer owes the challenge. Cancelling, letting the pending sign-in expire after 15 minutes, or an epoch move that voids it all keep it, so nobody can stop the alert by walking away. A browser that passes the first factor again keeps the row of its first hold and that hold's time.
 
 Every 5 minutes, Keystone runs `keystone:alert-abandoned-challenges` on one server, with no overlap, as the [operator commands](operator-commands.md#abandoned-challenges) page explains. It records `challenge.abandoned` for every row at least 7 minutes old and deletes the rows. Each account gets one mail for all of its own: how many there were, from which IP addresses and on which devices. The 7 minutes are fixed, with no setting. The rows of an account that was deleted go with it, with nothing recorded or mailed.
 
