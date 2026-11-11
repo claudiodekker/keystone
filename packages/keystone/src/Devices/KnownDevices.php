@@ -37,7 +37,7 @@ class KnownDevices
      * Hand the browser signing in to the account a fresh device cookie, and determine if the account knew the browser.
      *
      * Every account that knew the browser's old cookie knows the fresh one, so a copy of the old one matches nothing once this sign-in is done.
-     * A cookie of a device the account knew whose value a later sign-in replaced comes from one of two browsers sharing it, which is recorded.
+     * A cookie whose value a later sign-in replaced means two browsers share it, which is recorded.
      */
     public function signIn(KeystoneUser $account): bool
     {
@@ -77,7 +77,7 @@ class KnownDevices
     }
 
     /**
-     * Delete every device no account signed in from within the retention, which no sign-in counts as known any more, and get how many.
+     * Delete every device no account signed in from within the retention, and get how many.
      */
     public function prune(): int
     {
@@ -98,6 +98,8 @@ class KnownDevices
 
     /**
      * Move every account that knew the sent cookie to the fresh one, and record the account's sign-in from the device.
+     *
+     * The upsert lets two sign-ins sent at once from one new browser both finish, and its values are cast first, since an upsert skips the model's casts.
      */
     protected function rekey(KeystoneUser $account, ?DeviceCookie $sent, DeviceCookie $fresh): void
     {
@@ -109,19 +111,20 @@ class KnownDevices
                 ->update(['digest' => $fresh->digest()]);
         }
 
-        $device = UserKnownDevice::query()
-            ->where('user_id', $account->getAuthIdentifier())
-            ->where('device_digest', $fresh->deviceDigest())
-            ->firstOrNew();
-
-        $device->forceFill([
+        $device = (new UserKnownDevice)->forceFill([
             'user_id' => $account->getAuthIdentifier(),
             'digest' => $fresh->digest(),
             'device_digest' => $fresh->deviceDigest(),
             'ip_address' => $context?->ipAddress,
             'user_agent' => $context?->userAgent,
             'last_seen_at' => Date::now(),
-        ])->save();
+        ]);
+
+        UserKnownDevice::query()->upsert(
+            [$device->getAttributes()],
+            uniqueBy: ['user_id', 'device_digest'],
+            update: ['digest', 'ip_address', 'user_agent', 'last_seen_at', 'updated_at'],
+        );
     }
 
     /**
@@ -147,7 +150,7 @@ class KnownDevices
     }
 
     /**
-     * Make the cookie the browser keeps for the retention: host-only, sent only over HTTPS, hidden from scripts, and kept off cross-site requests.
+     * Make the cookie the browser keeps for the retention, out of reach of scripts and other sites.
      */
     protected function makeCookie(DeviceCookie $cookie): Cookie
     {

@@ -1,9 +1,10 @@
 <?php
 
 use ClaudioDekker\Keystone\Methods\Surface;
-use ClaudioDekker\Keystone\Models\UserKnownDevice;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Notification;
 
@@ -11,6 +12,10 @@ beforeEach(function () {
     $this->withoutEnrollmentMandates();
 
     Notification::fake();
+});
+
+afterEach(function () {
+    Model::encryptUsing(null);
 });
 
 it('knows the browser whose sign-in the challenge completed', function () {
@@ -53,7 +58,9 @@ it('leaves the browser signed out when the device it signs in from cannot be wri
     $user = $this->createUser();
     $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
-    UserKnownDevice::saving(fn () => throw new RuntimeException('The disk is full.'));
+    $encrypter = Mockery::mock(Crypt::getFacadeRoot())->makePartial();
+    $encrypter->shouldReceive('encrypt')->once()->andThrow(new RuntimeException('The encryption key is lost.'));
+    Model::encryptUsing($encrypter);
 
     $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada@example.com',
@@ -65,5 +72,5 @@ it('leaves the browser signed out when the device it signs in from cannot be wri
 
     $this->assertSignInPage($next, ['status' => null]);
     expect($this->securityEvents()->for($user)->where('type', SecurityEventType::SIGNED_IN))->toBeEmpty();
-    Exceptions::assertReported(fn (RuntimeException $exception) => $exception->getMessage() === 'The disk is full.');
+    Exceptions::assertReported(fn (RuntimeException $exception) => $exception->getMessage() === 'The encryption key is lost.');
 });
