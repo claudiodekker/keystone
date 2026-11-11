@@ -6,6 +6,8 @@ use Carbon\CarbonImmutable;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Http\RequestContext;
 use ClaudioDekker\Keystone\Models\UserKnownDevice;
+use ClaudioDekker\Keystone\SecurityEvents\Recorder;
+use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Contracts\Cookie\QueueingFactory as CookieJar;
 use Illuminate\Database\Connection;
@@ -25,6 +27,7 @@ class KnownDevices
         protected Config $config,
         protected Connection $connection,
         protected CookieJar $cookies,
+        protected Recorder $recorder,
         protected Request $request,
     ) {
         //
@@ -34,26 +37,31 @@ class KnownDevices
      * Hand the browser signing in to the account a fresh device cookie, and determine if the account knew the browser.
      *
      * Every account that knew the browser's old cookie knows the fresh one, so a copy of the old one matches nothing once this sign-in is done.
+     * A cookie of a device the account knew whose value a later sign-in replaced comes from one of two browsers sharing it, which is recorded.
      */
     public function signIn(KeystoneUser $account): bool
     {
         $value = $this->request->cookie(DeviceCookie::NAME);
         $sent = DeviceCookie::fromValue(is_string($value) ? $value : null);
         $fresh = $sent?->rekeyed() ?? DeviceCookie::generate();
+        $device = $sent === null ? null : $this->deviceOf($account, $sent);
 
-        $known = $this->connection->transaction(fn () => $this->rekey($account, $sent, $fresh));
+        $this->connection->transaction(fn () => $this->rekey($account, $sent, $fresh));
 
         $this->cookies->queue($this->makeCookie($fresh));
 
-        return $known;
+        if ($device !== null && ! hash_equals($device->digest, $sent->digest())) {
+            $this->recorder->record(SecurityEventType::DEVICE_COOKIE_REUSED, account: $account);
+        }
+
+        return $device !== null;
     }
 
     /**
-     * Move every account that knew the sent cookie to the fresh one, record the account's sign-in from the device, and determine if the account knew it.
+     * Move every account that knew the sent cookie to the fresh one, and record the account's sign-in from the device.
      */
-    protected function rekey(KeystoneUser $account, ?DeviceCookie $sent, DeviceCookie $fresh): bool
+    protected function rekey(KeystoneUser $account, ?DeviceCookie $sent, DeviceCookie $fresh): void
     {
-        $known = $sent !== null && $this->knows($account, $sent);
         $context = RequestContext::of($this->request);
 
         if ($sent !== null) {
@@ -75,20 +83,18 @@ class KnownDevices
             'user_agent' => $context?->userAgent,
             'last_seen_at' => Date::now(),
         ])->save();
-
-        return $known;
     }
 
     /**
-     * Determine if the account signed in with the cookie within the retention.
+     * Get the account's device the cookie names, whatever its value, if the account signed in from it within the retention.
      */
-    protected function knows(KeystoneUser $account, DeviceCookie $cookie): bool
+    protected function deviceOf(KeystoneUser $account, DeviceCookie $cookie): ?UserKnownDevice
     {
         return UserKnownDevice::query()
             ->where('user_id', $account->getAuthIdentifier())
-            ->where('digest', $cookie->digest())
+            ->where('device_digest', $cookie->deviceDigest())
             ->where('last_seen_at', '>', $this->seenSince())
-            ->exists();
+            ->first();
     }
 
     /**

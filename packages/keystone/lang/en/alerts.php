@@ -19,6 +19,12 @@ return [
         ],
     ],
     'device' => 'Device: :device',
+    'device_cookie' => [
+        'reused' => [
+            'subject' => 'A copy of a browser you use may have signed in',
+            'summary' => "Your account was signed in to from a browser holding a copy of what another browser you signed in from keeps. Either browser could be someone else's.",
+        ],
+    ],
     'device-name' => ':browser on :platform',
     'if-not-you' => "If this wasn't you, sign in and review your security settings.",
     'ip-address' => 'IP address: :ip_address',
