@@ -9,6 +9,7 @@ use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Models\UserPendingChallenge;
 use ClaudioDekker\Keystone\SecurityEvents\Recorder;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
+use ClaudioDekker\Keystone\Session\SessionState;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Date;
 
@@ -29,6 +30,7 @@ class PendingChallenges
         protected KnownDevices $devices,
         protected Recorder $recorder,
         protected Request $request,
+        protected SessionState $session,
     ) {
         //
     }
@@ -51,16 +53,20 @@ class PendingChallenges
             'ip_address' => $context?->ipAddress,
             'user_agent' => $context?->userAgent,
         ])->save();
+
+        $this->session->keepPendingChallenge($challenge->getKey());
     }
 
     /**
-     * Forget the account's pending challenge once the browser passed it.
+     * Forget the pending challenge the browser left once it passed the challenge.
      */
     public function pass(KeystoneUser $account): void
     {
         UserPendingChallenge::query()
-            ->where('user_id', $account->getAuthIdentifier())
+            ->whereKey($this->session->pendingChallenge())
             ->delete();
+
+        $this->session->forgetPendingChallenge();
     }
 
     /**

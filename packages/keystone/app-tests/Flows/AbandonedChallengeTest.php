@@ -94,3 +94,21 @@ it("alerts the owner about a challenge left by a copy of the device cookie that 
 
     expect($this->sentAlerts()->where('alert.type', SecurityEventType::CHALLENGE_ABANDONED))->not->toBeEmpty();
 });
+
+it('still alerts the owner about a challenge left by one browser once another browser passed its own', function () {
+    config(['keystone.notifications.signed_in' => null]);
+    $user = $this->createUser();
+    $support = $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);
+    $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.23'])->passFirstFactor($user);
+    $this->switchToFreshBrowser();
+    $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.9'])->passFirstFactor($user);
+    $this->answerChallenge($user, $support);
+
+    $this->travel(7)->minutes();
+    $this->artisan('keystone:alert-abandoned-challenges');
+
+    $abandoned = $this->securityEvents()->for($user)->where('type', SecurityEventType::CHALLENGE_ABANDONED);
+
+    expect($this->sentAlerts()->pluck('alert.type')->unique()->all())->toBe([SecurityEventType::CHALLENGE_ABANDONED])
+        ->and($abandoned->pluck('ip_address')->all())->toBe(['198.51.100.23']);
+});
