@@ -9,6 +9,7 @@ use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\StartsCeremony;
 use ClaudioDekker\Keystone\Methods\Surface;
+use ClaudioDekker\Keystone\Models\UserRememberToken;
 use ClaudioDekker\Keystone\Status;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Contracts\Config\Repository as Config;
@@ -56,6 +57,11 @@ class SessionState
     protected const string PENDING_CHALLENGE = 'keystone.pending_challenge';
 
     /**
+     * The session key that holds the id of the remember-me token the session issued or restored from.
+     */
+    protected const string REMEMBER_TOKEN = 'keystone.remember_token';
+
+    /**
      * How long a ceremony lasts after its start, in seconds.
      */
     protected const int CEREMONY_LIFETIME_SECONDS = 10 * 60;
@@ -70,6 +76,7 @@ class SessionState
         protected Dispatcher $events,
         protected Config $config,
         protected Encrypter $encrypter,
+        protected RememberTokens $rememberTokens,
     ) {
         //
     }
@@ -308,22 +315,36 @@ class SessionState
     }
 
     /**
-     * Restore the full sign-in of the account a remember-me cookie remembers, on a fresh session id.
+     * Restore the full sign-in of the account the remember-me token remembers, on a fresh session id.
      */
-    public function restore(KeystoneUser $account): void
+    public function restore(KeystoneUser $account, UserRememberToken $token): void
     {
         $this->changeAuthLevel();
         $this->enter($account, remember: true);
+        $this->keepRememberToken($token);
     }
 
     /**
-     * End the session and leave the signed-out status for the sign-in page, and get who was signed in, if anyone.
+     * Remember the remember-me token the session issued, so signing out forgets it.
+     */
+    public function keepRememberToken(UserRememberToken $token): void
+    {
+        $this->session->put(static::REMEMBER_TOKEN, $token->getKey());
+    }
+
+    /**
+     * End the session, forget its remember-me token and leave the signed-out status for the sign-in page, and get who was signed in, if anyone.
      */
     public function signOut(): ?KeystoneUser
     {
         $account = $this->account();
+        $token = $this->session->get(static::REMEMBER_TOKEN);
 
         Keystone::guard()->logout();
+
+        if (is_int($token) || is_string($token)) {
+            $this->rememberTokens->forget($token);
+        }
 
         $this->leaveStatus(Status::SIGNED_OUT);
 

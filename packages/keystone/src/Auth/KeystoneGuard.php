@@ -190,19 +190,20 @@ class KeystoneGuard extends SessionGuard
     }
 
     /**
-     * Sign the browser back in as the account its remember-me cookie remembers, if any.
+     * Sign the browser back in as the account its live remember-me cookie remembers, if any.
      */
     protected function restore(): void
     {
-        $account = $this->container->make(RememberTokens::class)->account();
+        $token = $this->container->make(RememberTokens::class)->find();
+        $account = $token === null ? null : $this->provider->retrieveById($token->user_id);
 
-        if ($account === null) {
+        if (! $account instanceof KeystoneUser) {
             return;
         }
 
         $this->viaRemember = true;
 
-        $this->state()->restore($account);
+        $this->state()->restore($account, $token);
     }
 
     /**
