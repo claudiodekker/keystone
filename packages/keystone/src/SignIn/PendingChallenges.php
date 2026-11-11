@@ -2,10 +2,13 @@
 
 namespace ClaudioDekker\Keystone\SignIn;
 
+use ClaudioDekker\Keystone\Auth\KeystoneUser;
+use ClaudioDekker\Keystone\Http\RequestContext;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Models\UserPendingChallenge;
 use ClaudioDekker\Keystone\SecurityEvents\Recorder;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Date;
 
 /**
@@ -23,8 +26,25 @@ class PendingChallenges
      */
     public function __construct(
         protected Recorder $recorder,
+        protected Request $request,
     ) {
         //
+    }
+
+    /**
+     * Keep the account's sign-in held at the challenge by the browser, until the challenge is passed.
+     */
+    public function hold(KeystoneUser $account): void
+    {
+        $context = RequestContext::of($this->request);
+
+        $challenge = new UserPendingChallenge;
+
+        $challenge->forceFill([
+            'user_id' => $account->getAuthIdentifier(),
+            'ip_address' => $context?->ipAddress,
+            'user_agent' => $context?->userAgent,
+        ])->save();
     }
 
     /**

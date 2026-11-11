@@ -34,6 +34,7 @@ class Proofs
         protected AccountChanges $accountChanges,
         protected KnownDevices $devices,
         protected Limiter $limiter,
+        protected PendingChallenges $pendingChallenges,
         protected Recorder $recorder,
         protected SessionState $session,
     ) {
@@ -103,6 +104,10 @@ class Proofs
         }
 
         $this->session->hold($account, $answer->type, $stage);
+
+        if ($stage === Stage::CHALLENGE) {
+            $this->pendingChallenges->hold($account);
+        }
 
         $this->recorder->record(
             SecurityEventType::SIGN_IN_HELD,
