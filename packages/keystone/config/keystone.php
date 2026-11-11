@@ -140,6 +140,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Remember Me
+    |--------------------------------------------------------------------------
+    |
+    | How many seconds a browser that ticked remember me stays signed in,
+    | counted from that sign-in, however often it comes back. Zero hides
+    | the box and turns remember me off, ignoring cookies issued before.
+    |
+    */
+
+    'remember' => [
+        'lifetime_seconds' => 60 * 60 * 24 * 30,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Require Recovery Codes
     |--------------------------------------------------------------------------
     |

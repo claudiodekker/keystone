@@ -8,6 +8,7 @@ use ClaudioDekker\Keystone\Http\EndedSession;
 use ClaudioDekker\Keystone\Http\Middleware\ClearSiteData;
 use ClaudioDekker\Keystone\SecurityEvents\Recorder;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
+use ClaudioDekker\Keystone\Session\RememberTokens;
 use ClaudioDekker\Keystone\Session\SessionState;
 use ClaudioDekker\Keystone\Session\Stage;
 use ClaudioDekker\Keystone\SignIn\SignInDecision;
@@ -60,6 +61,10 @@ class KeystoneGuard extends SessionGuard
 
         if ($this->namesUnreadUser()) {
             $this->readUser();
+        }
+
+        if ($this->isGuest()) {
+            $this->restore();
         }
 
         return parent::user();
@@ -172,6 +177,32 @@ class KeystoneGuard extends SessionGuard
         return ! $this->loggedOut
             && $this->user === null
             && $this->session->has($this->getName());
+    }
+
+    /**
+     * Determine if the session names no user, unless this request already set or signed one out.
+     */
+    protected function isGuest(): bool
+    {
+        return ! $this->loggedOut
+            && $this->user === null
+            && ! $this->session->has($this->getName());
+    }
+
+    /**
+     * Sign the browser back in as the account its remember-me cookie remembers, if any.
+     */
+    protected function restore(): void
+    {
+        $account = $this->container->make(RememberTokens::class)->account();
+
+        if ($account === null) {
+            return;
+        }
+
+        $this->viaRemember = true;
+
+        $this->state()->restore($account);
     }
 
     /**

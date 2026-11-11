@@ -308,6 +308,15 @@ class SessionState
     }
 
     /**
+     * Restore the full sign-in of the account a remember-me cookie remembers, on a fresh session id.
+     */
+    public function restore(KeystoneUser $account): void
+    {
+        $this->changeAuthLevel();
+        $this->enter($account, remember: true);
+    }
+
+    /**
      * End the session and leave the signed-out status for the sign-in page, and get who was signed in, if anyone.
      */
     public function signOut(): ?KeystoneUser
@@ -384,7 +393,7 @@ class SessionState
     /**
      * Stamp the sign-in time and the account's credential epoch, and put the account on the guard's session key and on the guard for the rest of the request.
      */
-    protected function enter(KeystoneUser $account): void
+    protected function enter(KeystoneUser $account, bool $remember = false): void
     {
         $guard = Keystone::guard();
 
@@ -393,7 +402,7 @@ class SessionState
         $this->session->put(static::EPOCH, CredentialEpoch::of($account->getAuthIdentifier()));
         $guard->setUser($account);
 
-        $this->events->dispatch(new Login($guard->getName(), $account, false));
+        $this->events->dispatch(new Login($guard->getName(), $account, $remember));
     }
 
     /**

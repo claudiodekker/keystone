@@ -31,19 +31,19 @@ class SignIn
     }
 
     /**
-     * Attempt to sign in with the type and the submitted input.
+     * Attempt to sign in with the type and the submitted input, remembering the browser once signed in when asked.
      *
      * @param  array<string, mixed>  $input
      *
      * @throws ThrottledException
      * @throws ValidationException
      */
-    public function attempt(CredentialType $type, array $input): SignedIn|Held|Refused
+    public function attempt(CredentialType $type, array $input, bool $remember = false): SignedIn|Held|Refused
     {
         $validated = $this->validate($type, $input);
 
         return $this->floor->hold(
-            fn () => $this->prove($type, $validated),
+            fn () => $this->prove($type, $validated, $remember),
             fn (SignedIn|Held|Refused $outcome) => ! $outcome instanceof Refused,
         );
     }
@@ -73,7 +73,7 @@ class SignIn
      *
      * @throws ThrottledException
      */
-    protected function prove(CredentialType $type, array $validated): SignedIn|Held|Refused
+    protected function prove(CredentialType $type, array $validated, bool $remember): SignedIn|Held|Refused
     {
         $account = $this->accounts->resolve($validated['identifier']);
 
@@ -92,6 +92,6 @@ class SignIn
             return $this->proofs->hold($account, $answer, $stage);
         }
 
-        return $this->proofs->signIn($account, $answer);
+        return $this->proofs->signIn($account, $answer, remember: $remember);
     }
 }

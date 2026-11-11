@@ -69,7 +69,7 @@ abstract class SignInController implements KeystoneController
 
         $credentialType = $types->find($type, Surface::SIGN_IN) ?? throw new NotFoundHttpException;
 
-        $outcome = $signIn->attempt($credentialType, $request->all());
+        $outcome = $signIn->attempt($credentialType, $request->all(), remember: $request->boolean('remember'));
 
         if ($outcome instanceof Refused) {
             return $this->sendSignInRefused($request, Status::CREDENTIALS_REJECTED->label());

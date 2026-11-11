@@ -17,6 +17,7 @@ use ClaudioDekker\Keystone\RateLimits\Limiter;
 use ClaudioDekker\Keystone\SecurityEvents\Recorder;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use ClaudioDekker\Keystone\Session\PendingSignIn;
+use ClaudioDekker\Keystone\Session\RememberTokens;
 use ClaudioDekker\Keystone\Session\SessionState;
 use ClaudioDekker\Keystone\Session\Stage;
 use Illuminate\Database\Eloquent\Collection;
@@ -36,6 +37,7 @@ class Proofs
         protected Limiter $limiter,
         protected PendingChallenges $pendingChallenges,
         protected Recorder $recorder,
+        protected RememberTokens $rememberTokens,
         protected SessionState $session,
     ) {
         //
@@ -69,9 +71,9 @@ class Proofs
     }
 
     /**
-     * Sign in the account the answer proved, once it is admitted, then write the proof's rehash.
+     * Sign in the account the answer proved, once it is admitted, remembering the browser when asked, then write the proof's rehash.
      */
-    public function signIn(KeystoneUser $account, Answer $answer, ?PendingSignIn $writer = null): SignedIn|Refused
+    public function signIn(KeystoneUser $account, Answer $answer, ?PendingSignIn $writer = null, bool $remember = false): SignedIn|Refused
     {
         if (! $this->admit($account, $answer, $writer)) {
             return $this->refuse($account, $answer);
@@ -79,6 +81,10 @@ class Proofs
 
         $knownDevice = $this->devices->signIn($account);
         $redirectTo = $this->session->signIn($account);
+
+        if ($remember) {
+            $this->rememberTokens->issue($account);
+        }
 
         $this->pendingChallenges->forget($account);
 
