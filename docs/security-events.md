@@ -4,7 +4,7 @@ Keystone records what happens to an account's security as security events. Every
 
 1. It writes a log line.
 2. It writes a row of `user_security_events`, when the event is for an account.
-3. It mails the account's owner an [alert](alerts.md), when the event is for an account and its type's slot holds a notification.
+3. It sends the account's owner an [alert](alerts.md), when the event is for an account and its type's slot holds a notification.
 4. It dispatches the `ClaudioDekker\Keystone\Events\SecurityEventRecorded` event with the whole entry.
 
 An anonymous event, such as a refused sign-in for an address no account holds, is only a log line. Identical ones, with the same type, IP address and path, are logged once per 60 seconds, counted in the default cache under a hash keyed by a key derived from your app key, so the cache never holds an address. While the cache fails, every one is logged. An operator's anonymous event, such as ending every account's sessions, is logged every time.
@@ -87,7 +87,7 @@ Keystone adds one piece of global middleware after the app's trusted-proxy middl
 
 ## Alerts
 
-An event can also mail the account's owner an alert. The [alerts page](alerts.md) covers which types alert, who gets each mail, what it says, new devices and abandoned challenges, and how to send your own.
+An event can also send the account's owner an alert. The [alerts page](alerts.md) covers which types alert, who gets each one, what it says, new devices and abandoned challenges, and how to send your own.
 
 ## Listening
 

@@ -70,7 +70,7 @@ Every key is an HMAC-SHA256 of its parts under a key derived from your app key, 
 
 ### When a limit trips
 
-The first refused attempt of each count's window records a `limit.tripped` security event, for the named or signed-in account when there is one, with a reason naming the limit: `keystone.daily_failed_attempt_limit`, `keystone.failed_attempt_limit` or `keystone.request_limit`. A failed-attempt trip also mails the account's owner an [alert](alerts.md), once for each count and window. A request-limit trip alerts nobody, since it names no credential and a busy shared network would mail owners for nothing. The same trip dispatches Laravel's `Illuminate\Auth\Events\Lockout` event, so a listener written for Fortify keeps working. A listener that fails is reported, and the refusal stands.
+The first refused attempt of each count's window records a `limit.tripped` security event, for the named or signed-in account when there is one, with a reason naming the limit: `keystone.daily_failed_attempt_limit`, `keystone.failed_attempt_limit` or `keystone.request_limit`. A failed-attempt trip also sends the account's owner an [alert](alerts.md), once for each count and window. A request-limit trip alerts nobody, since it names no credential and a busy shared network would alert owners for nothing. The same trip dispatches Laravel's `Illuminate\Auth\Events\Lockout` event, so a listener written for Fortify keeps working. A listener that fails is reported, and the refusal stands.
 
 ### Testing
 

@@ -1,6 +1,6 @@
 # Alerts
 
-An alert is a mail that tells an account's owner something happened to its security. Each type of event has a slot in `notifications`: the notification class Keystone sends for that type, or `null` to send none. Today `account.suspended`, `account.unsuspended`, `challenge.abandoned`, `credential.added`, `device_cookie.reused`, `limit.tripped`, `recovery_code.used`, `sessions.terminated`, `signed_in`, `sudo.failed` and `sudo.network_changed` alert by default:
+An alert is a notification that tells an account's owner something happened to its security. Each type of event has a slot in `notifications`: the notification class Keystone sends for that type, or `null` to send none. Keystone's own alert is a mail. A class of your own picks its channels in `via()`, and reaches the owner through each of their addresses, which Keystone hands it routed for mail. Today `account.suspended`, `account.unsuspended`, `challenge.abandoned`, `credential.added`, `device_cookie.reused`, `limit.tripped`, `recovery_code.used`, `sessions.terminated`, `signed_in`, `sudo.failed` and `sudo.network_changed` alert by default:
 
 ```php
 'notifications' => [
@@ -27,13 +27,13 @@ An alert is a mail that tells an account's owner something happened to its secur
 ],
 ```
 
-Two of these alert only some of the time. `signed_in` alerts only for a browser the account doesn't know, as [New devices](#new-devices) explains. `limit.tripped` alerts only when a failed-attempt limit trips, never a request limit. Anyone who knows an address can trip its count on the sign-in page, so an owner can get one of these mails per credential type each hour. Set the slot to `null` if that is more than your users want.
+Two of these alert only some of the time. `signed_in` alerts only for a browser the account doesn't know, as [New devices](#new-devices) explains. `limit.tripped` alerts only when a failed-attempt limit trips, never a request limit. Anyone who knows an address can trip its count on the sign-in page, so an owner can get one of these alerts per credential type each hour. Set the slot to `null` if that is more than your users want.
 
-There is no switch that silences every alert at once. To stop one type, set its slot to `null`. Alerts are not de-duplicated, so each event sends its own, except the abandoned challenges one sweep finds for an account, which share [one mail](#abandoned-challenges).
+There is no switch that silences every alert at once. To stop one type, set its slot to `null`. Alerts are not de-duplicated, so each event sends its own, except the abandoned challenges one sweep finds for an account, which share [one alert](#abandoned-challenges).
 
 ## Who gets one
 
-An alert goes to every verified address of the account, one mail each. An account that holds no verified address gets it at its unverified addresses instead, except an address another account holds verified. An address someone typed into a form never gets one.
+An alert goes to every verified address of the account, one each. An account that holds no verified address gets it at its unverified addresses instead, except an address another account holds verified. An address someone typed into a form never gets one.
 
 When a change to the account causes the event, Keystone reads the addresses before the change. An address that the change, or the transaction around it, removed still gets the alert.
 
@@ -56,7 +56,7 @@ To use another service, bind your own implementation of `ClaudioDekker\Keystone\
 
 ## New devices
 
-Signing in from a browser the account hasn't used before mails its owner. Keystone recognises a browser by a cookie, never by its IP address or user agent, since an attacker can copy a user agent and share a network. A known browser on a new network sends no alert, and a new browser on a network the account used before sends one.
+Signing in from a browser the account hasn't used before alerts its owner. Keystone recognises a browser by a cookie, never by its IP address or user agent, since an attacker can copy a user agent and share a network. A known browser on a new network sends no alert, and a new browser on a network the account used before sends one.
 
 Every completed sign-in, whichever step completes it, hands the browser the `__Host-keystone_device` cookie. Its value is 128 random bits that name the device and never change, a dot, and 256 random bits that the next sign-in replaces. The cookie is host-only, `Secure`, `HttpOnly` and `SameSite=Lax`, lives for the retention, and is not encrypted by Laravel, since Keystone only compares its digest. The `user_known_devices` table keeps the SHA-256 digest of the whole value and of the device part for each account, with the user agent and the last IP address encrypted, as labels only.
 
@@ -82,11 +82,11 @@ Someone who passes an account's first factor and never answers its [challenge](c
 
 Only passing the challenge deletes the row, or signing in to the account from that browser without it, once the account no longer owes the challenge. Cancelling, letting the pending sign-in expire after 15 minutes, or an epoch move that voids it all keep it, so nobody can stop the alert by walking away. A browser that passes the first factor again keeps the row of its first hold and that hold's time.
 
-Every 5 minutes, Keystone runs `keystone:alert-abandoned-challenges` on one server, with no overlap, as the [operator commands](operator-commands.md#abandoned-challenges) page explains. It records `challenge.abandoned` for every row at least 7 minutes old and deletes the rows. Each account gets one mail for all of its own: how many there were, from which IP addresses and on which devices. The 7 minutes are fixed, with no setting. The rows of an account that was deleted go with it, with nothing recorded or mailed.
+Every 5 minutes, Keystone runs `keystone:alert-abandoned-challenges` on one server, with no overlap, as the [operator commands](operator-commands.md#abandoned-challenges) page explains. It records `challenge.abandoned` for every row at least 7 minutes old and deletes the rows. Each account gets one alert for all of its own: how many there were, from which IP addresses and on which devices. The 7 minutes are fixed, with no setting. The rows of an account that was deleted go with it, with nothing recorded or sent.
 
 ## Sending your own
 
-Name your own notification class in a slot to send it in place of Keystone's, or to alert for a type that sends nothing by default. Keystone builds it with the event as its first argument, so its constructor can't ask the container for anything else. For `challenge.abandoned`, the other events the mail sums up follow as further arguments, which a variadic parameter such as `UserSecurityEvent ...$others` collects:
+Name your own notification class in a slot to send it in place of Keystone's, or to alert for a type that sends nothing by default. Keystone builds it with the event as its first argument, so its constructor can't ask the container for anything else. For `challenge.abandoned`, the other events the alert sums up follow as further arguments, which a variadic parameter such as `UserSecurityEvent ...$others` collects:
 
 ```php
 // config/keystone.php
@@ -132,7 +132,7 @@ class SignedOutAlert extends Notification implements ShouldBeEncrypted, ShouldQu
 }
 ```
 
-Keystone sends it on demand, to each address in turn, so `$notifiable` is the address and not your user. The event may be unsaved when its row could not be written, so copy what the mail needs in the constructor rather than keeping the event to reload on the queue. Implement `ShouldQueue` and `ShouldBeEncrypted`, as Keystone's own alert does, so your `jobs` and `failed_jobs` tables never hold an IP address or an address in clear.
+Keystone sends it on demand, to each address in turn, so `$notifiable` is the address and not your user. The event may be unsaved when its row could not be written, so copy what the alert needs in the constructor rather than keeping the event to reload on the queue. Implement `ShouldQueue` and `ShouldBeEncrypted`, as Keystone's own alert does, so your `jobs` and `failed_jobs` tables never hold an IP address or an address in clear.
 
 Keystone refuses to boot with a slot that would lose every alert of its type: a slot for a type that doesn't exist, a value that is neither `null` nor a notification class, a class whose constructor can't take the event alone, or `SecurityAlert` on a type it has no mail for. `SecurityAlert` has a mail only for the types that alert by default, so any other type needs a class of your own.
 

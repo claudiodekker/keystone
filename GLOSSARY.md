@@ -144,7 +144,7 @@ The one place that records security events. Core calls it inline from the code t
 
 ## Alert
 
-A mail that tells an account's owner something happened to its security. The recorder sends one for an event about an account when the event's slot holds a notification, to the account's verified addresses, or to the ones counting as verified when it holds none, read before the change that caused the event.
+A notification that tells an account's owner something happened to its security. Keystone's own, `SecurityAlert`, is a mail. The recorder sends one for an event about an account when the event's slot holds a notification, to the account's verified addresses, or to the ones counting as verified when it holds none, read before the change that caused the event.
 
 ## Known device
 

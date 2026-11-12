@@ -14,7 +14,7 @@ End every session of every account, yours included, with `--all`:
 
     php artisan keystone:end-sessions --all --operator="Margaret Hamilton"
 
-Keystone mails the account's owner an [alert](alerts.md) that an administrator signed them out. Pass `--no-alert` to end the sessions without one, such as when you tell the owner yourself:
+Keystone sends the account's owner an [alert](alerts.md) that an administrator signed them out. Pass `--no-alert` to end the sessions without one, such as when you tell the owner yourself:
 
     php artisan keystone:end-sessions 42 --operator="Margaret Hamilton" --no-alert
 
@@ -50,7 +50,7 @@ class UserSessionsController
 }
 ```
 
-Chain `withoutAlert()` to end the sessions without mailing the owner:
+Chain `withoutAlert()` to end the sessions without alerting the owner:
 
 ```php
 EndSessions::dispatch($user, operator: $request->user()->email)->withoutAlert();
@@ -131,7 +131,7 @@ Suspending sets the `suspended_at` column Keystone adds to your users table, and
 
 ### What gets recorded
 
-Suspending records `account.suspended`, and lifting the suspension records `account.unsuspended`, both with actor `operator` and the operator's name in the `operator` field. Each mails the account's owner an [alert](alerts.md). Set the type's slot in `notifications` to `null` to stop it.
+Suspending records `account.suspended`, and lifting the suspension records `account.unsuspended`, both with actor `operator` and the operator's name in the `operator` field. Each sends the account's owner an [alert](alerts.md). Set the type's slot in `notifications` to `null` to stop it.
 
 ## Pruning
 

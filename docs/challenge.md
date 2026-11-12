@@ -45,13 +45,13 @@ A set is 8 codes of 26 characters from A to Z and 0 to 9, shown in dash-separate
 
 An answer posts `recovery_code` to `login.challenge.submit` for `recovery-code`:
 
-- A code the account holds signs the user in and is spent, so it never answers again. Keystone records `recovery_code.used` and mails the owner an alert that says how many codes are left. Two answers of one code at the same moment spend it once, and only one of them signs in.
+- A code the account holds signs the user in and is spent, so it never answers again. Keystone records `recovery_code.used` and sends the owner an alert that says how many codes are left. Two answers of one code at the same moment spend it once, and only one of them signs in.
 - A code the account doesn't hold is refused like any wrong answer, on the `recovery_code` field.
 - While `require_recovery_codes` is `true`, the default, the account's last code is refused and kept with "This is your last recovery code. It is kept for account recovery and cannot be used here." Its failed attempt stays counted. With `require_recovery_codes` set to `false`, the last code is spent like any other.
 
 Recovery codes have their own failed-attempt count, apart from every other type's, so wrong answers of the other second factor never lock the user out of their codes.
 
-Cancelling sends a `DELETE` to `login.challenge.cancel`. It drops the pending sign-in and lands on the sign-in page with "Sign-in cancelled. You were not logged in." Cancelling leaves every rate limit count alone, so starting over resumes the same failed-attempt budget. It also leaves the [abandoned-challenge alert](alerts.md#abandoned-challenges) in place, so a browser the account doesn't know that cancels still mails the owner 7 minutes after its hold.
+Cancelling sends a `DELETE` to `login.challenge.cancel`. It drops the pending sign-in and lands on the sign-in page with "Sign-in cancelled. You were not logged in." Cancelling leaves every rate limit count alone, so starting over resumes the same failed-attempt budget. It also leaves the [abandoned-challenge alert](alerts.md#abandoned-challenges) in place, so a browser the account doesn't know that cancels still alerts the owner 7 minutes after its hold.
 
 ## Your controller
 
