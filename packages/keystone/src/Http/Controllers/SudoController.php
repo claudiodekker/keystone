@@ -84,6 +84,16 @@ abstract class SudoController implements KeystoneController
     }
 
     /**
+     * End the session's sudo, so its next change that needs sudo asks again.
+     */
+    public function destroy(Request $request, Sudo $sudo): Response|Responsable
+    {
+        $sudo->end();
+
+        return $this->sendSudoEnded($request);
+    }
+
+    /**
      * Get the field a refusal of the type's answer is shown on: the first the type validates at the step, else its name.
      */
     protected function field(CredentialType $type, Sudo $sudo): string
@@ -120,4 +130,9 @@ abstract class SudoController implements KeystoneController
      * Send the user on to where they were going once sudo is granted.
      */
     abstract protected function sendSudoGranted(Request $request, string $redirectTo): Response|Responsable;
+
+    /**
+     * Send the user on once their sudo ended.
+     */
+    abstract protected function sendSudoEnded(Request $request): Response|Responsable;
 }

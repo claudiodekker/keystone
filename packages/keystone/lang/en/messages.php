@@ -14,5 +14,6 @@ return [
     'sign-in-cancelled' => 'Sign-in cancelled. You were not logged in.',
     'signed-out' => 'You have been logged out.',
     'sudo-required' => 'Please confirm it is you to continue.',
+    'sudo-revoked' => 'You will be asked to confirm it is you before your next sensitive change.',
     'throttled' => 'Too many attempts. Please try again in :seconds seconds.',
 ];

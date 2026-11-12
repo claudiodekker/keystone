@@ -81,6 +81,14 @@ trait SudoAssertions
     }
 
     /**
+     * Assert the response sent the user on once their sudo ended.
+     */
+    public function assertSudoEnded(TestResponse $response): void
+    {
+        $response->assertRedirect();
+    }
+
+    /**
      * Assert the response sent a session that holds no sudo-in-progress on to the given path.
      */
     public function assertNoSudoInProgress(TestResponse $response, string $redirectTo): void

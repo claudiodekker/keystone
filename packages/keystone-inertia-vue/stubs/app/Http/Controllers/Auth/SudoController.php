@@ -66,4 +66,12 @@ class SudoController extends KeystoneSudoController
     {
         return redirect($redirectTo);
     }
+
+    /**
+     * Send the user back to the page they ended sudo from.
+     */
+    protected function sendSudoEnded(Request $request): RedirectResponse
+    {
+        return back();
+    }
 }

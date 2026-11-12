@@ -18,9 +18,12 @@ use ClaudioDekker\Keystone\Models\UserRecoveryCode;
 use ClaudioDekker\Keystone\RateLimits\FailedAttempt;
 use ClaudioDekker\Keystone\RateLimits\Limiter;
 use ClaudioDekker\Keystone\RecoveryCodes\RecoveryCodeType;
+use ClaudioDekker\Keystone\SecurityEvents\Recorder;
+use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use ClaudioDekker\Keystone\Session\SessionState;
 use ClaudioDekker\Keystone\Session\Stage;
 use ClaudioDekker\Keystone\Session\SudoInProgress;
+use ClaudioDekker\Keystone\Status;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Contracts\Validation\Factory as ValidationFactory;
 use Illuminate\Database\Eloquent\Collection;
@@ -36,6 +39,7 @@ class Sudo
      */
     public function __construct(
         protected AccountChanges $accountChanges,
+        protected Recorder $recorder,
         protected SignInDecision $decision,
         protected Holdings $holdings,
         protected Limiter $limiter,
@@ -117,6 +121,22 @@ class Sudo
             fn () => $this->prove($type, $validated, $sudo, $account),
             fn (SudoGranted|SudoFirstFactorPassed|Refused|LastRecoveryCodeKept $outcome) => $outcome instanceof SudoGranted || $outcome instanceof SudoFirstFactorPassed,
         );
+    }
+
+    /**
+     * End the session's sudo, recording the end of a live grant, and leave the revoked status for the next page.
+     *
+     * @throws AuthenticationException
+     */
+    public function end(): void
+    {
+        $account = $this->account();
+
+        if ($this->session->endSudo()) {
+            $this->recorder->record(SecurityEventType::SUDO_REVOKED, account: $account);
+        }
+
+        $this->session->leaveStatus(Status::SUDO_REVOKED);
     }
 
     /**

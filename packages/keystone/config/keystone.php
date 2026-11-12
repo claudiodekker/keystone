@@ -119,6 +119,7 @@ return [
         'sudo.failed' => SecurityAlert::class,
         'sudo.granted' => null,
         'sudo.network_changed' => SecurityAlert::class,
+        'sudo.revoked' => null,
     ],
 
     /*

@@ -369,6 +369,18 @@ class SessionState
     }
 
     /**
+     * End the session's sudo grant and sudo-in-progress on a fresh session id, and determine if it held a live grant.
+     */
+    public function endSudo(): bool
+    {
+        $wasGranted = $this->liveSudoGrant() !== null;
+
+        $this->changeAuthLevel();
+
+        return $wasGranted;
+    }
+
+    /**
      * Get the subnet of the request's address the session's sudo grant is bound to, or null when the address has none.
      */
     public function subnet(): ?string
