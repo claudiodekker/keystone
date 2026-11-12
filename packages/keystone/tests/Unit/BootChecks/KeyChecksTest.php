@@ -260,6 +260,25 @@ it('refuses a remember-me lifetime that is not zero or a positive integer', func
     'a list' => [[2592000]],
 ]);
 
+it('refuses a sudo lifetime that is not a positive integer', function (mixed $value) {
+    config(['keystone.sudo.lifetime_seconds' => $value]);
+
+    expect($this->bootFailures())->toBe(['keystone.sudo.lifetime_seconds must be a positive integer.']);
+})->with([
+    'zero' => 0,
+    'negative' => -1,
+    'null' => null,
+    'a numeric string' => '900',
+    'a float' => 900.5,
+    'a list' => [[900]],
+]);
+
+it('boots with a sudo lifetime of one second', function () {
+    config(['keystone.sudo.lifetime_seconds' => 1]);
+
+    expect($this->bootFailures())->toBe([]);
+});
+
 it('boots with remember me off or at its smallest lifetime', function (int $seconds) {
     config(['keystone.remember.lifetime_seconds' => $seconds]);
 
