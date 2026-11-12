@@ -116,14 +116,19 @@ class Sudo
     {
         $surface = $sudo->surface();
         $attempt = $this->limiter->takeFailedAttempt($type, $surface, $account);
+        $subnet = $this->session->subnet();
+
+        if ($subnet === null) {
+            return $this->proofs->refuseSudo($account, $type, $surface, 'keystone.unbindable_subnet');
+        }
 
         $answer = $this->proofs->verify($type, $surface, $account, $validated, $attempt);
 
         if (! $this->decision->proves($answer->proof, $type, $account)) {
-            return $this->proofs->refuseSudo($account, $answer);
+            return $this->proofs->refuseSudo($account, $type, $surface, $answer->proof->reason);
         }
 
-        return $this->proofs->grantSudo($account, $answer, $sudo, $this->session->subnet());
+        return $this->proofs->grantSudo($account, $answer, $sudo, $subnet);
     }
 
     /**
