@@ -93,6 +93,14 @@ trait InteractsWithKeystone
     }
 
     /**
+     * Send the requests from here on from an address on another network than the test's own, as a browser that moved would.
+     */
+    public function fromAnotherNetwork(): static
+    {
+        return $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.7']);
+    }
+
+    /**
      * Send the requests from here on from a browser that has never visited the app, and get the browser left behind.
      */
     public function switchToFreshBrowser(): Browser

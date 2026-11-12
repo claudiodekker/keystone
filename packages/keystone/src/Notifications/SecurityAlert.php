@@ -40,6 +40,7 @@ class SecurityAlert extends Notification implements ShouldBeEncrypted, ShouldQue
         'sessions.terminated' => 'keystone::alerts.sessions.terminated',
         'signed_in' => 'keystone::alerts.signed_in',
         'sudo.failed' => 'keystone::alerts.sudo.failed',
+        'sudo.network_changed' => 'keystone::alerts.sudo.network_changed',
     ];
 
     /**

@@ -3,6 +3,8 @@
 namespace ClaudioDekker\Keystone\Http;
 
 use ClaudioDekker\Keystone\Exceptions\SudoRequiredException;
+use ClaudioDekker\Keystone\SecurityEvents\Recorder;
+use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use ClaudioDekker\Keystone\Session\SessionState;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\Request;
@@ -31,6 +33,7 @@ class SudoGate
      * Create the gate.
      */
     public function __construct(
+        protected Recorder $recorder,
         protected SessionState $session,
     ) {
         //
@@ -40,6 +43,7 @@ class SudoGate
      * Let the request through when its session holds a live sudo grant from the request's subnet, else refuse it by throwing.
      *
      * A guest is refused before any grant is read. A request the gate already let through is let through again without a second look.
+     * A live grant used from another subnet is revoked, recorded and alerted before the request is refused.
      *
      * @throws AuthenticationException
      * @throws SudoRequiredException
@@ -56,7 +60,12 @@ class SudoGate
 
         $grant = $this->session->liveSudoGrant();
 
-        if ($grant === null || $grant->subnet !== $this->session->subnet()) {
+        if ($grant === null) {
+            $this->refuse($request);
+        }
+
+        if ($grant->subnet !== $this->session->subnet()) {
+            $this->revoke();
             $this->refuse($request);
         }
 
@@ -69,6 +78,14 @@ class SudoGate
     public static function refused(Request $request): bool
     {
         return $request->attributes->get(static::ANSWER) === static::REFUSED;
+    }
+
+    /**
+     * Record the revocation of the session's grant, which its refusal ends, alerting the owner.
+     */
+    protected function revoke(): void
+    {
+        $this->recorder->record(SecurityEventType::SUDO_NETWORK_CHANGED, account: $this->session->account());
     }
 
     /**

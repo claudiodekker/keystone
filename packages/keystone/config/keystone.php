@@ -118,6 +118,7 @@ return [
         'signed_out' => null,
         'sudo.failed' => SecurityAlert::class,
         'sudo.granted' => null,
+        'sudo.network_changed' => SecurityAlert::class,
     ],
 
     /*

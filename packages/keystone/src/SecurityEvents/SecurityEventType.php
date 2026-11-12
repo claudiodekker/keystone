@@ -25,4 +25,5 @@ enum SecurityEventType: string
     case SIGN_IN_VOIDED = 'sign_in.voided';
     case SUDO_FAILED = 'sudo.failed';
     case SUDO_GRANTED = 'sudo.granted';
+    case SUDO_NETWORK_CHANGED = 'sudo.network_changed';
 }
