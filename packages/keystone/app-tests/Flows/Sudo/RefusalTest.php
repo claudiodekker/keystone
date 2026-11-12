@@ -63,3 +63,22 @@ it('counts an answer from an address that has no subnet against the failed-attem
 
     $this->assertThrottled($response);
 });
+
+it("keeps a count of its own, apart from sign-in's", function () {
+    config(['keystone.rate_limits.failed_attempts_per_hour' => 1]);
+    $user = $this->createUser();
+    $this->signInWithoutSudo($user);
+    $support = $this->supportFor(Surface::SIGN_IN);
+    $address = $this->addVerifiedAddress($user);
+    $this->get($this->sudoGatedPage());
+
+    $sameDevice = $this->browserWithCopiedCookies();
+    $signedIn = $this->switchToFreshBrowser();
+    $this->switchBackTo($sameDevice);
+    $this->post(route('login.submit', $support->type()->name()), ['identifier' => $address, ...$support->rejectedProof(Surface::SIGN_IN)]);
+
+    $this->switchBackTo($signedIn);
+    $response = $this->post(route('sudo.submit', $support->type()->name()), $support->validProof(Surface::SIGN_IN, $user));
+
+    $this->assertSudoGranted($response, $this->sudoGatedPage());
+});
