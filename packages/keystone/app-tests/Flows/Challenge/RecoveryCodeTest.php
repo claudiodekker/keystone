@@ -91,7 +91,7 @@ it('records the sign-in with the recovery code type, naming no credential', func
     $events = $this->securityEvents()->for($user);
     $signedIn = $events->last();
 
-    expect($events->pluck('type')->all())->toBe([SecurityEventType::SIGN_IN_HELD, SecurityEventType::RECOVERY_CODE_USED, SecurityEventType::SIGNED_IN])
+    expect($events->pluck('type')->all())->toBe([SecurityEventType::SIGN_IN_HELD, SecurityEventType::RECOVERY_CODE_USED, SecurityEventType::SUDO_GRANTED, SecurityEventType::SIGNED_IN])
         ->and($signedIn->flow)->toBe(Flow::CHALLENGE)
         ->and($signedIn->credential_type)->toBe('recovery-code')
         ->and($signedIn->credential_id)->toBeNull();

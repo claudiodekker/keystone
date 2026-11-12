@@ -13,15 +13,19 @@ use ClaudioDekker\Keystone\Contracts\IpLocation;
 use ClaudioDekker\Keystone\Contracts\SessionDemotedResponse;
 use ClaudioDekker\Keystone\Contracts\SessionExpiredResponse;
 use ClaudioDekker\Keystone\Contracts\SessionInfo;
+use ClaudioDekker\Keystone\Contracts\SudoRequiredResponse;
 use ClaudioDekker\Keystone\Devices\DeviceCookie;
 use ClaudioDekker\Keystone\Devices\DeviceDetectorSessionInfo;
 use ClaudioDekker\Keystone\Devices\NullSessionInfo;
 use ClaudioDekker\Keystone\Exceptions\KeystoneMisconfiguredException;
+use ClaudioDekker\Keystone\Exceptions\SudoRequiredException;
 use ClaudioDekker\Keystone\Http\EndedSession;
 use ClaudioDekker\Keystone\Http\Middleware\ApplyHardeningFloor;
 use ClaudioDekker\Keystone\Http\Middleware\CaptureRequestContext;
 use ClaudioDekker\Keystone\Http\Middleware\ClearSiteData;
 use ClaudioDekker\Keystone\Http\Middleware\RefuseCrossSiteRequests;
+use ClaudioDekker\Keystone\Http\Middleware\RequireSudo;
+use ClaudioDekker\Keystone\Http\Responses\SudoPageRedirect;
 use ClaudioDekker\Keystone\Http\Responses\UnauthenticatedResponse;
 use ClaudioDekker\Keystone\Locations\NullIpLocation;
 use ClaudioDekker\Keystone\Locations\StevebaumanIpLocation;
@@ -39,6 +43,7 @@ use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Exceptions\Handler;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Redirector;
+use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\ServiceProvider;
 use Stevebauman\Location\LocationManager;
@@ -75,6 +80,8 @@ class KeystoneServiceProvider extends ServiceProvider
             Status::SESSION_EXPIRED,
             reason: 'expired',
         ));
+
+        $this->app->bindIf(SudoRequiredResponse::class, SudoPageRedirect::class);
 
         $this->app->bindIf(IpLocation::class, $this->ipLocation());
         $this->app->bindIf(SessionInfo::class, $this->sessionInfo());
@@ -117,6 +124,7 @@ class KeystoneServiceProvider extends ServiceProvider
         $this->excludeKeystoneCookiesFromEncryption();
         $this->hardenResponses();
         $this->refuseCrossSiteRequests();
+        $this->registerSudoGate();
         $this->schedule();
 
         $this->loadMigrationsFrom(dirname(__DIR__).'/database/migrations');
@@ -273,6 +281,26 @@ class KeystoneServiceProvider extends ServiceProvider
     protected function refuseCrossSiteRequests(): void
     {
         $this->app->make(Kernel::class)->appendMiddlewareToGroup('web', RefuseCrossSiteRequests::class);
+    }
+
+    /**
+     * Let apps gate their routes with the sudo middleware alias, and answer a request the gate refused with the app's response.
+     */
+    protected function registerSudoGate(): void
+    {
+        $this->app->make(Router::class)->aliasMiddleware(RequireSudo::ALIAS, RequireSudo::class);
+
+        $this->callAfterResolving(ExceptionHandler::class, function (ExceptionHandler $handler) {
+            if (! $handler instanceof Handler) {
+                return;
+            }
+
+            $handler->renderable(function (SudoRequiredException $exception, Request $request) {
+                $response = $this->app->make(SudoRequiredResponse::class)->toResponse($request, $exception);
+
+                return Router::toResponse($request, $response);
+            });
+        });
     }
 
     /**

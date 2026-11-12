@@ -5,6 +5,7 @@ namespace ClaudioDekker\Keystone\Http\Middleware;
 use ClaudioDekker\Keystone\Http\ContentSecurityPolicy;
 use ClaudioDekker\Keystone\Http\Controllers\KeystoneController;
 use ClaudioDekker\Keystone\Http\HardeningSettings;
+use ClaudioDekker\Keystone\Http\SudoGate;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -58,10 +59,14 @@ class ApplyHardeningFloor
     }
 
     /**
-     * Determine if the request's route is Keystone's, by its controller class.
+     * Determine if the floor covers the request: a Keystone route, or any route the sudo gate refused it on.
      */
     public static function covers(Request $request): bool
     {
+        if (SudoGate::refused($request)) {
+            return true;
+        }
+
         $controller = $request->route()?->getControllerClass();
 
         return $controller !== null && is_a($controller, KeystoneController::class, true);

@@ -20,6 +20,7 @@ use ClaudioDekker\Keystone\Session\PendingSignIn;
 use ClaudioDekker\Keystone\Session\RememberTokens;
 use ClaudioDekker\Keystone\Session\SessionState;
 use ClaudioDekker\Keystone\Session\Stage;
+use ClaudioDekker\Keystone\Session\SudoInProgress;
 use Illuminate\Database\Eloquent\Collection;
 use Throwable;
 
@@ -159,6 +160,46 @@ class Proofs
     }
 
     /**
+     * Move the sudo-in-progress on to its second step once the answer is admitted, then write the proof's rehash.
+     */
+    public function passSudoFirstFactor(KeystoneUser $account, Answer $answer, SudoInProgress $sudo): SudoFirstFactorPassed|Refused
+    {
+        if (! $this->admitForSudo($account, $answer, $sudo)) {
+            return $this->refuseSudo($account, $answer->type, $answer->surface, $answer->proof->reason);
+        }
+
+        $this->session->passSudoFirstFactor($sudo, $answer->type);
+
+        $this->rehash($account, $answer);
+
+        return new SudoFirstFactorPassed;
+    }
+
+    /**
+     * Grant the session sudo bound to the subnet once the answer is admitted, recording the grant, then write the proof's rehash.
+     */
+    public function grantSudo(KeystoneUser $account, Answer $answer, SudoInProgress $sudo, string $subnet): SudoGranted|Refused
+    {
+        if (! $this->admitForSudo($account, $answer, $sudo)) {
+            return $this->refuseSudo($account, $answer->type, $answer->surface, $answer->proof->reason);
+        }
+
+        $this->recorder->record(
+            SecurityEventType::SUDO_GRANTED,
+            account: $account,
+            surface: $answer->surface,
+            credentialType: $answer->type,
+            credential: $answer->proof->credential,
+        );
+
+        $this->session->grantSudo($subnet);
+
+        $this->rehash($account, $answer);
+
+        return new SudoGranted($sudo->intendedPath);
+    }
+
+    /**
      * Refuse the answer, recording the rejected proof for the account it was given for.
      */
     public function refuse(?KeystoneUser $account, Answer $answer): Refused
@@ -175,11 +216,27 @@ class Proofs
     }
 
     /**
+     * Refuse an answer of the type given for sudo on the surface, recording the failure for the account, which alerts its owner.
+     */
+    public function refuseSudo(KeystoneUser $account, CredentialType $type, Surface $surface, ?string $reason): Refused
+    {
+        $this->recorder->record(
+            SecurityEventType::SUDO_FAILED,
+            account: $account,
+            surface: $surface,
+            credentialType: $type,
+            reason: $reason,
+        );
+
+        return new Refused;
+    }
+
+    /**
      * Determine if the account the answer proved may go on: it isn't barred and its credential advanced, so the attempt is given back.
      *
      * A barred account's attempt stays counted, so the limit never tells that its credential was right.
      */
-    protected function admit(KeystoneUser $account, Answer $answer, ?PendingSignIn $writer): bool
+    protected function admit(KeystoneUser $account, Answer $answer, PendingSignIn|SudoInProgress|null $writer): bool
     {
         if (Suspension::isSuspended($account->getAuthIdentifier())) {
             return false;
@@ -195,9 +252,46 @@ class Proofs
     }
 
     /**
+     * Determine if the proven answer may go on at sudo, writing the proof's advanced secret, and give its attempt back when it may.
+     *
+     * An account that left the sudo-in-progress's credential epoch while the answer was checked may not, even when the proof advances nothing.
+     */
+    protected function admitForSudo(KeystoneUser $account, Answer $answer, SudoInProgress $sudo): bool
+    {
+        $secret = $answer->proof->advancedSecret();
+        $credential = $answer->credential();
+
+        if ($secret !== null && $credential === null) {
+            return false;
+        }
+
+        try {
+            $this->accountChanges->change($account, fn (AccountChange $change) => $this->advanceIn($change, $credential, $secret), $sudo);
+        } catch (AccountChangeRefusedException) {
+            return false;
+        }
+
+        $this->limiter->giveBack($answer->attempt);
+
+        return true;
+    }
+
+    /**
+     * Advance the credential to the secret within the change, when the proof carries one.
+     */
+    protected function advanceIn(AccountChange $change, ?UserCredential $credential, ?string $secret): void
+    {
+        if ($credential === null || $secret === null) {
+            return;
+        }
+
+        $change->advance($credential, $secret);
+    }
+
+    /**
      * Advance the proven credential to the secret the proof carries, and determine if the proof still holds.
      */
-    protected function advance(KeystoneUser $account, Answer $answer, ?PendingSignIn $writer): bool
+    protected function advance(KeystoneUser $account, Answer $answer, PendingSignIn|SudoInProgress|null $writer): bool
     {
         $secret = $answer->proof->advancedSecret();
 

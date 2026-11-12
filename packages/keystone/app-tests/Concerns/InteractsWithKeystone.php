@@ -10,6 +10,7 @@ use ClaudioDekker\Keystone\AppTests\Assertions\GuestStepAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\SessionExpiryAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\SignInAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\SignOutAssertions;
+use ClaudioDekker\Keystone\AppTests\Assertions\SudoAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\ThrottledAssertions;
 use ClaudioDekker\Keystone\AppTests\Support\Browser;
 use ClaudioDekker\Keystone\AppTests\Support\CredentialTypeSupport;
@@ -58,6 +59,7 @@ trait InteractsWithKeystone
     use SessionExpiryAssertions;
     use SignInAssertions;
     use SignOutAssertions;
+    use SudoAssertions;
     use ThrottledAssertions;
 
     /**
@@ -88,6 +90,22 @@ trait InteractsWithKeystone
             'Origin' => 'https://elsewhere.example',
             'Sec-Fetch-Site' => 'cross-site',
         ]);
+    }
+
+    /**
+     * Send the requests from here on from an address on another network than the test's own, as a browser that moved would.
+     */
+    public function fromAnotherNetwork(): static
+    {
+        return $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.7']);
+    }
+
+    /**
+     * Send the requests from here on from the test's own address again, as a browser back on its own network would.
+     */
+    public function fromOwnNetwork(): static
+    {
+        return $this->withServerVariables(['REMOTE_ADDR' => '127.0.0.1']);
     }
 
     /**
@@ -188,6 +206,18 @@ trait InteractsWithKeystone
     }
 
     /**
+     * Serve a page only a signed-in user holding sudo reaches, through the app's own auth and sudo middleware, and get its path.
+     */
+    public function sudoGatedPage(): string
+    {
+        $path = '/keystone/app-tests/sudo-gated';
+
+        Route::middleware(['web', 'auth', 'sudo'])->match(['get', 'post'], $path, fn () => response()->noContent());
+
+        return $path;
+    }
+
+    /**
      * Get how many failed attempts an account gets per credential type and flow in an hour, as the app configures it.
      */
     public function failedAttemptAllowance(): int
@@ -207,6 +237,14 @@ trait InteractsWithKeystone
         }
 
         return $lifetime;
+    }
+
+    /**
+     * Get how many seconds sudo lasts after it was granted, as the app configures it.
+     */
+    public function sudoLifetimeSeconds(): int
+    {
+        return config()->integer('keystone.sudo.lifetime_seconds');
     }
 
     /**
@@ -269,6 +307,17 @@ trait InteractsWithKeystone
             'identifier' => $address,
             ...$support->validProof(Surface::SIGN_IN, $user),
         ]);
+    }
+
+    /**
+     * Sign the user in through the first installed type that serves sign-in, then let the sudo grant the sign-in brought run out.
+     */
+    public function signInWithoutSudo(KeystoneUser $user): void
+    {
+        $this->passFirstFactor($user);
+
+        Auth::forgetGuards();
+        $this->travel($this->sudoLifetimeSeconds())->seconds();
     }
 
     /**

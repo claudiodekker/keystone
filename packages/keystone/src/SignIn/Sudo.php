@@ -1,0 +1,352 @@
+<?php
+
+namespace ClaudioDekker\Keystone\SignIn;
+
+use ClaudioDekker\Keystone\Accounts\AccountChange;
+use ClaudioDekker\Keystone\Accounts\AccountChanges;
+use ClaudioDekker\Keystone\Accounts\Holdings;
+use ClaudioDekker\Keystone\Accounts\Suspension;
+use ClaudioDekker\Keystone\Auth\KeystoneUser;
+use ClaudioDekker\Keystone\Exceptions\AccountChangeRefusedException;
+use ClaudioDekker\Keystone\Exceptions\ThrottledException;
+use ClaudioDekker\Keystone\Http\Pages\SudoPage;
+use ClaudioDekker\Keystone\Methods\CredentialType;
+use ClaudioDekker\Keystone\Methods\CredentialTypes;
+use ClaudioDekker\Keystone\Methods\InitiateShape;
+use ClaudioDekker\Keystone\Methods\Surface;
+use ClaudioDekker\Keystone\Methods\Verification;
+use ClaudioDekker\Keystone\Models\UserRecoveryCode;
+use ClaudioDekker\Keystone\RateLimits\FailedAttempt;
+use ClaudioDekker\Keystone\RateLimits\Limiter;
+use ClaudioDekker\Keystone\RecoveryCodes\RecoveryCodeType;
+use ClaudioDekker\Keystone\SecurityEvents\Recorder;
+use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
+use ClaudioDekker\Keystone\Session\SessionState;
+use ClaudioDekker\Keystone\Session\Stage;
+use ClaudioDekker\Keystone\Session\SudoInProgress;
+use ClaudioDekker\Keystone\Status;
+use Illuminate\Auth\AuthenticationException;
+use Illuminate\Contracts\Validation\Factory as ValidationFactory;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Date;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+
+/**
+ * @internal
+ */
+class Sudo
+{
+    /**
+     * Create the sudo flow.
+     */
+    public function __construct(
+        protected AccountChanges $accountChanges,
+        protected Recorder $recorder,
+        protected SignInDecision $decision,
+        protected Holdings $holdings,
+        protected Limiter $limiter,
+        protected Proofs $proofs,
+        protected RecoveryCodeType $recoveryCodeType,
+        protected SessionState $session,
+        protected TimingFloor $floor,
+        protected CredentialTypes $types,
+        protected ValidationFactory $validation,
+    ) {
+        //
+    }
+
+    /**
+     * Open the session's sudo-in-progress at its step, the first type it offers preselected.
+     *
+     * @throws AuthenticationException
+     */
+    public function open(): SudoPage|NoSudoInProgress
+    {
+        $account = $this->account();
+        $sudo = $this->resume($account);
+
+        if ($sudo instanceof NoSudoInProgress) {
+            return $sudo;
+        }
+
+        $types = $this->offer($sudo, $account);
+
+        return new SudoPage(
+            types: $types,
+            preselected: $types[0]['name'] ?? null,
+        );
+    }
+
+    /**
+     * Answer the session's sudo-in-progress with the named type and the submitted input.
+     *
+     * @param  array<string, mixed>  $input
+     *
+     * @throws AuthenticationException
+     * @throws NotFoundHttpException
+     * @throws ThrottledException
+     * @throws ValidationException
+     */
+    public function answer(string $name, array $input): SudoGranted|SudoFirstFactorPassed|Refused|LastRecoveryCodeKept|NoSudoInProgress
+    {
+        $account = $this->account();
+        $sudo = $this->resume($account);
+
+        if ($sudo instanceof NoSudoInProgress) {
+            return $sudo;
+        }
+
+        $type = $this->offered($name, $sudo, $account) ?? throw new NotFoundHttpException;
+
+        $validated = $this->validation->make($input, $type->rules($sudo->surface()))->validate();
+
+        return $this->floor->hold(
+            fn () => $this->prove($type, $validated, $sudo, $account),
+            fn (SudoGranted|SudoFirstFactorPassed|Refused|LastRecoveryCodeKept|NoSudoInProgress $outcome) => $outcome instanceof SudoGranted || $outcome instanceof SudoFirstFactorPassed,
+        );
+    }
+
+    /**
+     * Get the field a refusal of the named type's answer is shown on: the first the type validates at the session's step, else its name.
+     */
+    public function field(string $name): string
+    {
+        $surface = $this->session->sudoInProgress()?->surface() ?? Surface::SIGN_IN;
+        $type = $name === RecoveryCodeType::NAME ? $this->recoveryCodeType : $this->types->find($name, $surface);
+
+        return array_key_first($type?->rules($surface) ?? []) ?? $name;
+    }
+
+    /**
+     * End the session's sudo, recording the end of a live grant, and leave the revoked status for the next page.
+     *
+     * @throws AuthenticationException
+     */
+    public function end(): void
+    {
+        $account = $this->account();
+
+        if ($this->session->endSudo()) {
+            $this->recorder->record(SecurityEventType::SUDO_REVOKED, account: $account);
+        }
+
+        $this->session->leaveStatus(Status::SUDO_REVOKED);
+    }
+
+    /**
+     * Grant the session sudo when the type proves one of the account's credentials.
+     *
+     * @param  array<string, mixed>  $validated
+     *
+     * @throws ThrottledException
+     */
+    protected function prove(CredentialType $type, array $validated, SudoInProgress $sudo, KeystoneUser $account): SudoGranted|SudoFirstFactorPassed|Refused|LastRecoveryCodeKept|NoSudoInProgress
+    {
+        $surface = $sudo->surface();
+        $attempt = $this->limiter->takeFailedAttempt($type, $surface, $account);
+        $subnet = $this->session->subnet();
+
+        if ($subnet === null) {
+            return $this->proofs->refuseSudo($account, $type, $surface, 'keystone.unbindable_subnet');
+        }
+
+        if ($type instanceof RecoveryCodeType) {
+            return $this->spend($type, $validated, $sudo, $account, $attempt, $subnet);
+        }
+
+        $answer = $this->proofs->verify($type, $surface, $account, $validated, $attempt);
+
+        if (! $this->proves($answer, $sudo, $account)) {
+            return $this->proofs->refuseSudo($account, $type, $surface, $answer->proof->reason);
+        }
+
+        $refusal = $this->refuseBeforeWriting($sudo, $account, $type);
+
+        if ($refusal !== null) {
+            return $refusal;
+        }
+
+        if ($sudo->firstFactor === null && $this->decision->owed($account, $type) === Stage::CHALLENGE) {
+            return $this->proofs->passSudoFirstFactor($account, $answer, $sudo);
+        }
+
+        return $this->proofs->grantSudo($account, $answer, $sudo, $subnet);
+    }
+
+    /**
+     * Grant the session sudo when the typed code is one of the account's recovery codes, spending it unless it is the last.
+     *
+     * @param  array<string, mixed>  $validated
+     */
+    protected function spend(RecoveryCodeType $type, array $validated, SudoInProgress $sudo, KeystoneUser $account, FailedAttempt $attempt, string $subnet): SudoGranted|Refused|LastRecoveryCodeKept|NoSudoInProgress
+    {
+        $codes = UserRecoveryCode::query()
+            ->where('user_id', $account->getAuthIdentifier())
+            ->get();
+
+        $verification = new Verification(
+            surface: Surface::CHALLENGE,
+            input: $validated,
+            credentials: $codes->map->toCredential()->values()->all(),
+        );
+
+        $answer = new Answer($type, Surface::CHALLENGE, $type->verify($verification), new Collection, $attempt);
+        $code = $codes->find($answer->proof->credential);
+
+        if ($code === null) {
+            return $this->proofs->refuseSudo($account, $type, Surface::CHALLENGE, $answer->proof->reason);
+        }
+
+        $refusal = $this->refuseBeforeWriting($sudo, $account, $type);
+
+        if ($refusal !== null) {
+            return $refusal;
+        }
+
+        try {
+            $spent = $this->accountChanges->change($account, fn (AccountChange $change) => $this->spendUnlessLast($change, $code), $sudo);
+        } catch (AccountChangeRefusedException) {
+            return $this->proofs->refuseSudo($account, $type, Surface::CHALLENGE, $answer->proof->reason);
+        }
+
+        if (! $spent) {
+            $this->proofs->refuseSudo($account, $type, Surface::CHALLENGE, 'recovery-code.last_code');
+
+            return new LastRecoveryCodeKept;
+        }
+
+        return $this->proofs->grantSudo($account, $answer, $sudo, $subnet);
+    }
+
+    /**
+     * Get the refusal of a proven answer that may write nothing: its sudo-in-progress ran out while it was checked, or its account is barred, else null.
+     */
+    protected function refuseBeforeWriting(SudoInProgress $sudo, KeystoneUser $account, CredentialType $type): Refused|NoSudoInProgress|null
+    {
+        if ($sudo->hasExpiredAt(Date::now()->getTimestamp())) {
+            return new NoSudoInProgress($sudo->intendedPath);
+        }
+
+        if ($this->isBarred($account)) {
+            return $this->proofs->refuseSudo($account, $type, $sudo->surface(), 'keystone.barred');
+        }
+
+        return null;
+    }
+
+    /**
+     * Determine if the account is barred from sudo as it stands now: suspended, or owing enrollment.
+     */
+    protected function isBarred(KeystoneUser $account): bool
+    {
+        return Suspension::isSuspended($account->getAuthIdentifier())
+            || $this->decision->isOwed($account, Stage::ENROLLMENT);
+    }
+
+    /**
+     * Spend the code unless it is the account's last, which is kept for account recovery, and determine if it was spent.
+     */
+    protected function spendUnlessLast(AccountChange $change, UserRecoveryCode $code): bool
+    {
+        if ($change->isLastRecoveryCode($code)) {
+            return false;
+        }
+
+        $change->spendRecoveryCode($code);
+
+        return true;
+    }
+
+    /**
+     * Get the session's sudo-in-progress, or where to send the user on when it holds none or one whose account no longer holds a second factor of another type than the one that passed its first step.
+     *
+     * A sudo-in-progress whose second step can't be answered is ended, so the next refusal starts over at the first step.
+     */
+    protected function resume(KeystoneUser $account): SudoInProgress|NoSudoInProgress
+    {
+        $sudo = $this->session->sudoInProgress();
+
+        if ($sudo === null) {
+            return new NoSudoInProgress($this->session->intendedPath());
+        }
+
+        if ($sudo->firstFactor === null || $this->holdsSecondFactorBesides($sudo->firstFactor, $account)) {
+            return $sudo;
+        }
+
+        $this->session->endSudo();
+
+        return new NoSudoInProgress($sudo->intendedPath);
+    }
+
+    /**
+     * Determine if the account holds a second factor of another type than the named one.
+     */
+    protected function holdsSecondFactorBesides(string $type, KeystoneUser $account): bool
+    {
+        return array_diff($this->holdings->secondFactors($account), [$type]) !== [];
+    }
+
+    /**
+     * Find the named type when the sudo-in-progress's step offers it to the account.
+     */
+    protected function offered(string $name, SudoInProgress $sudo, KeystoneUser $account): ?CredentialType
+    {
+        if (! in_array($name, array_column($this->offer($sudo, $account), 'name'), true)) {
+            return null;
+        }
+
+        if ($name === RecoveryCodeType::NAME) {
+            return $this->recoveryCodeType;
+        }
+
+        return $this->types->find($name, $sudo->surface());
+    }
+
+    /**
+     * Get the types the sudo-in-progress's step offers: at the first step the types serving sign-in the account holds.
+     * At the second step, the second factors it holds of another type than the first factor's, then its recovery codes.
+     *
+     * @return array<int, array{name: string, shape: string}>
+     */
+    protected function offer(SudoInProgress $sudo, KeystoneUser $account): array
+    {
+        $held = $sudo->firstFactor === null
+            ? $this->holdings->signInTypes($account)
+            : array_diff($this->holdings->secondFactors($account), [$sudo->firstFactor]);
+
+        $types = collect($this->types->shapes($sudo->surface()))
+            ->filter(fn (array $type) => in_array($type['name'], $held, true))
+            ->values()
+            ->all();
+
+        if ($sudo->firstFactor !== null && $this->holdings->holdsRecoveryCodes($account)) {
+            $types[] = ['name' => RecoveryCodeType::NAME, 'shape' => InitiateShape::FORM->value];
+        }
+
+        return $types;
+    }
+
+    /**
+     * Determine if the answer proves the sudo-in-progress's step: a credential the account holds, and at the second step one of another type than the first factor's.
+     */
+    protected function proves(Answer $answer, SudoInProgress $sudo, KeystoneUser $account): bool
+    {
+        if ($sudo->firstFactor === null) {
+            return $this->decision->proves($answer->proof, $answer->type, $account);
+        }
+
+        return $this->decision->answers($answer->proof, $answer->type, $sudo->firstFactor, $account);
+    }
+
+    /**
+     * Get the signed-in account, refusing a guest.
+     *
+     * @throws AuthenticationException
+     */
+    protected function account(): KeystoneUser
+    {
+        return $this->session->account() ?? throw new AuthenticationException;
+    }
+}

@@ -2,15 +2,22 @@
 import InputError from '@/components/InputError.vue'
 import FormShape from '@/partials/shapes/Form.vue'
 import type { SignInType } from '@/types/auth'
+import type { RouteDefinition } from '@/wayfinder'
 
 defineProps<{
+  /** The password type as the page offers it. */
   type: SignInType
-  remember: boolean
+  /** Whether the form offers the remember-me box. */
+  remember?: boolean
+  /** Where the form posts, the password's sign-in when not given. */
+  action?: RouteDefinition<'post'>
+  /** Whether a signed-in user is confirming it is them, so the form asks for no email address. */
+  confirming?: boolean
 }>()
 </script>
 
 <template>
-  <FormShape :type="type" :remember="remember">
+  <FormShape :type="type" :remember="remember" :action="action" :confirming="confirming">
     <template #default="{ errors }">
       <div class="grid gap-2">
         <div class="flex items-center justify-between">

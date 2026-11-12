@@ -14,13 +14,13 @@ End every session of every account, yours included, with `--all`:
 
     php artisan keystone:end-sessions --all --operator="Margaret Hamilton"
 
-Keystone mails the account's owner an [alert](security-events.md#alerts) that an administrator signed them out. Pass `--no-alert` to end the sessions without one, such as when you tell the owner yourself:
+Keystone sends the account's owner an [alert](alerts.md) that an administrator signed them out. Pass `--no-alert` to end the sessions without one, such as when you tell the owner yourself:
 
     php artisan keystone:end-sessions 42 --operator="Margaret Hamilton" --no-alert
 
 Ending every account's sessions with `--all` alerts nobody.
 
-Ending an account's sessions also makes it forget every browser it signed in from, so a browser holding a stolen [device cookie](security-events.md#new-devices) stops counting apart, and the owner's next sign-in from each browser alerts as new. `--all` forgets every account's browsers.
+Ending an account's sessions also makes it forget every browser it signed in from, so a browser holding a stolen [device cookie](alerts.md#new-devices) stops counting apart, and the owner's next sign-in from each browser alerts as new. `--all` forgets every account's browsers.
 
 `--operator` names who is ending the sessions, and it is required. Keystone records it on the security event, cut to 64 characters, with control characters replaced by spaces. Use a name your team will recognise in the logs, such as an email address.
 
@@ -50,7 +50,7 @@ class UserSessionsController
 }
 ```
 
-Chain `withoutAlert()` to end the sessions without mailing the owner:
+Chain `withoutAlert()` to end the sessions without alerting the owner:
 
 ```php
 EndSessions::dispatch($user, operator: $request->user()->email)->withoutAlert();
@@ -131,11 +131,11 @@ Suspending sets the `suspended_at` column Keystone adds to your users table, and
 
 ### What gets recorded
 
-Suspending records `account.suspended`, and lifting the suspension records `account.unsuspended`, both with actor `operator` and the operator's name in the `operator` field. Each mails the account's owner an [alert](security-events.md#alerts). Set the type's slot in `notifications` to `null` to stop it.
+Suspending records `account.suspended`, and lifting the suspension records `account.unsuspended`, both with actor `operator` and the operator's name in the `operator` field. Each sends the account's owner an [alert](alerts.md). Set the type's slot in `notifications` to `null` to stop it.
 
 ## Pruning
 
-Keystone deletes what it keeps past its retention or lifetime every night with `keystone:prune`. Today that is every [known device](security-events.md#new-devices) no account signed in from within `retention.known_devices_seconds`, and every [remember-me](remember-me.md) token past its expiry. Keystone schedules the command itself, daily at midnight on one server, so your app registers nothing. It needs Laravel's scheduler running, as Laravel's [scheduling docs](https://laravel.com/docs/scheduling#running-the-scheduler) describe, and a cache store every server shares for `onOneServer()`.
+Keystone deletes what it keeps past its retention or lifetime every night with `keystone:prune`. Today that is every [known device](alerts.md#new-devices) no account signed in from within `retention.known_devices_seconds`, and every [remember-me](remember-me.md) token past its expiry. Keystone schedules the command itself, daily at midnight on one server, so your app registers nothing. It needs Laravel's scheduler running, as Laravel's [scheduling docs](https://laravel.com/docs/scheduling#running-the-scheduler) describe, and a cache store every server shares for `onOneServer()`.
 
 Run it by hand at any time:
 
@@ -145,7 +145,7 @@ A browser unseen for the retention counts as new whether or not the prune has de
 
 ## Abandoned challenges
 
-Keystone alerts the owner of an account whose [challenge](security-events.md#abandoned-challenges) a browser it doesn't know left unanswered with `keystone:alert-abandoned-challenges`. Keystone schedules the command itself, every 5 minutes on one server and never overlapping itself, so your app registers nothing. Like the prune, it needs the scheduler running and a shared cache store. It runs without a queue worker, though the alerts it sends are queued like any other.
+Keystone alerts the owner of an account whose [challenge](alerts.md#abandoned-challenges) a browser it doesn't know left unanswered with `keystone:alert-abandoned-challenges`. Keystone schedules the command itself, every 5 minutes on one server and never overlapping itself, so your app registers nothing. Like the prune, it needs the scheduler running and a shared cache store. It runs without a queue worker, though the alerts it sends are queued like any other.
 
 Run it by hand at any time:
 

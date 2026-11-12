@@ -86,8 +86,8 @@ it('records signed_out for the account when the user signs out', function () {
 
     $events = $this->securityEvents()->for($user);
 
-    expect($events->pluck('type')->all())->toBe([SecurityEventType::SIGNED_IN, SecurityEventType::SIGNED_OUT])
-        ->and($events[1]->flow)->toBeNull();
+    expect($events->pluck('type')->all())->toBe([SecurityEventType::SUDO_GRANTED, SecurityEventType::SIGNED_IN, SecurityEventType::SIGNED_OUT])
+        ->and($events[2]->flow)->toBeNull();
 });
 
 it('records nothing when a guest signs out', function () {

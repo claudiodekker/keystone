@@ -149,9 +149,9 @@ it('records session.ended with the reason expired for the account', function () 
 
     $events = $this->securityEvents()->for($user);
 
-    expect($events->pluck('type')->all())->toBe([SecurityEventType::SIGNED_IN, SecurityEventType::SESSION_ENDED])
-        ->and($events[1]->reason)->toBe('keystone.expired')
-        ->and($events[1]->flow)->toBeNull();
+    expect($events->pluck('type')->all())->toBe([SecurityEventType::SUDO_GRANTED, SecurityEventType::SIGNED_IN, SecurityEventType::SESSION_ENDED])
+        ->and($events[2]->reason)->toBe('keystone.expired')
+        ->and($events[2]->flow)->toBeNull();
 });
 
 it('records the expiry with the address of the request that found it', function () {
@@ -170,7 +170,7 @@ it('records the expiry with the address of the request that found it', function 
 
     $events = $this->securityEvents()->for($user);
 
-    expect($events->pluck('ip_address')->all())->toBe(['203.0.113.9', '198.51.100.7']);
+    expect($events->pluck('ip_address')->all())->toBe(['203.0.113.9', '203.0.113.9', '198.51.100.7']);
 });
 
 it("clears the browser's site data when the session expires", function () {
@@ -270,7 +270,7 @@ it("answers with the app's own expiry response, after ending and recording the s
 
     expect($response->getStatusCode())->toBe(418)
         ->and($answer->signedIn)->toBeFalse()
-        ->and($answer->recorded)->toBe([SecurityEventType::SIGNED_IN, SecurityEventType::SESSION_ENDED]);
+        ->and($answer->recorded)->toBe([SecurityEventType::SUDO_GRANTED, SecurityEventType::SIGNED_IN, SecurityEventType::SESSION_ENDED]);
 
     $this->assertSiteDataCleared($response, ['cache', 'storage']);
     $this->assertSignInPage($next, ['status' => __('keystone::messages.session-expired')]);

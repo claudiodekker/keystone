@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\ChallengeController;
 use App\Http\Controllers\Auth\EnrollmentController;
 use App\Http\Controllers\Auth\SignInController;
 use App\Http\Controllers\Auth\SignOutController;
+use App\Http\Controllers\Auth\SudoController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('login')->group(function () {
@@ -24,3 +25,9 @@ Route::prefix('login')->group(function () {
 });
 
 Route::post('logout', [SignOutController::class, 'destroy'])->name('logout');
+
+Route::prefix('sudo')->group(function () {
+    Route::get('/', [SudoController::class, 'show'])->name('sudo');
+    Route::post('{type}', [SudoController::class, 'store'])->name('sudo.submit');
+    Route::delete('/', [SudoController::class, 'destroy'])->name('sudo.end');
+});
