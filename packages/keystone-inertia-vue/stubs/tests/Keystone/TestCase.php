@@ -10,6 +10,7 @@ use Tests\Keystone\Assertions\GuestStepAssertions;
 use Tests\Keystone\Assertions\SessionExpiryAssertions;
 use Tests\Keystone\Assertions\SignInAssertions;
 use Tests\Keystone\Assertions\SignOutAssertions;
+use Tests\Keystone\Assertions\SudoAssertions;
 use Tests\Keystone\Assertions\ThrottledAssertions;
 
 /**
@@ -24,5 +25,6 @@ abstract class TestCase extends KeystoneTestCase
     use SessionExpiryAssertions;
     use SignInAssertions;
     use SignOutAssertions;
+    use SudoAssertions;
     use ThrottledAssertions;
 }

@@ -21,6 +21,7 @@ enum Status: string
     case SESSION_EXPIRED = 'session-expired';
     case SIGNED_OUT = 'signed-out';
     case SIGN_IN_CANCELLED = 'sign-in-cancelled';
+    case SUDO_REQUIRED = 'sudo-required';
     case THROTTLED = 'throttled';
 
     /**

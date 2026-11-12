@@ -166,9 +166,9 @@ it('records session.ended with the reason epoch when the ended session makes its
 
     $events = $this->securityEvents()->for($user);
 
-    expect($events->pluck('type')->all())->toBe([SecurityEventType::SIGNED_IN, SecurityEventType::SESSIONS_TERMINATED, SecurityEventType::SESSION_ENDED])
-        ->and($events[2]->reason)->toBe('keystone.epoch')
-        ->and($events[2]->actor)->toBe(Actor::USER);
+    expect($events->pluck('type')->all())->toBe([SecurityEventType::SUDO_GRANTED, SecurityEventType::SIGNED_IN, SecurityEventType::SESSIONS_TERMINATED, SecurityEventType::SESSION_ENDED])
+        ->and($events[3]->reason)->toBe('keystone.epoch')
+        ->and($events[3]->actor)->toBe(Actor::USER);
 });
 
 it("clears the browser's site data on the request that finds the session ended", function () {
@@ -243,7 +243,7 @@ it('ends nothing and records nothing when the transaction the job ran in rolls b
     $response = $this->get(route('login'));
 
     $this->assertAlreadySignedIn($response);
-    expect(array_column($this->securityEvents()->logged(), 'type'))->toBe(['signed_in']);
+    expect(array_column($this->securityEvents()->logged(), 'type'))->toBe(['sudo.granted', 'signed_in']);
 })->with([
     'the account' => [fn (KeystoneUser $user) => EndSessions::dispatchSync($user, operator: 'margaret')],
     'every account' => [fn () => EndAllSessions::dispatchSync(operator: 'margaret')],

@@ -10,6 +10,7 @@ use ClaudioDekker\Keystone\AppTests\Assertions\GuestStepAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\SessionExpiryAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\SignInAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\SignOutAssertions;
+use ClaudioDekker\Keystone\AppTests\Assertions\SudoAssertions;
 use ClaudioDekker\Keystone\AppTests\Assertions\ThrottledAssertions;
 use ClaudioDekker\Keystone\AppTests\Support\Browser;
 use ClaudioDekker\Keystone\AppTests\Support\CredentialTypeSupport;
@@ -58,6 +59,7 @@ trait InteractsWithKeystone
     use SessionExpiryAssertions;
     use SignInAssertions;
     use SignOutAssertions;
+    use SudoAssertions;
     use ThrottledAssertions;
 
     /**

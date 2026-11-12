@@ -5,19 +5,24 @@ namespace ClaudioDekker\Keystone\Session;
 use ClaudioDekker\Keystone\Accounts\AccountLookup;
 use ClaudioDekker\Keystone\Accounts\CredentialEpoch;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
+use ClaudioDekker\Keystone\Http\RequestContext;
 use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\StartsCeremony;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\Models\UserRememberToken;
+use ClaudioDekker\Keystone\SecurityEvents\Recorder;
+use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use ClaudioDekker\Keystone\Status;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Contracts\Config\Repository as Config;
+use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Contracts\Encryption\Encrypter;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Contracts\Routing\UrlGenerator;
 use Illuminate\Contracts\Session\Session;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
 
@@ -68,6 +73,8 @@ class SessionState
 
     /**
      * Create the session state over the request's session.
+     *
+     * The recorder is made from the container when a grant is recorded, since it reads the flow from the session state.
      */
     public function __construct(
         protected AccountLookup $accounts,
@@ -76,6 +83,8 @@ class SessionState
         protected Dispatcher $events,
         protected Config $config,
         protected Encrypter $encrypter,
+        protected Request $request,
+        protected Container $container,
     ) {
         //
     }
@@ -238,13 +247,7 @@ class SessionState
      */
     public function pendingSignIn(): ?PendingSignIn
     {
-        $phase = $this->session->get(static::PHASE);
-
-        if (! is_array($phase)) {
-            return null;
-        }
-
-        $pending = PendingSignIn::fromSession($phase);
+        $pending = PendingSignIn::fromSession($this->phase());
 
         if ($pending?->hasExpiredAt(Date::now()->getTimestamp()) !== false) {
             return null;
@@ -302,7 +305,7 @@ class SessionState
     }
 
     /**
-     * Complete a sign-in for the account, and get the path to send the user to, the one its pending sign-in kept if it has one.
+     * Complete a sign-in for the account, granting it sudo, and get the path to send the user to, the one its pending sign-in kept if it has one.
      */
     public function signIn(KeystoneUser $account): string
     {
@@ -310,8 +313,67 @@ class SessionState
 
         $this->changeAuthLevel();
         $this->enter($account);
+        $this->grantSudoForSignIn($account);
 
         return $redirectTo;
+    }
+
+    /**
+     * Get the session's sudo grant while it is live, unless it has none.
+     */
+    public function liveSudoGrant(): ?SudoGrant
+    {
+        $grant = SudoGrant::fromSession($this->phase());
+        $lifetime = $this->config->integer('keystone.sudo.lifetime_seconds');
+
+        if ($grant?->isLiveAt(Date::now()->getTimestamp(), $lifetime) !== true) {
+            return null;
+        }
+
+        return $grant;
+    }
+
+    /**
+     * Get the session's sudo-in-progress, unless it has none or it outlived its lifetime.
+     */
+    public function sudoInProgress(): ?SudoInProgress
+    {
+        $sudo = SudoInProgress::fromSession($this->phase());
+
+        if ($sudo?->hasExpiredAt(Date::now()->getTimestamp()) !== false) {
+            return null;
+        }
+
+        return $sudo;
+    }
+
+    /**
+     * Refuse the session sudo, starting a sudo-in-progress that goes on to the path in place of whatever phase it held.
+     *
+     * A live sudo-in-progress keeps its start, and goes on to the path only when it replaces the one it kept.
+     */
+    public function refuseSudo(string $intendedPath, bool $replacesIntendedPath): void
+    {
+        $sudo = $this->sudoInProgress();
+
+        if ($sudo !== null && ! $replacesIntendedPath) {
+            return;
+        }
+
+        if ($sudo !== null) {
+            $this->session->put(static::PHASE, $sudo->goingTo($intendedPath)->toSession());
+
+            return;
+        }
+
+        $sudo = new SudoInProgress(
+            intendedPath: $intendedPath,
+            epoch: $this->epoch(),
+            startedAt: Date::now()->getTimestamp(),
+        );
+
+        $this->session->forget(static::CEREMONIES);
+        $this->session->put(static::PHASE, $sudo->toSession());
     }
 
     /**
@@ -375,6 +437,20 @@ class SessionState
     }
 
     /**
+     * Get the URL as a path on the app, or null when it isn't one.
+     */
+    public function toPath(string $url): ?string
+    {
+        $path = Str::chopStart($url, $this->urls->to('/'));
+
+        if (! $this->isPath($path)) {
+            return null;
+        }
+
+        return $path;
+    }
+
+    /**
      * Get the flow a step on the surface is in, or null when it is in none, such as signing out.
      */
     public function flow(?Surface $surface): ?Flow
@@ -385,6 +461,40 @@ class SessionState
             Surface::SIGN_IN => Flow::SIGN_IN,
             default => null,
         };
+    }
+
+    /**
+     * Grant the session sudo bound to the request's subnet once its sign-in completed, recording the grant, unless the request's address has no subnet.
+     */
+    protected function grantSudoForSignIn(KeystoneUser $account): void
+    {
+        $subnet = RequestContext::of($this->request)?->subnet;
+
+        if ($subnet === null) {
+            return;
+        }
+
+        $grant = new SudoGrant(
+            grantedAt: Date::now()->getTimestamp(),
+            subnet: $subnet,
+        );
+
+        $this->session->put(static::PHASE, $grant->toSession());
+
+        $recorder = $this->container->make(Recorder::class);
+        $recorder->record(SecurityEventType::SUDO_GRANTED, account: $account, reason: 'keystone.sign_in');
+    }
+
+    /**
+     * Get the session's phase as its session value, empty when it holds none.
+     *
+     * @return array<array-key, mixed>
+     */
+    protected function phase(): array
+    {
+        $phase = $this->session->get(static::PHASE);
+
+        return is_array($phase) ? $phase : [];
     }
 
     /**
@@ -452,13 +562,7 @@ class SessionState
             return '/';
         }
 
-        $path = Str::chopStart($intended, $this->urls->to('/'));
-
-        if (! $this->isPath($path)) {
-            return '/';
-        }
-
-        return $path;
+        return $this->toPath($intended) ?? '/';
     }
 
     /**

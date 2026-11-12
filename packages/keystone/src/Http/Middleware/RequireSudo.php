@@ -2,6 +2,7 @@
 
 namespace ClaudioDekker\Keystone\Http\Middleware;
 
+use ClaudioDekker\Keystone\Http\SudoGate;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -17,10 +18,21 @@ class RequireSudo
     public const string ALIAS = 'sudo';
 
     /**
-     * Let the request through.
+     * Create the middleware.
+     */
+    public function __construct(
+        protected SudoGate $gate,
+    ) {
+        //
+    }
+
+    /**
+     * Let the request through only once the gate does.
      */
     public function handle(Request $request, Closure $next): Response
     {
+        $this->gate->ensure($request);
+
         return $next($request);
     }
 }

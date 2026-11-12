@@ -4,6 +4,7 @@ use ClaudioDekker\Keystone\Tests\Fixtures\Http\Controllers\ChallengeController;
 use ClaudioDekker\Keystone\Tests\Fixtures\Http\Controllers\EnrollmentController;
 use ClaudioDekker\Keystone\Tests\Fixtures\Http\Controllers\SignInController;
 use ClaudioDekker\Keystone\Tests\Fixtures\Http\Controllers\SignOutController;
+use ClaudioDekker\Keystone\Tests\Fixtures\Http\Controllers\SudoController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('login', [SignInController::class, 'show'])->name('login');
@@ -18,3 +19,5 @@ Route::post('login/enrollment/{type}', [EnrollmentController::class, 'store'])->
 Route::delete('login/enrollment', [EnrollmentController::class, 'destroy'])->name('login.enrollment.cancel');
 
 Route::post('logout', [SignOutController::class, 'destroy'])->name('logout');
+
+Route::get('sudo', [SudoController::class, 'show'])->name('sudo');
