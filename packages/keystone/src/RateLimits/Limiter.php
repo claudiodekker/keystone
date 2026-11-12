@@ -14,6 +14,7 @@ use ClaudioDekker\Keystone\Methods\OneTimeCode;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\SecurityEvents\Recorder;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
+use ClaudioDekker\Keystone\Session\Flow;
 use ClaudioDekker\Keystone\Session\SessionState;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Cache\RateLimiter;
@@ -101,7 +102,7 @@ class Limiter
      *
      * The subject is the account the attempt names, or the identifier it was given when that names none.
      * A known device of the account keeps a count of its own, and every other browser shares one, each with the full allowance.
-     * A one-time code is also counted against a daily ceiling, but only once the hourly count let it through. A store failure is reported and refuses the attempt.
+     * A one-time code is also counted against a daily ceiling, but only once the hourly count let it through, and shares its count between the challenge and sudo. A store failure is reported and refuses the attempt.
      *
      * @throws ThrottledException
      */
@@ -109,7 +110,7 @@ class Limiter
     {
         $flow = $this->session->flow($surface) ?? throw MissingFlowException::forSurface($surface);
         $account = $subject instanceof KeystoneUser ? $subject : null;
-        $parts = [...$this->subject($subject), $this->source($account), $type->name(), $flow->value];
+        $parts = [...$this->subject($subject), $this->source($account), $type->name(), $this->countedFlow($type, $flow)->value];
         $allowance = $this->config->integer('keystone.rate_limits.failed_attempts_per_hour');
 
         $counts = [$this->takeWithin(Limit::FAILED_ATTEMPT, $parts, $allowance, $account, $surface, $type)];
@@ -211,6 +212,18 @@ class Limiter
     protected function secondsUntil(int $timestamp): int
     {
         return $timestamp - Date::now()->getTimestamp();
+    }
+
+    /**
+     * Get the flow a failed attempt of the type is counted in: the challenge's for a one-time code in the sudo flow, so a stolen session gets no fresh guesses, else its own.
+     */
+    protected function countedFlow(CredentialType $type, Flow $flow): Flow
+    {
+        if ($type instanceof OneTimeCode && $flow === Flow::SUDO) {
+            return Flow::CHALLENGE;
+        }
+
+        return $flow;
     }
 
     /**
