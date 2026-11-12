@@ -348,6 +348,23 @@ class SessionState
     }
 
     /**
+     * Grant the session sudo bound to the subnet, in place of its sudo-in-progress, on a fresh session id.
+     */
+    public function grantSudo(string $subnet): void
+    {
+        $this->changeAuthLevel();
+        $this->putSudoGrant($subnet);
+    }
+
+    /**
+     * Get the subnet of the request's address the session's sudo grant is bound to, or null when the address has none.
+     */
+    public function subnet(): ?string
+    {
+        return RequestContext::of($this->request)?->subnet;
+    }
+
+    /**
      * Refuse the session sudo, starting a sudo-in-progress that goes on to the path in place of whatever phase it held.
      *
      * A live sudo-in-progress keeps its start, and goes on to the path only when it replaces the one it kept.
@@ -452,9 +469,18 @@ class SessionState
 
     /**
      * Get the flow a step on the surface is in, or null when it is in none, such as signing out.
+     *
+     * A signed-in session whose sudo-in-progress is at the surface is in the sudo flow.
      */
     public function flow(?Surface $surface): ?Flow
     {
+        if ($surface !== null
+            && $this->sudoInProgress()?->surface() === $surface
+            && $this->isSignedIn()
+        ) {
+            return Flow::SUDO;
+        }
+
         return match ($surface) {
             Surface::CHALLENGE => Flow::CHALLENGE,
             Surface::ENROLLMENT => Flow::ENROLLMENT,
@@ -468,21 +494,29 @@ class SessionState
      */
     protected function grantSudoForSignIn(KeystoneUser $account): void
     {
-        $subnet = RequestContext::of($this->request)?->subnet;
+        $subnet = $this->subnet();
 
         if ($subnet === null) {
             return;
         }
 
+        $this->putSudoGrant($subnet);
+
+        $recorder = $this->container->make(Recorder::class);
+        $recorder->record(SecurityEventType::SUDO_GRANTED, account: $account, reason: 'keystone.sign_in');
+    }
+
+    /**
+     * Put a sudo grant bound to the subnet in the session's phase, granted now.
+     */
+    protected function putSudoGrant(string $subnet): void
+    {
         $grant = new SudoGrant(
             grantedAt: Date::now()->getTimestamp(),
             subnet: $subnet,
         );
 
         $this->session->put(static::PHASE, $grant->toSession());
-
-        $recorder = $this->container->make(Recorder::class);
-        $recorder->record(SecurityEventType::SUDO_GRANTED, account: $account, reason: 'keystone.sign_in');
     }
 
     /**

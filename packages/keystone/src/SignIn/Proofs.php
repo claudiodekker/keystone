@@ -20,6 +20,7 @@ use ClaudioDekker\Keystone\Session\PendingSignIn;
 use ClaudioDekker\Keystone\Session\RememberTokens;
 use ClaudioDekker\Keystone\Session\SessionState;
 use ClaudioDekker\Keystone\Session\Stage;
+use ClaudioDekker\Keystone\Session\SudoInProgress;
 use Illuminate\Database\Eloquent\Collection;
 use Throwable;
 
@@ -159,6 +160,30 @@ class Proofs
     }
 
     /**
+     * Grant the session sudo bound to the subnet once the answer is admitted, recording the grant, then write the proof's rehash.
+     */
+    public function grantSudo(KeystoneUser $account, Answer $answer, SudoInProgress $sudo, string $subnet): SudoGranted|Refused
+    {
+        if (! $this->admit($account, $answer, $sudo)) {
+            return $this->refuse($account, $answer);
+        }
+
+        $this->recorder->record(
+            SecurityEventType::SUDO_GRANTED,
+            account: $account,
+            surface: $answer->surface,
+            credentialType: $answer->type,
+            credential: $answer->proof->credential,
+        );
+
+        $this->session->grantSudo($subnet);
+
+        $this->rehash($account, $answer);
+
+        return new SudoGranted($sudo->intendedPath);
+    }
+
+    /**
      * Refuse the answer, recording the rejected proof for the account it was given for.
      */
     public function refuse(?KeystoneUser $account, Answer $answer): Refused
@@ -179,7 +204,7 @@ class Proofs
      *
      * A barred account's attempt stays counted, so the limit never tells that its credential was right.
      */
-    protected function admit(KeystoneUser $account, Answer $answer, ?PendingSignIn $writer): bool
+    protected function admit(KeystoneUser $account, Answer $answer, PendingSignIn|SudoInProgress|null $writer): bool
     {
         if (Suspension::isSuspended($account->getAuthIdentifier())) {
             return false;
@@ -197,7 +222,7 @@ class Proofs
     /**
      * Advance the proven credential to the secret the proof carries, and determine if the proof still holds.
      */
-    protected function advance(KeystoneUser $account, Answer $answer, ?PendingSignIn $writer): bool
+    protected function advance(KeystoneUser $account, Answer $answer, PendingSignIn|SudoInProgress|null $writer): bool
     {
         $secret = $answer->proof->advancedSecret();
 

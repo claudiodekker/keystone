@@ -34,4 +34,12 @@ class SudoController extends KeystoneSudoController
     {
         return redirect($redirectTo);
     }
+
+    /**
+     * Send the user on to where they were going once sudo is granted.
+     */
+    protected function sendSudoGranted(Request $request, string $redirectTo): RedirectResponse
+    {
+        return redirect($redirectTo);
+    }
 }

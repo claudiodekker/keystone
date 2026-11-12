@@ -56,7 +56,7 @@ class SudoGate
 
         $grant = $this->session->liveSudoGrant();
 
-        if ($grant === null || $grant->subnet !== RequestContext::of($request)?->subnet) {
+        if ($grant === null || $grant->subnet !== $this->session->subnet()) {
             $this->refuse($request);
         }
 

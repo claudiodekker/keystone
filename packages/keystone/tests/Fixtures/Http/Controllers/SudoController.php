@@ -27,4 +27,12 @@ class SudoController extends BaseSudoController
     {
         return redirect($redirectTo);
     }
+
+    /**
+     * Send the user on to where they were going once sudo is granted.
+     */
+    protected function sendSudoGranted(Request $request, string $redirectTo): Response
+    {
+        return redirect($redirectTo);
+    }
 }

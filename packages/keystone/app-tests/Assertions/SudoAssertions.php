@@ -42,6 +42,14 @@ trait SudoAssertions
     }
 
     /**
+     * Assert the response sent the user on to the given path once sudo was granted.
+     */
+    public function assertSudoGranted(TestResponse $response, string $redirectTo): void
+    {
+        $response->assertRedirect($redirectTo);
+    }
+
+    /**
      * Assert the response sent a session that holds no sudo-in-progress on to the given path.
      */
     public function assertNoSudoInProgress(TestResponse $response, string $redirectTo): void

@@ -21,3 +21,4 @@ Route::delete('login/enrollment', [EnrollmentController::class, 'destroy'])->nam
 Route::post('logout', [SignOutController::class, 'destroy'])->name('logout');
 
 Route::get('sudo', [SudoController::class, 'show'])->name('sudo');
+Route::post('sudo/{type}', [SudoController::class, 'store'])->name('sudo.submit');

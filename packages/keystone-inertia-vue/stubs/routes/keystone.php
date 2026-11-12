@@ -26,4 +26,7 @@ Route::prefix('login')->group(function () {
 
 Route::post('logout', [SignOutController::class, 'destroy'])->name('logout');
 
-Route::get('sudo', [SudoController::class, 'show'])->name('sudo');
+Route::prefix('sudo')->group(function () {
+    Route::get('/', [SudoController::class, 'show'])->name('sudo');
+    Route::post('{type}', [SudoController::class, 'store'])->name('sudo.submit');
+});

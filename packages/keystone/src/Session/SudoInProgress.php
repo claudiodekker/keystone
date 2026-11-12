@@ -2,6 +2,8 @@
 
 namespace ClaudioDekker\Keystone\Session;
 
+use ClaudioDekker\Keystone\Methods\Surface;
+
 /**
  * @internal
  *
@@ -86,6 +88,14 @@ readonly class SudoInProgress
             epoch: $this->epoch,
             startedAt: $this->startedAt,
         );
+    }
+
+    /**
+     * Get the surface the sudo-in-progress's step verifies on.
+     */
+    public function surface(): Surface
+    {
+        return Surface::SIGN_IN;
     }
 
     /**

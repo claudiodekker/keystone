@@ -224,6 +224,14 @@ trait InteractsWithKeystone
     }
 
     /**
+     * Get how many seconds sudo lasts after it was granted, as the app configures it.
+     */
+    public function sudoLifetimeSeconds(): int
+    {
+        return config()->integer('keystone.sudo.lifetime_seconds');
+    }
+
+    /**
      * Get how many seconds a remember-me cookie restores for after its sign-in as the app configures it, skipping the test when the app turned remember me off.
      */
     public function rememberLifetimeSeconds(): int
