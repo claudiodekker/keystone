@@ -15,12 +15,23 @@
       {{ type.name }}
     </button>
   </div>
+
+  <component
+    :is="componentFor(selected)"
+    v-if="selected"
+    :key="selected.name"
+    :type="selected"
+    :action="submit(selected.name)"
+    confirming
+  />
 </template>
 
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3'
 import { computed, ref } from 'vue'
 import AuthLayout from '@/layouts/AuthLayout.vue'
+import { componentFor } from '@/partials'
+import { submit } from '@/routes/sudo'
 import type { SudoPage } from '@/types/auth'
 
 defineOptions({ layout: AuthLayout })
