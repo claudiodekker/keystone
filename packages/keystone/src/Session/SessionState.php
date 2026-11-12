@@ -591,13 +591,14 @@ class SessionState
     }
 
     /**
-     * Get the Unix second a ceremony started now ends at: its lifetime after now, or the end of the pending sign-in it was started under when that comes first.
+     * Get the Unix second a ceremony started now ends at: its lifetime after now, or the end of the pending sign-in or sudo-in-progress it was started under when that comes first.
      */
     protected function ceremonyEndsAt(): int
     {
         $endsAt = Date::now()->getTimestamp() + static::CEREMONY_LIFETIME_SECONDS;
+        $phaseEndsAt = $this->pendingSignIn()?->endsAt() ?? $this->sudoInProgress()?->endsAt() ?? $endsAt;
 
-        return min($endsAt, $this->pendingSignIn()?->endsAt() ?? $endsAt);
+        return min($endsAt, $phaseEndsAt);
     }
 
     /**

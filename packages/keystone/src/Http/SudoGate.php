@@ -15,19 +15,9 @@ use Illuminate\Http\Request;
 class SudoGate
 {
     /**
-     * The request attribute that holds how the gate answered the request.
+     * The request attribute that marks a request the gate refused.
      */
-    protected const string ANSWER = self::class;
-
-    /**
-     * The answer of a request the gate let through.
-     */
-    protected const string PASSED = 'passed';
-
-    /**
-     * The answer of a request the gate refused.
-     */
-    protected const string REFUSED = 'refused';
+    protected const string REFUSED = self::class;
 
     /**
      * Create the gate.
@@ -42,7 +32,7 @@ class SudoGate
     /**
      * Let the request through when its session holds a live sudo grant from the request's subnet, else refuse it by throwing.
      *
-     * A guest is refused before any grant is read. A request the gate already let through is let through again without a second look.
+     * A guest is refused before any grant is read.
      * A live grant used from another subnet is revoked, recorded and alerted before the request is refused.
      *
      * @throws AuthenticationException
@@ -52,10 +42,6 @@ class SudoGate
     {
         if (! $this->session->isSignedIn()) {
             throw new AuthenticationException;
-        }
-
-        if ($request->attributes->get(static::ANSWER) === static::PASSED) {
-            return;
         }
 
         $grant = $this->session->liveSudoGrant();
@@ -68,8 +54,6 @@ class SudoGate
             $this->revoke();
             $this->refuse($request);
         }
-
-        $request->attributes->set(static::ANSWER, static::PASSED);
     }
 
     /**
@@ -77,7 +61,7 @@ class SudoGate
      */
     public static function refused(Request $request): bool
     {
-        return $request->attributes->get(static::ANSWER) === static::REFUSED;
+        return $request->attributes->get(static::REFUSED) === true;
     }
 
     /**
@@ -97,7 +81,7 @@ class SudoGate
     {
         $this->session->refuseSudo($this->intendedPath($request), replacesIntendedPath: $this->isBrowserGet($request));
 
-        $request->attributes->set(static::ANSWER, static::REFUSED);
+        $request->attributes->set(static::REFUSED, true);
 
         throw SudoRequiredException::forRequest();
     }

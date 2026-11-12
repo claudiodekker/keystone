@@ -79,6 +79,12 @@ it('ends every ceremony at each change of auth level', function (Closure $change
     'a hold' => [fn (SessionState $session, User $ada) => $session->hold($ada, app(CredentialTypes::class)->find('form', Surface::SIGN_IN), Stage::CHALLENGE)],
     'a sign-in' => [fn (SessionState $session, User $ada) => $session->signIn($ada)],
     'a cancel' => [fn (SessionState $session) => $session->dropPendingSignIn()],
+    'a sudo grant' => [fn (SessionState $session) => $session->grantSudo('203.0.113.0/24')],
+    "passing sudo's first step" => [function (SessionState $session) {
+        $session->refuseSudo('/', replacesIntendedPath: true);
+        $session->passSudoFirstFactor($session->sudoInProgress(), app(CredentialTypes::class)->find('form', Surface::SIGN_IN));
+    }],
+    'ending sudo' => [fn (SessionState $session) => $session->endSudo()],
 ]);
 
 it('ends a ceremony 10 minutes after its start', function () {
@@ -102,6 +108,23 @@ it('ends a ceremony with the pending sign-in it was started under', function () 
     $type = new FakeCeremonyType;
     $session = app(SessionState::class);
     $session->hold($ada, app(CredentialTypes::class)->find('form', Surface::SIGN_IN), Stage::CHALLENGE);
+    $this->travel(10 * 60)->seconds();
+    $session->startCeremony($type, Surface::CHALLENGE);
+
+    $this->travel(5 * 60 - 1)->seconds();
+    $lastSecond = $session->ceremony($type, Surface::CHALLENGE);
+    $this->travel(1)->seconds();
+    $ended = $session->ceremony($type, Surface::CHALLENGE);
+
+    expect($lastSecond)->not->toBeNull()
+        ->and($ended)->toBeNull();
+});
+
+it('ends a ceremony with the sudo-in-progress it was started under', function () {
+    $this->freezeSecond();
+    $type = new FakeCeremonyType;
+    $session = app(SessionState::class);
+    $session->refuseSudo('/', replacesIntendedPath: true);
     $this->travel(10 * 60)->seconds();
     $session->startCeremony($type, Surface::CHALLENGE);
 
