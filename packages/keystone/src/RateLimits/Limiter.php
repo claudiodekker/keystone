@@ -102,7 +102,8 @@ class Limiter
      *
      * The subject is the account the attempt names, or the identifier it was given when that names none.
      * A known device of the account keeps a count of its own, and every other browser shares one, each with the full allowance.
-     * A one-time code is also counted against a daily ceiling, but only once the hourly count let it through, and shares its count between the challenge and sudo. A store failure is reported and refuses the attempt.
+     * A one-time code is also counted against a daily ceiling, but only once the hourly count let it through, and shares its count between the challenge and sudo.
+     * A store failure is reported and refuses the attempt.
      *
      * @throws ThrottledException
      */

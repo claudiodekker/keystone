@@ -252,9 +252,9 @@ class Proofs
     }
 
     /**
-     * Determine if the answer the sudo-in-progress was given may go on: its proof's advanced secret, if any, is written in one locked account change the sudo-in-progress still writes, so the attempt is given back.
+     * Determine if the proven answer may go on at sudo, writing the proof's advanced secret, and give its attempt back when it may.
      *
-     * The change runs even when the proof advances nothing, so an account that left the sudo-in-progress's credential epoch while the answer was checked is never granted.
+     * An account that left the sudo-in-progress's credential epoch while the answer was checked may not, even when the proof advances nothing.
      */
     protected function admitForSudo(KeystoneUser $account, Answer $answer, SudoInProgress $sudo): bool
     {
@@ -266,7 +266,7 @@ class Proofs
         }
 
         try {
-            $this->accountChanges->change($account, fn (AccountChange $change) => $secret === null ? null : $change->advance($credential, $secret), $sudo);
+            $this->accountChanges->change($account, fn (AccountChange $change) => $this->advanceIn($change, $credential, $secret), $sudo);
         } catch (AccountChangeRefusedException) {
             return false;
         }
@@ -274,6 +274,18 @@ class Proofs
         $this->limiter->giveBack($answer->attempt);
 
         return true;
+    }
+
+    /**
+     * Advance the credential to the secret within the change, when the proof carries one.
+     */
+    protected function advanceIn(AccountChange $change, ?UserCredential $credential, ?string $secret): void
+    {
+        if ($credential === null || $secret === null) {
+            return;
+        }
+
+        $change->advance($credential, $secret);
     }
 
     /**

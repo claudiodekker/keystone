@@ -389,32 +389,29 @@ class SessionState
     }
 
     /**
-     * Refuse the session sudo, starting a sudo-in-progress that goes on to the path in place of whatever phase it held.
-     *
-     * A live sudo-in-progress keeps its start, and goes on to the path only when it replaces the one it kept.
+     * Refuse the session sudo for a page it can visit again, sending the user to it once granted: its live sudo-in-progress goes there, keeping its start, or a new one starts.
      */
-    public function refuseSudo(string $intendedPath, bool $replacesIntendedPath): void
+    public function refuseSudoGoingTo(string $intendedPath): void
     {
         $sudo = $this->sudoInProgress();
 
-        if ($sudo !== null && ! $replacesIntendedPath) {
-            return;
-        }
-
-        if ($sudo !== null) {
-            $this->session->put(static::PHASE, $sudo->goingTo($intendedPath)->toSession());
+        if ($sudo === null) {
+            $this->startSudo($intendedPath);
 
             return;
         }
 
-        $sudo = new SudoInProgress(
-            intendedPath: $intendedPath,
-            epoch: $this->epoch(),
-            startedAt: Date::now()->getTimestamp(),
-        );
+        $this->session->put(static::PHASE, $sudo->goingTo($intendedPath)->toSession());
+    }
 
-        $this->session->forget(static::CEREMONIES);
-        $this->session->put(static::PHASE, $sudo->toSession());
+    /**
+     * Refuse the session sudo for a change made from the page at the path: its live sudo-in-progress is kept as it is, or a new one starts that goes back to that page.
+     */
+    public function refuseSudoReturningTo(string $previousPath): void
+    {
+        if ($this->sudoInProgress() === null) {
+            $this->startSudo($previousPath);
+        }
     }
 
     /**
@@ -525,6 +522,21 @@ class SessionState
             Surface::SIGN_IN => Flow::SIGN_IN,
             default => null,
         };
+    }
+
+    /**
+     * Start a sudo-in-progress that goes on to the path, in place of whatever phase the session held, ending its ceremonies.
+     */
+    protected function startSudo(string $intendedPath): void
+    {
+        $sudo = new SudoInProgress(
+            intendedPath: $intendedPath,
+            epoch: $this->epoch(),
+            startedAt: Date::now()->getTimestamp(),
+        );
+
+        $this->session->forget(static::CEREMONIES);
+        $this->session->put(static::PHASE, $sudo->toSession());
     }
 
     /**

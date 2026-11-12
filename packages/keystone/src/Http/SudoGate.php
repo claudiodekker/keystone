@@ -30,9 +30,8 @@ class SudoGate
     }
 
     /**
-     * Let the request through when its session holds a live sudo grant from the request's subnet, else refuse it by throwing.
+     * Let the request through when its session holds a live sudo grant from the request's subnet.
      *
-     * A guest is refused before any grant is read.
      * A live grant used from another subnet is revoked, recorded and alerted before the request is refused.
      *
      * @throws AuthenticationException
@@ -51,7 +50,7 @@ class SudoGate
         }
 
         if ($grant->subnet !== $this->session->subnet()) {
-            $this->revoke();
+            $this->recordNetworkChange();
             $this->refuse($request);
         }
     }
@@ -65,9 +64,9 @@ class SudoGate
     }
 
     /**
-     * Record the revocation of the session's grant, which its refusal ends, alerting the owner.
+     * Record that the session's live grant was used from another network, alerting the owner, before the refusal ends it.
      */
-    protected function revoke(): void
+    protected function recordNetworkChange(): void
     {
         $this->recorder->record(SecurityEventType::SUDO_NETWORK_CHANGED, account: $this->session->account());
     }
@@ -79,7 +78,7 @@ class SudoGate
      */
     protected function refuse(Request $request): never
     {
-        $this->session->refuseSudo($this->intendedPath($request), replacesIntendedPath: $this->isBrowserGet($request));
+        $this->refuseSession($request);
 
         $request->attributes->set(static::REFUSED, true);
 
@@ -87,13 +86,25 @@ class SudoGate
     }
 
     /**
-     * Get the path to send the user to once granted: a browser's GET goes back to its own URL, anything else to the same-origin page it came from, else the root.
+     * Refuse the request's session sudo, keeping where to send the user once granted: a browser's GET goes back to its own URL, anything else to the page it came from.
      */
-    protected function intendedPath(Request $request): string
+    protected function refuseSession(Request $request): void
     {
-        $url = $this->isBrowserGet($request) ? $request->fullUrl() : $request->headers->get('referer');
+        if ($this->isBrowserGet($request)) {
+            $this->session->refuseSudoGoingTo($this->pathOf($request->fullUrl()));
 
-        if (! is_string($url)) {
+            return;
+        }
+
+        $this->session->refuseSudoReturningTo($this->pathOf($request->headers->get('referer')));
+    }
+
+    /**
+     * Get the URL as a path on the app, or the root when it isn't one, such as a page of another site.
+     */
+    protected function pathOf(?string $url): string
+    {
+        if ($url === null) {
             return '/';
         }
 

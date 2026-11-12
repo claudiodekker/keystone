@@ -38,7 +38,7 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 class Sudo
 {
     /**
-     * Create the sudo replay.
+     * Create the sudo flow.
      */
     public function __construct(
         protected AccountChanges $accountChanges,
@@ -305,7 +305,8 @@ class Sudo
     }
 
     /**
-     * Get the types the sudo-in-progress's step offers: the types serving sign-in the account holds, and at the second step the second factors it holds of another type than the first factor's, then its recovery codes.
+     * Get the types the sudo-in-progress's step offers: at the first step the types serving sign-in the account holds.
+     * At the second step, the second factors it holds of another type than the first factor's, then its recovery codes.
      *
      * @return array<int, array{name: string, shape: string}>
      */

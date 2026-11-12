@@ -81,7 +81,7 @@ it('ends every ceremony at each change of auth level', function (Closure $change
     'a cancel' => [fn (SessionState $session) => $session->dropPendingSignIn()],
     'a sudo grant' => [fn (SessionState $session) => $session->grantSudo('203.0.113.0/24')],
     "passing sudo's first step" => [function (SessionState $session) {
-        $session->refuseSudo('/', replacesIntendedPath: true);
+        $session->refuseSudoGoingTo('/');
         $session->passSudoFirstFactor($session->sudoInProgress(), app(CredentialTypes::class)->find('form', Surface::SIGN_IN));
     }],
     'ending sudo' => [fn (SessionState $session) => $session->endSudo()],
@@ -124,7 +124,7 @@ it('ends a ceremony with the sudo-in-progress it was started under', function ()
     $this->freezeSecond();
     $type = new FakeCeremonyType;
     $session = app(SessionState::class);
-    $session->refuseSudo('/', replacesIntendedPath: true);
+    $session->refuseSudoGoingTo('/');
     $this->travel(10 * 60)->seconds();
     $session->startCeremony($type, Surface::CHALLENGE);
 

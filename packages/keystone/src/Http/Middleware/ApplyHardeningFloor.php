@@ -59,7 +59,7 @@ class ApplyHardeningFloor
     }
 
     /**
-     * Determine if the request's route is Keystone's, by its controller class, or the sudo gate refused the request on any route.
+     * Determine if the floor covers the request: a Keystone route, or any route the sudo gate refused it on.
      */
     public static function covers(Request $request): bool
     {
