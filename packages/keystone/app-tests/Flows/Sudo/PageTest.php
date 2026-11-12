@@ -63,3 +63,25 @@ it('sends a session without a sudo-in-progress or an intended URL on to the root
 
     $this->assertNoSudoInProgress($response, '/');
 });
+
+it('ends a sudo-in-progress fifteen minutes after the refusal that started it, however often it is refused again', function () {
+    $user = $this->createUser();
+    $this->signInWithoutSudo($user);
+    $gated = $this->sudoGatedPage();
+    $this->get($gated);
+
+    Auth::forgetGuards();
+    $this->travel(10 * 60)->seconds();
+    $this->get($gated);
+
+    Auth::forgetGuards();
+    $this->travel(5 * 60 - 1)->seconds();
+    $beforeTheEnd = $this->get(route('sudo'));
+
+    Auth::forgetGuards();
+    $this->travel(1)->second();
+    $atTheEnd = $this->get(route('sudo'));
+
+    $this->assertSudoPage($beforeTheEnd);
+    $this->assertNoSudoInProgress($atTheEnd, '/');
+});
