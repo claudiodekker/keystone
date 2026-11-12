@@ -5,6 +5,7 @@ namespace ClaudioDekker\Keystone\SignIn;
 use ClaudioDekker\Keystone\Accounts\AccountChange;
 use ClaudioDekker\Keystone\Accounts\AccountChanges;
 use ClaudioDekker\Keystone\Accounts\Holdings;
+use ClaudioDekker\Keystone\Accounts\Suspension;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
 use ClaudioDekker\Keystone\Exceptions\AccountChangeRefusedException;
 use ClaudioDekker\Keystone\Exceptions\ThrottledException;
@@ -27,6 +28,7 @@ use ClaudioDekker\Keystone\Status;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Contracts\Validation\Factory as ValidationFactory;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
@@ -101,7 +103,7 @@ class Sudo
 
         return $this->floor->hold(
             fn () => $this->prove($type, $validated, $sudo, $account),
-            fn (SudoGranted|SudoFirstFactorPassed|Refused|LastRecoveryCodeKept $outcome) => $outcome instanceof SudoGranted || $outcome instanceof SudoFirstFactorPassed,
+            fn (SudoGranted|SudoFirstFactorPassed|Refused|LastRecoveryCodeKept|NoSudoInProgress $outcome) => $outcome instanceof SudoGranted || $outcome instanceof SudoFirstFactorPassed,
         );
     }
 
@@ -139,7 +141,7 @@ class Sudo
      *
      * @throws ThrottledException
      */
-    protected function prove(CredentialType $type, array $validated, SudoInProgress $sudo, KeystoneUser $account): SudoGranted|SudoFirstFactorPassed|Refused|LastRecoveryCodeKept
+    protected function prove(CredentialType $type, array $validated, SudoInProgress $sudo, KeystoneUser $account): SudoGranted|SudoFirstFactorPassed|Refused|LastRecoveryCodeKept|NoSudoInProgress
     {
         $surface = $sudo->surface();
         $attempt = $this->limiter->takeFailedAttempt($type, $surface, $account);
@@ -159,6 +161,12 @@ class Sudo
             return $this->proofs->refuseSudo($account, $type, $surface, $answer->proof->reason);
         }
 
+        $refusal = $this->refuseBeforeWriting($sudo, $account, $type);
+
+        if ($refusal !== null) {
+            return $refusal;
+        }
+
         if ($sudo->firstFactor === null && $this->decision->owed($account, $type) === Stage::CHALLENGE) {
             return $this->proofs->passSudoFirstFactor($account, $answer, $sudo);
         }
@@ -171,7 +179,7 @@ class Sudo
      *
      * @param  array<string, mixed>  $validated
      */
-    protected function spend(RecoveryCodeType $type, array $validated, SudoInProgress $sudo, KeystoneUser $account, FailedAttempt $attempt, string $subnet): SudoGranted|Refused|LastRecoveryCodeKept
+    protected function spend(RecoveryCodeType $type, array $validated, SudoInProgress $sudo, KeystoneUser $account, FailedAttempt $attempt, string $subnet): SudoGranted|Refused|LastRecoveryCodeKept|NoSudoInProgress
     {
         $codes = UserRecoveryCode::query()
             ->where('user_id', $account->getAuthIdentifier())
@@ -190,6 +198,12 @@ class Sudo
             return $this->proofs->refuseSudo($account, $type, Surface::CHALLENGE, $answer->proof->reason);
         }
 
+        $refusal = $this->refuseBeforeWriting($sudo, $account, $type);
+
+        if ($refusal !== null) {
+            return $refusal;
+        }
+
         try {
             $spent = $this->accountChanges->change($account, fn (AccountChange $change) => $this->spendUnlessLast($change, $code), $sudo);
         } catch (AccountChangeRefusedException) {
@@ -203,6 +217,31 @@ class Sudo
         }
 
         return $this->proofs->grantSudo($account, $answer, $sudo, $subnet);
+    }
+
+    /**
+     * Get the refusal of a proven answer that may write nothing: its sudo-in-progress ran out while it was checked, or its account is barred, else null.
+     */
+    protected function refuseBeforeWriting(SudoInProgress $sudo, KeystoneUser $account, CredentialType $type): Refused|NoSudoInProgress|null
+    {
+        if ($sudo->hasExpiredAt(Date::now()->getTimestamp())) {
+            return new NoSudoInProgress($sudo->intendedPath);
+        }
+
+        if ($this->isBarred($account)) {
+            return $this->proofs->refuseSudo($account, $type, $sudo->surface(), 'keystone.barred');
+        }
+
+        return null;
+    }
+
+    /**
+     * Determine if the account is barred from sudo as it stands now: suspended, or owing enrollment.
+     */
+    protected function isBarred(KeystoneUser $account): bool
+    {
+        return Suspension::isSuspended($account->getAuthIdentifier())
+            || $this->decision->isOwed($account, Stage::ENROLLMENT);
     }
 
     /**

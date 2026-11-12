@@ -164,7 +164,7 @@ class Proofs
      */
     public function passSudoFirstFactor(KeystoneUser $account, Answer $answer, SudoInProgress $sudo): SudoFirstFactorPassed|Refused
     {
-        if (! $this->admit($account, $answer, $sudo)) {
+        if (! $this->admitForSudo($account, $answer, $sudo)) {
             return $this->refuseSudo($account, $answer->type, $answer->surface, $answer->proof->reason);
         }
 
@@ -180,7 +180,7 @@ class Proofs
      */
     public function grantSudo(KeystoneUser $account, Answer $answer, SudoInProgress $sudo, string $subnet): SudoGranted|Refused
     {
-        if (! $this->admit($account, $answer, $sudo)) {
+        if (! $this->admitForSudo($account, $answer, $sudo)) {
             return $this->refuseSudo($account, $answer->type, $answer->surface, $answer->proof->reason);
         }
 
@@ -243,6 +243,31 @@ class Proofs
         }
 
         if (! $this->advance($account, $answer, $writer)) {
+            return false;
+        }
+
+        $this->limiter->giveBack($answer->attempt);
+
+        return true;
+    }
+
+    /**
+     * Determine if the answer the sudo-in-progress was given may go on: its proof's advanced secret, if any, is written in one locked account change the sudo-in-progress still writes, so the attempt is given back.
+     *
+     * The change runs even when the proof advances nothing, so an account that left the sudo-in-progress's credential epoch while the answer was checked is never granted.
+     */
+    protected function admitForSudo(KeystoneUser $account, Answer $answer, SudoInProgress $sudo): bool
+    {
+        $secret = $answer->proof->advancedSecret();
+        $credential = $answer->credential();
+
+        if ($secret !== null && $credential === null) {
+            return false;
+        }
+
+        try {
+            $this->accountChanges->change($account, fn (AccountChange $change) => $secret === null ? null : $change->advance($credential, $secret), $sudo);
+        } catch (AccountChangeRefusedException) {
             return false;
         }
 
