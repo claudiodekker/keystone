@@ -103,3 +103,26 @@ it('verifies nothing and takes no attempt for an answer without a sudo-in-progre
     expect($this->securityEvents()->for($user)->where('type', SecurityEventType::SUDO_FAILED))->toBeEmpty()
         ->and($this->securityEvents()->for($user)->count())->toBe($recorded + 1);
 });
+
+it('refuses a type the step does not offer without verifying it or taking an attempt', function () {
+    config(['keystone.rate_limits.failed_attempts_per_hour' => 1]);
+    $user = $this->createUser();
+    $this->signInWithoutSudo($user);
+    $secondFactor = $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);
+    $firstFactor = $this->supportFor(Surface::SIGN_IN);
+    $gated = $this->sudoGatedPage();
+    $this->get($gated);
+
+    Auth::forgetGuards();
+    $this->post(route('sudo.submit', $firstFactor->type()->name()), $firstFactor->validProof(Surface::SIGN_IN, $user));
+
+    Auth::forgetGuards();
+    $notOffered = $this->post(route('sudo.submit', 'recovery-code'), ['recovery_code' => 'ABCDE-23456']);
+
+    Auth::forgetGuards();
+    $response = $this->post(route('sudo.submit', $secondFactor->type()->name()), $secondFactor->validProof(Surface::CHALLENGE, $user));
+
+    expect($notOffered->getStatusCode())->toBe(404);
+    $this->assertSudoGranted($response, $gated);
+    expect($this->securityEvents()->for($user)->where('type', SecurityEventType::SUDO_FAILED))->toBeEmpty();
+});

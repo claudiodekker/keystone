@@ -54,17 +54,26 @@ class Sudo
     }
 
     /**
-     * Find the type that answers the sudo-in-progress's step by its name: a type offered on the step's surface, or core's recovery codes at the second step.
+     * Find the type that answers the sudo-in-progress's step by its name: one the step offers the account, or any type on sign-in's surface while no sudo-in-progress is held.
      */
     public function type(string $name): ?CredentialType
     {
-        $surface = $this->surface();
+        $sudo = $this->session->sudoInProgress();
+        $account = $this->session->account();
 
-        if ($surface === Surface::CHALLENGE && $name === RecoveryCodeType::NAME) {
+        if ($sudo === null || $account === null) {
+            return $this->types->find($name, Surface::SIGN_IN);
+        }
+
+        if (! in_array($name, array_column($this->offer($sudo, $account), 'name'), true)) {
+            return null;
+        }
+
+        if ($name === RecoveryCodeType::NAME) {
             return $this->recoveryCodeType;
         }
 
-        return $this->types->find($name, $surface);
+        return $this->types->find($name, $sudo->surface());
     }
 
     /**
