@@ -3,6 +3,7 @@
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Route;
 
 beforeEach(function () {
     $this->withoutEnrollmentMandates();
@@ -99,4 +100,12 @@ it('lets a live grant through from another address on the same network', functio
     $response = $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.200'])->get($this->sudoGatedPage());
 
     expect($response->getStatusCode())->toBe(204);
+});
+
+it('turns a guest away on a route gated by sudo alone', function () {
+    Route::middleware(['web', 'sudo'])->get('/keystone/app-tests/sudo-only', fn () => response()->noContent());
+
+    $response = $this->getJson('/keystone/app-tests/sudo-only');
+
+    expect($response->getStatusCode())->toBe(401);
 });
