@@ -28,6 +28,7 @@ use Illuminate\Auth\AuthenticationException;
 use Illuminate\Contracts\Validation\Factory as ValidationFactory;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
  * @internal
@@ -54,37 +55,6 @@ class Sudo
     }
 
     /**
-     * Find the type that answers the sudo-in-progress's step by its name: one the step offers the account, or any type on sign-in's surface while no sudo-in-progress is held.
-     */
-    public function type(string $name): ?CredentialType
-    {
-        $sudo = $this->session->sudoInProgress();
-        $account = $this->session->account();
-
-        if ($sudo === null || $account === null) {
-            return $this->types->find($name, Surface::SIGN_IN);
-        }
-
-        if (! in_array($name, array_column($this->offer($sudo, $account), 'name'), true)) {
-            return null;
-        }
-
-        if ($name === RecoveryCodeType::NAME) {
-            return $this->recoveryCodeType;
-        }
-
-        return $this->types->find($name, $sudo->surface());
-    }
-
-    /**
-     * Get the surface the session's sudo-in-progress's step verifies on, sign-in's when it holds none.
-     */
-    public function surface(): Surface
-    {
-        return $this->session->sudoInProgress()?->surface() ?? Surface::SIGN_IN;
-    }
-
-    /**
      * Open the session's sudo-in-progress at its step, the first type it offers preselected.
      *
      * @throws AuthenticationException
@@ -92,10 +62,10 @@ class Sudo
     public function open(): SudoPage|NoSudoInProgress
     {
         $account = $this->account();
-        $sudo = $this->session->sudoInProgress();
+        $sudo = $this->resume($account);
 
-        if ($sudo === null) {
-            return new NoSudoInProgress($this->session->intendedPath());
+        if ($sudo instanceof NoSudoInProgress) {
+            return $sudo;
         }
 
         $types = $this->offer($sudo, $account);
@@ -107,22 +77,25 @@ class Sudo
     }
 
     /**
-     * Answer the session's sudo-in-progress with the type and the submitted input.
+     * Answer the session's sudo-in-progress with the named type and the submitted input.
      *
      * @param  array<string, mixed>  $input
      *
      * @throws AuthenticationException
+     * @throws NotFoundHttpException
      * @throws ThrottledException
      * @throws ValidationException
      */
-    public function answer(CredentialType $type, array $input): SudoGranted|SudoFirstFactorPassed|Refused|LastRecoveryCodeKept|NoSudoInProgress
+    public function answer(string $name, array $input): SudoGranted|SudoFirstFactorPassed|Refused|LastRecoveryCodeKept|NoSudoInProgress
     {
         $account = $this->account();
-        $sudo = $this->session->sudoInProgress();
+        $sudo = $this->resume($account);
 
-        if ($sudo === null) {
-            return new NoSudoInProgress($this->session->intendedPath());
+        if ($sudo instanceof NoSudoInProgress) {
+            return $sudo;
         }
+
+        $type = $this->offered($name, $sudo, $account) ?? throw new NotFoundHttpException;
 
         $validated = $this->validation->make($input, $type->rules($sudo->surface()))->validate();
 
@@ -130,6 +103,17 @@ class Sudo
             fn () => $this->prove($type, $validated, $sudo, $account),
             fn (SudoGranted|SudoFirstFactorPassed|Refused|LastRecoveryCodeKept $outcome) => $outcome instanceof SudoGranted || $outcome instanceof SudoFirstFactorPassed,
         );
+    }
+
+    /**
+     * Get the field a refusal of the named type's answer is shown on: the first the type validates at the session's step, else its name.
+     */
+    public function field(string $name): string
+    {
+        $surface = $this->session->sudoInProgress()?->surface() ?? Surface::SIGN_IN;
+        $type = $name === RecoveryCodeType::NAME ? $this->recoveryCodeType : $this->types->find($name, $surface);
+
+        return array_key_first($type?->rules($surface) ?? []) ?? $name;
     }
 
     /**
@@ -233,6 +217,52 @@ class Sudo
         $change->spendRecoveryCode($code);
 
         return true;
+    }
+
+    /**
+     * Get the session's sudo-in-progress, or where to send the user on when it holds none or one whose account no longer holds a second factor of another type than the one that passed its first step.
+     *
+     * A sudo-in-progress whose second step can't be answered is ended, so the next refusal starts over at the first step.
+     */
+    protected function resume(KeystoneUser $account): SudoInProgress|NoSudoInProgress
+    {
+        $sudo = $this->session->sudoInProgress();
+
+        if ($sudo === null) {
+            return new NoSudoInProgress($this->session->intendedPath());
+        }
+
+        if ($sudo->firstFactor === null || $this->holdsSecondFactorBesides($sudo->firstFactor, $account)) {
+            return $sudo;
+        }
+
+        $this->session->endSudo();
+
+        return new NoSudoInProgress($sudo->intendedPath);
+    }
+
+    /**
+     * Determine if the account holds a second factor of another type than the named one.
+     */
+    protected function holdsSecondFactorBesides(string $type, KeystoneUser $account): bool
+    {
+        return array_diff($this->holdings->secondFactors($account), [$type]) !== [];
+    }
+
+    /**
+     * Find the named type when the sudo-in-progress's step offers it to the account.
+     */
+    protected function offered(string $name, SudoInProgress $sudo, KeystoneUser $account): ?CredentialType
+    {
+        if (! in_array($name, array_column($this->offer($sudo, $account), 'name'), true)) {
+            return null;
+        }
+
+        if ($name === RecoveryCodeType::NAME) {
+            return $this->recoveryCodeType;
+        }
+
+        return $this->types->find($name, $sudo->surface());
     }
 
     /**

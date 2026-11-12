@@ -5,7 +5,6 @@ namespace ClaudioDekker\Keystone\Http\Controllers;
 use ClaudioDekker\Keystone\Http\Middleware\FlashOnlyTheIdentifier;
 use ClaudioDekker\Keystone\Http\Middleware\LimitRequests;
 use ClaudioDekker\Keystone\Http\Pages\SudoPage;
-use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\RateLimits\StepKind;
 use ClaudioDekker\Keystone\SignIn\LastRecoveryCodeKept;
 use ClaudioDekker\Keystone\SignIn\NoSudoInProgress;
@@ -17,7 +16,6 @@ use Illuminate\Contracts\Support\Responsable;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\Middleware;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
  * @api
@@ -60,20 +58,18 @@ abstract class SudoController implements KeystoneController
      */
     public function store(Request $request, string $type, Sudo $sudo): Response|Responsable
     {
-        $credentialType = $sudo->type($type) ?? throw new NotFoundHttpException;
-
-        $outcome = $sudo->answer($credentialType, $request->all());
+        $outcome = $sudo->answer($type, $request->all());
 
         if ($outcome instanceof NoSudoInProgress) {
             return $this->sendNoSudoInProgress($request, $outcome->redirectTo);
         }
 
         if ($outcome instanceof Refused) {
-            return $this->sendSudoRefused($request, $this->field($credentialType, $sudo), Status::CREDENTIAL_INVALID->label());
+            return $this->sendSudoRefused($request, $sudo->field($type), Status::CREDENTIAL_INVALID->label());
         }
 
         if ($outcome instanceof LastRecoveryCodeKept) {
-            return $this->sendSudoLastRecoveryCodeKept($request, $this->field($credentialType, $sudo), Status::LAST_RECOVERY_CODE->label());
+            return $this->sendSudoLastRecoveryCodeKept($request, $sudo->field($type), Status::LAST_RECOVERY_CODE->label());
         }
 
         if ($outcome instanceof SudoFirstFactorPassed) {
@@ -91,14 +87,6 @@ abstract class SudoController implements KeystoneController
         $sudo->end();
 
         return $this->sendSudoEnded($request);
-    }
-
-    /**
-     * Get the field a refusal of the type's answer is shown on: the first the type validates at the step, else its name.
-     */
-    protected function field(CredentialType $type, Sudo $sudo): string
-    {
-        return array_key_first($type->rules($sudo->surface())) ?? $type->name();
     }
 
     /**

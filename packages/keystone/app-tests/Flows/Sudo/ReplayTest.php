@@ -99,3 +99,54 @@ it('grants sudo once the second factor answers the second step, and sends the us
     $this->assertSudoGranted($response, $gated);
     expect($next->getStatusCode())->toBe(204);
 });
+
+it('sends the user on without sudo when the account no longer holds a second factor at the second step, starting over at the first', function () {
+    $user = $this->createUser();
+    $this->signInWithoutSudo($user);
+    $secondFactor = $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);
+    $firstFactor = $this->supportFor(Surface::SIGN_IN);
+    $gated = $this->sudoGatedPage();
+    $this->get($gated);
+
+    Auth::forgetGuards();
+    $this->post(route('sudo.submit', $firstFactor->type()->name()), $firstFactor->validProof(Surface::SIGN_IN, $user));
+
+    $this->removeCredentials($user, $secondFactor);
+
+    Auth::forgetGuards();
+    $response = $this->get(route('sudo'));
+
+    Auth::forgetGuards();
+    $this->get($gated);
+
+    Auth::forgetGuards();
+    $page = $this->get(route('sudo'));
+
+    $this->assertNoSudoInProgress($response, $gated);
+    $this->assertSudoPage($page, ['types' => [['name' => $firstFactor->type()->name(), 'shape' => 'form']]]);
+});
+
+it('sends an answer on without sudo, checking nothing, when the account no longer holds a second factor at the second step', function () {
+    $user = $this->createUser();
+    $this->signInWithoutSudo($user);
+    $secondFactor = $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);
+    $firstFactor = $this->supportFor(Surface::SIGN_IN);
+    $gated = $this->sudoGatedPage();
+    $this->get($gated);
+
+    Auth::forgetGuards();
+    $this->post(route('sudo.submit', $firstFactor->type()->name()), $firstFactor->validProof(Surface::SIGN_IN, $user));
+    $recorded = $this->securityEvents()->for($user)->count();
+
+    $this->removeCredentials($user, $secondFactor);
+
+    Auth::forgetGuards();
+    $response = $this->post(route('sudo.submit', $secondFactor->type()->name()), $secondFactor->validProof(Surface::CHALLENGE, $user));
+
+    Auth::forgetGuards();
+    $next = $this->getJson($gated);
+
+    $this->assertNoSudoInProgress($response, $gated);
+    $this->assertSudoRequiredForJson($next);
+    expect($this->securityEvents()->for($user))->toHaveCount($recorded);
+});
