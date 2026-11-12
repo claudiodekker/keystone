@@ -188,6 +188,18 @@ trait InteractsWithKeystone
     }
 
     /**
+     * Serve a page only a signed-in user holding sudo reaches, through the app's own auth and sudo middleware, and get its path.
+     */
+    public function sudoGatedPage(): string
+    {
+        $path = '/keystone/app-tests/sudo-gated';
+
+        Route::middleware(['web', 'auth', 'sudo'])->match(['get', 'post'], $path, fn () => response()->noContent());
+
+        return $path;
+    }
+
+    /**
      * Get how many failed attempts an account gets per credential type and flow in an hour, as the app configures it.
      */
     public function failedAttemptAllowance(): int

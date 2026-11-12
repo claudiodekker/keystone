@@ -22,6 +22,7 @@ use ClaudioDekker\Keystone\Http\Middleware\ApplyHardeningFloor;
 use ClaudioDekker\Keystone\Http\Middleware\CaptureRequestContext;
 use ClaudioDekker\Keystone\Http\Middleware\ClearSiteData;
 use ClaudioDekker\Keystone\Http\Middleware\RefuseCrossSiteRequests;
+use ClaudioDekker\Keystone\Http\Middleware\RequireSudo;
 use ClaudioDekker\Keystone\Http\Responses\UnauthenticatedResponse;
 use ClaudioDekker\Keystone\Locations\NullIpLocation;
 use ClaudioDekker\Keystone\Locations\StevebaumanIpLocation;
@@ -39,6 +40,7 @@ use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Exceptions\Handler;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Redirector;
+use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\ServiceProvider;
 use Stevebauman\Location\LocationManager;
@@ -117,6 +119,7 @@ class KeystoneServiceProvider extends ServiceProvider
         $this->excludeKeystoneCookiesFromEncryption();
         $this->hardenResponses();
         $this->refuseCrossSiteRequests();
+        $this->registerSudoGate();
         $this->schedule();
 
         $this->loadMigrationsFrom(dirname(__DIR__).'/database/migrations');
@@ -273,6 +276,14 @@ class KeystoneServiceProvider extends ServiceProvider
     protected function refuseCrossSiteRequests(): void
     {
         $this->app->make(Kernel::class)->appendMiddlewareToGroup('web', RefuseCrossSiteRequests::class);
+    }
+
+    /**
+     * Let apps gate their routes with the sudo middleware alias.
+     */
+    protected function registerSudoGate(): void
+    {
+        $this->app->make(Router::class)->aliasMiddleware(RequireSudo::ALIAS, RequireSudo::class);
     }
 
     /**
