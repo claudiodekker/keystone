@@ -165,7 +165,7 @@ class Proofs
     public function grantSudo(KeystoneUser $account, Answer $answer, SudoInProgress $sudo, string $subnet): SudoGranted|Refused
     {
         if (! $this->admit($account, $answer, $sudo)) {
-            return $this->refuse($account, $answer);
+            return $this->refuseSudo($account, $answer);
         }
 
         $this->recorder->record(
@@ -190,6 +190,22 @@ class Proofs
     {
         $this->recorder->record(
             SecurityEventType::PROOF_REJECTED,
+            account: $account,
+            surface: $answer->surface,
+            credentialType: $answer->type,
+            reason: $answer->proof->reason,
+        );
+
+        return new Refused;
+    }
+
+    /**
+     * Refuse the answer given for sudo, recording the failure for the account, which alerts its owner.
+     */
+    public function refuseSudo(KeystoneUser $account, Answer $answer): Refused
+    {
+        $this->recorder->record(
+            SecurityEventType::SUDO_FAILED,
             account: $account,
             surface: $answer->surface,
             credentialType: $answer->type,

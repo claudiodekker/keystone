@@ -2,11 +2,15 @@
 
 namespace ClaudioDekker\Keystone\Http\Controllers;
 
+use ClaudioDekker\Keystone\Http\Middleware\FlashOnlyTheIdentifier;
 use ClaudioDekker\Keystone\Http\Middleware\LimitRequests;
 use ClaudioDekker\Keystone\Http\Pages\SudoPage;
+use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\RateLimits\StepKind;
 use ClaudioDekker\Keystone\SignIn\NoSudoInProgress;
+use ClaudioDekker\Keystone\SignIn\Refused;
 use ClaudioDekker\Keystone\SignIn\Sudo;
+use ClaudioDekker\Keystone\Status;
 use Illuminate\Contracts\Support\Responsable;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\Middleware;
@@ -28,6 +32,7 @@ abstract class SudoController implements KeystoneController
     public static function middleware(): array
     {
         return [
+            FlashOnlyTheIdentifier::class,
             new Middleware(LimitRequests::for(StepKind::CHANGE), only: ['destroy']),
             new Middleware(LimitRequests::for(StepKind::SUBMIT), only: ['store']),
             new Middleware(LimitRequests::for(StepKind::VIEW), except: ['destroy', 'store']),
@@ -61,7 +66,19 @@ abstract class SudoController implements KeystoneController
             return $this->sendNoSudoInProgress($request, $outcome->redirectTo);
         }
 
+        if ($outcome instanceof Refused) {
+            return $this->sendSudoRefused($request, $this->field($credentialType, $sudo), Status::CREDENTIAL_INVALID->label());
+        }
+
         return $this->sendSudoGranted($request, $outcome->redirectTo);
+    }
+
+    /**
+     * Get the field a refusal of the type's answer is shown on: the first the type validates at the step, else its name.
+     */
+    protected function field(CredentialType $type, Sudo $sudo): string
+    {
+        return array_key_first($type->rules($sudo->surface())) ?? $type->name();
     }
 
     /**
@@ -73,6 +90,11 @@ abstract class SudoController implements KeystoneController
      * Send a session that holds no sudo-in-progress on to where it was going.
      */
     abstract protected function sendNoSudoInProgress(Request $request, string $redirectTo): Response|Responsable;
+
+    /**
+     * Refuse the answer with the translated message on the type's field, keeping the sudo-in-progress.
+     */
+    abstract protected function sendSudoRefused(Request $request, string $field, string $message): Response|Responsable;
 
     /**
      * Send the user on to where they were going once sudo is granted.

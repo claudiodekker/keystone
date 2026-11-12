@@ -46,6 +46,14 @@ class Sudo
     }
 
     /**
+     * Get the surface the session's sudo-in-progress's step verifies on, sign-in's when it holds none.
+     */
+    public function surface(): Surface
+    {
+        return $this->session->sudoInProgress()?->surface() ?? Surface::SIGN_IN;
+    }
+
+    /**
      * Open the session's sudo-in-progress at its step: the types serving sign-in the account holds, the first one preselected.
      *
      * @throws AuthenticationException
@@ -112,7 +120,7 @@ class Sudo
         $answer = $this->proofs->verify($type, $surface, $account, $validated, $attempt);
 
         if (! $this->decision->proves($answer->proof, $type, $account)) {
-            return $this->proofs->refuse($account, $answer);
+            return $this->proofs->refuseSudo($account, $answer);
         }
 
         return $this->proofs->grantSudo($account, $answer, $sudo, $this->session->subnet());

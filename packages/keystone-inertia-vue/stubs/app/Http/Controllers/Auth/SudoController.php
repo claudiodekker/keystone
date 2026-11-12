@@ -36,6 +36,14 @@ class SudoController extends KeystoneSudoController
     }
 
     /**
+     * Return to the sudo page with the message on the type's field, flashing back no input.
+     */
+    protected function sendSudoRefused(Request $request, string $field, string $message): RedirectResponse
+    {
+        return to_route('sudo')->withErrors([$field => $message]);
+    }
+
+    /**
      * Send the user on to where they were going once sudo is granted.
      */
     protected function sendSudoGranted(Request $request, string $redirectTo): RedirectResponse

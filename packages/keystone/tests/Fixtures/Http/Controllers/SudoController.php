@@ -29,6 +29,16 @@ class SudoController extends BaseSudoController
     }
 
     /**
+     * Return to the sudo page with the message on the type's field, flashing back all input as a careless app would.
+     */
+    protected function sendSudoRefused(Request $request, string $field, string $message): Response
+    {
+        return to_route('sudo')
+            ->withErrors([$field => $message])
+            ->withInput();
+    }
+
+    /**
      * Send the user on to where they were going once sudo is granted.
      */
     protected function sendSudoGranted(Request $request, string $redirectTo): Response

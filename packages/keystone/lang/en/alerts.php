@@ -56,6 +56,12 @@ return [
             'summary' => 'An administrator signed your account out of every session.',
         ],
     ],
+    'sudo' => [
+        'failed' => [
+            'subject' => 'Someone failed to confirm it was you',
+            'summary' => 'Someone signed in to your account was asked to confirm it was you before a sensitive change, and got it wrong.',
+        ],
+    ],
     'signed_in' => [
         'subject' => 'New sign-in to your account',
         'summary' => "Your account was signed in to from a browser it hasn't used before.",

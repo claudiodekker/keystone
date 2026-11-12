@@ -17,3 +17,16 @@ it('reads the sudo lifetime from the app', function () {
 
     expect($this->sudoLifetimeSeconds())->toBe(420);
 });
+
+it('signs the user in with a sudo grant that already ran out', function () {
+    $this->withoutEnrollmentMandates();
+    $user = $this->createUser();
+
+    $this->signInWithoutSudo($user);
+
+    $protected = $this->getJson($this->protectedPage());
+    $gated = $this->getJson($this->sudoGatedPage());
+
+    expect($protected->getStatusCode())->toBe(204)
+        ->and($gated->getStatusCode())->toBe(403);
+});

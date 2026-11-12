@@ -3,6 +3,7 @@
 namespace ClaudioDekker\Keystone\AppTests\Assertions;
 
 use Illuminate\Testing\TestResponse;
+use PHPUnit\Framework\Assert;
 
 /**
  * @api
@@ -39,6 +40,17 @@ trait SudoAssertions
         foreach ($fields as $name => $value) {
             $response->assertViewHas($name, $value);
         }
+    }
+
+    /**
+     * Assert the response refused the answer with the message on the field, back at the sudo page and flashing back no input.
+     */
+    public function assertSudoRefused(TestResponse $response, string $field, string $message): void
+    {
+        $response->assertRedirectToRoute('sudo');
+        $response->assertSessionHasErrors([$field => $message]);
+
+        Assert::assertSame([], $this->app['session.store']->getOldInput(), 'The response flashed back the answer.');
     }
 
     /**

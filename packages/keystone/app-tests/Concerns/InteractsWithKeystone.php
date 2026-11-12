@@ -294,6 +294,17 @@ trait InteractsWithKeystone
     }
 
     /**
+     * Sign the user in through the first installed type that serves sign-in, then let the sudo grant the sign-in brought run out.
+     */
+    public function signInWithoutSudo(KeystoneUser $user): void
+    {
+        $this->passFirstFactor($user);
+
+        Auth::forgetGuards();
+        $this->travel($this->sudoLifetimeSeconds())->seconds();
+    }
+
+    /**
      * Submit the valid proof of the user's credential of the supported type to the challenge.
      */
     public function answerChallenge(KeystoneUser $user, CredentialTypeSupport $support): TestResponse

@@ -116,6 +116,7 @@ return [
         'sign_in.voided' => null,
         'signed_in' => SecurityAlert::class,
         'signed_out' => null,
+        'sudo.failed' => SecurityAlert::class,
         'sudo.granted' => null,
     ],
 
