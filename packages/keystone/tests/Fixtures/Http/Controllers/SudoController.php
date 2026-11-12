@@ -39,6 +39,16 @@ class SudoController extends BaseSudoController
     }
 
     /**
+     * Return to the sudo page with the message on the code's field, flashing back all input as a careless app would.
+     */
+    protected function sendSudoLastRecoveryCodeKept(Request $request, string $field, string $message): Response
+    {
+        return to_route('sudo')
+            ->withErrors([$field => $message])
+            ->withInput();
+    }
+
+    /**
      * Send the user on to the sudo page's second step.
      */
     protected function sendSudoSecondStep(Request $request): Response

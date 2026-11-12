@@ -44,6 +44,14 @@ class SudoController extends KeystoneSudoController
     }
 
     /**
+     * Return to the sudo page with the message on the code's field, flashing back no input.
+     */
+    protected function sendSudoLastRecoveryCodeKept(Request $request, string $field, string $message): RedirectResponse
+    {
+        return to_route('sudo')->withErrors([$field => $message]);
+    }
+
+    /**
      * Send the user on to the sudo page's second step.
      */
     protected function sendSudoSecondStep(Request $request): RedirectResponse

@@ -54,6 +54,17 @@ trait SudoAssertions
     }
 
     /**
+     * Assert the response refused the account's last recovery code with its message, back at the sudo page and flashing back no input.
+     */
+    public function assertSudoLastRecoveryCodeKept(TestResponse $response): void
+    {
+        $response->assertRedirectToRoute('sudo');
+        $response->assertSessionHasErrors(['recovery_code' => __('keystone::messages.last-recovery-code')]);
+
+        Assert::assertSame([], $this->app['session.store']->getOldInput(), 'The response flashed back the code.');
+    }
+
+    /**
      * Assert the response sent the user whose first factor passed on to the sudo page's second step.
      */
     public function assertSudoSecondStep(TestResponse $response): void

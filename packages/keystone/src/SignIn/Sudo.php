@@ -2,14 +2,20 @@
 
 namespace ClaudioDekker\Keystone\SignIn;
 
+use ClaudioDekker\Keystone\Accounts\AccountChange;
+use ClaudioDekker\Keystone\Accounts\AccountChanges;
 use ClaudioDekker\Keystone\Accounts\Holdings;
 use ClaudioDekker\Keystone\Auth\KeystoneUser;
+use ClaudioDekker\Keystone\Exceptions\AccountChangeRefusedException;
 use ClaudioDekker\Keystone\Exceptions\ThrottledException;
 use ClaudioDekker\Keystone\Http\Pages\SudoPage;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\InitiateShape;
 use ClaudioDekker\Keystone\Methods\Surface;
+use ClaudioDekker\Keystone\Methods\Verification;
+use ClaudioDekker\Keystone\Models\UserRecoveryCode;
+use ClaudioDekker\Keystone\RateLimits\FailedAttempt;
 use ClaudioDekker\Keystone\RateLimits\Limiter;
 use ClaudioDekker\Keystone\RecoveryCodes\RecoveryCodeType;
 use ClaudioDekker\Keystone\Session\SessionState;
@@ -17,6 +23,7 @@ use ClaudioDekker\Keystone\Session\Stage;
 use ClaudioDekker\Keystone\Session\SudoInProgress;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Contracts\Validation\Factory as ValidationFactory;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -28,10 +35,12 @@ class Sudo
      * Create the sudo replay.
      */
     public function __construct(
+        protected AccountChanges $accountChanges,
         protected SignInDecision $decision,
         protected Holdings $holdings,
         protected Limiter $limiter,
         protected Proofs $proofs,
+        protected RecoveryCodeType $recoveryCodeType,
         protected SessionState $session,
         protected TimingFloor $floor,
         protected CredentialTypes $types,
@@ -41,11 +50,17 @@ class Sudo
     }
 
     /**
-     * Find the type that answers the sudo-in-progress's step by its name: a type offered on the step's surface.
+     * Find the type that answers the sudo-in-progress's step by its name: a type offered on the step's surface, or core's recovery codes at the second step.
      */
     public function type(string $name): ?CredentialType
     {
-        return $this->types->find($name, $this->surface());
+        $surface = $this->surface();
+
+        if ($surface === Surface::CHALLENGE && $name === RecoveryCodeType::NAME) {
+            return $this->recoveryCodeType;
+        }
+
+        return $this->types->find($name, $surface);
     }
 
     /**
@@ -87,7 +102,7 @@ class Sudo
      * @throws ThrottledException
      * @throws ValidationException
      */
-    public function answer(CredentialType $type, array $input): SudoGranted|SudoFirstFactorPassed|Refused|NoSudoInProgress
+    public function answer(CredentialType $type, array $input): SudoGranted|SudoFirstFactorPassed|Refused|LastRecoveryCodeKept|NoSudoInProgress
     {
         $account = $this->account();
         $sudo = $this->session->sudoInProgress();
@@ -100,7 +115,7 @@ class Sudo
 
         return $this->floor->hold(
             fn () => $this->prove($type, $validated, $sudo, $account),
-            fn (SudoGranted|SudoFirstFactorPassed|Refused $outcome) => ! $outcome instanceof Refused,
+            fn (SudoGranted|SudoFirstFactorPassed|Refused|LastRecoveryCodeKept $outcome) => $outcome instanceof SudoGranted || $outcome instanceof SudoFirstFactorPassed,
         );
     }
 
@@ -111,7 +126,7 @@ class Sudo
      *
      * @throws ThrottledException
      */
-    protected function prove(CredentialType $type, array $validated, SudoInProgress $sudo, KeystoneUser $account): SudoGranted|SudoFirstFactorPassed|Refused
+    protected function prove(CredentialType $type, array $validated, SudoInProgress $sudo, KeystoneUser $account): SudoGranted|SudoFirstFactorPassed|Refused|LastRecoveryCodeKept
     {
         $surface = $sudo->surface();
         $attempt = $this->limiter->takeFailedAttempt($type, $surface, $account);
@@ -119,6 +134,10 @@ class Sudo
 
         if ($subnet === null) {
             return $this->proofs->refuseSudo($account, $type, $surface, 'keystone.unbindable_subnet');
+        }
+
+        if ($type instanceof RecoveryCodeType) {
+            return $this->spend($type, $validated, $sudo, $account, $attempt, $subnet);
         }
 
         $answer = $this->proofs->verify($type, $surface, $account, $validated, $attempt);
@@ -135,9 +154,62 @@ class Sudo
     }
 
     /**
+     * Grant the session sudo when the typed code is one of the account's recovery codes, spending it unless it is the last.
+     *
+     * @param  array<string, mixed>  $validated
+     */
+    protected function spend(RecoveryCodeType $type, array $validated, SudoInProgress $sudo, KeystoneUser $account, FailedAttempt $attempt, string $subnet): SudoGranted|Refused|LastRecoveryCodeKept
+    {
+        $codes = UserRecoveryCode::query()
+            ->where('user_id', $account->getAuthIdentifier())
+            ->get();
+
+        $verification = new Verification(
+            surface: Surface::CHALLENGE,
+            input: $validated,
+            credentials: $codes->map->toCredential()->values()->all(),
+        );
+
+        $answer = new Answer($type, Surface::CHALLENGE, $type->verify($verification), new Collection, $attempt);
+        $code = $codes->find($answer->proof->credential);
+
+        if ($code === null) {
+            return $this->proofs->refuseSudo($account, $type, Surface::CHALLENGE, $answer->proof->reason);
+        }
+
+        try {
+            $spent = $this->accountChanges->change($account, fn (AccountChange $change) => $this->spendUnlessLast($change, $code), $sudo);
+        } catch (AccountChangeRefusedException) {
+            return $this->proofs->refuseSudo($account, $type, Surface::CHALLENGE, $answer->proof->reason);
+        }
+
+        if (! $spent) {
+            $this->proofs->refuseSudo($account, $type, Surface::CHALLENGE, 'recovery-code.last_code');
+
+            return new LastRecoveryCodeKept;
+        }
+
+        return $this->proofs->grantSudo($account, $answer, $sudo, $subnet);
+    }
+
+    /**
+     * Spend the code unless it is the account's last, which is kept for account recovery, and determine if it was spent.
+     */
+    protected function spendUnlessLast(AccountChange $change, UserRecoveryCode $code): bool
+    {
+        if ($change->isLastRecoveryCode($code)) {
+            return false;
+        }
+
+        $change->spendRecoveryCode($code);
+
+        return true;
+    }
+
+    /**
      * Get the types the sudo-in-progress's step offers: the types serving sign-in the account holds, and at the second step the second factors it holds of another type than the first factor's, then its recovery codes.
      *
-     * @return list<array{name: string, shape: string}>
+     * @return array<int, array{name: string, shape: string}>
      */
     protected function offer(SudoInProgress $sudo, KeystoneUser $account): array
     {

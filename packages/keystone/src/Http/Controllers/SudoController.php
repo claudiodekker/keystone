@@ -7,6 +7,7 @@ use ClaudioDekker\Keystone\Http\Middleware\LimitRequests;
 use ClaudioDekker\Keystone\Http\Pages\SudoPage;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\RateLimits\StepKind;
+use ClaudioDekker\Keystone\SignIn\LastRecoveryCodeKept;
 use ClaudioDekker\Keystone\SignIn\NoSudoInProgress;
 use ClaudioDekker\Keystone\SignIn\Refused;
 use ClaudioDekker\Keystone\SignIn\Sudo;
@@ -71,6 +72,10 @@ abstract class SudoController implements KeystoneController
             return $this->sendSudoRefused($request, $this->field($credentialType, $sudo), Status::CREDENTIAL_INVALID->label());
         }
 
+        if ($outcome instanceof LastRecoveryCodeKept) {
+            return $this->sendSudoLastRecoveryCodeKept($request, $this->field($credentialType, $sudo), Status::LAST_RECOVERY_CODE->label());
+        }
+
         if ($outcome instanceof SudoFirstFactorPassed) {
             return $this->sendSudoSecondStep($request);
         }
@@ -100,6 +105,11 @@ abstract class SudoController implements KeystoneController
      * Refuse the answer with the translated message on the type's field, keeping the sudo-in-progress.
      */
     abstract protected function sendSudoRefused(Request $request, string $field, string $message): Response|Responsable;
+
+    /**
+     * Refuse the account's last recovery code with the translated message on its field, keeping the code and the sudo-in-progress.
+     */
+    abstract protected function sendSudoLastRecoveryCodeKept(Request $request, string $field, string $message): Response|Responsable;
 
     /**
      * Send the user whose first factor passed on to the second step, which asks for a second factor.
