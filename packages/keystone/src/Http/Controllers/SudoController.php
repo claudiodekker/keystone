@@ -10,6 +10,7 @@ use ClaudioDekker\Keystone\RateLimits\StepKind;
 use ClaudioDekker\Keystone\SignIn\NoSudoInProgress;
 use ClaudioDekker\Keystone\SignIn\Refused;
 use ClaudioDekker\Keystone\SignIn\Sudo;
+use ClaudioDekker\Keystone\SignIn\SudoFirstFactorPassed;
 use ClaudioDekker\Keystone\Status;
 use Illuminate\Contracts\Support\Responsable;
 use Illuminate\Http\Request;
@@ -70,6 +71,10 @@ abstract class SudoController implements KeystoneController
             return $this->sendSudoRefused($request, $this->field($credentialType, $sudo), Status::CREDENTIAL_INVALID->label());
         }
 
+        if ($outcome instanceof SudoFirstFactorPassed) {
+            return $this->sendSudoSecondStep($request);
+        }
+
         return $this->sendSudoGranted($request, $outcome->redirectTo);
     }
 
@@ -95,6 +100,11 @@ abstract class SudoController implements KeystoneController
      * Refuse the answer with the translated message on the type's field, keeping the sudo-in-progress.
      */
     abstract protected function sendSudoRefused(Request $request, string $field, string $message): Response|Responsable;
+
+    /**
+     * Send the user whose first factor passed on to the second step, which asks for a second factor.
+     */
+    abstract protected function sendSudoSecondStep(Request $request): Response|Responsable;
 
     /**
      * Send the user on to where they were going once sudo is granted.

@@ -348,6 +348,18 @@ class SessionState
     }
 
     /**
+     * Move the sudo-in-progress on to its second step once the type passed its first, keeping its start, on a fresh session id.
+     */
+    public function passSudoFirstFactor(SudoInProgress $sudo, CredentialType $firstFactor): void
+    {
+        $passed = $sudo->passedBy($firstFactor->name());
+
+        $this->changeAuthLevel();
+
+        $this->session->put(static::PHASE, $passed->toSession());
+    }
+
+    /**
      * Grant the session sudo bound to the subnet, in place of its sudo-in-progress, on a fresh session id.
      */
     public function grantSudo(string $subnet): void

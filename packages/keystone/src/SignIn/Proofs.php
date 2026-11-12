@@ -160,6 +160,22 @@ class Proofs
     }
 
     /**
+     * Move the sudo-in-progress on to its second step once the answer is admitted, then write the proof's rehash.
+     */
+    public function passSudoFirstFactor(KeystoneUser $account, Answer $answer, SudoInProgress $sudo): SudoFirstFactorPassed|Refused
+    {
+        if (! $this->admit($account, $answer, $sudo)) {
+            return $this->refuseSudo($account, $answer->type, $answer->surface, $answer->proof->reason);
+        }
+
+        $this->session->passSudoFirstFactor($sudo, $answer->type);
+
+        $this->rehash($account, $answer);
+
+        return new SudoFirstFactorPassed;
+    }
+
+    /**
      * Grant the session sudo bound to the subnet once the answer is admitted, recording the grant, then write the proof's rehash.
      */
     public function grantSudo(KeystoneUser $account, Answer $answer, SudoInProgress $sudo, string $subnet): SudoGranted|Refused

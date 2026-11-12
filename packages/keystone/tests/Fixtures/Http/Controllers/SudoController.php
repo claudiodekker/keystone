@@ -39,6 +39,14 @@ class SudoController extends BaseSudoController
     }
 
     /**
+     * Send the user on to the sudo page's second step.
+     */
+    protected function sendSudoSecondStep(Request $request): Response
+    {
+        return to_route('sudo');
+    }
+
+    /**
      * Send the user on to where they were going once sudo is granted.
      */
     protected function sendSudoGranted(Request $request, string $redirectTo): Response

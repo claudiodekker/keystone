@@ -27,11 +27,13 @@ readonly class SudoInProgress
      * @param  string  $intendedPath  the path the user goes on to once granted
      * @param  int|null  $epoch  the account's credential epoch the session was signed in on
      * @param  int  $startedAt  the Unix second of the refusal that started it
+     * @param  string|null  $firstFactor  the name of the credential type that passed its first step, null until one did
      */
     public function __construct(
         public string $intendedPath,
         public ?int $epoch,
         public int $startedAt,
+        public ?string $firstFactor = null,
     ) {
         //
     }
@@ -43,9 +45,13 @@ readonly class SudoInProgress
      */
     public static function fromSession(array $value): ?static
     {
-        $value += array_fill_keys(['kind', 'intended_path', 'epoch', 'started_at'], null);
+        $value += array_fill_keys(['kind', 'intended_path', 'epoch', 'started_at', 'first_factor'], null);
 
         if (! is_int($value['epoch']) && $value['epoch'] !== null) {
+            return null;
+        }
+
+        if (! is_string($value['first_factor']) && $value['first_factor'] !== null) {
             return null;
         }
 
@@ -60,13 +66,14 @@ readonly class SudoInProgress
             intendedPath: $value['intended_path'],
             epoch: $value['epoch'],
             startedAt: $value['started_at'],
+            firstFactor: $value['first_factor'],
         );
     }
 
     /**
      * Get the sudo-in-progress as its session value.
      *
-     * @return array{kind: string, intended_path: string, epoch: int|null, started_at: int}
+     * @return array{kind: string, intended_path: string, epoch: int|null, started_at: int, first_factor: string|null}
      */
     public function toSession(): array
     {
@@ -75,6 +82,7 @@ readonly class SudoInProgress
             'intended_path' => $this->intendedPath,
             'epoch' => $this->epoch,
             'started_at' => $this->startedAt,
+            'first_factor' => $this->firstFactor,
         ];
     }
 
@@ -87,15 +95,29 @@ readonly class SudoInProgress
             intendedPath: $intendedPath,
             epoch: $this->epoch,
             startedAt: $this->startedAt,
+            firstFactor: $this->firstFactor,
         );
     }
 
     /**
-     * Get the surface the sudo-in-progress's step verifies on.
+     * Get the sudo-in-progress at its second step once the named type passed its first, keeping its start.
+     */
+    public function passedBy(string $firstFactor): static
+    {
+        return new static(
+            intendedPath: $this->intendedPath,
+            epoch: $this->epoch,
+            startedAt: $this->startedAt,
+            firstFactor: $firstFactor,
+        );
+    }
+
+    /**
+     * Get the surface the sudo-in-progress's step verifies on: sign-in's first, the challenge's once a first factor passed.
      */
     public function surface(): Surface
     {
-        return Surface::SIGN_IN;
+        return $this->firstFactor === null ? Surface::SIGN_IN : Surface::CHALLENGE;
     }
 
     /**

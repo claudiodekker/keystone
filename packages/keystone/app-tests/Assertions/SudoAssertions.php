@@ -54,6 +54,14 @@ trait SudoAssertions
     }
 
     /**
+     * Assert the response sent the user whose first factor passed on to the sudo page's second step.
+     */
+    public function assertSudoSecondStep(TestResponse $response): void
+    {
+        $response->assertRedirectToRoute('sudo');
+    }
+
+    /**
      * Assert the response sent the user on to the given path once sudo was granted.
      */
     public function assertSudoGranted(TestResponse $response, string $redirectTo): void

@@ -60,3 +60,42 @@ it('gives the session a new id when it grants sudo', function () {
 
     expect($response->getCookie($cookie)->getValue())->not->toBe($beforeGranting);
 });
+
+it('asks an account holding a second factor for it once the first factor passed, granting nothing yet', function () {
+    $user = $this->createUser();
+    $this->signInWithoutSudo($user);
+    $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);
+    $support = $this->supportFor(Surface::SIGN_IN);
+    $gated = $this->sudoGatedPage();
+    $this->get($gated);
+
+    Auth::forgetGuards();
+    $response = $this->post(route('sudo.submit', $support->type()->name()), $support->validProof(Surface::SIGN_IN, $user));
+
+    Auth::forgetGuards();
+    $next = $this->getJson($gated);
+
+    $this->assertSudoSecondStep($response);
+    expect($next->getStatusCode())->toBe(403);
+});
+
+it('grants sudo once the second factor answers the second step, and sends the user on to the gated page', function () {
+    $user = $this->createUser();
+    $this->signInWithoutSudo($user);
+    $secondFactor = $this->supportFor(Surface::CHALLENGE)->arrangeCredential(Surface::CHALLENGE, $user);
+    $firstFactor = $this->supportFor(Surface::SIGN_IN);
+    $gated = $this->sudoGatedPage();
+    $this->get($gated);
+
+    Auth::forgetGuards();
+    $this->post(route('sudo.submit', $firstFactor->type()->name()), $firstFactor->validProof(Surface::SIGN_IN, $user));
+
+    Auth::forgetGuards();
+    $response = $this->post(route('sudo.submit', $secondFactor->type()->name()), $secondFactor->validProof(Surface::CHALLENGE, $user));
+
+    Auth::forgetGuards();
+    $next = $this->get($gated);
+
+    $this->assertSudoGranted($response, $gated);
+    expect($next->getStatusCode())->toBe(204);
+});

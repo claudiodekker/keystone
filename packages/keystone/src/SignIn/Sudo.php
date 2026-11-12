@@ -11,6 +11,7 @@ use ClaudioDekker\Keystone\Methods\CredentialTypes;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\RateLimits\Limiter;
 use ClaudioDekker\Keystone\Session\SessionState;
+use ClaudioDekker\Keystone\Session\Stage;
 use ClaudioDekker\Keystone\Session\SudoInProgress;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Contracts\Validation\Factory as ValidationFactory;
@@ -38,11 +39,11 @@ class Sudo
     }
 
     /**
-     * Find the type that answers the sudo-in-progress's step by its name.
+     * Find the type that answers the sudo-in-progress's step by its name: a type offered on the step's surface.
      */
     public function type(string $name): ?CredentialType
     {
-        return $this->types->find($name, Surface::SIGN_IN);
+        return $this->types->find($name, $this->surface());
     }
 
     /**
@@ -88,7 +89,7 @@ class Sudo
      * @throws ThrottledException
      * @throws ValidationException
      */
-    public function answer(CredentialType $type, array $input): SudoGranted|Refused|NoSudoInProgress
+    public function answer(CredentialType $type, array $input): SudoGranted|SudoFirstFactorPassed|Refused|NoSudoInProgress
     {
         $account = $this->account();
         $sudo = $this->session->sudoInProgress();
@@ -101,7 +102,7 @@ class Sudo
 
         return $this->floor->hold(
             fn () => $this->prove($type, $validated, $sudo, $account),
-            fn (SudoGranted|Refused $outcome) => $outcome instanceof SudoGranted,
+            fn (SudoGranted|SudoFirstFactorPassed|Refused $outcome) => ! $outcome instanceof Refused,
         );
     }
 
@@ -112,7 +113,7 @@ class Sudo
      *
      * @throws ThrottledException
      */
-    protected function prove(CredentialType $type, array $validated, SudoInProgress $sudo, KeystoneUser $account): SudoGranted|Refused
+    protected function prove(CredentialType $type, array $validated, SudoInProgress $sudo, KeystoneUser $account): SudoGranted|SudoFirstFactorPassed|Refused
     {
         $surface = $sudo->surface();
         $attempt = $this->limiter->takeFailedAttempt($type, $surface, $account);
@@ -124,11 +125,27 @@ class Sudo
 
         $answer = $this->proofs->verify($type, $surface, $account, $validated, $attempt);
 
-        if (! $this->decision->proves($answer->proof, $type, $account)) {
+        if (! $this->proves($answer, $sudo, $account)) {
             return $this->proofs->refuseSudo($account, $type, $surface, $answer->proof->reason);
         }
 
+        if ($sudo->firstFactor === null && $this->decision->owed($account, $type) === Stage::CHALLENGE) {
+            return $this->proofs->passSudoFirstFactor($account, $answer, $sudo);
+        }
+
         return $this->proofs->grantSudo($account, $answer, $sudo, $subnet);
+    }
+
+    /**
+     * Determine if the answer proves the sudo-in-progress's step: a credential the account holds, and at the second step one of another type than the first factor's.
+     */
+    protected function proves(Answer $answer, SudoInProgress $sudo, KeystoneUser $account): bool
+    {
+        if ($sudo->firstFactor === null) {
+            return $this->decision->proves($answer->proof, $answer->type, $account);
+        }
+
+        return $this->decision->answers($answer->proof, $answer->type, $sudo->firstFactor, $account);
     }
 
     /**
