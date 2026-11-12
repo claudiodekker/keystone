@@ -8,8 +8,10 @@ use ClaudioDekker\Keystone\Exceptions\ThrottledException;
 use ClaudioDekker\Keystone\Http\Pages\SudoPage;
 use ClaudioDekker\Keystone\Methods\CredentialType;
 use ClaudioDekker\Keystone\Methods\CredentialTypes;
+use ClaudioDekker\Keystone\Methods\InitiateShape;
 use ClaudioDekker\Keystone\Methods\Surface;
 use ClaudioDekker\Keystone\RateLimits\Limiter;
+use ClaudioDekker\Keystone\RecoveryCodes\RecoveryCodeType;
 use ClaudioDekker\Keystone\Session\SessionState;
 use ClaudioDekker\Keystone\Session\Stage;
 use ClaudioDekker\Keystone\Session\SudoInProgress;
@@ -55,24 +57,20 @@ class Sudo
     }
 
     /**
-     * Open the session's sudo-in-progress at its step: the types serving sign-in the account holds, the first one preselected.
+     * Open the session's sudo-in-progress at its step, the first type it offers preselected.
      *
      * @throws AuthenticationException
      */
     public function open(): SudoPage|NoSudoInProgress
     {
         $account = $this->account();
+        $sudo = $this->session->sudoInProgress();
 
-        if ($this->session->sudoInProgress() === null) {
+        if ($sudo === null) {
             return new NoSudoInProgress('/');
         }
 
-        $held = $this->holdings->signInTypes($account);
-
-        $types = collect($this->types->shapes(Surface::SIGN_IN))
-            ->filter(fn (array $type) => in_array($type['name'], $held, true))
-            ->values()
-            ->all();
+        $types = $this->offer($sudo, $account);
 
         return new SudoPage(
             types: $types,
@@ -134,6 +132,29 @@ class Sudo
         }
 
         return $this->proofs->grantSudo($account, $answer, $sudo, $subnet);
+    }
+
+    /**
+     * Get the types the sudo-in-progress's step offers: the types serving sign-in the account holds, and at the second step the second factors it holds of another type than the first factor's, then its recovery codes.
+     *
+     * @return list<array{name: string, shape: string}>
+     */
+    protected function offer(SudoInProgress $sudo, KeystoneUser $account): array
+    {
+        $held = $sudo->firstFactor === null
+            ? $this->holdings->signInTypes($account)
+            : array_diff($this->holdings->secondFactors($account), [$sudo->firstFactor]);
+
+        $types = collect($this->types->shapes($sudo->surface()))
+            ->filter(fn (array $type) => in_array($type['name'], $held, true))
+            ->values()
+            ->all();
+
+        if ($sudo->firstFactor !== null && $this->holdings->holdsRecoveryCodes($account)) {
+            $types[] = ['name' => RecoveryCodeType::NAME, 'shape' => InitiateShape::FORM->value];
+        }
+
+        return $types;
     }
 
     /**
