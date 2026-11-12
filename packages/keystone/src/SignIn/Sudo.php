@@ -86,7 +86,7 @@ class Sudo
         $sudo = $this->session->sudoInProgress();
 
         if ($sudo === null) {
-            return new NoSudoInProgress('/');
+            return new NoSudoInProgress($this->session->intendedPath());
         }
 
         $types = $this->offer($sudo, $account);
@@ -112,7 +112,7 @@ class Sudo
         $sudo = $this->session->sudoInProgress();
 
         if ($sudo === null) {
-            return new NoSudoInProgress('/');
+            return new NoSudoInProgress($this->session->intendedPath());
         }
 
         $validated = $this->validation->make($input, $type->rules($sudo->surface()))->validate();

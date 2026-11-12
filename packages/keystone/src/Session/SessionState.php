@@ -478,6 +478,20 @@ class SessionState
     }
 
     /**
+     * Take the intended URL out of the session as a path on the app, or the root when it isn't one.
+     */
+    public function intendedPath(): string
+    {
+        $intended = $this->session->pull('url.intended');
+
+        if (! is_string($intended)) {
+            return '/';
+        }
+
+        return $this->toPath($intended) ?? '/';
+    }
+
+    /**
      * Get the URL as a path on the app, or null when it isn't one.
      */
     public function toPath(string $url): ?string
@@ -607,20 +621,6 @@ class SessionState
         $guard->setUser($account);
 
         $this->events->dispatch(new Login($guard->getName(), $account, $remember));
-    }
-
-    /**
-     * Take the intended URL out of the session as a path on the app, or the root when it isn't one.
-     */
-    protected function intendedPath(): string
-    {
-        $intended = $this->session->pull('url.intended');
-
-        if (! is_string($intended)) {
-            return '/';
-        }
-
-        return $this->toPath($intended) ?? '/';
     }
 
     /**

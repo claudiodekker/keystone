@@ -45,3 +45,21 @@ it('shows the second factors the account holds at the second step, then its reco
         ],
     ]);
 });
+
+it('sends a session without a sudo-in-progress on to the intended URL', function () {
+    $user = $this->createUser();
+    $this->signInWithoutSudo($user);
+
+    $response = $this->withSession(['url.intended' => '/reports?period=7d'])->get(route('sudo'));
+
+    $this->assertNoSudoInProgress($response, '/reports?period=7d');
+});
+
+it('sends a session without a sudo-in-progress or an intended URL on to the root', function () {
+    $user = $this->createUser();
+    $this->signInWithoutSudo($user);
+
+    $response = $this->get(route('sudo'));
+
+    $this->assertNoSudoInProgress($response, '/');
+});

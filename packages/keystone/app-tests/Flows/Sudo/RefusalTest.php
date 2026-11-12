@@ -82,3 +82,24 @@ it("keeps a count of its own, apart from sign-in's", function () {
 
     $this->assertSudoGranted($response, $this->sudoGatedPage());
 });
+
+it('verifies nothing and takes no attempt for an answer without a sudo-in-progress', function () {
+    config(['keystone.rate_limits.failed_attempts_per_hour' => 1]);
+    $user = $this->createUser();
+    $this->signInWithoutSudo($user);
+    $support = $this->supportFor(Surface::SIGN_IN);
+    $recorded = $this->securityEvents()->for($user)->count();
+
+    $stray = $this->post(route('sudo.submit', $support->type()->name()), $support->rejectedProof(Surface::SIGN_IN));
+
+    Auth::forgetGuards();
+    $this->get($this->sudoGatedPage());
+
+    Auth::forgetGuards();
+    $response = $this->post(route('sudo.submit', $support->type()->name()), $support->validProof(Surface::SIGN_IN, $user));
+
+    $this->assertNoSudoInProgress($stray, '/');
+    $this->assertSudoGranted($response, $this->sudoGatedPage());
+    expect($this->securityEvents()->for($user)->where('type', SecurityEventType::SUDO_FAILED))->toBeEmpty()
+        ->and($this->securityEvents()->for($user)->count())->toBe($recorded + 1);
+});
