@@ -84,11 +84,27 @@ Ending a signed-in session whose account newly owes enrollment, such as after a 
 
 ## Session phase
 
-The one session value that says where a guest session is in the flows, such as a pending sign-in. A new phase replaces the old one, and every change of auth level forgets it: a hold, a sign-in and a cancel each give the session a new id.
+The one session value that says where a session is in the flows: a pending sign-in, a sudo-in-progress or a sudo grant. A new phase replaces the old one, and every change of auth level forgets it: a hold, a sign-in, a cancel, a remembered return, passing sudo's first step, a sudo grant and ending sudo each give the session a new id. A malformed value counts as no phase.
+
+## Sudo
+
+A short proof that the user of a signed-in session is the account's owner, asked for before a change to how the account signs in. A route opts in with the `sudo` middleware. Only a real sign-in or the sudo page grants it, never a remembered return.
+
+## Sudo grant
+
+The session phase of a session that proved who it is: the time it was granted and the subnet of the address it was granted to, the /24 of an IPv4 address or the /64 of an IPv6 one. It ends `sudo.lifetime_seconds` after it was granted and never slides. A live grant used from another subnet is revoked and recorded as `sudo.network_changed`.
+
+## Sudo-in-progress
+
+The session phase of a signed-in session the sudo gate refused: where to send the user once granted, the account's credential epoch, when the refusal came, and the type that passed its first step once one did. It lasts a fixed 15 minutes from the refusal that started it, and a later refusal keeps that start. Its first step verifies on the sign-in surface and its second on the challenge surface, in the `sudo` flow.
+
+## Sudo gate
+
+The one decision that lets a request reach a route gated by sudo, or refuses it by throwing. It turns a guest away before reading any grant, lets a live grant from its own subnet through, and otherwise starts or keeps a sudo-in-progress and refuses the request with the app's `SudoRequiredResponse`.
 
 ## Ceremony slot
 
-What a credential type keeps between starting a ceremony and verifying its answer, such as a WebAuthn challenge or a TOTP key being enrolled. A type that has something to start implements `StartsCeremony`, and a type with nothing to start implements nothing. Core keeps one slot per type and surface, encrypted in the session, and hands it to the type's verify. The type draws its page from the slot on each request, such as a TOTP key's QR code, so the slot keeps nothing the page can draw again. Starting again replaces it. It ends 10 minutes after its start, or with the pending sign-in it was started under when that comes first, and at every change of auth level.
+What a credential type keeps between starting a ceremony and verifying its answer, such as a WebAuthn challenge or a TOTP key being enrolled. A type that has something to start implements `StartsCeremony`, and a type with nothing to start implements nothing. Core keeps one slot per type and surface, encrypted in the session, and hands it to the type's verify. The type draws its page from the slot on each request, such as a TOTP key's QR code, so the slot keeps nothing the page can draw again. Starting again replaces it. It ends 10 minutes after its start, or with the pending sign-in or sudo-in-progress it was started under when that comes first, and at every change of auth level.
 
 ## Verified address
 

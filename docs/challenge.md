@@ -51,7 +51,7 @@ An answer posts `recovery_code` to `login.challenge.submit` for `recovery-code`:
 
 Recovery codes have their own failed-attempt count, apart from every other type's, so wrong answers of the other second factor never lock the user out of their codes.
 
-Cancelling sends a `DELETE` to `login.challenge.cancel`. It drops the pending sign-in and lands on the sign-in page with "Sign-in cancelled. You were not logged in." Cancelling leaves every rate limit count alone, so starting over resumes the same failed-attempt budget. It also leaves the [abandoned-challenge alert](security-events.md#abandoned-challenges) in place, so a browser the account doesn't know that cancels still mails the owner 7 minutes after its hold.
+Cancelling sends a `DELETE` to `login.challenge.cancel`. It drops the pending sign-in and lands on the sign-in page with "Sign-in cancelled. You were not logged in." Cancelling leaves every rate limit count alone, so starting over resumes the same failed-attempt budget. It also leaves the [abandoned-challenge alert](alerts.md#abandoned-challenges) in place, so a browser the account doesn't know that cancels still mails the owner 7 minutes after its hold.
 
 ## Your controller
 

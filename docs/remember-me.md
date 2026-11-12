@@ -37,7 +37,7 @@ A request from a browser with no signed-in session that sends a live cookie is s
 
 A restored session gets an [absolute lifetime](configuration.md#how-long-a-session-lasts) of its own, counted from the restore. When that lifetime passes and the cookie is still live, the next request restores the session again, with no `session.ended`, no `Clear-Site-Data` and no expiry notice. The user notices nothing.
 
-A return reads the [device cookie](security-events.md#new-devices) to record whether the browser is a known device of the account, and changes neither cookie. A browser that reopens with several tabs sends several requests at once, and each of them restores. A copy of the remember-me cookie used in another browser alerts the owner as a sign-in from a new device. A copy of every cookie the browser holds restores without an alert until the owner's next real sign-in from that browser, as a stolen session cookie would.
+A return reads the [device cookie](alerts.md#new-devices) to record whether the browser is a known device of the account, and changes neither cookie. A browser that reopens with several tabs sends several requests at once, and each of them restores. A copy of the remember-me cookie used in another browser alerts the owner as a sign-in from a new device. A copy of every cookie the browser holds restores without an alert until the owner's next real sign-in from that browser, as a stolen session cookie would.
 
 Keystone restores once Laravel has started the session, so a global middleware that asks who is signed in before `StartSession` runs sees a guest.
 
