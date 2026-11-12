@@ -87,7 +87,7 @@ it('keeps a grant revoked on another network ended once the browser is back on i
     $this->fromAnotherNetwork()->get($gated);
 
     Auth::forgetGuards();
-    $response = $this->withServerVariables(['REMOTE_ADDR' => '127.0.0.1'])->getJson($gated);
+    $response = $this->fromOwnNetwork()->getJson($gated);
 
     $this->assertSudoRequiredForJson($response);
 });

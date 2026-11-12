@@ -44,7 +44,7 @@ it('signs in without a grant or its record from an address that has no subnet', 
     $signedIn = $this->withServerVariables(['REMOTE_ADDR' => 'not-an-address'])->passFirstFactor($user);
 
     Auth::forgetGuards();
-    $response = $this->withServerVariables(['REMOTE_ADDR' => '127.0.0.1'])->getJson($this->sudoGatedPage());
+    $response = $this->fromOwnNetwork()->getJson($this->sudoGatedPage());
 
     $this->assertSignedIn($signedIn, '/');
     $this->assertSudoRequiredForJson($response);

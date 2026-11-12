@@ -59,7 +59,7 @@ it('counts an answer from an address that has no subnet against the failed-attem
     $this->withServerVariables(['REMOTE_ADDR' => 'not-an-address'])->post(route('sudo.submit', $support->type()->name()), $proof);
 
     Auth::forgetGuards();
-    $response = $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.9'])->post(route('sudo.submit', $support->type()->name()), $proof);
+    $response = $this->fromOwnNetwork()->post(route('sudo.submit', $support->type()->name()), $proof);
 
     $this->assertThrottled($response);
 });

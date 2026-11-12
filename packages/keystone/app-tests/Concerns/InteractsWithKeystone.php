@@ -101,6 +101,14 @@ trait InteractsWithKeystone
     }
 
     /**
+     * Send the requests from here on from the test's own address again, as a browser back on its own network would.
+     */
+    public function fromOwnNetwork(): static
+    {
+        return $this->withServerVariables(['REMOTE_ADDR' => '127.0.0.1']);
+    }
+
+    /**
      * Send the requests from here on from a browser that has never visited the app, and get the browser left behind.
      */
     public function switchToFreshBrowser(): Browser
