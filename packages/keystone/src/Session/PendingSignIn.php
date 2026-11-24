@@ -10,6 +10,11 @@ namespace ClaudioDekker\Keystone\Session;
 readonly class PendingSignIn
 {
     /**
+     * The kind the pending sign-in's session value names, which tells it apart from the session's other phases.
+     */
+    protected const string KIND = 'pending_sign_in';
+
+    /**
      * How long a pending sign-in lasts after its hold, in seconds.
      */
     protected const int LIFETIME_SECONDS = 15 * 60;
@@ -44,7 +49,7 @@ readonly class PendingSignIn
      */
     public static function fromSession(array $value): ?static
     {
-        $value += array_fill_keys(['account', 'first_factor', 'stage', 'intended_path', 'epoch', 'held_at', 'second_factor', 'remember'], null);
+        $value += array_fill_keys(['kind', 'account', 'first_factor', 'stage', 'intended_path', 'epoch', 'held_at', 'second_factor', 'remember'], null);
 
         $stage = is_string($value['stage']) ? Stage::tryFrom($value['stage']) : null;
 
@@ -60,7 +65,8 @@ readonly class PendingSignIn
             return null;
         }
 
-        if ($stage === null
+        if ($value['kind'] !== static::KIND
+            || $stage === null
             || ! is_string($value['first_factor'])
             || ! is_string($value['intended_path'])
             || ! is_int($value['held_at'])
@@ -84,11 +90,12 @@ readonly class PendingSignIn
     /**
      * Get the pending sign-in as its session value.
      *
-     * @return array{account: int|string, first_factor: string, stage: string, intended_path: string, epoch: int|null, held_at: int, second_factor: string|null, remember: bool}
+     * @return array{kind: string, account: int|string, first_factor: string, stage: string, intended_path: string, epoch: int|null, held_at: int, second_factor: string|null, remember: bool}
      */
     public function toSession(): array
     {
         return [
+            'kind' => static::KIND,
             'account' => $this->account,
             'first_factor' => $this->firstFactor,
             'stage' => $this->stage->value,

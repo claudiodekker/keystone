@@ -116,6 +116,10 @@ return [
         'sign_in.voided' => null,
         'signed_in' => SecurityAlert::class,
         'signed_out' => null,
+        'sudo.failed' => SecurityAlert::class,
+        'sudo.granted' => null,
+        'sudo.network_changed' => SecurityAlert::class,
+        'sudo.revoked' => null,
     ],
 
     /*
@@ -207,6 +211,21 @@ return [
 
     'session' => [
         'absolute_lifetime_seconds' => 12 * 60 * 60,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Sudo
+    |--------------------------------------------------------------------------
+    |
+    | How many seconds sudo lasts after the sign-in or the confirmation that
+    | granted it, however busy the session stays. A lower value shortens
+    | grants already held, since a grant's age is checked when read.
+    |
+    */
+
+    'sudo' => [
+        'lifetime_seconds' => 15 * 60,
     ],
 
     /*

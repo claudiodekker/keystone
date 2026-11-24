@@ -173,7 +173,7 @@ class Challenge
 
         $answer = $this->proofs->verify($type, Surface::CHALLENGE, $account, $validated, $attempt);
 
-        if (! $this->decision->answers($answer->proof, $type, $pending, $account)) {
+        if (! $this->decision->answers($answer->proof, $type, $pending->firstFactor, $account)) {
             return $this->proofs->refuse($account, $answer);
         }
 

@@ -1,5 +1,5 @@
 <template>
-  <Form v-slot="{ errors }" :action="submit(type.name)" disable-while-processing class="flex flex-col gap-6">
+  <Form v-slot="{ errors }" :action="action ?? submit(type.name)" disable-while-processing class="flex flex-col gap-6">
     <div class="grid gap-2">
       <label :for="id" class="text-sm font-medium text-gray-700">Code from your authenticator app</label>
       <input
@@ -32,10 +32,13 @@ import { useId } from 'vue'
 import InputError from '@/components/InputError.vue'
 import { submit } from '@/routes/login/challenge'
 import type { ChallengeType } from '@/types/auth'
+import type { RouteDefinition } from '@/wayfinder'
 
 defineProps<{
   /** The TOTP type as the challenge offers it. */
   type: ChallengeType
+  /** Where the form posts, the challenge's answer when not given. */
+  action?: RouteDefinition<'post'>
 }>()
 
 const id = useId()

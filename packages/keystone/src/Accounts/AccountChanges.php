@@ -8,6 +8,7 @@ use ClaudioDekker\Keystone\Models\UserKnownDevice;
 use ClaudioDekker\Keystone\SecurityEvents\Recorder;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use ClaudioDekker\Keystone\Session\PendingSignIn;
+use ClaudioDekker\Keystone\Session\SudoInProgress;
 use Closure;
 use Illuminate\Database\Connection;
 
@@ -31,7 +32,7 @@ class AccountChanges
      * Apply a change to the account while its row is locked, moving its credential epoch when the change ends its sessions, and get what the change returned.
      *
      * The change records its events only once the outermost transaction commits, so one that rolls back records nothing. Their alerts go to the addresses the account held before the change.
-     * A change a pending sign-in writes is refused, writing nothing, once the account left the credential epoch it was held on or was barred.
+     * A change a pending sign-in or a sudo-in-progress writes is refused, writing nothing, once the account left the credential epoch it was held or signed in on.
      *
      * @template TResult
      *
@@ -40,7 +41,7 @@ class AccountChanges
      *
      * @throws AccountChangeRefusedException
      */
-    public function change(KeystoneUser $account, Closure $apply, ?PendingSignIn $writer = null): mixed
+    public function change(KeystoneUser $account, Closure $apply, PendingSignIn|SudoInProgress|null $writer = null): mixed
     {
         [$change, $result] = $this->connection->transaction(function () use ($account, $apply, $writer) {
             $epoch = CredentialEpoch::lock($account->getAuthIdentifier());

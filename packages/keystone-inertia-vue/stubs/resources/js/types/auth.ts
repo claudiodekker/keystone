@@ -35,3 +35,13 @@ export type EnrollmentPage = {
 export type RecoveryCodesPage = {
   codes: string[]
 }
+
+export type SudoType = {
+  name: string
+  shape: InitiateShape
+}
+
+export type SudoPage = {
+  preselected: string | null
+  types: SudoType[]
+}

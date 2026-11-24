@@ -120,11 +120,11 @@ class SignInDecision
     }
 
     /**
-     * Determine if the proof answers the pending sign-in's challenge: a credential the held account holds, of another type than the first factor's.
+     * Determine if the proof answers a challenge after the named first factor: a credential the account holds, of another type than the first factor's.
      */
-    public function answers(Proof $proof, CredentialType $type, PendingSignIn $pending, KeystoneUser $account): bool
+    public function answers(Proof $proof, CredentialType $type, string $firstFactor, KeystoneUser $account): bool
     {
-        return $type->name() !== $pending->firstFactor && $this->proves($proof, $type, $account);
+        return $type->name() !== $firstFactor && $this->proves($proof, $type, $account);
     }
 
     /**

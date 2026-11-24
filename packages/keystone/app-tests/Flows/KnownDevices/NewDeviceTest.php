@@ -82,7 +82,7 @@ it('sends no alert when a browser the account knows signs in from a new network'
     $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
 
-    $first = $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.23'])->post(route('login.submit', $support->type()->name()), [
+    $first = $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada@example.com',
         ...$support->validProof(Surface::SIGN_IN, $user),
     ]);
@@ -90,7 +90,7 @@ it('sends no alert when a browser the account knows signs in from a new network'
     $this->keepCookiesFrom($first);
     $this->post(route('logout'));
 
-    $response = $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.71'])->post(route('login.submit', $support->type()->name()), [
+    $response = $this->fromAnotherNetwork()->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada@example.com',
         ...$support->validProof(Surface::SIGN_IN, $user),
     ]);
@@ -104,7 +104,7 @@ it('alerts the owner when a browser the account has not seen signs in from a net
     $this->addVerifiedAddress($user, 'ada@example.com');
     $support = $this->supportFor(Surface::SIGN_IN)->arrangeCredential(Surface::SIGN_IN, $user);
 
-    $first = $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.23'])->post(route('login.submit', $support->type()->name()), [
+    $first = $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada@example.com',
         ...$support->validProof(Surface::SIGN_IN, $user),
     ]);
@@ -112,7 +112,7 @@ it('alerts the owner when a browser the account has not seen signs in from a net
     $this->keepCookiesFrom($first);
     $this->switchToFreshBrowser();
 
-    $response = $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.23'])->post(route('login.submit', $support->type()->name()), [
+    $response = $this->post(route('login.submit', $support->type()->name()), [
         'identifier' => 'ada@example.com',
         ...$support->validProof(Surface::SIGN_IN, $user),
     ]);

@@ -60,6 +60,16 @@ return [
         'subject' => 'New sign-in to your account',
         'summary' => "Your account was signed in to from a browser it hasn't used before.",
     ],
+    'sudo' => [
+        'failed' => [
+            'subject' => 'Someone failed to confirm it was you',
+            'summary' => 'Someone signed in to your account was asked to confirm it was you before a sensitive change, and got it wrong.',
+        ],
+        'network_changed' => [
+            'subject' => 'Your account was used from another network',
+            'summary' => 'A session of your account that had just confirmed it was you was used from another network, so it has to confirm it again before a sensitive change.',
+        ],
+    ],
     'unknown-device' => 'Unknown device',
     'when' => 'When: :time UTC',
 ];

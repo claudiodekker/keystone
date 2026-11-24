@@ -42,6 +42,7 @@ class KeyChecks
             ...$this->requireRecoveryCodes(),
             ...$this->requireSecondFactor(),
             ...$this->retention(),
+            ...$this->sudoLifetime(),
             ...$this->trustedOrigins(),
         ];
     }
@@ -164,6 +165,20 @@ class KeyChecks
         }
 
         return ['keystone.retention.known_devices_seconds must be a positive integer.'];
+    }
+
+    /**
+     * Get the failure of sudo.lifetime_seconds when it isn't a positive integer.
+     *
+     * @return list<string>
+     */
+    protected function sudoLifetime(): array
+    {
+        if ($this->isPositiveInteger($this->config->get('keystone.sudo.lifetime_seconds'))) {
+            return [];
+        }
+
+        return ['keystone.sudo.lifetime_seconds must be a positive integer.'];
     }
 
     /**

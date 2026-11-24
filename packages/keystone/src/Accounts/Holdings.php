@@ -29,16 +29,17 @@ class Holdings
      */
     public function secondFactors(KeystoneUser $account): array
     {
-        $offered = array_map(fn (CredentialType $type) => $type->name(), $this->types->serving(Surface::CHALLENGE));
+        return $this->held($account, Surface::CHALLENGE);
+    }
 
-        $held = UserCredential::query()
-            ->where('user_id', $account->getAuthIdentifier())
-            ->whereIn('type', $offered)
-            ->distinct()
-            ->pluck('type')
-            ->all();
-
-        return array_values(array_intersect($offered, $held));
+    /**
+     * Get the names of the types serving sign-in the account holds a credential of, in the order the types were registered.
+     *
+     * @return list<string>
+     */
+    public function signInTypes(KeystoneUser $account): array
+    {
+        return $this->held($account, Surface::SIGN_IN);
     }
 
     /**
@@ -57,5 +58,24 @@ class Holdings
         return UserRecoveryCode::query()
             ->where('user_id', $account->getAuthIdentifier())
             ->exists();
+    }
+
+    /**
+     * Get the names of the types serving the surface the account holds a credential of, in the order the types were registered.
+     *
+     * @return list<string>
+     */
+    protected function held(KeystoneUser $account, Surface $surface): array
+    {
+        $offered = array_map(fn (CredentialType $type) => $type->name(), $this->types->serving($surface));
+
+        $held = UserCredential::query()
+            ->where('user_id', $account->getAuthIdentifier())
+            ->whereIn('type', $offered)
+            ->distinct()
+            ->pluck('type')
+            ->all();
+
+        return array_values(array_intersect($offered, $held));
     }
 }

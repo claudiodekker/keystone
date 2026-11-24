@@ -34,11 +34,10 @@ it('records signed_in for the account when a user signs in', function () {
 
     $this->assertSignedIn($response, '/');
 
-    $events = $this->securityEvents()->for($user);
+    $signedIn = $this->securityEvents()->for($user)->where('type', SecurityEventType::SIGNED_IN);
 
-    expect($events)->toHaveCount(1)
-        ->and($events[0]->type)->toBe(SecurityEventType::SIGNED_IN)
-        ->and($events[0]->user_id)->toBe($user->getAuthIdentifier());
+    expect($signedIn)->toHaveCount(1)
+        ->and($signedIn->sole()->user_id)->toBe($user->getAuthIdentifier());
 });
 
 it('records proof.rejected for the account when its sign-in is refused', function () {
@@ -147,7 +146,7 @@ it('keeps recording for any value of keystone.events.enabled but false', functio
         ...$support->validProof(Surface::SIGN_IN, $user),
     ]);
 
-    expect($this->securityEvents()->for($user))->toHaveCount(1);
+    expect($this->securityEvents()->for($user)->pluck('type')->all())->toBe([SecurityEventType::SUDO_GRANTED, SecurityEventType::SIGNED_IN]);
 })->with([
     'true' => true,
     'the string false' => 'false',
@@ -166,7 +165,7 @@ it('dispatches SecurityEventRecorded with the whole entry', function () {
         ...$support->validProof(Surface::SIGN_IN, $user),
     ]);
 
-    $event = $this->securityEvents()->for($user)->sole();
+    $event = $this->securityEvents()->for($user)->where('type', SecurityEventType::SIGNED_IN)->sole();
 
     Event::assertDispatched(SecurityEventRecorded::class, fn (SecurityEventRecorded $recorded) => $recorded->entry->is($event) && $recorded->entry->type === SecurityEventType::SIGNED_IN);
 });
@@ -181,8 +180,8 @@ it("carries the request's address, user agent and request id, in the row and in 
         ...$support->validProof(Surface::SIGN_IN, $user),
     ]);
 
-    $event = $this->securityEvents()->for($user)->sole();
-    $line = $this->securityEvents()->logged()[0];
+    $event = $this->securityEvents()->for($user)->where('type', SecurityEventType::SIGNED_IN)->sole();
+    $line = collect($this->securityEvents()->logged())->firstWhere('type', 'signed_in');
 
     expect($event->ip_address)->toBe('203.0.113.9')
         ->and($event->user_agent)->toBe('Mozilla/5.0 (X11; Linux x86_64)')
@@ -203,7 +202,7 @@ it('logs every fixed field in the context of the log line', function () {
         ...$support->validProof(Surface::SIGN_IN, $user),
     ]);
 
-    $line = $this->securityEvents()->logged()[0];
+    $line = collect($this->securityEvents()->logged())->firstWhere('type', 'signed_in');
 
     expect(array_keys($line))->toBe([
         'id',
@@ -223,7 +222,7 @@ it('logs every fixed field in the context of the log line', function () {
         'request_id',
         'operator',
     ])
-        ->and($line['id'])->toBe($this->securityEvents()->for($user)->sole()->id)
+        ->and($line['id'])->toBe($this->securityEvents()->for($user)->where('type', SecurityEventType::SIGNED_IN)->sole()->id)
         ->and($line['occurred_at'])->toBe('2026-10-17T12:00:00.000000Z')
         ->and($line['type'])->toBe('signed_in')
         ->and($line['actor'])->toBe('user')
@@ -263,10 +262,10 @@ it('replaces control characters and invalid UTF-8 in the user agent and cuts it 
         ...$support->validProof(Surface::SIGN_IN, $user),
     ]);
 
-    $event = $this->securityEvents()->for($user)->sole();
+    $event = $this->securityEvents()->for($user)->where('type', SecurityEventType::SIGNED_IN)->sole();
 
     expect($event->user_agent)->toBe('Mozilla  /5.0?'.str_repeat('a', 498))
-        ->and($this->securityEvents()->logged()[0]['user_agent'])->toBe($event->user_agent);
+        ->and(collect($this->securityEvents()->logged())->firstWhere('type', 'signed_in')['user_agent'])->toBe($event->user_agent);
 });
 
 it('records a refused sign-in inside the timing floor', function () {
@@ -298,7 +297,7 @@ it('still signs in and writes the row and the event when the log channel fails',
     ]);
 
     $this->assertSignedIn($response, '/');
-    expect($this->securityEvents()->for($user)->sole()->type)->toBe(SecurityEventType::SIGNED_IN);
+    expect($this->securityEvents()->for($user)->pluck('type')->all())->toBe([SecurityEventType::SUDO_GRANTED, SecurityEventType::SIGNED_IN]);
     Event::assertDispatched(SecurityEventRecorded::class);
     Exceptions::assertReported(UnexpectedValueException::class);
 });
@@ -322,7 +321,7 @@ it('still signs in and writes the log line and the event when the row cannot be 
 
     $this->assertSignedIn($response, '/');
     expect($this->securityEvents()->for($user))->toBeEmpty()
-        ->and($this->securityEvents()->logged()[0]['type'])->toBe('signed_in');
+        ->and(array_column($this->securityEvents()->logged(), 'type'))->toBe(['sudo.granted', 'signed_in']);
 
     Event::assertDispatched(SecurityEventRecorded::class, fn (SecurityEventRecorded $recorded) => $recorded->entry->user_id === $user->getAuthIdentifier());
     Exceptions::assertReported(fn (RuntimeException $exception) => $exception->getMessage() === 'The database refused the insert.');
@@ -340,8 +339,8 @@ it('still signs in and records when an app listener fails', function () {
     ]);
 
     $this->assertSignedIn($response, '/');
-    expect($this->securityEvents()->for($user)->sole()->type)->toBe(SecurityEventType::SIGNED_IN)
-        ->and($this->securityEvents()->logged()[0]['type'])->toBe('signed_in');
+    expect($this->securityEvents()->for($user)->pluck('type')->all())->toBe([SecurityEventType::SUDO_GRANTED, SecurityEventType::SIGNED_IN])
+        ->and(array_column($this->securityEvents()->logged(), 'type'))->toBe(['sudo.granted', 'signed_in']);
 
     Exceptions::assertReported(fn (RuntimeException $exception) => $exception->getMessage() === 'The listener failed.');
 });
@@ -354,7 +353,7 @@ it('still signs in and records nothing when the entry cannot be built', function
     $real = Crypt::getFacadeRoot();
     $encrypter = Mockery::mock($real)->makePartial();
     $encrypter->shouldReceive('encrypt')->twice()->andReturnUsing($real->encrypt(...));
-    $encrypter->shouldReceive('encrypt')->once()->andThrow(new RuntimeException('The encryption key is lost.'));
+    $encrypter->shouldReceive('encrypt')->andThrow(new RuntimeException('The encryption key is lost.'));
     Model::encryptUsing($encrypter);
 
     $response = $this->post(route('login.submit', $support->type()->name()), [
@@ -381,5 +380,5 @@ it("reads the address the app's trusted proxy forwarded", function () {
         ...$support->validProof(Surface::SIGN_IN, $user),
     ]);
 
-    expect($this->securityEvents()->for($user)->sole()->ip_address)->toBe('203.0.113.9');
+    expect($this->securityEvents()->for($user)->where('type', SecurityEventType::SIGNED_IN)->sole()->ip_address)->toBe('203.0.113.9');
 });

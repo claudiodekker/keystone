@@ -28,8 +28,8 @@ it('reads the events for the user, and none for another user', function () {
 
     $events = $this->securityEvents()->for($user);
 
-    expect($events->pluck('user_id')->all())->toBe([$user->getAuthIdentifier()])
-        ->and($events->pluck('type')->all())->toBe([SecurityEventType::SIGNED_IN]);
+    expect($events->pluck('user_id')->all())->toBe([$user->getAuthIdentifier(), $user->getAuthIdentifier()])
+        ->and($events->pluck('type')->all())->toBe([SecurityEventType::SUDO_GRANTED, SecurityEventType::SIGNED_IN]);
 });
 
 it('reads every event, oldest first, when given no user', function () {
@@ -53,8 +53,8 @@ it('reads every event, oldest first, when given no user', function () {
 
     $events = $this->securityEvents()->stored();
 
-    expect($events->pluck('user_id')->all())->toBe([$other->getAuthIdentifier(), $other->getAuthIdentifier(), $user->getAuthIdentifier()])
-        ->and($events->pluck('type')->all())->toBe([SecurityEventType::SIGNED_IN, SecurityEventType::SIGNED_OUT, SecurityEventType::SIGNED_IN]);
+    expect($events->pluck('user_id')->all())->toBe([$other->getAuthIdentifier(), $other->getAuthIdentifier(), $other->getAuthIdentifier(), $user->getAuthIdentifier(), $user->getAuthIdentifier()])
+        ->and($events->pluck('type')->all())->toBe([SecurityEventType::SUDO_GRANTED, SecurityEventType::SIGNED_IN, SecurityEventType::SIGNED_OUT, SecurityEventType::SUDO_GRANTED, SecurityEventType::SIGNED_IN]);
 });
 
 it('reads the context of every security event log line, and no other line', function () {
@@ -70,7 +70,6 @@ it('reads the context of every security event log line, and no other line', func
 
     $lines = $this->securityEvents()->logged();
 
-    expect($lines)->toHaveCount(1)
-        ->and($lines[0]['type'])->toBe('signed_in')
-        ->and($lines[0]['user_id'])->toBe($user->getAuthIdentifier());
+    expect(array_column($lines, 'type'))->toBe(['sudo.granted', 'signed_in'])
+        ->and(array_column($lines, 'user_id'))->toBe([$user->getAuthIdentifier(), $user->getAuthIdentifier()]);
 });
