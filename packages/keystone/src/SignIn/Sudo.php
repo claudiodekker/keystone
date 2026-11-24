@@ -161,7 +161,7 @@ class Sudo
             return $this->proofs->refuseSudo($account, $type, $surface, $answer->proof->reason);
         }
 
-        $refusal = $this->refuseBeforeWriting($sudo, $account, $type);
+        $refusal = $this->refuseBeforeWriting($sudo, $account, $type, $answer->attempt);
 
         if ($refusal !== null) {
             return $refusal;
@@ -198,7 +198,7 @@ class Sudo
             return $this->proofs->refuseSudo($account, $type, Surface::CHALLENGE, $answer->proof->reason);
         }
 
-        $refusal = $this->refuseBeforeWriting($sudo, $account, $type);
+        $refusal = $this->refuseBeforeWriting($sudo, $account, $type, $attempt);
 
         if ($refusal !== null) {
             return $refusal;
@@ -220,11 +220,13 @@ class Sudo
     }
 
     /**
-     * Get the refusal of a proven answer that may write nothing: its sudo-in-progress ran out while it was checked, or its account is barred, else null.
+     * Get the refusal of a proven answer that may write nothing: its sudo-in-progress ran out while it was checked, which gives its attempt back, or its account is barred, else null.
      */
-    protected function refuseBeforeWriting(SudoInProgress $sudo, KeystoneUser $account, CredentialType $type): Refused|NoSudoInProgress|null
+    protected function refuseBeforeWriting(SudoInProgress $sudo, KeystoneUser $account, CredentialType $type, FailedAttempt $attempt): Refused|NoSudoInProgress|null
     {
         if ($sudo->hasExpiredAt(Date::now()->getTimestamp())) {
+            $this->limiter->giveBack($attempt);
+
             return new NoSudoInProgress($sudo->intendedPath);
         }
 

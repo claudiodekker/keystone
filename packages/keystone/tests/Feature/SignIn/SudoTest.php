@@ -43,6 +43,21 @@ it('refuses an answer whose sudo-in-progress ran out while it was checked, writi
         ->and(UserSecurityEvent::query()->where('type', SecurityEventType::SUDO_GRANTED)->count())->toBe(1);
 });
 
+it('gives back the attempt of a right answer whose sudo-in-progress ran out while it was checked', function () {
+    config(['keystone.rate_limits.failed_attempts_per_hour' => 1]);
+    $this->type->duringNextVerify(fn () => $this->travel(15)->minutes());
+    $this->post(route('sudo.submit', 'form'), ['secret' => 'correct horse']);
+
+    Auth::forgetGuards();
+    $this->get('/gated');
+
+    Auth::forgetGuards();
+    $response = $this->post(route('sudo.submit', 'form'), ['secret' => 'correct horse']);
+
+    $response->assertRedirect('/gated');
+    expect(UserSecurityEvent::query()->where('type', SecurityEventType::SUDO_GRANTED)->count())->toBe(2);
+});
+
 it("ends with no grant when the account's credential epoch moved while the answer was checked", function () {
     $this->type->duringNextVerify(fn () => CredentialEpoch::move($this->ada->getKey()));
 
