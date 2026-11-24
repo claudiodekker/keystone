@@ -42,6 +42,7 @@ use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Exceptions\Handler;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Routing\Redirector;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Auth;
@@ -284,11 +285,12 @@ class KeystoneServiceProvider extends ServiceProvider
     }
 
     /**
-     * Let apps gate their routes with the sudo middleware alias, and answer a request the gate refused with the app's response.
+     * Let apps gate their routes with the sudo middleware alias, run ahead of route-model binding, and answer a request the gate refused with the app's response.
      */
     protected function registerSudoGate(): void
     {
         $this->app->make(Router::class)->aliasMiddleware(RequireSudo::ALIAS, RequireSudo::class);
+        $this->app->make(Kernel::class)->addToMiddlewarePriorityBefore(SubstituteBindings::class, RequireSudo::class);
 
         $this->callAfterResolving(ExceptionHandler::class, function (ExceptionHandler $handler) {
             if (! $handler instanceof Handler) {

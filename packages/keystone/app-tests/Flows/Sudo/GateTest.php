@@ -1,5 +1,6 @@
 <?php
 
+use ClaudioDekker\Keystone\Keystone;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Notification;
@@ -108,4 +109,13 @@ it('turns a guest away on a route gated by sudo alone', function () {
     $response = $this->getJson('/keystone/app-tests/sudo-only');
 
     expect($response->getStatusCode())->toBe(401);
+});
+
+it("refuses a session without sudo before the route's bound record is looked up", function () {
+    Route::bind('sudoGatedUser', fn (string $id) => Keystone::userModel()::query()->findOrFail($id));
+    Route::middleware(['web', 'auth', 'sudo'])->get('/keystone/app-tests/sudo-gated-users/{sudoGatedUser}', fn () => response()->noContent());
+
+    $response = $this->actingAs($this->createUser())->get('/keystone/app-tests/sudo-gated-users/0');
+
+    $this->assertSudoRequired($response);
 });
