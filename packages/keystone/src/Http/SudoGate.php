@@ -5,6 +5,7 @@ namespace ClaudioDekker\Keystone\Http;
 use ClaudioDekker\Keystone\Exceptions\SudoRequiredException;
 use ClaudioDekker\Keystone\SecurityEvents\Recorder;
 use ClaudioDekker\Keystone\SecurityEvents\SecurityEventType;
+use ClaudioDekker\Keystone\Session\AppPaths;
 use ClaudioDekker\Keystone\Session\SessionState;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\Request;
@@ -25,6 +26,7 @@ class SudoGate
     public function __construct(
         protected Recorder $recorder,
         protected SessionState $session,
+        protected AppPaths $paths,
     ) {
         //
     }
@@ -108,7 +110,7 @@ class SudoGate
             return '/';
         }
 
-        return $this->session->toPath($url) ?? '/';
+        return $this->paths->toPath($url) ?? '/';
     }
 
     /**

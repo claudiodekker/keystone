@@ -20,11 +20,9 @@ use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Contracts\Encryption\Encrypter;
 use Illuminate\Contracts\Events\Dispatcher;
-use Illuminate\Contracts\Routing\UrlGenerator;
 use Illuminate\Contracts\Session\Session;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Date;
-use Illuminate\Support\Str;
 
 /**
  * @internal
@@ -79,7 +77,7 @@ class SessionState
     public function __construct(
         protected AccountLookup $accounts,
         protected Session $session,
-        protected UrlGenerator $urls,
+        protected AppPaths $paths,
         protected Dispatcher $events,
         protected Config $config,
         protected Encrypter $encrypter,
@@ -491,21 +489,7 @@ class SessionState
             return '/';
         }
 
-        return $this->toPath($intended) ?? '/';
-    }
-
-    /**
-     * Get the URL as a path on the app, or null when it isn't one.
-     */
-    public function toPath(string $url): ?string
-    {
-        $path = Str::chopStart($url, $this->urls->to('/'));
-
-        if (! $this->isPath($path)) {
-            return null;
-        }
-
-        return $path;
+        return $this->paths->toPath($intended) ?? '/';
     }
 
     /**
@@ -640,16 +624,5 @@ class SessionState
         $guard->setUser($account);
 
         $this->events->dispatch(new Login($guard->getName(), $account, $remember));
-    }
-
-    /**
-     * Determine if the URL is a path on this app: one leading slash, and no backslash or control character.
-     */
-    protected function isPath(string $url): bool
-    {
-        return str_starts_with($url, '/')
-            && ! str_starts_with($url, '//')
-            && ! str_contains($url, '\\')
-            && preg_match('/[\x00-\x1F\x7F]/', $url) === 0;
     }
 }
