@@ -57,7 +57,7 @@ it('ends a sudo-in-progress too, recording nothing', function () {
     expect($this->securityEvents()->for($user)->where('type', SecurityEventType::SUDO_REVOKED))->toBeEmpty();
 });
 
-it('gives the session a new id when it ends sudo', function () {
+it('keeps the session id when it ends sudo', function () {
     $user = $this->createUser();
     $this->passFirstFactor($user);
     $cookie = config('session.cookie');
@@ -67,7 +67,7 @@ it('gives the session a new id when it ends sudo', function () {
     Auth::forgetGuards();
     $response = $this->withCookie($cookie, $before)->delete(route('sudo.end'));
 
-    expect($response->getCookie($cookie)->getValue())->not->toBe($before);
+    expect($response->getCookie($cookie)->getValue())->toBe($before);
 });
 
 it('turns a guest away', function () {

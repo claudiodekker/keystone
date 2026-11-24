@@ -373,13 +373,15 @@ class SessionState
     }
 
     /**
-     * End the session's sudo grant and sudo-in-progress on a fresh session id, and determine if it held a live grant.
+     * End the session's sudo grant and sudo-in-progress, and determine if it held a live grant.
+     *
+     * The session keeps its id: ending sudo only lowers what it may do, and a new id would let a copy of the session cookie move the session away from its browser.
      */
     public function endSudo(): bool
     {
         $wasGranted = $this->liveSudoGrant() !== null;
 
-        $this->changeAuthLevel();
+        $this->forgetPhase();
 
         return $wasGranted;
     }
@@ -577,6 +579,15 @@ class SessionState
     protected function changeAuthLevel(): void
     {
         $this->session->regenerate(true);
+
+        $this->forgetPhase();
+    }
+
+    /**
+     * Forget the session's phase and the ceremonies started under it.
+     */
+    protected function forgetPhase(): void
+    {
         $this->session->forget([static::PHASE, static::CEREMONIES]);
     }
 

@@ -91,6 +91,6 @@ Keystone reads the address after your trusted-proxy middleware, as Laravel's `$r
 
 ## Ending sudo
 
-A `DELETE` to `sudo.end` ends the session's grant and sudo-in-progress, gives the session a new id and leaves the status "You will be asked to confirm it is you before your next sensitive change." It isn't gated by sudo, and counts against the `change` request limit. It records `sudo.revoked` only when it ended a live grant, so repeating it adds nothing to the trail.
+A `DELETE` to `sudo.end` ends the session's grant and sudo-in-progress on the same session id and leaves the status "You will be asked to confirm it is you before your next sensitive change." It isn't gated by sudo, and counts against the `change` request limit. It records `sudo.revoked` only when it ended a live grant, so repeating it adds nothing to the trail.
 
-Every change of the session's auth level also ends sudo: a sign-in, a hold, passing a second factor, a remembered return, passing sudo's first step and ending sudo. Signing out and anything that ends the session end it with the session.
+Every change of the session's auth level also ends sudo: a sign-in, a hold, passing a second factor, a remembered return and passing sudo's first step. Signing out and anything that ends the session end it with the session.

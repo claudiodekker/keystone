@@ -84,7 +84,7 @@ Ending a signed-in session whose account newly owes enrollment, such as after a 
 
 ## Session phase
 
-The one session value that says where a session is in the flows: a pending sign-in, a sudo-in-progress or a sudo grant. A new phase replaces the old one, and every change of auth level forgets it: a hold, a sign-in, a cancel, a remembered return, passing sudo's first step, a sudo grant and ending sudo each give the session a new id. A malformed value counts as no phase.
+The one session value that says where a session is in the flows: a pending sign-in, a sudo-in-progress or a sudo grant. A new phase replaces the old one, and every change of auth level forgets it: a hold, a sign-in, a cancel, a remembered return, passing sudo's first step and a sudo grant each give the session a new id. Ending sudo forgets it on the same id. A malformed value counts as no phase.
 
 ## Sudo
 
