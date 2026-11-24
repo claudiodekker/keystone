@@ -298,9 +298,15 @@ class SessionState
 
     /**
      * Drop the session's pending sign-in, leaving a guest.
+     *
+     * A signed-in session holds no pending sign-in, so its phase, such as a sudo grant, is left as it is.
      */
     public function dropPendingSignIn(): void
     {
+        if ($this->isSignedIn()) {
+            return;
+        }
+
         $this->changeAuthLevel();
     }
 

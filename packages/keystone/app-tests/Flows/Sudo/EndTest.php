@@ -90,3 +90,19 @@ it('limits ending sudo as a change', function () {
 
     $this->assertThrottled($response);
 });
+
+it("keeps a signed-in session's live grant when it cancels a sign-in it isn't in", function (string $cancel) {
+    $user = $this->createUser();
+    $this->passFirstFactor($user);
+
+    Auth::forgetGuards();
+    $this->delete(route($cancel));
+
+    Auth::forgetGuards();
+    $response = $this->get($this->sudoGatedPage());
+
+    expect($response->getStatusCode())->toBe(204);
+})->with([
+    'the challenge' => ['login.challenge.cancel'],
+    'enrollment' => ['login.enrollment.cancel'],
+]);
