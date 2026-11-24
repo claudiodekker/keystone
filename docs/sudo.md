@@ -15,7 +15,7 @@ Route::delete('account', DeleteAccountController::class)->middleware(['auth', 's
 
 A guest is turned away as `auth` turns one away, even on a route gated by `sudo` alone. A signed-in session passes while it holds a live sudo grant from the network the request comes from. Any other session is refused:
 
-- a browser is redirected to the sudo page, the route named `sudo`;
+- a browser is redirected to the sudo page, the route named `sudo`, with a `303` so a refused `DELETE` or `PUT` follows it as a `GET`;
 - a JSON request gets a `403` with `reason` set to `sudo`.
 
 ```json

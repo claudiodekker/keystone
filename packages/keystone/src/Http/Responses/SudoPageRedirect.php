@@ -30,6 +30,8 @@ class SudoPageRedirect implements SudoRequiredResponse
 
     /**
      * Send a browser to the sudo page, and tell a JSON client the request needs sudo.
+     *
+     * The redirect is a 303, so a refused DELETE follows it as a GET rather than ending sudo at the same URL.
      */
     public function toResponse(Request $request, SudoRequiredException $exception): Response
     {
@@ -40,6 +42,6 @@ class SudoPageRedirect implements SudoRequiredResponse
             ], 403);
         }
 
-        return $this->redirector->route(static::ROUTE);
+        return $this->redirector->route(static::ROUTE, status: 303);
     }
 }

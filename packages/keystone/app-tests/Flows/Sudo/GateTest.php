@@ -119,3 +119,12 @@ it("refuses a session without sudo before the route's bound record is looked up"
 
     $this->assertSudoRequired($response);
 });
+
+it('sends a refused DELETE on to the sudo page as a GET, so it never reaches the route that ends sudo', function () {
+    $user = $this->createUser();
+    $this->signInWithoutSudo($user);
+
+    $response = $this->delete($this->sudoGatedPage());
+
+    $this->assertSudoRequired($response);
+});

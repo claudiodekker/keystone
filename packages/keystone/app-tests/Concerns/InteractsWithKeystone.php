@@ -212,7 +212,7 @@ trait InteractsWithKeystone
     {
         $path = '/keystone/app-tests/sudo-gated';
 
-        Route::middleware(['web', 'auth', 'sudo'])->match(['get', 'post'], $path, fn () => response()->noContent());
+        Route::middleware(['web', 'auth', 'sudo'])->match(['get', 'post', 'delete'], $path, fn () => response()->noContent());
 
         return $path;
     }

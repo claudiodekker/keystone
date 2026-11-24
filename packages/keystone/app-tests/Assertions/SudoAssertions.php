@@ -11,10 +11,11 @@ use PHPUnit\Framework\Assert;
 trait SudoAssertions
 {
     /**
-     * Assert the response sent the user whose session holds no sudo to the sudo page.
+     * Assert the response sent the user whose session holds no sudo to the sudo page, as a GET whatever the refused request's method.
      */
     public function assertSudoRequired(TestResponse $response): void
     {
+        $response->assertStatus(303);
         $response->assertRedirectToRoute('sudo');
     }
 
