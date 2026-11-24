@@ -54,6 +54,8 @@ The stub routes serve it:
 
 A right answer at the last step grants sudo, gives the session a new id and sends the user on. A right first factor of an account that still owes its second factor grants nothing yet, gives the session a new id and returns to the page for the second step.
 
+`sudo.submit`, `sudo.end` and the stub `logout` route use Laravel's [session blocking](https://laravel.com/docs/session#session-blocking), so an answer, an end and a sign-out from the same session run one after the other. Without it, an answer that started before a sign-out finished would write the signed-in session back under its new id, and the browser would stay signed in. Session blocking needs a cache store with atomic locks, such as `database`, `redis` or `file`.
+
 A wrong answer returns to the page with "The provided credential is invalid." and records `sudo.failed`, which alerts the account's owner, from a browser the account knows too. Whoever answers holds the session, or a copy of it.
 
 Answers count against the [failed-attempt limit](configuration.md) in a `sudo` flow of their own, apart from sign-in's, so wrong passwords on the sign-in page never lock the owner out of sudo. A one-time code, such as a TOTP code, shares its count with the challenge, so a stolen session gets no fresh guesses at it.

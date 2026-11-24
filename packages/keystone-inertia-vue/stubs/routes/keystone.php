@@ -24,10 +24,10 @@ Route::prefix('login')->group(function () {
     });
 });
 
-Route::post('logout', [SignOutController::class, 'destroy'])->name('logout');
+Route::post('logout', [SignOutController::class, 'destroy'])->name('logout')->block();
 
 Route::prefix('sudo')->group(function () {
     Route::get('/', [SudoController::class, 'show'])->name('sudo');
-    Route::post('{type}', [SudoController::class, 'store'])->name('sudo.submit');
-    Route::delete('/', [SudoController::class, 'destroy'])->name('sudo.end');
+    Route::post('{type}', [SudoController::class, 'store'])->name('sudo.submit')->block();
+    Route::delete('/', [SudoController::class, 'destroy'])->name('sudo.end')->block();
 });
