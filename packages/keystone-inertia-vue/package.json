@@ -6,7 +6,7 @@
     "@inertiajs/vue3": "^3.11",
     "@laravel/vite-plugin-wayfinder": "^0.1",
     "@tailwindcss/vite": "^4.3",
-    "@vitejs/plugin-vue": "^6.0",
+    "@vitejs/plugin-vue": "^6.0.11",
     "laravel-vite-plugin": "^3.2",
     "tailwindcss": "^4.3",
     "typescript": "^6",
